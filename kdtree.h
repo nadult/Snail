@@ -34,7 +34,7 @@ public:
 class SlowKDTree
 {
 public:
-	enum { MaxLevel=30 };
+	enum { MaxLevel=60 };
 
 	SlowKDTree(const vector<Object> &objects);
 	void Draw(Image&,Vec3<float>,Vec3<float>,const Camera &cam,u32 node=0) const;
@@ -103,6 +103,9 @@ public:
 		nonCoherent+=local.nonCoherent;
 		breaking+=local.breaking;
 		notBreaking+=local.notBreaking;
+		intersectOk+=local.intersectOk;
+		intersectFail+=local.intersectFail;
+		skips+=local.skips;
 	}
 	void Init() {
 		memset(this,0,sizeof(KDStats));
@@ -113,20 +116,26 @@ public:
 	double BreakingPercentage() const {
 		return 100.0*breaking/double(breaking+notBreaking);
 	}
+	double IntersectFailPercentage() const {
+		return 100.0*intersectFail/double(intersectFail+intersectOk);
+	}
 	void PrintInfo(int resx,int resy,double cycles,double msRenderTime) {
 			double raysPerSec=double(tracedRays)*(1000.0/msRenderTime);
 			double nPixels=double(resx*resy);
 
-			printf("isct*4/pix:%.4f iter/pix:%.4f MCycles/frame:%.2f\tRays/sec:%.0f\tCoherency:%.2f%% br:%.2f%%\n",
-				double(colTests)/nPixels,double(iters)/nPixels,
-				cycles,raysPerSec,
-				CoherentPercentage(),BreakingPercentage());
+			printf("isct,iter:%.3f %.3f MCycles/frame:%.2f\tMRays/sec:%.2f\t"
+					"Coherency:%.2f%% br:%.2f%% fa:%.2f%% %d\n",
+					double(colTests)/nPixels,double(iters)/nPixels,
+				cycles,raysPerSec*0.000001,CoherentPercentage(),
+				BreakingPercentage(),IntersectFailPercentage(),skips);
 	}
 
 	u32 colTests,iters,runs,tracedRays;
 	u32 coherent,nonCoherent;
 
 	u32 breaking,notBreaking;
+	u32 intersectOk,intersectFail;
+	u32 skips;
 };
 
 class KDTree
@@ -141,13 +150,16 @@ public:
 	void FullTraverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output&) const;
 
 	template <class Output,class Vec,class base>
-	void Traverse(int packetId,const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output &out) const;
+	void Traverse(int packetId,const Vec &rOrigin,const Vec &rDir,const base &maxD,
+			const Output &out) const;
 
 	template <class Output,class Group>
-	void TraverseFast(int packetId,Group &group,const RaySelector<Group::size>&,const floatq &maxD,const Output &out) const;
+	void TraverseFast(int packetId,Group &group,const RaySelector<Group::size>&,const floatq &maxD,
+			const Output &out) const;
 
 	template <class Output,class Group>
-	void TraverseOptimized(int packetId,Group &group,const RaySelector<Group::size>&,const floatq &maxD,const Output &out) const;
+	void TraverseOptimized(int packetId,Group &group,const RaySelector<Group::size>&,const floatq &maxD,
+			const Output &out) const;
 
 	bool TestNode(Vec3f min,Vec3f max,int node) const;
 	bool Test() const;

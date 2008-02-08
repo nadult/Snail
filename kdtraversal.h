@@ -307,11 +307,13 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 					const Object &obj=objs[tid];
 					const bool fullInNode=obj.fullInNode;
 					
-					if(obj.lastVisit==packetId) continue;
+					if(obj.lastVisit==packetId) { localStats.skips++; continue; }
 					bool fullInside=1;
 
 					int nodeIdx=node-&nodes[0];
 					const SSEPVec3 &nodeMin=nodeMinMax[nodeIdx*2+0],&nodeMax=nodeMinMax[nodeIdx*2+1];
+
+					int anyPassed=0;
 
 					for(int i=0;i<sel.Num();i++) {
 						int q=sel[i];
@@ -321,6 +323,7 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 						SSEMask mask=(ret>Const<floatq,0>::Value()&&ret<out.dist[q]);
 						u32 msk=ForWhich(mask);
 
+						anyPassed+=msk;
 
 						SSEVec3 col=group.Origin(q)+group.Dir(q)*ret;
 						SSEMask insideMask=	col.X()>=nodeMin.X()&&col.X()<=nodeMax.X()&&
@@ -330,8 +333,8 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 						mask=mask&&insideMask; 
 						// Jakies promienie uderzyly w obiekt poza KD-nodem
 						if(msk^insideMsk) fullInside=0;
-						msk&=insideMsk;
 
+						msk&=insideMsk;
 
 						if(Output::objectIdsFlag) {
 							if(msk) for(int m=0;m<ScalarInfo<floatq>::Multiplicity;m++)
@@ -341,6 +344,9 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 						active[i]^=msk;
 						out.dist[q]=Condition(mask,ret,out.dist[q]);
 					}
+
+					if(!anyPassed) localStats.intersectOk++;
+					else localStats.intersectFail++;
 
 					if(fullInside) {
 						obj.lastVisit=packetId;

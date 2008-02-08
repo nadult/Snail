@@ -61,17 +61,21 @@ public:
 	Scene()
 		:tree(vector<Object>()),startTree(vector<Object>()),nLights(0)
 	{
-		objects.push_back(Sphere(Vec3f(-2,0,5)*5.0f,4.04f*5));
-		objects.push_back(Sphere(Vec3f(3,2,10)*5.0f,3*5));
-		objects.push_back(Sphere(Vec3f(0,0,-2.0)*5.0f,0.3f*5));
-		objects.push_back(Sphere(Vec3f(4.1,1.5f,5)*5.0f,1*5));
-		objects.push_back(Sphere(Vec3f(4.1,0.5f,-3.5f)*5.0f,1*5)); 
+//		objects.push_back(Sphere(Vec3f(-2,0,5)*5.0f,4.04f*5));
+//		objects.push_back(Sphere(Vec3f(3,2,10)*5.0f,3*5));
+//		objects.push_back(Sphere(Vec3f(0,0,-2.0)*5.0f,0.3f*5));
+//		objects.push_back(Sphere(Vec3f(4.1,1.5f,5)*5.0f,1*5));
+//		objects.push_back(Sphere(Vec3f(4.1,0.5f,-3.5f)*5.0f,1*5)); 
 
 		srand(1235);
-		for(int n=0;n<100;n++)
+
+	/*	for(int n=0;n<100;n++) {
+			Vec3f pos(FRand()*38.0f-20.0f,FRand()*38.0f-20.0f,FRand()*38.0f-20.0f); pos*=8.0f;
+			for(int n=0;n<50;n++)
 			objects.push_back(
-				Sphere(Vec3f(FRand()*38.0f-20.0f,FRand()*38.0f-20.0f,FRand()*38.0f-20.0f)*8.0f,
-							FRand()*15.50f));
+				Sphere(Vec3f(FRand()*7.80f-4.0f,FRand()*7.80f-4.0f,FRand()*7.80f-4.0f)+pos,
+							FRand()*1.50f));
+		} */
 
 	//	objects.push_back(Triangle(Vec3f(1000,-30,1000),Vec3f(1000,-30,-1000),Vec3f(-100,-30,1000)));
 	//	objects.push_back(Triangle(Vec3f(-1000,-30,1000),Vec3f(1000,-30,-1000),Vec3f(-100,-31,-1000)));
@@ -87,40 +91,12 @@ public:
 	//	objects.push_back(Triangle(Vec3f(0,10,0),Vec3f(10,0,0),Vec3f(10,0,5)));
 	//	objects.push_back(Triangle(Vec3f(0,10,0),Vec3f(-10,0,0),Vec3f(-10,0,-5)));
 
-	/*	{ // Ladowanie czachy
-			FILE *f=fopen("skull1.obj","rb");
-			vector<Vec3f> verts,normals,tex;
-			for(;!feof(f);) {
-				char buf[100];
-				fscanf(f,"%s",buf);
-				if(strcmp(buf,"v")==0) {
-					Vec3f vert;
-					fscanf(f,"%f %f %f",&vert.X(),&vert.Z(),&vert.Y());
-					vert=(vert-Vec3f(-120,200,-77));
-					verts.push_back(vert);
-				}
-				else if(strcmp(buf,"f")==0) {
-					static int q=0; q++;
-					if(q==1000) break;
-					int a,b,c;
-					fscanf(f,"%d %d %d",&a,&b,&c);
-					objects.push_back(Triangle(verts[a-1],verts[b-1],verts[c-1]));
-				}
-				else if(strcmp(buf,"end")==0)
-					break;
-				else { //if(strcmp(buf,"#")==0)
-					char c=0;
-					while(c!='\n') fread(&c,1,1,f);
-				}
-			}
-			fclose(f);
-		} */
-		
+	LoadModel("sponza.obj",objects,20.0f);
 
 	//	AddSoftLight(Vec3f(-10,20.0f,24.5f),Vec3f(800,505,505),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-30,-20,0),Vec3f(10,0,1020),Vec3f(40,40,40),1,1,1);
-		AddSoftLight(Vec3f(20,-20,40),Vec3f(100,1000,10),Vec3f(40,40,40),1,1,1);
-		AddLight(Vec3f(-2,-10,5),Vec3f(1000,1000,1000));
+	//	AddSoftLight(Vec3f(20,-20,40),Vec3f(100,1000,10),Vec3f(40,40,40),1,1,1);
+	//	AddLight(Vec3f(-2,-10,5),Vec3f(2000,2000,2000));
 		
 		startTree=SlowKDTree(objects);
 		tree=KDTree(startTree);
@@ -149,6 +125,16 @@ public:
 			lights[nLights++]=Light(pos+dens*Vec3f(x/float(dx)-0.5f,y/float(dy)-0.5f,z/float(dz)-0.5f),col);
 	}
 
+	template <class Vec,class Base>
+	Vec ShadeLight(const Vec &lightColor,const Base &dot,const Base &lightDistSq) const
+	{
+		Vec out;
+		Base mul=Inv(lightDistSq);
+		Base spec=dot*dot*dot;
+		out = ( lightColor *Vec(Const<Base,1>::Value(),Const<Base,1,2>::Value(),Const<Base,1,2>::Value())*dot+lightColor*spec)*mul;
+		return out;
+	}
+
 	template <class Vec,class Group>
 	void RayTrace(int packetId,Group &group,const RaySelector<Group::size> &startSelector,Vec *out,int maxRefl) const
 	{
@@ -170,7 +156,7 @@ public:
 
 		tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),group,sel,maxDist,NormalOutput(dst,objId));
 
-		Vec3q nrm[Group::size],colPos[Group::size],reflDir[Group::size];
+		Vec3q nrm[Group::size],colPos[Group::size],reflDir[Group::size],accLight[Group::size];
 		boolv tmask[Group::size];
 
 		for(int i=0;i<sel.Num();i++) {
@@ -192,10 +178,14 @@ public:
 				}
 			}
 
+			out[q]=Const<base,1>::Value();
+			out[q].X()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,50>::Value());
+			out[q].Y()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,200>::Value());
+			out[q].Z()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,1000>::Value());
 	//		Vec3q refl=Reflect(group.Dir(q),nrm[q]);
-	//		out[q].X()=Condition(refl.X()>Const<base,0>::Value(),Const<base,1,12>::Value());
-	//		out[q].Y()=Condition(refl.Y()>Const<base,0>::Value(),Const<base,1,12>::Value());
-	//		out[q].Z()=Condition(refl.Z()>Const<base,0>::Value(),Const<base,1,12>::Value());
+	//		out[q].X()=Condition(refl.X()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
+	//		out[q].Y()=Condition(refl.Y()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
+	//		out[q].Z()=Condition(refl.Z()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
 		}
 
 		for(int n=0;n<nLights;n++) {
@@ -229,18 +219,24 @@ public:
 //				boolv mask=Const<SSEMask,0>::Value();
 //				__m128i a=_mm_load_si128((__m128i*)(objId+q*4)),b=_mm_load_si128((__m128i*)(lightObjId+q*4));
 //				boolv mask=_mm_castsi128_ps(_mm_cmpeq_epi32(a,b));
+				base dot=nrm[q]|-fromLight[q]; {
+					boolv mask=dot<=Const<base,0>::Value();
+					if(ForAll(mask)) {
+						if(n==0) accLight[q]=Const<base,0>::Value();
+						continue;
+					}
+					dot=Condition(!mask,dot);
+				}
 
 				boolv mask=tDst[q]*tDst[q]<lightDistSq[q]*Const<SSEReal,999,1000>::Value();
 //				if(ForAll(mask)) // wszystkie punkty zasloniete
 //					continue;
 				
-				base dot=nrm[q]|-fromLight[q]; {
-					boolv mask=dot<=Const<base,0>::Value();
-					if(ForAll(mask)) continue;
-					dot=Condition(!mask,dot);
-				}
 
-				out[q]+=Condition(!mask,lightColor*dot*Inv(lightDistSq[q]));
+				Vec col=Condition(!mask,ShadeLight(lightColor,dot,lightDistSq[q]));
+
+				if(n==0) accLight[q]=col;
+				else accLight[q]+=col;
 			}
 		}
 
@@ -261,14 +257,18 @@ public:
 			}
 		}
 
-		for(int i=0;i<sel.Num();i++) {
+		if(nLights) for(int i=0;i<sel.Num();i++) {
+			int q=sel[i];
+			out[q]=Condition(!tmask[q],out[q]*accLight[q]);
+		}
+		else for(int i=0;i<sel.Num();i++) {
 			int q=sel[i];
 			out[q]=Condition(!tmask[q],out[q]);
 		}
 
 		ticks=Ticks()-ticks;
 
-	/*	for(int q=0;q<Group::size;q++) {
+		/*for(int q=0;q<Group::size;q++) {
 			out[q].X()=floatq(sqrt(float(ticks))*0.001f);
 			out[q].Y()=floatq(float(0));
 			out[q].Z()=floatq(float(0));
@@ -292,7 +292,7 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling)
 
 	float ratio=float(out.width)/float(out.height);
 
-	enum { QuadLevels=3,
+	enum { QuadLevels=0,
 			NQuads=1<<(QuadLevels*2), PWidth=2<<QuadLevels, PHeight=2<<QuadLevels };
 	bool grid=0;
 
@@ -407,14 +407,16 @@ int main(int argc, char **argv)
 		if(scene.tree.objects[n].fullInNode) full++;
 		else notFull++;
 	}
-	printf("KD Tree params:\nFull KDnode objects: %.2f%%\n\n",double(full)/double(full+notFull));
+	printf("KD Tree params:\nFull KDnode objects: %.2f%%\n\n",100.0*double(full)/double(full+notFull));
 
 	Image img(resx,resy);
 	Camera cam;
 	cam.plane_dist=0.5f;
 	//cam.pos=Vec3f(30,20,-75); 
-	cam.pos=Vec3f(20,-15,40); 
-	//Matrix<Vec4f> rotMat=RotateY(0.7f); cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
+	cam.pos=Vec3f(-60,-15,40); 
+	cam.pos=Vec3f(-286.897186,140.399719,-124.059662);
+
+//	Matrix<Vec4f> rotMat=RotateY(-102.7f); cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
 	cam.pos-=cam.front*200.0f;
 
 	if(nonInteractive) {
@@ -439,6 +441,10 @@ int main(int argc, char **argv)
 
 			if(out.TestKey(SDLK_r)) cam.pos-=cam.up*speed;
 			if(out.TestKey(SDLK_f)) cam.pos+=cam.up*speed;
+
+			if(out.TestKey(SDLK_p)) {
+				printf("Camera position: (%f ,  %f , %f)\n",cam.pos.x,cam.pos.y,cam.pos.z);
+			}
 
 			if(out.MouseDX()) {
 				Matrix<Vec4f> rotMat=RotateY(out.MouseDX()*0.002f);

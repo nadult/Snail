@@ -1,7 +1,8 @@
 ICCFLAGS=-openmp -inline-level=2 -inline-forceinline -fp-model fast -fp-speculationfast -shared-intel -lstdc++
-GCCFLAGS=--param inline-call-cost=1 -fopenmp -mfpmath=sse -l gomp
+GCCFLAGS=--param inline-call-cost=1 -fopenmp -mfpmath=sse
+#-pg -g
 FLAGS=$(GCCFLAGS) -O3 -msse3 -pthread -I /home/someone/rtracer/veclib
-CC=g++-4.2
+CC=g++
 #CC=icc
 
 all: rtracer
@@ -28,8 +29,11 @@ sdlout.o: sdlout.cpp rtracer.gch
 ray_generator.o: ray_generator.cpp rtracer.gch
 	$(CC) $(FLAGS) -c -o ray_generator.o ray_generator.cpp
 
-rtracer: rtracer.o image.o kdtree.o sdlout.o ray_generator.o rtracer.gch
-	$(CC) $(FLAGS) `sdl-config --static-libs` -o rtracer rtracer.o image.o kdtree.o sdlout.o ray_generator.o
+model.o: model.cpp rtracer.gch
+	$(CC) $(FLAGS) -c -o model.o model.cpp
+
+rtracer: rtracer.o image.o kdtree.o sdlout.o ray_generator.o model.o rtracer.gch
+	$(CC) $(FLAGS) `sdl-config --static-libs` -o rtracer rtracer.o image.o kdtree.o sdlout.o ray_generator.o model.o
 
 clean:
 	rm rtracer *.o *.gch

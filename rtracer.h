@@ -122,17 +122,20 @@ typename Vec::TScalar Triangle::Collide(const VecO &rOrig,const Vec &rDir) const
 
 	base dist=-((rOrig-a)|nrm)/(rDir|nrm);
 	base out=Const<base,-1>::Value();
-	
+
 	Bool test=dist>Const<base,1,1000>::Value();
 	if(ForAny(test)) {
 		Vec H=Vec(rOrig)+rDir*dist;
 
-		test=test&&(Vec(edgeNrm[0])|(H-a))<Const<base,0>::Value();
-		if(ForAny(test)) {
-			test=test&&(Vec(edgeNrm[1])|(H-b))<Const<base,0>::Value();
-			if(ForAny(test))
-				test=test&&(Vec(edgeNrm[2])|(H-c))<Const<base,0>::Value();
-		}		
+		test.m=(_mm_and_ps(
+			_mm_and_ps(	(Vec(edgeNrm[0])|(H-a)).m,
+						(Vec(edgeNrm[1])|(H-b)).m),
+						(Vec(edgeNrm[2])|(H-c)).m)<Const<base,0>::Value()).m;
+
+
+		/*test=test&&(Vec(edgeNrm[0])|(H-a))<Const<base,0>::Value();
+		test=test&&(Vec(edgeNrm[1])|(H-b))<Const<base,0>::Value();
+		test=test&&(Vec(edgeNrm[2])|(H-c))<Const<base,0>::Value();*/
 		
 		out=Condition(test,dist,out);
 	}
@@ -237,6 +240,8 @@ public:
 			return tris[id].Collide(rOrig,rDir);
 		}
 	}
+//	template <class Vec0,class Vec>
+//		INLINE typename bool Collide(
 	template <class Vec>
 	INLINE Vec Normal(const Vec &colPos) const {
 		Vec out;
@@ -260,6 +265,8 @@ public:
 		return bounds[id*2+1];
 	}
 };
+
+void LoadModel(const char *fileName,vector<Object> &out,float scale);
 
 
 class Material

@@ -29,19 +29,18 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 }
 
 
-class Segment
+/* Possible split position */
+class PSplit
 {
 public:
-	Segment(float b,float e,u32 i=0)
-		:begin(b),end(e),id(i) { }
+	PSplit(float p,bool s)
+		:pos(p),start(s) { }
 
-	bool operator<(const Segment& s) const
-		{ return begin<s.begin; }
+	bool operator<(const PSplit& s) const
+		{ return pos<s.pos; }
 
-	float Length() const { return end-begin; }
-
-	float begin,end;
-	u32 id;
+	float pos;
+	bool start;
 };
 
 
@@ -61,62 +60,91 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 		vector<u32> &objs=node.objects;
 
 		// Szukanie najwiêkszego wolnego obszaru w poszczególnych wymiarach
-		vector<Segment> segs[3];
-		for(int n=0;n<3;n++) segs[n].reserve(objs.size());
+		vector<PSplit> splits[3];
+		for(int n=0;n<3;n++) splits[n].reserve(objs.size()*2);
 		for(int n=0;n<objs.size();n++) {
 			Object &obj=objects[objs[n]];
 			Vec3f min,max;
 			Convert(obj.BoundMin(),min);
 			Convert(obj.BoundMax(),max);
 
-			segs[0].push_back(Segment(min.X(),max.X()));
-			segs[1].push_back(Segment(min.Y(),max.Y()));
-			segs[2].push_back(Segment(min.Z(),max.Z()));
+			splits[0].push_back(PSplit(min.X(),1));
+			splits[1].push_back(PSplit(min.Y(),1));
+			splits[2].push_back(PSplit(min.Z(),1));
+			splits[0].push_back(PSplit(max.X(),0));
+			splits[1].push_back(PSplit(max.Y(),0));
+			splits[2].push_back(PSplit(max.Z(),0));
 		}
 		
-		for(int n=0;n<3;n++) std::sort(segs[n].begin(),segs[n].end());
-
-		const double travCost=0.1;
+		const double travCost=0.14;
 		const double hitTestCost=1.0;
+		double noSplitCost=hitTestCost*objs.size();
 
 		double minCost[3],dividers[3];
 		double sub[3]={tMin.x,tMin.y,tMin.z},mul[3]={1.0/(tMax.x-tMin.x),1.0/(tMax.y-tMin.y),1.0/(tMax.z-tMin.z)};
 
 		double nodeSize[3]={tMax.x-tMin.x,tMax.y-tMin.y,tMax.z-tMin.z};
-		double voxelsSum=objs.size(),iNodeSize=1.0/(nodeSize[0]*nodeSize[1]+nodeSize[0]*nodeSize[2]+nodeSize[1]*nodeSize[2]);
+		double iNodeSize=1.0/(nodeSize[0]*nodeSize[1]+nodeSize[0]*nodeSize[2]+nodeSize[1]*nodeSize[2]);
+//		double longestSeg[3]={0,},longestSegP[3];
 
 #pragma omp parallel for
 		for(int s=0;s<3;s++) {
-			vector<Segment> &seg=segs[s];
-			double voxels=0; minCost[s]=-1;
+			vector<PSplit> &split=splits[s];
+			std::sort(split.begin(),split.end());
+			minCost[s]=noSplitCost+1.0;
+
 			double tNodeSize[3]={nodeSize[0],nodeSize[1],nodeSize[2]};
+			double voxelsLeft=0,voxelsRight=objs.size();
+		
+/*			if(split[0].pos-sub[s]>0) {
+				longestSeg[s]=split[0].pos-sub[s];
+				longestSegP[s]=split[0].pos;
+			}
+			int opened=0;*/
 
-			for(double posInNode=0;posInNode<1.0;posInNode+=0.001) {
-				double pos=sub[s]+posInNode*nodeSize[s];
+			for(int ks=0;ks<split.size();ks++) {
+				double pos=split[ks].pos;
+				if(!split[ks].start) { voxelsRight--; /*opened--;*/ }
+				double posInNode=(pos-sub[s])*mul[s];
 
-				double voxelsLeft=seg.size(),voxelsRight=seg.size();
-				for(int n=0;n<seg.size();n++)
-					if(seg[n].begin>=pos) { voxelsLeft=n; break; }
-				for(int n=seg.size()-1;n>=0;n--)
-					if(seg[n].end<=pos) { voxelsRight=seg.size()-n-1; break; }
-				
-				tNodeSize[s]=nodeSize[s]*posInNode;
-				double leftSize=tNodeSize[0]*tNodeSize[1]+tNodeSize[0]*tNodeSize[2]+tNodeSize[1]*tNodeSize[2];
-				tNodeSize[s]=nodeSize[s]*(1.0-posInNode);
-				double rightSize=tNodeSize[0]*tNodeSize[1]+tNodeSize[0]*tNodeSize[2]+tNodeSize[1]*tNodeSize[2];
+				if(posInNode>0.0&&posInNode<1.0) {
+					tNodeSize[s]=nodeSize[s]*posInNode;
+					double leftSize= (tNodeSize[0]*tNodeSize[1]+tNodeSize[0]*tNodeSize[2]+tNodeSize[1]*tNodeSize[2])*iNodeSize;
+					tNodeSize[s]=nodeSize[s]*(1.0-posInNode);
+					double rightSize=(tNodeSize[0]*tNodeSize[1]+tNodeSize[0]*tNodeSize[2]+tNodeSize[1]*tNodeSize[2])*iNodeSize;
 
-				double splitCost = travCost+hitTestCost*(leftSize*voxelsLeft+rightSize*voxelsRight)*iNodeSize;
+					double splitCost=travCost+hitTestCost*(leftSize*voxelsLeft+rightSize*voxelsRight);
 
-				if(splitCost<minCost[s]||minCost[s]<0) {
-					minCost[s]=splitCost;
-					dividers[s]=pos;
+					if(splitCost<minCost[s]) {
+						minCost[s]=splitCost;
+						dividers[s]=pos;
+					}
 				}
+
+				if(split[ks].start) { voxelsLeft++; /*opened++;*/ }
+		/*		if(opened==0&&ks+1<split.size()) {
+					double seg=split[ks+1].pos-split[ks].pos;
+					if(seg>longestSeg[s]) {
+						longestSeg[s]=seg;
+						longestSegP[s]=ks>0?split[ks].pos:split[ks+1].pos;
+					}
+				}*/
 			}
 		}
 
+		/*
+		for(int s=0;s<3;s++) {
+			double nodeSize=(&(tMax-tMin).x)[s];
+			if(longestSeg[s]>nodeSize*0.1) {
+				dividers[s]=longestSegP[s];
+				minCost[s]=1.0-longestSeg[s]/nodeSize;
+				//printf("%f\n",minCost[s]);
+			}
+		}*/
+
 		axis=minCost[0]<minCost[2]?0:2;
 		if(minCost[1]<minCost[axis]) axis=1;
-		if(hitTestCost*objs.size()<minCost[axis]) {
+		if(noSplitCost<minCost[axis]) {
 			nodes[idx].pMin=tMin;
 			nodes[idx].pMax=tMax;
 			return;
