@@ -58,7 +58,7 @@ int PacketIdGenerator::base[256];
 class Scene
 {
 public:
-	Scene()
+	Scene(const char *modelFile)
 		:tree(vector<Object>()),startTree(vector<Object>()),nLights(0)
 	{
 //		objects.push_back(Sphere(Vec3f(-2,0,5)*5.0f,4.04f*5));
@@ -69,13 +69,13 @@ public:
 
 		srand(1235);
 
-	/*	for(int n=0;n<100;n++) {
-			Vec3f pos(FRand()*38.0f-20.0f,FRand()*38.0f-20.0f,FRand()*38.0f-20.0f); pos*=8.0f;
-			for(int n=0;n<50;n++)
-			objects.push_back(
-				Sphere(Vec3f(FRand()*7.80f-4.0f,FRand()*7.80f-4.0f,FRand()*7.80f-4.0f)+pos,
-							FRand()*1.50f));
-		} */
+//		for(int n=0;n<200;n++) {
+//			Vec3f pos(FRand()*38.0f-20.0f,FRand()*38.0f-20.0f,FRand()*38.0f-20.0f); pos*=8.0f;
+//			for(int n=0;n<50;n++)
+//			objects.push_back(
+//				Sphere(Vec3f(FRand()*7.80f-4.0f,FRand()*7.80f-4.0f,FRand()*7.80f-4.0f)+pos,
+//							FRand()*1.50f));
+//		}
 
 	//	objects.push_back(Triangle(Vec3f(1000,-30,1000),Vec3f(1000,-30,-1000),Vec3f(-100,-30,1000)));
 	//	objects.push_back(Triangle(Vec3f(-1000,-30,1000),Vec3f(1000,-30,-1000),Vec3f(-100,-31,-1000)));
@@ -91,12 +91,12 @@ public:
 	//	objects.push_back(Triangle(Vec3f(0,10,0),Vec3f(10,0,0),Vec3f(10,0,5)));
 	//	objects.push_back(Triangle(Vec3f(0,10,0),Vec3f(-10,0,0),Vec3f(-10,0,-5)));
 
-	LoadModel("sponza.obj",objects,20.0f);
+	LoadWavefrontObj(modelFile,objects,20.0f);
 
-	//	AddSoftLight(Vec3f(-10,20.0f,24.5f),Vec3f(800,505,505),Vec3f(40,40,40),1,1,1);
+	//	AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-30,-20,0),Vec3f(10,0,1020),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(20,-20,40),Vec3f(100,1000,10),Vec3f(40,40,40),1,1,1);
-	//	AddLight(Vec3f(-2,-10,5),Vec3f(2000,2000,2000));
+//		AddLight(Vec3f(5.696046,-12.600281,0.779701),Vec3f(500,500,500));
 		
 		startTree=SlowKDTree(objects);
 		tree=KDTree(startTree);
@@ -129,14 +129,18 @@ public:
 	Vec ShadeLight(const Vec &lightColor,const Base &dot,const Base &lightDistSq) const
 	{
 		Vec out;
-		Base mul=Inv(lightDistSq);
-		Base spec=dot*dot*dot;
-		out = ( lightColor *Vec(Const<Base,1>::Value(),Const<Base,1,2>::Value(),Const<Base,1,2>::Value())*dot+lightColor*spec)*mul;
+		Base mul=RSqrt(lightDistSq);
+//		Base spec=dot*dot*dot;
+		out = ( 
+				 lightColor*dot
+//				+lightColor*spec
+				)*mul;
 		return out;
 	}
 
 	template <class Vec,class Group>
-	void RayTrace(int packetId,Group &group,const RaySelector<Group::size> &startSelector,Vec *out,int maxRefl) const
+	void RayTrace(int packetId,Group &group,const RaySelector<Group::size> &startSelector,Vec *out,int maxRefl
+			,bool rdtscShader,bool noncoh) const
 	{
 		typedef typename Vec::TScalar base;
 		typedef typename Vec::TBool boolv;
@@ -154,7 +158,10 @@ public:
 		const base maxDist=Const<base,10000>::Value();
 		base dst[Group::size];
 
-		tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),group,sel,maxDist,NormalOutput(dst,objId));
+		int nColTests;
+		KDStats stats=tree.stats;
+		tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),group,sel,maxDist,NormalOutput(dst,objId),noncoh);
+		nColTests=tree.stats.colTests-stats.colTests;
 
 		Vec3q nrm[Group::size],colPos[Group::size],reflDir[Group::size],accLight[Group::size];
 		boolv tmask[Group::size];
@@ -178,14 +185,15 @@ public:
 				}
 			}
 
-			out[q]=Const<base,1>::Value();
-			out[q].X()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,50>::Value());
-			out[q].Y()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,200>::Value());
-			out[q].Z()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,1000>::Value());
-	//		Vec3q refl=Reflect(group.Dir(q),nrm[q]);
-	//		out[q].X()=Condition(refl.X()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
-	//		out[q].Y()=Condition(refl.Y()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
-	//		out[q].Z()=Condition(refl.Z()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
+	//		out[q]=Const<base,1>::Value();
+	//		out[q].X()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,50>::Value());
+	//		out[q].Y()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,200>::Value());
+	//		out[q].Z()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,1000>::Value());
+//			Vec3q refl=Reflect(group.Dir(q),nrm[q]);
+//			out[q].X()=Condition(refl.X()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
+//			out[q].Y()=Condition(refl.Y()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
+//			out[q].Z()=Condition(refl.Z()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
+			out[q]=nrm[q];
 		}
 
 		for(int n=0;n<nLights;n++) {
@@ -207,10 +215,10 @@ public:
 
 			base tDst[Group::size];
 			//__declspec(align(16))
-			u32 lightObjId[ScalarInfo<base>::Multiplicity*Group::size] __attribute__((aligned(16))); {
-				RayGroup<Group::recLevel,1> tGroup(fromLight,&lightPos);
-				tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),tGroup,sel,maxDist,ShadowOutput(tDst));
-			}
+//			u32 lightObjId[ScalarInfo<base>::Multiplicity*Group::size] __attribute__((aligned(16))); {
+//				RayGroup<Group::recLevel,1> tGroup(fromLight,&lightPos);
+//				tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),tGroup,sel,maxDist,ShadowOutput(tDst));
+//			}
 
 			Vec lightColor=light.color;
 
@@ -228,12 +236,13 @@ public:
 					dot=Condition(!mask,dot);
 				}
 
-				boolv mask=tDst[q]*tDst[q]<lightDistSq[q]*Const<SSEReal,999,1000>::Value();
+//				boolv mask=tDst[q]*tDst[q]<lightDistSq[q]*Const<SSEReal,999,1000>::Value();
 //				if(ForAll(mask)) // wszystkie punkty zasloniete
 //					continue;
 				
 
-				Vec col=Condition(!mask,ShadeLight(lightColor,dot,lightDistSq[q]));
+				Vec col=(//Condition(!mask,
+						ShadeLight(lightColor,dot,lightDistSq[q]));
 
 				if(n==0) accLight[q]=col;
 				else accLight[q]+=col;
@@ -249,7 +258,7 @@ public:
 			}
 
 			RayGroup<Group::recLevel,0> tGroup(reflDir,colPos);
-			RayTrace(PacketIdGenerator::Gen(packetId),tGroup,sel,reflColor,maxRefl-1);
+			RayTrace(PacketIdGenerator::Gen(packetId),tGroup,sel,reflColor,maxRefl-1,0,0);
 
 			for(int i=0;i<sel.Num();i++) {
 				int q=sel.Idx(i);
@@ -268,11 +277,11 @@ public:
 
 		ticks=Ticks()-ticks;
 
-		/*for(int q=0;q<Group::size;q++) {
+		if(rdtscShader) for(int q=0;q<Group::size;q++) {
 			out[q].X()=floatq(sqrt(float(ticks))*0.001f);
 			out[q].Y()=floatq(float(0));
-			out[q].Z()=floatq(float(0));
-		}*/
+			out[q].Z()=floatq(float(nColTests)*0.005f);
+		}
 	}
 
 	vector<Object> objects;
@@ -286,13 +295,13 @@ public:
 
 double ticks=0,lastTicks=0,iters=0;
 
-void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling)
+void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling,bool reflections,bool rdtscShader)
 {
 	unsigned long long tick=Ticks();
 
 	float ratio=float(out.width)/float(out.height);
 
-	enum { QuadLevels=0,
+	enum { QuadLevels=1,
 			NQuads=1<<(QuadLevels*2), PWidth=2<<QuadLevels, PHeight=2<<QuadLevels };
 	bool grid=0;
 
@@ -329,7 +338,7 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling)
 			RayGroup<QuadLevels,1> group(dir,&orig);
 
 			Vec3q rgb[NQuads];
-			scene.RayTrace(PacketIdGenerator::Gen(),group,allSelector,rgb,0);
+			scene.RayTrace(PacketIdGenerator::Gen(),group,allSelector,rgb,reflections?1:0,rdtscShader,0);
 
 			rayGen.Decompose(rgb,rgb);
 			Vec3f trgb[PWidth*PHeight];
@@ -385,53 +394,58 @@ int main(int argc, char **argv)
 	float speed=0.5f;
 #else*/
 	int resx=512,resy=512;
-	float speed=0.7f;
+	float speed=2.0f;
 //#endif
 	
 	bool fullscreen=0,nonInteractive=0;
 	int threads=omp_get_num_procs()*8;
+	const char *modelFile="lancia.obj";
 
 	if(argc>2) { resx=atoi(argv[1]); resy=atoi(argv[2]); }
 	if(argc>3) { fullscreen=atoi(argv[3])==1; if(atoi(argv[3])>=2) nonInteractive=1; }
 	if(argc>4) threads=atoi(argv[4]);
+	if(argc>5) modelFile=argv[5];
 
 	omp_set_num_threads(threads);
 	printf("Threads/cores: %d/%d\n",omp_get_max_threads(),omp_get_num_procs());
 
-	Scene scene;
-	if(!scene.tree.Test())
-		return 0;
+	int bticks=SDL_GetTicks();
+	Scene scene(modelFile);
+	if(!scene.tree.Test()) return 0;
+	bticks=SDL_GetTicks()-bticks;
+	printf("KD Tree build time: %.2f sec\n",double(bticks)*0.001);
 
 	int full=0,notFull=0;
 	for(int n=0;n<scene.tree.objects.size();n++) {
 		if(scene.tree.objects[n].fullInNode) full++;
 		else notFull++;
 	}
-	printf("KD Tree params:\nFull KDnode objects: %.2f%%\n\n",100.0*double(full)/double(full+notFull));
+	printf("Objects %d:\nFull KDnode objects: %.2f%%\n\n",full+notFull,100.0*double(full)/double(full+notFull));
 
 	Image img(resx,resy);
 	Camera cam;
 	cam.plane_dist=0.5f;
-	//cam.pos=Vec3f(30,20,-75); 
-	cam.pos=Vec3f(-60,-15,40); 
-	cam.pos=Vec3f(-286.897186,140.399719,-124.059662);
+	cam.pos=Vec3f(52.423584,158.399719,51.276756);
+	cam.front=Vec3f(0.999916,0.000000,-0.013203);
+	cam.right=Vec3f(-0.013203,0.000000,-0.999916);
+
 
 //	Matrix<Vec4f> rotMat=RotateY(-102.7f); cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
-	cam.pos-=cam.front*200.0f;
 
 	if(nonInteractive) {
-		for(int n=atoi(argv[3]);n>=0;n--) GenImage(scene,cam,img,0);
+		for(int n=atoi(argv[3]);n>=0;n--) GenImage(scene,cam,img,0,1,0);
 		img.SaveToFile("output.tga");
 	}
 	else {
 		SDLOutput out(resx,resy,fullscreen);
-		bool showTree=0,pixelDoubling=0;
+		bool showTree=0,pixelDoubling=0,refls=0,rdtscSh=0;
 
 		while(out.PollEvents()) {
 			if(out.TestKey(SDLK_ESCAPE)) break;
-			if(out.TestKey(SDLK_p)) img.SaveToFile("output.tga");
-			if(out.TestKey(SDLK_t)) showTree^=1;
-			if(out.TestKey(SDLK_o)) pixelDoubling^=1;
+			if(out.TestKey(SDLK_k)) img.SaveToFile("output.tga");
+			if(out.TestKey(SDLK_p)) pixelDoubling^=1;
+			if(out.TestKey(SDLK_o)) refls^=1;
+			if(out.TestKey(SDLK_i)) rdtscSh^=1;
 
 			if(out.TestKey(SDLK_w)) cam.pos+=cam.front*speed;
 			if(out.TestKey(SDLK_s)) cam.pos-=cam.front*speed;
@@ -443,28 +457,34 @@ int main(int argc, char **argv)
 			if(out.TestKey(SDLK_f)) cam.pos+=cam.up*speed;
 
 			if(out.TestKey(SDLK_p)) {
-				printf("Camera position: (%f ,  %f , %f)\n",cam.pos.x,cam.pos.y,cam.pos.z);
+				printf("cam.pos=Vec3f(%f,%f,%f);\ncam.front=Vec3f(%f,%f,%f);\ncam.right=Vec3f(%f,%f,%f);\n",
+						cam.pos.x,cam.pos.y,cam.pos.z,cam.front.x,cam.front.y,cam.front.z,
+						cam.right.x,cam.right.y,cam.right.z);
 			}
 
-			if(out.MouseDX()) {
-				Matrix<Vec4f> rotMat=RotateY(out.MouseDX()*0.002f);
-				cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
+			{
+				int dx=out.MouseDX();
+				if(out.TestKey(SDLK_n)) dx-=20;
+				if(out.TestKey(SDLK_m)) dx+=20;
+				if(dx) {
+					Matrix<Vec4f> rotMat=RotateY(dx*0.003f);
+					cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
+				}
+				//if(out.MouseDY()) {
+				//	Matrix<Vec4f> rotMat(Quat(AxisAngle(cam.right,-out.MouseDY()*0.002f)));
+				//	cam.up=rotMat*cam.up; cam.front=rotMat*cam.front;
+				//}
 			}
-			//if(out.MouseDY()) {
-			//	Matrix<Vec4f> rotMat(Quat(AxisAngle(cam.right,-out.MouseDY()*0.002f)));
-			//	cam.up=rotMat*cam.up; cam.front=rotMat*cam.front;
-			//}
 			
 			scene.tree.stats.Init();
 			int ticks=SDL_GetTicks();
-			GenImage(scene,cam,img,pixelDoubling);
+			GenImage(scene,cam,img,pixelDoubling,refls,rdtscSh);
 			ticks=SDL_GetTicks()-ticks;
 
 			scene.tree.stats.PrintInfo(resx,resy,lastTicks,ticks);
 
 			Vec3f a,b; Convert(scene.tree.pMin,a); Convert(scene.tree.pMax,b);
-			if(showTree) scene.startTree.Draw(img,a,b,cam);
-			scene.Animate();
+		//	scene.Animate();
 			out.Render(img);
 		}
 	}

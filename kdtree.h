@@ -22,9 +22,10 @@ class SlowKDNode
 {
 public:
 	SlowKDNode() :type(T_LEAF) { }
+	SlowKDNode(int ax,float p,u32 c) :type((Type)ax),pos(p),child(c) { }
+
 	enum Type { T_X=0, T_Y=1, T_Z=2, T_LEAF=3 } type;
 
-	bool notEmpty;
 	float pos;
 	u32 child; // left: child+0    right: child+1
 	vector<u32> objects;
@@ -34,7 +35,7 @@ public:
 class SlowKDTree
 {
 public:
-	enum { MaxLevel=60 };
+	enum { MaxLevel=40 };
 
 	SlowKDTree(const vector<Object> &objects);
 	void Draw(Image&,Vec3<float>,Vec3<float>,const Camera &cam,u32 node=0) const;
@@ -159,7 +160,7 @@ public:
 
 	template <class Output,class Group>
 	void TraverseOptimized(int packetId,Group &group,const RaySelector<Group::size>&,const floatq &maxD,
-			const Output &out) const;
+			const Output &out,bool noncoh) const;
 
 	bool TestNode(Vec3f min,Vec3f max,int node) const;
 	bool Test() const;

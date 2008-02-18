@@ -26,15 +26,16 @@ SDLOutput::SDLOutput(int w, int h,bool full)
 		throw Exception("Error while setting video mode");
     }
 	memset(keybuf,0,256);
-	SDL_ShowCursor(0);
-	SDL_WM_GrabInput(SDL_GRAB_ON);
+//	SDL_ShowCursor(0);
+//	SDL_WM_GrabInput(SDL_GRAB_ON);
 	initiated=1;
 }
 
 SDLOutput::~SDLOutput()
 {
 	initiated=0;
-	SDL_ShowCursor(1); SDL_Quit();
+//	SDL_ShowCursor(1);
+	SDL_Quit();
 }
 
 void SDLOutput::Render(const Image &img)

@@ -92,12 +92,10 @@ public:
 		nrm=(b-a)^(c-a);
 		nrm*=RSqrt(nrm|nrm);
 		dist=Vec3q(nrm)|a;
-		edgeNrm[0]=(b-a)^nrm;
-		edgeNrm[1]=(c-b)^nrm;
-		edgeNrm[2]=(a-c)^nrm;
+		e1=(b-a); e2=(c-a);
+		e1ce2=e1^e2;
 	}
-	Vec3p a,b,c;
-	Vec3p edgeNrm[3];
+	Vec3p a,b,c,e1,e2,e1ce2;
 	Vec3p nrm;
 	floatq dist;
 };
@@ -120,57 +118,19 @@ typename Vec::TScalar Triangle::Collide(const VecO &rOrig,const Vec &rDir) const
 	typedef typename Vec::TScalar base;
 	typedef typename Vec::TBool Bool;
 
-	base dist=-((rOrig-a)|nrm)/(rDir|nrm);
 	base out=Const<base,-1>::Value();
 
-	Bool test=dist>Const<base,1,1000>::Value();
-	if(ForAny(test)) {
-		Vec H=Vec(rOrig)+rDir*dist;
-
-		test.m=(_mm_and_ps(
-			_mm_and_ps(	(Vec(edgeNrm[0])|(H-a)).m,
-						(Vec(edgeNrm[1])|(H-b)).m),
-						(Vec(edgeNrm[2])|(H-c)).m)<Const<base,0>::Value()).m;
-
-
-		/*test=test&&(Vec(edgeNrm[0])|(H-a))<Const<base,0>::Value();
-		test=test&&(Vec(edgeNrm[1])|(H-b))<Const<base,0>::Value();
-		test=test&&(Vec(edgeNrm[2])|(H-c))<Const<base,0>::Value();*/
-		
+	base det = rDir|e1ce2;
+	VecO tvec = rOrig-VecO(a);
+	base u = rDir|(VecO(e1)^tvec);
+	base v = rDir|(tvec^VecO(e2));
+	Bool test=Min(u,v)>=Const<base,0>::Value()&&u+v<=det;
+	if (ForAny(test)) {
+		base dist=-(tvec|nrm)/(rDir|nrm);
 		out=Condition(test,dist,out);
 	}
 
 	return out;
-/*
-	Vec3p eb=c-a,ec=b-a;
-	Vec3p anrm=Abs(nrm);
-	Vec H=rOrig+rDir*dist;
-
-	int k;
-	if (ForAny(anrm.X()>anrm.Y()))
-		if (ForAny(anrm.X()>anrm.Z())) k=0; else k=2;
-	else
-		if (ForAny(anrm.Y()>anrm.Z())) k=1; else k=2;
-	base beta,gamma;
-
-	switch(k) {
-	case 0:
-		beta=(eb.Y() * H.Z() - eb.Z() * H.Y()) / (eb.Y() * ec.Z() - eb.Z() * ec.Y());
-		gamma=(ec.Z() * H.Y() - ec.Y() * H.Z()) / (eb.Y() * ec.Z() - eb.Z() * ec.Y());
-		break;
-	case 1:
-		beta=(eb.Z() * H.X() - eb.X() * H.Z()) / (eb.Z() * ec.X() - eb.X() * ec.Z());
-		gamma=(ec.X() * H.Z() - ec.Z() * H.X()) / (eb.Z() * ec.X() - eb.X() * ec.Z());
-		break;
-	case 2:
-		beta=(eb.X() * H.Y() - eb.Y() * H.X()) / (eb.X() * ec.Y() - eb.Y() * ec.X());
-		gamma=(ec.Y() * H.X() - ec.X() * H.Y()) / (eb.X() * ec.Y() - eb.Y() * ec.X());
-		break;
-	}
-
-	return Condition(dist>ConstEpsilon<base>::Value()&&beta>=Const<base,0>::Value()&&
-					gamma>=Const<base,0>::Value()&&beta+gamma<=Const<base,1>::Value(),
-					dist,Const<base,-1>::Value());*/
 }
 
 /*
@@ -192,7 +152,7 @@ public:
 class Object
 {
 public:
-	enum { MaxObjs=100000 };
+	enum { MaxObjs=1000000 };
 
 	static Triangle tris[MaxObjs];
 	static Sphere spheres[MaxObjs];
@@ -233,28 +193,29 @@ public:
 
 	template <class VecO,class Vec>
 	INLINE typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const {
-		switch(type) {
-		case T_SPHERE:
-			return spheres[id].Collide(rOrig,rDir);
-		case T_TRIANGLE:
+//		switch(type) {
+//		case T_SPHERE:
+//			return spheres[id].Collide(rOrig,rDir);
+//		case T_TRIANGLE:
 			return tris[id].Collide(rOrig,rDir);
-		}
+//		}
 	}
 //	template <class Vec0,class Vec>
 //		INLINE typename bool Collide(
 	template <class Vec>
 	INLINE Vec Normal(const Vec &colPos) const {
 		Vec out;
-		switch(type) {
-		case T_SPHERE: {
-			Vec sPos(spheres[id].pos);
-			Vec surfNormal=colPos-sPos;
-			surfNormal*=RSqrt(surfNormal|surfNormal);
-			out=surfNormal;
-			break; }
-		case T_TRIANGLE: {
-			out=Vec(tris[id].nrm); }
-		}
+//		switch(type) {
+//		case T_SPHERE: {
+//			Vec sPos(spheres[id].pos);
+//			Vec surfNormal=colPos-sPos;
+//			surfNormal*=RSqrt(surfNormal|surfNormal);
+//			out=surfNormal;
+//			break; }
+//		case T_TRIANGLE:
+			out=Vec(tris[id].nrm);
+//			break;
+//		}
 		return out;
 	}
 
@@ -266,8 +227,9 @@ public:
 	}
 };
 
-void LoadModel(const char *fileName,vector<Object> &out,float scale);
 
+void LoadWavefrontObj(const char *fileName,vector<Object> &out,float scale);
+void LoadRaw(const char *fileName,vector<Object> &out,float scale);
 
 class Material
 {
@@ -326,3 +288,4 @@ public:
 #include "kdtree.h"
 
 #endif
+

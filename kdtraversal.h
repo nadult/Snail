@@ -301,6 +301,13 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 			if(node->NumObjects()) {
 
 				const u32 *oid=objIds+node->FirstObject();
+				
+				SSEPVec3 nodeMin,nodeMax; {
+					int nodeIdx=node-&nodes[0];
+					SSEPVec3 nodeEps(Const<floatq,1,1000>::Value().m);
+					nodeMin=nodeMinMax[nodeIdx*2+0]-nodeEps;
+					nodeMax=nodeMinMax[nodeIdx*2+1]+nodeEps;
+				}
 
 				for(int n=node->NumObjects();n>0;n--) {
 					int tid=*oid++;
@@ -309,9 +316,6 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 					
 					if(obj.lastVisit==packetId) { localStats.skips++; continue; }
 					bool fullInside=1;
-
-					int nodeIdx=node-&nodes[0];
-					const SSEPVec3 &nodeMin=nodeMinMax[nodeIdx*2+0],&nodeMax=nodeMinMax[nodeIdx*2+1];
 
 					int anyPassed=0;
 
@@ -325,16 +329,17 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 
 						anyPassed+=msk;
 
-						SSEVec3 col=group.Origin(q)+group.Dir(q)*ret;
-						SSEMask insideMask=	col.X()>=nodeMin.X()&&col.X()<=nodeMax.X()&&
-											col.Y()>=nodeMin.Y()&&col.Y()<=nodeMax.Y()&&	
-											col.Z()>=nodeMin.Z()&&col.Z()<=nodeMax.Z();
-						u32 insideMsk=ForWhich(insideMask);
-						mask=mask&&insideMask; 
-						// Jakies promienie uderzyly w obiekt poza KD-nodem
-						if(msk^insideMsk) fullInside=0;
-
-						msk&=insideMsk;
+						if(!fullInNode) {
+							SSEVec3 col=group.Origin(q)+group.Dir(q)*ret;
+							SSEMask insideMask=	col.X()>=nodeMin.X()&&col.X()<=nodeMax.X()&&
+												col.Y()>=nodeMin.Y()&&col.Y()<=nodeMax.Y()&&	
+												col.Z()>=nodeMin.Z()&&col.Z()<=nodeMax.Z();
+							u32 insideMsk=ForWhich(insideMask);
+							mask=mask&&insideMask; 
+							// Jakies promienie uderzyly w obiekt poza KD-nodem
+							if(msk^insideMsk) fullInside=0;
+							msk&=insideMsk;
+						}
 
 						if(Output::objectIdsFlag) {
 							if(msk) for(int m=0;m<ScalarInfo<floatq>::Multiplicity;m++)
@@ -412,9 +417,19 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 
 template <class Output,class Group>
 void KDTree::TraverseOptimized(int packetId,Group &group,const RaySelector<Group::size> &sel,
-							   const floatq &maxD,const Output &out) const {
+							   const floatq &maxD,const Output &out,bool noncoh) const {
 	if(!sel.Num()) return;
 
+	if(noncoh) {
+		for(int i=0;i<sel.Num();i++) {
+			int q=sel[i];
+			Traverse(PacketIdGenerator::Gen(packetId),group.Origin(q),group.Dir(q),maxD,Output(out,q));
+		}
+		stats.runs+=sel.Num();
+		stats.nonCoherent+=sel.Num();
+		stats.tracedRays+=sel.Num()*4;
+		return;
+	}
 	RaySelector<Group::size> selectors[9];
 	group.GenSelectors(sel,selectors);
 	for(int k=0;k<8;k++) if(selectors[k].Num()) {

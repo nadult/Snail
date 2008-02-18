@@ -5,17 +5,12 @@
 SlowKDTree::SlowKDTree(const vector<Object> &objs)
 :objects(objs)
 {
-	nodes.push_back(SlowKDNode());
 	if(objs.size()==0) {
 		Convert(Vec3f(0,0,0),pMin);
 		Convert(Vec3f(0,0,0),pMax);
 		return;
 	}
 
-	for(int n=0;n<objects.size();n++) {
-		objects[n].fullInNode=1;
-		nodes[0].objects.push_back(n);
-	}
 
 	pMin=objs[0].BoundMin(); pMax=objs[0].BoundMax();
 	for(int n=0;n<objs.size();n++) {
@@ -25,7 +20,35 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 	Vec3f min,max;
 	Convert(pMin,min);
 	Convert(pMax,max);
-	Build(0,0,min,max);
+
+
+	bool cutSides=1;
+	int startNode=0;
+
+	if(cutSides) {
+		nodes.push_back(SlowKDNode(0,min.x,1));
+		nodes.push_back(SlowKDNode());
+		nodes.push_back(SlowKDNode(1,min.y,3));
+		nodes.push_back(SlowKDNode());
+		nodes.push_back(SlowKDNode(2,min.z,5));
+		nodes.push_back(SlowKDNode());
+		nodes.push_back(SlowKDNode(0,max.x,7));
+		nodes.push_back(SlowKDNode(1,max.y,9));
+		nodes.push_back(SlowKDNode());
+		nodes.push_back(SlowKDNode(2,max.z,11));
+		nodes.push_back(SlowKDNode());
+		nodes.push_back(SlowKDNode());
+		startNode=11;
+	}
+	nodes.push_back(SlowKDNode());
+
+	for(int n=0;n<objects.size();n++) {
+		objects[n].fullInNode=1;
+		nodes[startNode].objects.push_back(n);
+	}
+
+	printf("Building KD Tree...\n");
+	Build(startNode,0,min,max);
 }
 
 
@@ -46,7 +69,16 @@ public:
 
 void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 {
-	if(nodes[idx].objects.size()<=0) { nodes[idx].notEmpty=0; return; }
+	if(nodes[idx].objects.size()<1) return;
+
+	float size=(tMax.x-tMin.x)*(tMax.y-tMin.y)*(tMax.z-tMin.z);
+	float sceneSize; Convert((pMax.X()-pMin.X())*(pMax.Y()-pMin.Y())*(pMax.Z()-pMin.Z()),sceneSize);
+	if(size/sceneSize<0.0000001f) {
+//		printf(".");
+		nodes[idx].pMin=tMin;
+		nodes[idx].pMax=tMax;
+		return;
+	}
 
 	if(level>MaxLevel) {
 		nodes[idx].pMin=tMin;
@@ -76,44 +108,59 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			splits[2].push_back(PSplit(max.Z(),0));
 		}
 		
-		const double travCost=0.14;
-		const double hitTestCost=1.0;
-		double noSplitCost=hitTestCost*objs.size();
+		const float travCost=0.14;
+		const float hitTestCost=1.0;
+		float noSplitCost=hitTestCost*objs.size();
 
-		double minCost[3],dividers[3];
-		double sub[3]={tMin.x,tMin.y,tMin.z},mul[3]={1.0/(tMax.x-tMin.x),1.0/(tMax.y-tMin.y),1.0/(tMax.z-tMin.z)};
+		float minCost[3],dividers[3];
+		float sub[3]={tMin.x,tMin.y,tMin.z},mul[3]={1.0/(tMax.x-tMin.x),1.0/(tMax.y-tMin.y),1.0/(tMax.z-tMin.z)};
 
-		double nodeSize[3]={tMax.x-tMin.x,tMax.y-tMin.y,tMax.z-tMin.z};
-		double iNodeSize=1.0/(nodeSize[0]*nodeSize[1]+nodeSize[0]*nodeSize[2]+nodeSize[1]*nodeSize[2]);
-//		double longestSeg[3]={0,},longestSegP[3];
+		float nodeSize[3]={tMax.x-tMin.x,tMax.y-tMin.y,tMax.z-tMin.z};
+		float iNodeSize=1.0/(nodeSize[0]*nodeSize[1]+nodeSize[0]*nodeSize[2]+nodeSize[1]*nodeSize[2]);
+		float longestSeg[3]={0,},longestSegP[3];
 
-#pragma omp parallel for
 		for(int s=0;s<3;s++) {
 			vector<PSplit> &split=splits[s];
 			std::sort(split.begin(),split.end());
 			minCost[s]=noSplitCost+1.0;
 
-			double tNodeSize[3]={nodeSize[0],nodeSize[1],nodeSize[2]};
-			double voxelsLeft=0,voxelsRight=objs.size();
+			float tNodeSize[3]={nodeSize[0],nodeSize[1],nodeSize[2]};
+			int voxelsLeft=0,voxelsRight=objs.size();
 		
-/*			if(split[0].pos-sub[s]>0) {
-				longestSeg[s]=split[0].pos-sub[s];
+			float startSegLen=split[0].pos-sub[s];
+			float endSegLen=nodeSize[s]+sub[s]-split.back().pos;
+			if(startSegLen>endSegLen) {
+				longestSeg[s]=startSegLen;
 				longestSegP[s]=split[0].pos;
 			}
-			int opened=0;*/
+			else {
+				longestSeg[s]=endSegLen;
+				longestSegP[s]=split.back().pos;
+			}
+			int opened=0;
 
 			for(int ks=0;ks<split.size();ks++) {
-				double pos=split[ks].pos;
-				if(!split[ks].start) { voxelsRight--; /*opened--;*/ }
-				double posInNode=(pos-sub[s])*mul[s];
+				float pos=split[ks].pos;
+				if(!split[ks].start) {
+					voxelsRight--;
+
+					if(voxelsLeft+voxelsRight<=objs.size()&&ks+1<split.size()) {
+						float seg=split[ks+1].pos-split[ks].pos;
+						if(seg>longestSeg[s]) {
+							longestSeg[s]=seg;
+							longestSegP[s]=ks>0?split[ks].pos:split[ks+1].pos;
+						}
+					}
+				}
+				float posInNode=(pos-sub[s])*mul[s];
 
 				if(posInNode>0.0&&posInNode<1.0) {
 					tNodeSize[s]=nodeSize[s]*posInNode;
-					double leftSize= (tNodeSize[0]*tNodeSize[1]+tNodeSize[0]*tNodeSize[2]+tNodeSize[1]*tNodeSize[2])*iNodeSize;
+					float leftSize= (tNodeSize[0]*tNodeSize[1]+tNodeSize[0]*tNodeSize[2]+tNodeSize[1]*tNodeSize[2])*iNodeSize;
 					tNodeSize[s]=nodeSize[s]*(1.0-posInNode);
-					double rightSize=(tNodeSize[0]*tNodeSize[1]+tNodeSize[0]*tNodeSize[2]+tNodeSize[1]*tNodeSize[2])*iNodeSize;
+					float rightSize=(tNodeSize[0]*tNodeSize[1]+tNodeSize[0]*tNodeSize[2]+tNodeSize[1]*tNodeSize[2])*iNodeSize;
 
-					double splitCost=travCost+hitTestCost*(leftSize*voxelsLeft+rightSize*voxelsRight);
+					float splitCost=travCost+hitTestCost*(leftSize*float(voxelsLeft)+rightSize*float(voxelsRight));
 
 					if(splitCost<minCost[s]) {
 						minCost[s]=splitCost;
@@ -121,24 +168,16 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 					}
 				}
 
-				if(split[ks].start) { voxelsLeft++; /*opened++;*/ }
-		/*		if(opened==0&&ks+1<split.size()) {
-					double seg=split[ks+1].pos-split[ks].pos;
-					if(seg>longestSeg[s]) {
-						longestSeg[s]=seg;
-						longestSegP[s]=ks>0?split[ks].pos:split[ks+1].pos;
-					}
-				}*/
+				if(split[ks].start) voxelsLeft++;
 			}
 		}
 
-		/*
-		for(int s=0;s<3;s++) {
+		/*for(int s=0;s<3;s++) {
 			double nodeSize=(&(tMax-tMin).x)[s];
-			if(longestSeg[s]>nodeSize*0.1) {
+			if(longestSeg[s]>nodeSize*0.2) {
 				dividers[s]=longestSegP[s];
 				minCost[s]=1.0-longestSeg[s]/nodeSize;
-				//printf("%f\n",minCost[s]);
+			//	printf("%f\n",minCost[s]);
 			}
 		}*/
 
@@ -174,8 +213,15 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			if(pMin<divider&&pMax>divider)
 				obj.fullInNode=0;
 
-			if(pMin<divider) left.objects.push_back(node.objects[n]);
-			if(pMax>divider) right.objects.push_back(node.objects[n]);
+			bool added=0;
+			if(pMin<divider) { left.objects.push_back(node.objects[n]); added=1; }
+			if(pMax>divider) { right.objects.push_back(node.objects[n]); added=1; }
+			if(!added) {
+				if(left.objects.size()<right.objects.size())
+					left.objects.push_back(node.objects[n]);
+				else
+					right.objects.push_back(node.objects[n]);
+			}
 		}
 		node.objects.clear();
 	}
@@ -256,6 +302,7 @@ KDTree::KDTree(const SlowKDTree &tree)
 	objects=tree.objects;
 
 	nodeMinMax=buffer;//(SSEPVec3*)_aligned_malloc(sizeof(SSEPVec3)*nodes.size()*2,16);
+	printf("Converting...\n");
 
 	for(u32 n=0;n<nodes.size();n++) {
 		const SlowKDNode &sNode=tree.nodes[n];
@@ -281,6 +328,7 @@ KDTree::~KDTree()
 bool KDTree::TestNode(Vec3f min,Vec3f max,int n) const {
 	const KDNode &node=nodes[n];
 	bool left,right;
+	return 1;
 
 	switch(node.Axis()) {
 	case 0:
