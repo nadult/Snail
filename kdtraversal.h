@@ -59,35 +59,59 @@ void KDTree::Traverse(int packetId,const Vec &rOrigin,const Vec &rDir,const base
 		if(axis==3) { // leaf
 			if(node->NumObjects()) {
 				const u32 *id=objIds+node->FirstObject();
+				
+				SSEPVec3 nodeMin,nodeMax; {
+					int nodeIdx=node-&nodes[0];
+					SSEPVec3 nodeEps(Const<floatq,1,1000>::Value().m);
+					nodeMin=nodeMinMax[nodeIdx*2+0]-nodeEps;
+					nodeMax=nodeMinMax[nodeIdx*2+1]+nodeEps;
+				}
 
 				for(int n=node->NumObjects();n>0;n--) {
 					int tid=*id++;
 					const Object &obj=objs[tid];
 					base ret=obj.Collide(rOrigin,rDir);
 					
-					if(obj.lastVisit==packetId) continue;
-					obj.lastVisit=packetId;
+					if(obj.lastVisit==packetId) { localStats.skips++; continue; }
+					bool fullInside=1;
+					
+					typename Vec::TBool mask=ret>Const<base,0>::Value()&&ret<minRet;
+					u32 msk=ForWhich(mask);	
+	
+					if(!obj.fullInNode) {
+						Vec col=rOrigin+rDir*ret;
+						typename Vec::TBool insideMask=	col.X()>=nodeMin.X()&&col.X()<=nodeMax.X()&&
+														col.Y()>=nodeMin.Y()&&col.Y()<=nodeMax.Y()&&	
+														col.Z()>=nodeMin.Z()&&col.Z()<=nodeMax.Z();
+						u32 insideMsk=ForWhich(insideMask);
+						mask=mask&&insideMask; 
+						// Jakies promienie uderzyly w obiekt poza KD-nodem
+						if(msk^insideMsk) fullInside=0;
+						msk&=insideMsk;
+					}
 
 					localStats.colTests++;
 
-					typename Vec::TBool mask=ret>Const<base,0>::Value()&&ret<minRet;
-					
 					if(Output::objectIdsFlag) {
-						u32 msk=ForWhich(mask);
-
 						if(msk) for(int m=0;m<ScalarInfo<base>::Multiplicity;m++)
 							if(msk&(1<<m)) out.object[m]=tid;
 					}
 
+					if(fullInside) {
+						obj.lastVisit=packetId;
+						stats.notBreaking++;
+					}
+					else stats.breaking++;
+
 					minRet=Condition(mask,ret,minRet);
 				}
 
-			// Wy³¹czenie umo¿liwia wykorzystanie tej procedurki dla promieni
-			// które nie maj¹ tego samego kierunku
-			//	if(ForAll(minRet<tMax&&minRet>tMin)) {
-			//		stats.Update(localStats);
-			//		return minRet;
-			//	}
+				if(ForAll(minRet<maxD)) {
+					stats.Update(localStats);
+					out.dist[0]=minRet;
+					return;
+				}
+
 			}
 
 			if(stack==stackBegin) {
@@ -287,10 +311,11 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 	const u32 *objIds=&objectIds[0];
 	const Object *objs=&objects[0];
 
-	Vec3p bMin=Max(pMin*negMask,minOR);
-	Vec3p bMax=pMax*negMask; {
-		Vec3p tMin=Min(bMin,bMax);
-		bMax=Max(bMin,bMax); bMin=tMin;
+	Vec3p bMin,bMax; {
+		Vec3p tMin=pMin*negMask,tMax=pMax*negMask;
+		Vec3p tpMin=Min(tMin,tMax),tpMax=Max(tMin,tMax);
+		bMin=Max(minOR,tpMin);
+		bMax=tpMax;
 	}
 
 	while(true) {
@@ -439,10 +464,30 @@ void KDTree::TraverseOptimized(int packetId,Group &group,const RaySelector<Group
 	if(selectors[8].Num()) {
 		RaySelector<Group::size> sel=selectors[8];
 
-		for(int i=0;i<sel.Num();i++) {
+		 for(int i=0;i<sel.Num();i++) {
 			int q=sel[i];
 			Traverse(PacketIdGenerator::Gen(packetId),group.Origin(q),group.Dir(q),maxD,Output(out,q));
-		}
+		} 
+		
+/*		for(int i=0;i<sel.Num();i++) {
+			int q=sel[i];
+			Vec3p orig[4]; Vec3p dir[4]; float fmaxD[4]; 
+			Convert(group.Origin(q),orig);
+			Convert(group.Dir(q),dir);
+			Convert(maxD,fmaxD);
+
+			struct TOut { float dist; u32 object[1]; } tout[4];
+
+			Traverse(PacketIdGenerator::Gen(packetId),orig[0],dir[0],fmaxD[0],tout[0]);
+			Traverse(PacketIdGenerator::Gen(packetId),orig[1],dir[1],fmaxD[1],tout[1]);
+			Traverse(PacketIdGenerator::Gen(packetId),orig[2],dir[2],fmaxD[2],tout[2]);
+			Traverse(PacketIdGenerator::Gen(packetId),orig[3],dir[3],fmaxD[3],tout[3]);
+
+			float tDist[4];
+			for(int n=0;n<4;n++) tDist[n]=tout.dist[n];
+			Convert(tDist,out.dist+q);
+			for(int n=0;n<4;n++) out.object[q*4+n]=tout[n].object[0];
+		} */
 		stats.runs+=sel.Num();
 		stats.nonCoherent+=sel.Num();
 	}

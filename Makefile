@@ -1,5 +1,6 @@
 ICCFLAGS=-openmp -inline-level=2 -inline-forceinline -fp-model fast -fp-speculationfast -shared-intel -lstdc++
-GCCFLAGS=-fopenmp -mfpmath=sse -ffast-math -funroll-loops -fomit-frame-pointer -S
+GCCFLAGS=-fopenmp -mfpmath=sse -ffast-math -funroll-loops
+
 FLAGS=$(GCCFLAGS) -O3 -msse3 -pthread -I /home/someone/rtracer/veclib
 CC=g++
 #CC=icc

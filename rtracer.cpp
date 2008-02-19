@@ -69,27 +69,13 @@ public:
 
 		srand(1235);
 
-//		for(int n=0;n<200;n++) {
+//		for(int n=0;n<2000;n++) {
 //			Vec3f pos(FRand()*38.0f-20.0f,FRand()*38.0f-20.0f,FRand()*38.0f-20.0f); pos*=8.0f;
-//			for(int n=0;n<50;n++)
+//			for(int n=0;n<20;n++)
 //			objects.push_back(
 //				Sphere(Vec3f(FRand()*7.80f-4.0f,FRand()*7.80f-4.0f,FRand()*7.80f-4.0f)+pos,
 //							FRand()*1.50f));
 //		}
-
-	//	objects.push_back(Triangle(Vec3f(1000,-30,1000),Vec3f(1000,-30,-1000),Vec3f(-100,-30,1000)));
-	//	objects.push_back(Triangle(Vec3f(-1000,-30,1000),Vec3f(1000,-30,-1000),Vec3f(-100,-31,-1000)));
-
-	//	for(int n=0;n<64;n++) {
-	//		objects.push_back(Triangle(	Vec3f(0,								-2,		0),
-	//									Vec3f(cos(n*6.2831f/64.0f)*10,			-10,		sin(n*6.2831f/64.0f)*10),
-	//									Vec3f(cos(((n+1)&63)*6.2831f/64.0f)*10,	-10,		sin(((n+1)&63)*6.2831f/64.0f)*10) ));
-	//	}
-		
-	//	objects.push_back(Triangle(Vec3f(0,10,0),Vec3f(0,0,10),Vec3f(5,0,10)));
-	//	objects.push_back(Triangle(Vec3f(0,10,0),Vec3f(0,0,-10),Vec3f(-5,0,-10)));
-	//	objects.push_back(Triangle(Vec3f(0,10,0),Vec3f(10,0,0),Vec3f(10,0,5)));
-	//	objects.push_back(Triangle(Vec3f(0,10,0),Vec3f(-10,0,0),Vec3f(-10,0,-5)));
 
 	LoadWavefrontObj(modelFile,objects,20.0f);
 
@@ -301,7 +287,7 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling,b
 
 	float ratio=float(out.width)/float(out.height);
 
-	enum { QuadLevels=1,
+	enum { QuadLevels=2,
 			NQuads=1<<(QuadLevels*2), PWidth=2<<QuadLevels, PHeight=2<<QuadLevels };
 	bool grid=0;
 
@@ -425,9 +411,14 @@ int main(int argc, char **argv)
 	Image img(resx,resy);
 	Camera cam;
 	cam.plane_dist=0.5f;
-	cam.pos=Vec3f(52.423584,158.399719,51.276756);
-	cam.front=Vec3f(0.999916,0.000000,-0.013203);
-	cam.right=Vec3f(-0.013203,0.000000,-0.999916);
+//	cam.pos=Vec3f(52.423584,158.399719,51.276756);
+//	cam.front=Vec3f(0.999916,0.000000,-0.013203);
+//	cam.right=Vec3f(-0.013203,0.000000,-0.999916);
+
+	cam.pos=Vec3f(-125.014099,-7.600281,115.258301);
+	cam.front=Vec3f(0.907629,0.000000,-0.419782);
+	cam.right=Vec3f(-0.419782,0.000000,-0.907629);
+
 
 
 //	Matrix<Vec4f> rotMat=RotateY(-102.7f); cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
@@ -463,7 +454,7 @@ int main(int argc, char **argv)
 			}
 
 			{
-				int dx=out.MouseDX();
+				int dx=out.TestKey(SDLK_SPACE)?out.MouseDX():0;
 				if(out.TestKey(SDLK_n)) dx-=20;
 				if(out.TestKey(SDLK_m)) dx+=20;
 				if(dx) {

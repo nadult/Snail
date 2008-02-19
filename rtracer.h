@@ -193,29 +193,29 @@ public:
 
 	template <class VecO,class Vec>
 	INLINE typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const {
-//		switch(type) {
-//		case T_SPHERE:
-//			return spheres[id].Collide(rOrig,rDir);
-//		case T_TRIANGLE:
+		switch(type) {
+		case T_SPHERE:
+			return spheres[id].Collide(rOrig,rDir);
+		case T_TRIANGLE:
 			return tris[id].Collide(rOrig,rDir);
-//		}
+		}
 	}
 //	template <class Vec0,class Vec>
 //		INLINE typename bool Collide(
 	template <class Vec>
 	INLINE Vec Normal(const Vec &colPos) const {
 		Vec out;
-//		switch(type) {
-//		case T_SPHERE: {
-//			Vec sPos(spheres[id].pos);
-//			Vec surfNormal=colPos-sPos;
-//			surfNormal*=RSqrt(surfNormal|surfNormal);
-//			out=surfNormal;
-//			break; }
-//		case T_TRIANGLE:
+		switch(type) {
+		case T_SPHERE: {
+			Vec sPos(spheres[id].pos);
+			Vec surfNormal=colPos-sPos;
+			surfNormal*=RSqrt(surfNormal|surfNormal);
+			out=surfNormal;
+			break; }
+		case T_TRIANGLE:
 			out=Vec(tris[id].nrm);
-//			break;
-//		}
+			break;
+		}
 		return out;
 	}
 

@@ -174,7 +174,8 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 
 		/*for(int s=0;s<3;s++) {
 			double nodeSize=(&(tMax-tMin).x)[s];
-			if(longestSeg[s]>nodeSize*0.2) {
+			if(longestSeg[s]>nodeSize*0.1) {
+				
 				dividers[s]=longestSegP[s];
 				minCost[s]=1.0-longestSeg[s]/nodeSize;
 			//	printf("%f\n",minCost[s]);
@@ -201,6 +202,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 
 	{ // Przerzucanie obiektow
 		SlowKDNode &left=nodes[nodes.size()-2],&right=nodes[nodes.size()-1],&node=nodes[idx];
+		vector<u32> midObjs;
 		for(int n=0;n<node.objects.size();n++) {
 			Object &obj=objects[node.objects[n]];
 			Vec3f min,max;
@@ -216,12 +218,14 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			bool added=0;
 			if(pMin<divider) { left.objects.push_back(node.objects[n]); added=1; }
 			if(pMax>divider) { right.objects.push_back(node.objects[n]); added=1; }
-			if(!added) {
-				if(left.objects.size()<right.objects.size())
-					left.objects.push_back(node.objects[n]);
-				else
-					right.objects.push_back(node.objects[n]);
-			}
+			if(!added) midObjs.push_back(node.objects[n]);
+		}
+
+		for(int n=0;n<midObjs.size();n++) {
+	//		if(left.objects.size()<right.objects.size())
+				left.objects.push_back(midObjs[n]);
+	//		else
+	//			right.objects.push_back(midObjs[n]);
 		}
 		node.objects.clear();
 	}
