@@ -464,10 +464,10 @@ void KDTree::TraverseOptimized(int packetId,Group &group,const RaySelector<Group
 	if(selectors[8].Num()) {
 		RaySelector<Group::size> sel=selectors[8];
 
-		 for(int i=0;i<sel.Num();i++) {
+/*		 for(int i=0;i<sel.Num();i++) {
 			int q=sel[i];
 			Traverse(PacketIdGenerator::Gen(packetId),group.Origin(q),group.Dir(q),maxD,Output(out,q));
-		} 
+		} */
 		
 /*		for(int i=0;i<sel.Num();i++) {
 			int q=sel[i];

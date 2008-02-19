@@ -119,6 +119,10 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 		float iNodeSize=1.0/(nodeSize[0]*nodeSize[1]+nodeSize[0]*nodeSize[2]+nodeSize[1]*nodeSize[2]);
 		float longestSeg[3]={0,},longestSegP[3];
 
+		int maxThr=omp_get_max_threads();
+		omp_set_num_threads(objs.size()>100?3:1);
+
+#pragma omp parallel for
 		for(int s=0;s<3;s++) {
 			vector<PSplit> &split=splits[s];
 			std::sort(split.begin(),split.end());
@@ -127,30 +131,29 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			float tNodeSize[3]={nodeSize[0],nodeSize[1],nodeSize[2]};
 			int voxelsLeft=0,voxelsRight=objs.size();
 		
-			float startSegLen=split[0].pos-sub[s];
-			float endSegLen=nodeSize[s]+sub[s]-split.back().pos;
-			if(startSegLen>endSegLen) {
-				longestSeg[s]=startSegLen;
-				longestSegP[s]=split[0].pos;
-			}
-			else {
-				longestSeg[s]=endSegLen;
-				longestSegP[s]=split.back().pos;
-			}
-			int opened=0;
+		//	float startSegLen=split[0].pos-sub[s];
+		//	float endSegLen=nodeSize[s]+sub[s]-split.back().pos;
+		//	if(startSegLen>endSegLen) {
+		//		longestSeg[s]=startSegLen;
+		//		longestSegP[s]=split[0].pos;
+		//	}
+		//	else {
+		//		longestSeg[s]=endSegLen;
+		//		longestSegP[s]=split.back().pos;
+		//	}
 
 			for(int ks=0;ks<split.size();ks++) {
 				float pos=split[ks].pos;
 				if(!split[ks].start) {
 					voxelsRight--;
 
-					if(voxelsLeft+voxelsRight<=objs.size()&&ks+1<split.size()) {
-						float seg=split[ks+1].pos-split[ks].pos;
-						if(seg>longestSeg[s]) {
-							longestSeg[s]=seg;
-							longestSegP[s]=ks>0?split[ks].pos:split[ks+1].pos;
-						}
-					}
+				//	if(voxelsLeft+voxelsRight<=objs.size()&&ks+1<split.size()) {
+				//		float seg=split[ks+1].pos-split[ks].pos;
+				//		if(seg>longestSeg[s]) {
+				//			longestSeg[s]=seg;
+				//			longestSegP[s]=ks>0?split[ks].pos:split[ks+1].pos;
+				//		}
+				//	}
 				}
 				float posInNode=(pos-sub[s])*mul[s];
 
@@ -171,6 +174,8 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 				if(split[ks].start) voxelsLeft++;
 			}
 		}
+
+		omp_set_num_threads(maxThr);
 
 		/*for(int s=0;s<3;s++) {
 			double nodeSize=(&(tMax-tMin).x)[s];
@@ -234,8 +239,14 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 	((float*)&newTMin)[axis]=divider;
 
 	u32 left=nodes.size()-2,right=nodes.size()-1;
-	Build(left,level+1,tMin,newTMax);
-	Build(right,level+1,newTMin,tMax);
+	if(level==0) {
+		Build(left,level+1,tMin,newTMax);
+		Build(right,level+1,newTMin,tMax);
+	}
+	else {		
+		Build(left,level+1,tMin,newTMax);
+		Build(right,level+1,newTMin,tMax);
+	}
 }
 
 void SlowKDTree::Draw(Image &img,Vec3f minP,Vec3f maxP,
