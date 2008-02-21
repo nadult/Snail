@@ -283,14 +283,14 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 		bMax=tpMax;
 	}
 
-	Vec3p midDir; {
+	Vec3p midDir,midOrig; {
 		midDir=Vec3p(0,0,0);
 		Vec3q tmp=group.Dir(sel[0]);
-		for(int n=1;n<sel.Num();n++)
-			tmp+=group.Dir(sel[n]);
+		for(int n=1;n<sel.Num();n++) tmp+=group.Dir(sel[n]);
 		Vec3p t[4]; Convert(tmp,t);
 		midDir=t[0]+t[1]+t[2]+t[3];
 		midDir*=RSqrt(midDir|midDir);
+		midOrig=(minOR+maxOR)*floatp(0.5f)*negMask;
 	}
 
 	while(true) {
@@ -315,17 +315,7 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 					const bool fullInNode=obj.fullInNode;
 					
 					if(obj.lastVisit==packetId) { /*localStats.skips++;*/ continue; }
-
-					bool beamCollision=obj.BeamCollide(pv,ov,negMask,
-							(minOR+maxOR)*floatp(0.5f),midDir);
-						//	minOR,maxOR);
-					/*{
-						floatq ret1=obj.Collide(group.Origin(0),group.Dir(0));
-						floatq ret2=obj.Collide(group.Origin(sel.Num()-1),group.Dir(sel.Num()-1));
-						SSEMask mask=	(ret1>Const<floatq,0>::Value()&&ret1<out.dist[0])||
-										(ret2>Const<floatq,0>::Value()&&ret2<out.dist[0]);
-						beamCollision=ForAny(mask);
-					}*/
+					bool beamCollision=obj.BeamCollide(pv,ov,negMask,midOrig,midDir);
 
 				 	if(!beamCollision) {
 						obj.lastVisit=packetId;

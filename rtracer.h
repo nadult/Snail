@@ -95,10 +95,16 @@ public:
 		nrm=(b-a)^(c-a);
 		nrm*=RSqrt(nrm|nrm);
 		dist=Vec3q(nrm)|a;
-		e1=(b-a); e2=(c-a);
-		e1ce2=e1^e2;
+		e1ce2=(b-a)^(c-a);
+		e1n=nrm^(b-a);
+		e2n=nrm^(c-b);
+		e3n=nrm^(a-c);
+		e1n*=RSqrt(e1n|e1n);
+		e2n*=RSqrt(e2n|e2n);
+		e3n*=RSqrt(e3n|e3n);
 	}
-	Vec3p a,b,c,e1,e2,e1ce2;
+	Vec3p a,b,c,e1ce2;
+	Vec3p e1n,e2n,e3n;
 	Vec3p nrm;
 	floatq dist;
 };
@@ -125,8 +131,8 @@ typename Vec::TScalar Triangle::Collide(const VecO &rOrig,const Vec &rDir) const
 
 	base det = rDir|e1ce2;
 	VecO tvec = rOrig-VecO(a);
-	base u = rDir|(VecO(e1)^tvec);
-	base v = rDir|(tvec^VecO(e2));
+	base u = rDir|(VecO(b-a)^tvec);
+	base v = rDir|(tvec^VecO(c-a));
 	Bool test=Min(u,v)>=Const<base,0>::Value()&&u+v<=det;
 	if (ForAny(test)) {
 		base dist=-(tvec|nrm)*Inv(rDir|nrm);
@@ -144,159 +150,26 @@ INLINE void Print(const char *name,__m128 val)
 }
 
 INLINE bool Triangle::BeamCollide(const floatq *pv,const floatq *ov,const Vec3p &negMask,
-									const Vec3p &minOR,const Vec3p &maxOR) const
+									const Vec3p &orig,const Vec3p &dir) const
 {
-	Vec3p ta=a*negMask,tb=b*negMask,tc=c*negMask,tnrm=nrm*negMask;
-	bool lessMin,moreMax;
-
-	/*
-	Vec4p tv[3]={pv[0].m,pv[1].m,pv[2].m};
-	Vec3p tdir[3]={
-		Vec3p(2,tv[0].X(),tv[0].Y())+Vec3p(2,tv[0].Z(),tv[0].W()),
-		Vec3p(tv[1].X(),2,tv[1].Y())+Vec3p(tv[1].Z(),2,tv[1].W()),
-		Vec3p(tv[2].X(),tv[2].Y(),2)+Vec3p(tv[2].Z(),tv[2].W(),2) };
-
-	Vec3p dir=(tdir[0]+tdir[1]+tdir[2])*floatp(1.0f/12.0f);
-	Vec3p orig=(minOR+maxOR)*floatp(0.5); */
-
-	Vec3p dir=maxOR,orig=minOR*negMask;
-
-	floatp vn=nrm|dir;
-	floatp v0=(orig|nrm)+(a|nrm);
-	floatp t=v0/vn;
+	floatp epsilon=Const<floatp,1,20>::Value();
+	floatp t=-((orig-a)|nrm)*Inv(dir|nrm);
 	Vec3p col=orig+dir*t;
-//	if(ForAny(t<Const<floatq,0>::Value())) return 0;
+	if(ForAny(t<epsilon)) return 0;
 
-	Print("a",a.m); Print("b",b.m); Print("c",c.m); Print("dir",dir.m);
-	Print("col",col.m); Print("nrm",nrm.m); Print("orig",orig.m); Print("t",t.m);
+//	Print("a",a.m); Print("b",b.m); Print("c",c.m); Print("dir",dir.m);
+//	Print("col",col.m); Print("nrm",nrm.m); Print("orig",orig.m); Print("t",t.m);
 
-	Vec3p e[3]={(b-a),(c-b),(a-c)};
-	Print("e0",e[0].m); Print("e1",e[1].m); Print("e2",e[2].m);
+//	Vec3p e[3]={(b-a),(c-b),(a-c)};
+//	Print("e0",e[0].m); Print("e1",e[1].m); Print("e2",e[2].m);
+//	Print("en0",e1n.m); Print("en1",e2n.m); Print("en2",e3n.m);
 
-	Vec3p en[3]={e[0]^nrm,e[1]^nrm,e[2]^nrm};
-	en[0]*=RSqrt(en[0]|en[0]);
-	en[1]*=RSqrt(en[1]|en[1]);
-	en[2]*=RSqrt(en[2]|en[2]);
+	floatq dist[3]={(col-a)|e1n,(col-b)|e2n,(col-c)|e3n};
+//	Print("d0",dist[0].m); Print("d1",dist[1].m); Print("d2",dist[2].m);
 
-	Print("en0",en[0].m); Print("en1",en[1].m); Print("en2",en[2].m);
-
-	floatq dist[3]={(col-a)|en[0],(col-b)|en[1],(col-c)|en[2]};
-	Print("d0",dist[0].m); Print("d1",dist[1].m); Print("d2",dist[2].m);
-
-	throw 0;
+//	throw 0;
 				
-	if(ForAny(dist[0]>=Const<floatp,-100,1>::Value()&&
-			dist[1]>=Const<floatp,-100,1>::Value()&&
-			dist[2]>=Const<floatp,-100,1>::Value()))
-		return 1;
-	return 0;
-
-//	Vec3p pa=(A|dir)*dir; floatq dista=(A-pa)|(A-pa);
-//	Vec3p pb=(B|dir)*dir; floatq distb=(B-pb)|(B-pb);
-//	Vec3p pc=(C|dir)*dir; floatq distc=(C-pc)|(C-pc);
-
-//	if(ForAny(dir.Z()<Const<floatq,0>::Value())) {
-//	if(ForAll(Min(dista,Min(distb,distc))>=Const<floatp,4>::Value())) {
-//		Print("dista",dista.m);
-//		Print("dir",dir.m);
-//		Print("orig",orig.m);
-//		Print("A",A.m);
-//		throw 0;
-//		return 0;
-//	}
-
-	return 1;
-
-	// Test on plane X -------------------------
-	{ floatq yzyz[3];
-	yzyz[0].m=_mm_shuffle(1*1+2*4+1*16+2*64,ta.m);
-	yzyz[1].m=_mm_shuffle(1*1+2*4+1*16+2*64,tb.m);
-	yzyz[2].m=_mm_shuffle(1*1+2*4+1*16+2*64,tc.m);
-	floatq p[3]={pv[0]*floatq(ta.X())+ov[0],pv[0]*floatq(tb.X())+ov[0],pv[0]*floatq(tc.X())+ov[0]};
-	int mask[3]={ForWhich(yzyz[0]<=p[0]),ForWhich(yzyz[1]<=p[1]),ForWhich(yzyz[2]<=p[2])};
-
-	int mi=mask[0]&mask[1]&mask[2],ma=mask[0]|mask[1]|mask[2];
-	lessMin=(mi&3),moreMax=(ma&12)^12; }
-
-	if(lessMin||moreMax) return 0;
-	
-	{
-		float tv[4]; Convert(pv[0],tv);
-		Vec3p nrmy[2]={Vec3p(tv[0],1,0),Vec3p(tv[2],1,0)};
-		Vec3p nrmz[2]={Vec3p(tv[1],0,1),Vec3p(tv[3],0,1)};
-		Vec3p yp[2]={Vec3p(maxOR.X(),minOR.Y(),0),Vec3p(minOR.X(),maxOR.Y(),0)};
-		Vec3p zp[2]={Vec3p(maxOR.X(),0,minOR.Z()),Vec3p(minOR.X(),0,maxOR.Z())};
-		floatp yd[2]={nrmy[0]|yp[0],nrmy[1]|yp[1]};
-		floatp zd[2]={nrmz[0]|zp[0],nrmz[1]|zp[1]};
-			
-		bool out[4]={
-			ForAny((ta|nrmy[0])<yd[0]&&(tb|nrmy[0])<yd[0]&&(tc|nrmy[0])<yd[0]),
-			ForAny((ta|nrmy[1])<yd[1]&&(tb|nrmy[1])<yd[1]&&(tc|nrmy[1])<yd[1]),
-			ForAny((ta|nrmz[0])<zd[0]&&(tb|nrmz[0])<zd[0]&&(tc|nrmz[0])<zd[0]),
-			ForAny((ta|nrmz[1])<zd[1]&&(tb|nrmz[1])<zd[1]&&(tc|nrmz[1])<zd[1]) };
-
-		if(out[0]||out[1]||out[2]||out[3]) return 0;
-	}
-
-	// Test on plane Y -------------------
-	{ floatq xzxz[3];
-	xzxz[0].m=_mm_shuffle(0*1+2*4+0*16+2*64,ta.m);
-	xzxz[1].m=_mm_shuffle(0*1+2*4+0*16+2*64,tb.m);
-	xzxz[2].m=_mm_shuffle(0*1+2*4+0*16+2*64,tc.m);
-	floatq p[3]={pv[1]*floatq(ta.Y())+ov[1],pv[1]*floatq(tb.Y())+ov[1],pv[1]*floatq(tc.Y())+ov[1]};
-	int mask[3]={ForWhich(xzxz[0]<=p[0]),ForWhich(xzxz[1]<=p[1]),ForWhich(xzxz[2]<=p[2])};
-	int mi=mask[0]&mask[1]&mask[2],ma=mask[0]|mask[1]|mask[2];
-	lessMin=(mi&3),moreMax=(ma&12)^12; }
-
-	if(lessMin||moreMax) return 0;
-	
-	{
-		float tv[4]; Convert(pv[2],tv);
-		Vec3p nrmx[2]={Vec3p(1,tv[0],0),Vec3p(1,tv[2],0)};
-		Vec3p nrmz[2]={Vec3p(0,tv[1],1),Vec3p(0,tv[3],1)};
-		Vec3p xp[2]={Vec3p(minOR.X(),maxOR.Y(),0),Vec3p(maxOR.X(),minOR.Y(),0)};
-		Vec3p zp[2]={Vec3p(0,maxOR.Y(),minOR.Z()),Vec3p(0,minOR.Y(),maxOR.Z())};
-		floatp xd[2]={nrmx[0]|xp[0],nrmx[1]|xp[1]};
-		floatp zd[2]={nrmz[0]|zp[0],nrmz[1]|zp[1]};
-			
-		bool out[4]={
-			ForAny((ta|nrmx[0])<xd[0]&&(tb|nrmx[0])<xd[0]&&(tc|nrmx[0])<xd[0]),
-			ForAny((ta|nrmx[1])<xd[1]&&(tb|nrmx[1])<xd[1]&&(tc|nrmx[1])<xd[1]),
-			ForAny((ta|nrmz[0])<zd[0]&&(tb|nrmz[0])<zd[0]&&(tc|nrmz[0])<zd[0]),
-			ForAny((ta|nrmz[1])<zd[1]&&(tb|nrmz[1])<zd[1]&&(tc|nrmz[1])<zd[1]) };
-
-		if(out[0]||out[1]||out[2]||out[3]) return 0;
-	}
-
-	// Test on plane Z ----------------------
-	{ floatq xyxy[3];
-	xyxy[0].m=_mm_shuffle(0*1+1*4+0*16+1*64,ta.m);
-	xyxy[1].m=_mm_shuffle(0*1+1*4+0*16+1*64,tb.m);
-	xyxy[2].m=_mm_shuffle(0*1+1*4+0*16+1*64,tc.m);
-	floatq p[3]={pv[2]*floatq(ta.Z())+ov[2],pv[2]*floatq(tb.Z())+ov[2],pv[2]*floatq(tc.Z())+ov[2]};
-	int mask[3]={ForWhich(xyxy[0]<=p[0]),ForWhich(xyxy[1]<=p[1]),ForWhich(xyxy[2]<=p[2])};
-	int mi=mask[0]&mask[1]&mask[2],ma=mask[0]|mask[1]|mask[2];
-	lessMin=(mi&3),moreMax=(ma&12)^12; }
-
-	if(lessMin||moreMax) return 0;
-
-	{
-		float tv[4]; Convert(pv[2],tv);
-		Vec3p nrmx[2]={Vec3p(1,0,tv[0]),Vec3p(1,0,tv[2])};
-		Vec3p nrmy[2]={Vec3p(0,1,tv[1]),Vec3p(0,1,tv[3])};
-		Vec3p xp[2]={Vec3p(minOR.X(),0,maxOR.Z()),Vec3p(maxOR.X(),0,minOR.Z())};
-		Vec3p yp[2]={Vec3p(0,minOR.Y(),maxOR.Z()),Vec3p(0,maxOR.Y(),minOR.Z())};
-		floatp xd[2]={nrmx[0]|xp[0],nrmx[1]|xp[1]};
-		floatp yd[2]={nrmy[0]|yp[0],nrmy[1]|yp[1]};
-			
-		bool out[4]={
-			ForAny((ta|nrmx[0])<xd[0]&&(tb|nrmx[0])<xd[0]&&(tc|nrmx[0])<xd[0]),
-			ForAny((ta|nrmx[1])<xd[1]&&(tb|nrmx[1])<xd[1]&&(tc|nrmx[1])<xd[1]),
-			ForAny((ta|nrmy[0])<yd[0]&&(tb|nrmy[0])<yd[0]&&(tc|nrmy[0])<yd[0]),
-			ForAny((ta|nrmy[1])<yd[1]&&(tb|nrmy[1])<yd[1]&&(tc|nrmy[1])<yd[1]) };
-
-		if(out[0]||out[1]||out[2]||out[3]) return 0;
-	}
+	if(ForAny(Min(dist[0],Min(dist[1],dist[2]))<-t*epsilon)) return 0;
 
 	return 1;
 }
