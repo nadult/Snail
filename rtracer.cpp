@@ -180,9 +180,9 @@ public:
 //			out[q].Y()=Condition(refl.Y()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
 //			out[q].Z()=Condition(refl.Z()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
 			out[q]=nrm[q]|group.Dir(q);
-			out[q].X()=Condition(group.Dir(q).X()<Const<floatq,0>::Value(),Const<floatq,1,2>::Value(),Const<floatq,1>::Value());
-			out[q].Y()=Condition(group.Dir(q).Y()<Const<floatq,0>::Value(),Const<floatq,1,2>::Value(),Const<floatq,1>::Value());
-			out[q].Z()=Condition(group.Dir(q).Z()<Const<floatq,0>::Value(),Const<floatq,1,2>::Value(),Const<floatq,1>::Value());
+//			out[q].X()=Condition(group.Dir(q).X()<Const<floatq,0>::Value(),Const<floatq,0,2>::Value(),Const<floatq,1>::Value());
+//			out[q].Y()=Condition(group.Dir(q).Y()<Const<floatq,0>::Value(),Const<floatq,0,2>::Value(),Const<floatq,1>::Value());
+//			out[q].Z()=Condition(group.Dir(q).Z()<Const<floatq,0>::Value(),Const<floatq,0,2>::Value(),Const<floatq,1>::Value());
 		}
 
 		for(int n=0;n<nLights;n++) {

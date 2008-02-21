@@ -247,6 +247,8 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 				out.object[q*4+n]=0;
 		}
 	}
+//	if(!(negMaskI[0]!=0&&negMaskI[1]!=0&&negMaskI[2]==0))
+//		return;
 
 	// Minimized / maximized ray origin
 	Vec3p minOR,maxOR; {
@@ -281,6 +283,16 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 		bMax=tpMax;
 	}
 
+	Vec3p midDir; {
+		midDir=Vec3p(0,0,0);
+		Vec3q tmp=group.Dir(sel[0]);
+		for(int n=1;n<sel.Num();n++)
+			tmp+=group.Dir(sel[n]);
+		Vec3p t[4]; Convert(tmp,t);
+		midDir=t[0]+t[1]+t[2]+t[3];
+		midDir*=RSqrt(midDir|midDir);
+	}
+
 	while(true) {
 		localStats.iters++;
 
@@ -304,7 +316,9 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 					
 					if(obj.lastVisit==packetId) { /*localStats.skips++;*/ continue; }
 
-					bool beamCollision=obj.BeamCollide(pv,ov,negMask,nodeMin,nodeMax);
+					bool beamCollision=obj.BeamCollide(pv,ov,negMask,
+							(minOR+maxOR)*floatp(0.5f),midDir);
+						//	minOR,maxOR);
 					/*{
 						floatq ret1=obj.Collide(group.Origin(0),group.Dir(0));
 						floatq ret2=obj.Collide(group.Origin(sel.Num()-1),group.Dir(sel.Num()-1));
