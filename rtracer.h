@@ -152,7 +152,7 @@ INLINE void Print(const char *name,__m128 val)
 INLINE bool Triangle::BeamCollide(const floatq *pv,const floatq *ov,const Vec3p &negMask,
 									const Vec3p &orig,const Vec3p &dir) const
 {
-	floatp epsilon=Const<floatp,1,20>::Value();
+	floatp epsilon=Const<floatp,1,30>::Value();
 	floatp t=-((orig-a)|nrm)*Inv(dir|nrm);
 	Vec3p col=orig+dir*t;
 	if(ForAny(t<epsilon)) return 0;

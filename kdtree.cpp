@@ -72,7 +72,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 
 	double size=(tMax.x-tMin.x)*(tMax.y-tMin.y)*(tMax.z-tMin.z);
 	double sceneSize; { float t; Convert((pMax.X()-pMin.X())*(pMax.Y()-pMin.Y())*(pMax.Z()-pMin.Z()),t); sceneSize=t; }
-	if(size/sceneSize<0.0000001) return;
+	if(size/sceneSize<0.000001) return;
 	if(level>MaxLevel) return;
 
 	int axis; float divider;
@@ -97,7 +97,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			splits[2].push_back(PSplit(max.Z(),0));
 		}
 		
-		const float travCost=0.14;
+		const float travCost=0.1;
 		const float hitTestCost=1.0;
 		float noSplitCost=hitTestCost*objs.size();
 

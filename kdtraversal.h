@@ -315,13 +315,17 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 					const bool fullInNode=obj.fullInNode;
 					
 					if(obj.lastVisit==packetId) { /*localStats.skips++;*/ continue; }
-					bool beamCollision=obj.BeamCollide(pv,ov,negMask,midOrig,midDir);
 
-				 	if(!beamCollision) {
-						obj.lastVisit=packetId;
-						localStats.skips++;
-						continue;
+					if(sel.Num()>2) {
+						bool beamCollision=obj.BeamCollide(pv,ov,negMask,midOrig,midDir);
+
+					 	if(!beamCollision) {
+							obj.lastVisit=packetId;
+							localStats.skips++;
+							continue;
+						}
 					}
+
 					bool fullInside=1;
 
 					int anyPassed=0;
@@ -347,10 +351,6 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 							if(msk^insideMsk) fullInside=0;
 							msk&=insideMsk;
 						}
-
-			//			if(msk&&!beamCollision) {
-			//				throw Exception("Error!!!");
-			//			}
 
 						if(Output::objectIdsFlag) {
 							if(msk) for(int m=0;m<ScalarInfo<floatq>::Multiplicity;m++)

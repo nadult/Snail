@@ -82,7 +82,7 @@ public:
 	//	AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-30,-20,0),Vec3f(10,0,1020),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(20,-20,40),Vec3f(100,1000,10),Vec3f(40,40,40),1,1,1);
-//		AddLight(Vec3f(5.696046,-12.600281,0.779701),Vec3f(500,500,500));
+	//	AddLight(Vec3f(5.696046,-12.600281,0.779701),Vec3f(500,500,500));
 		
 		startTree=SlowKDTree(objects);
 		tree=KDTree(startTree);
@@ -115,7 +115,7 @@ public:
 	Vec ShadeLight(const Vec &lightColor,const Base &dot,const Base &lightDistSq) const
 	{
 		Vec out;
-		Base mul=RSqrt(lightDistSq);
+		Base mul=Inv(lightDistSq);
 //		Base spec=dot*dot*dot;
 		out = ( 
 				 lightColor*dot
@@ -138,7 +138,6 @@ public:
 		for(int q=0;q<Group::size;q++)
 			out[q]=Vec(Const<base,0>::Value());
 
-//		__declspec(align(16))
 		u32 objId[ScalarInfo<base>::Multiplicity*Group::size] __attribute__((aligned(16)));
 
 		const base maxDist=Const<base,10000>::Value();
@@ -203,19 +202,18 @@ public:
 			}
 
 			base tDst[Group::size];
-			//__declspec(align(16))
-//			u32 lightObjId[ScalarInfo<base>::Multiplicity*Group::size] __attribute__((aligned(16))); {
-//				RayGroup<Group::recLevel,1> tGroup(fromLight,&lightPos);
-//				tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),tGroup,sel,maxDist,ShadowOutput(tDst));
-//			}
+			u32 lightObjId[ScalarInfo<base>::Multiplicity*Group::size] __attribute__((aligned(16))); {
+				RayGroup<Group::recLevel,1> tGroup(fromLight,&lightPos);
+//				tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),tGroup,sel,maxDist,ShadowOutput(tDst),0);
+			}
 
 			Vec lightColor=light.color;
 
 			for(int i=0;i<sel.Num();i++) {
 				int q=sel.Idx(i);
 //				boolv mask=Const<SSEMask,0>::Value();
-//				__m128i a=_mm_load_si128((__m128i*)(objId+q*4)),b=_mm_load_si128((__m128i*)(lightObjId+q*4));
-//				boolv mask=_mm_castsi128_ps(_mm_cmpeq_epi32(a,b));
+				__m128i a=_mm_load_si128((__m128i*)(objId+q*4)),b=_mm_load_si128((__m128i*)(lightObjId+q*4));
+				boolv mask=_mm_castsi128_ps(_mm_cmpeq_epi32(a,b));
 				base dot=nrm[q]|-fromLight[q]; {
 					boolv mask=dot<=Const<base,0>::Value();
 					if(ForAll(mask)) {
@@ -225,9 +223,9 @@ public:
 					dot=Condition(!mask,dot);
 				}
 
-//				boolv mask=tDst[q]*tDst[q]<lightDistSq[q]*Const<SSEReal,999,1000>::Value();
-//				if(ForAll(mask)) // wszystkie punkty zasloniete
-//					continue;
+		//		boolv mask=tDst[q]*tDst[q]<lightDistSq[q]*Const<SSEReal,999,1000>::Value();
+				if(ForAll(mask)) // wszystkie punkty zasloniete
+					continue;
 				
 
 				Vec col=(//Condition(!mask,
@@ -284,7 +282,8 @@ public:
 
 double ticks=0,lastTicks=0,iters=0;
 
-void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling,bool reflections,bool rdtscShader)
+void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling,bool reflections,
+		bool rdtscShader,bool updateRays)
 {
 	unsigned long long tick=Ticks();
 
@@ -300,7 +299,7 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling,b
 	Matrix<Vec4f> rotMat(Vec4f(cam.right),Vec4f(cam.up),Vec4f(cam.front),Vec4f(0,0,0,1));
 	rotMat=Transpose(rotMat);
 
-	Vec3q orig; Broadcast(cam.pos,orig);
+	Vec3q origin; Broadcast(cam.pos,origin);
 	scene.tree.Prepare();
 
 	RayGenerator rayGen(QuadLevels,w,h,cam.plane_dist);
@@ -309,6 +308,21 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling,b
 	RaySelector<NQuads> allSelector;
 	allSelector.SelectAll();
 
+	static Vec3q *rayBuffer=0;
+	if(!rayBuffer) rayBuffer=new Vec3q[w*h];
+
+	if(updateRays) {
+		for(int y=0;y<h;y+=PHeight) for(int x=0;x<w;x+=PWidth) {
+			Vec3q *dir=rayBuffer+(y/PHeight*(w/PWidth)+x/PWidth)*NQuads;
+			rayGen.Generate(PWidth,PHeight,x,y,dir);
+			for(int n=0;n<NQuads;n++) {
+				Vec3f tmp[4]; Convert(dir[n],tmp);
+				for(int k=0;k<4;k++) tmp[k]=rotMat*tmp[k];
+				Convert(tmp,dir[n]);
+			}
+		}
+	}
+
 #pragma omp parallel for
 	for(int y=0;y<h;y+=PHeight) {
 		char *buf[PHeight];
@@ -316,15 +330,8 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling,b
 			buf[ty]=&out.buffer[(y+ty)*out.width*3];
 
 		for(int x=0;x<w;x+=PWidth) {
-		
-			Vec3q dir[NQuads];
-			rayGen.Generate(PWidth,PHeight,x,y,dir);
-			for(int n=0;n<NQuads;n++) {
-				Vec3f tmp[4]; Convert(dir[n],tmp);
-				for(int k=0;k<4;k++) tmp[k]=rotMat*tmp[k];
-				Convert(tmp,dir[n]);
-			}
-			RayGroup<QuadLevels,1> group(dir,&orig);
+			Vec3q *dir=rayBuffer+(y/PHeight*(w/PWidth)+x/PWidth)*NQuads;
+			RayGroup<QuadLevels,1> group(dir,&origin);
 
 			Vec3q rgb[NQuads];
 			scene.RayTrace(PacketIdGenerator::Gen(),group,allSelector,rgb,reflections?1:0,rdtscShader,1);
@@ -427,12 +434,13 @@ int main(int argc, char **argv)
 //	Matrix<Vec4f> rotMat=RotateY(-102.7f); cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
 
 	if(nonInteractive) {
-		for(int n=atoi(argv[3]);n>=0;n--) GenImage(scene,cam,img,0,0,0);
+		for(int n=atoi(argv[3]);n>=0;n--) GenImage(scene,cam,img,0,0,0,1);
 		img.SaveToFile("output.tga");
 	}
 	else {
 		SDLOutput out(resx,resy,fullscreen);
 		bool showTree=0,pixelDoubling=0,refls=0,rdtscSh=0;
+		bool updateRays=1;
 
 		while(out.PollEvents()) {
 			if(out.TestKey(SDLK_ESCAPE)) break;
@@ -441,14 +449,14 @@ int main(int argc, char **argv)
 			if(out.TestKey(SDLK_o)) refls^=1;
 			if(out.TestKey(SDLK_i)) rdtscSh^=1;
 
-			if(out.TestKey(SDLK_w)) cam.pos+=cam.front*speed;
-			if(out.TestKey(SDLK_s)) cam.pos-=cam.front*speed;
+			if(out.TestKey(SDLK_w)) { cam.pos+=cam.front*speed; updateRays=1; }
+			if(out.TestKey(SDLK_s)) { cam.pos-=cam.front*speed; updateRays=1; }
 
-			if(out.TestKey(SDLK_a)) cam.pos-=cam.right*speed;
-			if(out.TestKey(SDLK_d)) cam.pos+=cam.right*speed;
+			if(out.TestKey(SDLK_a)) { cam.pos-=cam.right*speed; updateRays=1; }
+			if(out.TestKey(SDLK_d)) { cam.pos+=cam.right*speed; updateRays=1; }
 
-			if(out.TestKey(SDLK_r)) cam.pos-=cam.up*speed;
-			if(out.TestKey(SDLK_f)) cam.pos+=cam.up*speed;
+			if(out.TestKey(SDLK_r)) { cam.pos-=cam.up*speed; updateRays=1; }
+			if(out.TestKey(SDLK_f)) { cam.pos+=cam.up*speed; updateRays=1; }
 
 			if(out.TestKey(SDLK_p)) {
 				printf("cam.pos=Vec3f(%f,%f,%f);\ncam.front=Vec3f(%f,%f,%f);\ncam.right=Vec3f(%f,%f,%f);\n",
@@ -461,6 +469,7 @@ int main(int argc, char **argv)
 				if(out.TestKey(SDLK_n)) dx-=20;
 				if(out.TestKey(SDLK_m)) dx+=20;
 				if(dx) {
+					updateRays=1;
 					Matrix<Vec4f> rotMat=RotateY(dx*0.003f);
 					cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
 				}
@@ -472,7 +481,9 @@ int main(int argc, char **argv)
 			
 			scene.tree.stats.Init();
 			int ticks=SDL_GetTicks();
-			GenImage(scene,cam,img,pixelDoubling,refls,rdtscSh);
+			GenImage(scene,cam,img,pixelDoubling,refls,rdtscSh,updateRays);
+			updateRays=0;
+
 			ticks=SDL_GetTicks()-ticks;
 
 			scene.tree.stats.PrintInfo(resx,resy,lastTicks,ticks);
