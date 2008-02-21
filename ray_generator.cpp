@@ -34,6 +34,9 @@ void RayGenerator::Decompose(const Vec3q *in,Vec3q *out)
 			tmp				=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpacklo_ps(in[n+0].Z().m,in[n+1].Z().m));
 			out[n+1].Z().m	=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpackhi_ps(in[n+0].Z().m,in[n+1].Z().m));
 			out[n+0].Z().m=tmp;
+
+		//	out[n+1]*=RSqrt(out[n+1]);
+		//	out[n+0]*=RSqrt(out[n+0]);
 		}
 	}
 	if(tLevel>=2) {

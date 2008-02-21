@@ -7,9 +7,9 @@ CC=g++
 
 all: rtracer
 
-rtracer.gch: rtracer.h kdtree.h kdtraversal.h
-#	$(CC) $(FLAGS) -o rtracer.gch rtracer.h
-	touch rtracer.gch
+rtracer.gch: rtracer.h kdtree.h kdtraversal.h Makefile
+	$(CC) $(FLAGS) -o rtracer.gch rtracer.h
+#	touch rtracer.gch
 
 asmsrc: rtracer.cpp rtracer.gch
 	$(CC) $(FLAGS) -c -o src rtracer.cpp -S

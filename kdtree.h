@@ -29,7 +29,6 @@ public:
 	float pos;
 	u32 child; // left: child+0    right: child+1
 	vector<u32> objects;
-	Vec3f pMin,pMax;
 };
 
 class SlowKDTree
@@ -44,7 +43,7 @@ private:
 	friend class KDTree;
 
 	void Build(u32 node,u32 level,Vec3<float>,Vec3<float>);
-	SSEPVec3 pMin,pMax;
+	Vec3p pMin,pMax;
 	vector<SlowKDNode> nodes;
 	vector<Object> objects;
 };
@@ -150,9 +149,12 @@ public:
 	template <class Output,class Vec,class base>
 	void FullTraverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output&) const;
 
-	template <class Output,class Vec,class base>
-	void Traverse(int packetId,const Vec &rOrigin,const Vec &rDir,const base &maxD,
-			const Output &out) const;
+
+	void TraverseMono(int packetId,const Vec3p &rOrigin,const Vec3p &rDir,const float &maxD,float &dist,u32 *obj) const;
+
+//	template <class Output,class Vec,class base>
+//	void Traverse(int packetId,const Vec &rOrigin,const Vec &rDir,const base &maxD,
+//			const Output &out) const;
 
 	template <class Output,class Group>
 	void TraverseFast(int packetId,Group &group,const RaySelector<Group::size>&,const floatq &maxD,
@@ -174,7 +176,6 @@ public:
 private:
 	vector<KDNode> nodes;
 	vector<u32> objectIds;
-	SSEPVec3 *nodeMinMax;
 
 public:
 	mutable KDStats stats;

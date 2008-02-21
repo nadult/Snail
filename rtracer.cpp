@@ -126,7 +126,7 @@ public:
 
 	template <class Vec,class Group>
 	void RayTrace(int packetId,Group &group,const RaySelector<Group::size> &startSelector,Vec *out,int maxRefl
-			,bool rdtscShader,bool noncoh) const
+			,bool rdtscShader,bool primary) const
 	{
 		typedef typename Vec::TScalar base;
 		typedef typename Vec::TBool boolv;
@@ -146,7 +146,7 @@ public:
 
 		int nColTests;
 		KDStats stats=tree.stats;
-		tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),group,sel,maxDist,NormalOutput(dst,objId),noncoh);
+		tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),group,sel,maxDist,NormalOutput(dst,objId),primary);
 		nColTests=tree.stats.colTests-stats.colTests;
 
 		Vec3q nrm[Group::size],colPos[Group::size],reflDir[Group::size],accLight[Group::size];
@@ -179,7 +179,10 @@ public:
 //			out[q].X()=Condition(refl.X()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
 //			out[q].Y()=Condition(refl.Y()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
 //			out[q].Z()=Condition(refl.Z()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
-			out[q]=nrm[q];
+			out[q]=nrm[q]|group.Dir(q);
+			out[q].X()=Condition(group.Dir(q).X()<Const<floatq,0>::Value(),Const<floatq,1,2>::Value(),Const<floatq,1>::Value());
+			out[q].Y()=Condition(group.Dir(q).Y()<Const<floatq,0>::Value(),Const<floatq,1,2>::Value(),Const<floatq,1>::Value());
+			out[q].Z()=Condition(group.Dir(q).Z()<Const<floatq,0>::Value(),Const<floatq,1,2>::Value(),Const<floatq,1>::Value());
 		}
 
 		for(int n=0;n<nLights;n++) {
@@ -264,8 +267,8 @@ public:
 		ticks=Ticks()-ticks;
 
 		if(rdtscShader) for(int q=0;q<Group::size;q++) {
-			out[q].X()=floatq(sqrt(float(ticks))*0.001f);
-			out[q].Y()=floatq(float(0));
+//			out[q].X()=floatq(sqrt(float(ticks))*0.001f);
+//			out[q].Y()=floatq(float(0));
 			out[q].Z()=floatq(float(nColTests)*0.005f);
 		}
 	}
@@ -324,7 +327,7 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,bool pixDoubling,b
 			RayGroup<QuadLevels,1> group(dir,&orig);
 
 			Vec3q rgb[NQuads];
-			scene.RayTrace(PacketIdGenerator::Gen(),group,allSelector,rgb,reflections?1:0,rdtscShader,0);
+			scene.RayTrace(PacketIdGenerator::Gen(),group,allSelector,rgb,reflections?1:0,rdtscShader,1);
 
 			rayGen.Decompose(rgb,rgb);
 			Vec3f trgb[PWidth*PHeight];
@@ -424,7 +427,7 @@ int main(int argc, char **argv)
 //	Matrix<Vec4f> rotMat=RotateY(-102.7f); cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
 
 	if(nonInteractive) {
-		for(int n=atoi(argv[3]);n>=0;n--) GenImage(scene,cam,img,0,1,0);
+		for(int n=atoi(argv[3]);n>=0;n--) GenImage(scene,cam,img,0,0,0);
 		img.SaveToFile("output.tga");
 	}
 	else {

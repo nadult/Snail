@@ -88,6 +88,9 @@ public:
 	template <class VecO,class Vec>
 	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const;
 
+	bool BeamCollide(const floatq *pv,const floatq *ov,const Vec3p &negMask,const Vec3p&,const Vec3p&)
+		const;
+
 	void ComputeData() {
 		nrm=(b-a)^(c-a);
 		nrm*=RSqrt(nrm|nrm);
@@ -126,12 +129,67 @@ typename Vec::TScalar Triangle::Collide(const VecO &rOrig,const Vec &rDir) const
 	base v = rDir|(tvec^VecO(e2));
 	Bool test=Min(u,v)>=Const<base,0>::Value()&&u+v<=det;
 	if (ForAny(test)) {
-		base dist=-(tvec|nrm)/(rDir|nrm);
+		base dist=-(tvec|nrm)*Inv(rDir|nrm);
 		out=Condition(test,dist,out);
 	}
 
 	return out;
 }
+
+INLINE bool Triangle::BeamCollide(const floatq *pv,const floatq *ov,const Vec3p &negMask,
+									const Vec3p &nodeMin,const Vec3p &nodeMax) const
+{
+//	int out[3]={
+//		(_mm_movemask_ps(_mm_cmplt_ps(a.m,nodeMin.m))+_mm_movemask_ps(_mm_cmpgt_ps(a.m,nodeMax.m))*16)&0x77,
+//		(_mm_movemask_ps(_mm_cmplt_ps(b.m,nodeMin.m))+_mm_movemask_ps(_mm_cmpgt_ps(b.m,nodeMax.m))*16)&0x77,
+//		(_mm_movemask_ps(_mm_cmplt_ps(c.m,nodeMin.m))+_mm_movemask_ps(_mm_cmpgt_ps(c.m,nodeMax.m))*16)&0x77 };
+//
+//	if((out[0]==out[1]&&out[1]==out[2])&&out[0])
+//		return 0;
+
+	Vec3p ta=a*negMask,tb=b*negMask,tc=c*negMask;
+
+	floatq yzyz[3];
+	yzyz[0].m=_mm_shuffle(1*1+2*4+1*16+2*64,ta.m);
+	yzyz[1].m=_mm_shuffle(1*1+2*4+1*16+2*64,tb.m);
+	yzyz[2].m=_mm_shuffle(1*1+2*4+1*16+2*64,tc.m);
+	floatq p[3]={pv[0]*floatq(ta.X())+ov[0],pv[0]*floatq(tb.X())+ov[0],pv[0]*floatq(tc.X())+ov[0]};
+	int mask[3]={ForWhich(yzyz[0]<=p[0]),ForWhich(yzyz[1]<=p[1]),ForWhich(yzyz[2]<=p[2])};
+
+	int mi=mask[0]&mask[1]&mask[2],ma=mask[0]|mask[1]|mask[2];
+	bool lessMin=(mi&3),moreMax=(ma&4)==0||(ma&8)==0;
+	lessMin=moreMax=0;
+
+	if(!(lessMin||moreMax)) {
+		floatq xyxy[3];
+		xyxy[0].m=_mm_shuffle(0*1+1*4+0*16+1*64,ta.m);
+		xyxy[1].m=_mm_shuffle(0*1+1*4+0*16+1*64,tb.m);
+		xyxy[2].m=_mm_shuffle(0*1+1*4+0*16+1*64,tc.m);
+		floatq p[3]={pv[2]*floatq(ta.Z())+ov[2],pv[2]*floatq(tb.Z())+ov[2],pv[2]*floatq(tc.Z())+ov[2]};
+		int mask[3]={ForWhich(xyxy[0]<=p[0]),ForWhich(xyxy[1]<=p[1]),ForWhich(xyxy[2]<=p[2])};
+
+		int mi=mask[0]&mask[1]&mask[2],ma=mask[0]|mask[1]|mask[2];
+		bool lessMin=(mi&3),moreMax=(ma&12)^12;
+
+
+		if(!(lessMin||moreMax)) {
+			floatq xzxz[3];
+			xzxz[0].m=_mm_shuffle(0*1+2*4+0*16+2*64,ta.m);
+			xzxz[1].m=_mm_shuffle(0*1+2*4+0*16+2*64,tb.m);
+			xzxz[2].m=_mm_shuffle(0*1+2*4+0*16+2*64,tc.m);
+			floatq p[3]={pv[1]*floatq(ta.Y())+ov[1],pv[1]*floatq(tb.Y())+ov[1],pv[1]*floatq(tc.Y())+ov[1]};
+			int mask[3]={ForWhich(xzxz[0]<=p[0]),ForWhich(xzxz[1]<=p[1]),ForWhich(xzxz[2]<=p[2])};
+			int mi=mask[0]&mask[1]&mask[2],ma=mask[0]|mask[1]|mask[2];
+			bool lessMin=(mi&3),moreMax=(ma&4)==0||(ma&8)==0;
+			lessMin=moreMax=0;
+
+			return !(lessMin||moreMax);
+		}
+	}
+
+	return 0;
+}
+
 
 /*
 class Plane
@@ -198,6 +256,15 @@ public:
 			return spheres[id].Collide(rOrig,rDir);
 		case T_TRIANGLE:
 			return tris[id].Collide(rOrig,rDir);
+		}
+	}
+	INLINE bool BeamCollide(const floatq *pv,const floatq *ov,const Vec3p &negMask,
+							const Vec3p &min,const Vec3p &max) const {
+		switch(type) {
+		case T_TRIANGLE:
+			return tris[id].BeamCollide(pv,ov,negMask,min,max);
+		default:
+			return 1;
 		}
 	}
 //	template <class Vec0,class Vec>

@@ -21,7 +21,6 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 	Convert(pMin,min);
 	Convert(pMax,max);
 
-
 	bool cutSides=1;
 	int startNode=0;
 
@@ -71,20 +70,10 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 {
 	if(nodes[idx].objects.size()<1) return;
 
-	float size=(tMax.x-tMin.x)*(tMax.y-tMin.y)*(tMax.z-tMin.z);
-	float sceneSize; Convert((pMax.X()-pMin.X())*(pMax.Y()-pMin.Y())*(pMax.Z()-pMin.Z()),sceneSize);
-	if(size/sceneSize<0.0000001f) {
-//		printf(".");
-		nodes[idx].pMin=tMin;
-		nodes[idx].pMax=tMax;
-		return;
-	}
-
-	if(level>MaxLevel) {
-		nodes[idx].pMin=tMin;
-		nodes[idx].pMax=tMax;
-		return;
-	}
+	double size=(tMax.x-tMin.x)*(tMax.y-tMin.y)*(tMax.z-tMin.z);
+	double sceneSize; { float t; Convert((pMax.X()-pMin.X())*(pMax.Y()-pMin.Y())*(pMax.Z()-pMin.Z()),t); sceneSize=t; }
+	if(size/sceneSize<0.0000001) return;
+	if(level>MaxLevel) return;
 
 	int axis; float divider;
 	{
@@ -189,11 +178,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 
 		axis=minCost[0]<minCost[2]?0:2;
 		if(minCost[1]<minCost[axis]) axis=1;
-		if(noSplitCost<minCost[axis]) {
-			nodes[idx].pMin=tMin;
-			nodes[idx].pMax=tMax;
-			return;
-		}
+		if(noSplitCost<minCost[axis]) return;
 
 		divider=dividers[axis];
 
@@ -307,8 +292,6 @@ void SlowKDTree::Draw(Image &img,Vec3f minP,Vec3f maxP,
 #undef PIX*/
 }
 
-static SSEPVec3 buffer[1000000];
-
 KDTree::KDTree(const SlowKDTree &tree)
 {
 	pMin=tree.pMin; pMax=tree.pMax;
@@ -316,7 +299,6 @@ KDTree::KDTree(const SlowKDTree &tree)
 	nodes.resize(tree.nodes.size());
 	objects=tree.objects;
 
-	nodeMinMax=buffer;//(SSEPVec3*)_aligned_malloc(sizeof(SSEPVec3)*nodes.size()*2,16);
 	printf("Converting...\n");
 
 	for(u32 n=0;n<nodes.size();n++) {
@@ -324,9 +306,6 @@ KDTree::KDTree(const SlowKDTree &tree)
 		KDNode &node=nodes[n];
 
 		if(sNode.type==SlowKDNode::T_LEAF) {
-			Convert(sNode.pMin,nodeMinMax[n*2+0]);
-			Convert(sNode.pMax,nodeMinMax[n*2+1]);
-
 			node.SetLeaf(objectIds.size(),sNode.objects.size());
 			for(u32 i=0;i<sNode.objects.size();i++)
 				objectIds.push_back(sNode.objects[i]);
