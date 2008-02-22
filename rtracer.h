@@ -5,6 +5,7 @@
 #include <vector>
 #include <exception>
 #include <string>
+#include <memory.h>
 #include "omp.h"
 #include "veclib.h"
 
@@ -88,13 +89,12 @@ public:
 	template <class VecO,class Vec>
 	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const;
 
-	bool BeamCollide(const floatq *pv,const floatq *ov,const Vec3p &negMask,const Vec3p&,const Vec3p&)
-		const;
+	bool BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsilon) const;
 
 	void ComputeData() {
-		nrm=(b-a)^(c-a);
+		Vec3p nrm=(b-a)^(c-a);
 		nrm*=RSqrt(nrm|nrm);
-		dist=Vec3q(nrm)|a;
+		plane=Vec4p(nrm.X(),nrm.Y(),nrm.Z(),nrm|a);
 		e1ce2=(b-a)^(c-a);
 		e1n=nrm^(b-a);
 		e2n=nrm^(c-b);
@@ -103,10 +103,10 @@ public:
 		e2n*=RSqrt(e2n|e2n);
 		e3n*=RSqrt(e3n|e3n);
 	}
-	Vec3p a,b,c,e1ce2;
-	Vec3p e1n,e2n,e3n;
-	Vec3p nrm;
-	floatq dist;
+	Vec3p Nrm() const { return Vec3p(plane); }
+	Vec3p a,b,c;
+	Vec4p plane;
+	Vec3p e1ce2,e1n,e2n,e3n;
 };
 
 template <class VecO,class Vec>
@@ -135,40 +135,21 @@ typename Vec::TScalar Triangle::Collide(const VecO &rOrig,const Vec &rDir) const
 	base v = rDir|(tvec^VecO(c-a));
 	Bool test=Min(u,v)>=Const<base,0>::Value()&&u+v<=det;
 	if (ForAny(test)) {
-		base dist=-(tvec|nrm)*Inv(rDir|nrm);
+		base dist=-(tvec|Nrm())*Inv(rDir|Nrm());
 		out=Condition(test,dist,out);
 	}
 
 	return out;
 }
 
-INLINE void Print(const char *name,__m128 val)
+INLINE bool Triangle::BeamCollide(const Vec3p &orig,const Vec3p &dir,float eps) const
 {
-	float t[4];
-	Convert(floatq(val),t);
-	printf("%s: %f %f %f %f\n",name,t[0],t[1],t[2],t[3]);
-}
-
-INLINE bool Triangle::BeamCollide(const floatq *pv,const floatq *ov,const Vec3p &negMask,
-									const Vec3p &orig,const Vec3p &dir) const
-{
-	floatp epsilon=Const<floatp,1,30>::Value();
-	floatp t=-((orig-a)|nrm)*Inv(dir|nrm);
+	floatp epsilon(eps);
+	floatp t=-((orig-a)|Nrm())*Inv(dir|Nrm());
 	Vec3p col=orig+dir*t;
 	if(ForAny(t<epsilon)) return 0;
 
-//	Print("a",a.m); Print("b",b.m); Print("c",c.m); Print("dir",dir.m);
-//	Print("col",col.m); Print("nrm",nrm.m); Print("orig",orig.m); Print("t",t.m);
-
-//	Vec3p e[3]={(b-a),(c-b),(a-c)};
-//	Print("e0",e[0].m); Print("e1",e[1].m); Print("e2",e[2].m);
-//	Print("en0",e1n.m); Print("en1",e2n.m); Print("en2",e3n.m);
-
 	floatq dist[3]={(col-a)|e1n,(col-b)|e2n,(col-c)|e3n};
-//	Print("d0",dist[0].m); Print("d1",dist[1].m); Print("d2",dist[2].m);
-
-//	throw 0;
-				
 	if(ForAny(Min(dist[0],Min(dist[1],dist[2]))<-t*epsilon)) return 0;
 
 	return 1;
@@ -242,11 +223,10 @@ public:
 			return tris[id].Collide(rOrig,rDir);
 		}
 	}
-	INLINE bool BeamCollide(const floatq *pv,const floatq *ov,const Vec3p &negMask,
-							const Vec3p &min,const Vec3p &max) const {
+	INLINE bool BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsilon) const {
 		switch(type) {
 		case T_TRIANGLE:
-			return tris[id].BeamCollide(pv,ov,negMask,min,max);
+			return tris[id].BeamCollide(orig,dir,epsilon);
 		default:
 			return 1;
 		}
@@ -264,7 +244,7 @@ public:
 			out=surfNormal;
 			break; }
 		case T_TRIANGLE:
-			out=Vec(tris[id].nrm);
+			out=Vec(tris[id].Nrm());
 			break;
 		}
 		return out;

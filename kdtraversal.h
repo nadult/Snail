@@ -247,8 +247,6 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 				out.object[q*4+n]=0;
 		}
 	}
-//	if(!(negMaskI[0]!=0&&negMaskI[1]!=0&&negMaskI[2]==0))
-//		return;
 
 	// Minimized / maximized ray origin
 	Vec3p minOR,maxOR; {
@@ -283,14 +281,21 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 		bMax=tpMax;
 	}
 
-	Vec3p midDir,midOrig; {
-		midDir=Vec3p(0,0,0);
+	Vec3p beamDir,beamOrig; float beamEps; {
+		beamDir=Vec3p(0,0,0);
 		Vec3q tmp=group.Dir(sel[0]);
 		for(int n=1;n<sel.Num();n++) tmp+=group.Dir(sel[n]);
 		Vec3p t[4]; Convert(tmp,t);
-		midDir=t[0]+t[1]+t[2]+t[3];
-		midDir*=RSqrt(midDir|midDir);
-		midOrig=(minOR+maxOR)*floatp(0.5f)*negMask;
+		beamDir=t[0]+t[1]+t[2]+t[3];
+		beamDir*=RSqrt(beamDir|beamDir);
+		beamOrig=(minOR+maxOR)*floatp(0.5f)*negMask;
+
+		// Hardcoded for primary rays only
+		// It should be properly computed
+		if(Group::size>=4) beamEps=1.f/40.f;
+		if(Group::size>=16) beamEps=1.f/20.f;
+		if(Group::size>=64) beamEps=1.f/10.f;
+		if(Group::size>=256) beamEps=1.f/5.f;
 	}
 
 	while(true) {
@@ -317,7 +322,7 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 					if(obj.lastVisit==packetId) { /*localStats.skips++;*/ continue; }
 
 					if(sel.Num()>2) {
-						bool beamCollision=obj.BeamCollide(pv,ov,negMask,midOrig,midDir);
+						bool beamCollision=obj.BeamCollide(beamOrig,beamDir,beamEps);
 
 					 	if(!beamCollision) {
 							obj.lastVisit=packetId;
@@ -327,7 +332,6 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 					}
 
 					bool fullInside=1;
-
 					int anyPassed=0;
 
 					for(int i=0;i<sel.Num();i++) {
@@ -458,29 +462,6 @@ void KDTree::TraverseOptimized(int packetId,Group &group,const RaySelector<Group
 	group.GenSelectors(sel,selectors);
 
 	for(int k=0;k<8;k++) if(selectors[k].Num()) {
-	/*	if(primary&&selectors[k].Num()==sel.Num()) {
-			int num=sel.Num();
-			float fmaxD[4]; Convert(maxD,fmaxD);
-			float dist; u32 obj,tObj;
-
-			Vec3p orig[4]; Vec3p dir[4];
-			Convert(group.Origin(0),orig); Convert(group.Dir(0),dir);
-			TraverseMono(0,orig[0],dir[0],fmaxD[0],dist,&obj);
-			if(obj==0) goto NORMAL_TRAV;
-			tObj=obj; Convert(group.Origin(num-1),orig); Convert(group.Dir(num-1),dir);
-			TraverseMono(0,orig[3],dir[3],fmaxD[0],dist,&obj);
-			if(obj!=tObj) goto NORMAL_TRAV;
-
-			const Object &object=objects[obj];
-			for(int n=0;n<num;n++) {
-				floatq dist=object.Collide(group.Origin(n),group.Dir(n));
-				out.dist[n]=dist;
-				for(int i=0;i<4;i++) out.object[n*4+i]=obj;
-			}
-			continue;
-		}
-
-NORMAL_TRAV:*/
 		TraverseFast(PacketIdGenerator::Gen(packetId),group,selectors[k],maxD,out);
 		stats.runs++; stats.coherent+=sel.Num();
 	}
@@ -648,3 +629,4 @@ void KDTree::Traverse(int packetId,const Vec &rOrigin,const Vec &rDir,const base
 		tMax=Min(tMax,tSplit); node+=!sign;
 	}
 }*/
+
