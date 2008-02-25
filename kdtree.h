@@ -124,10 +124,10 @@ public:
 			double nPixels=double(resx*resy);
 
 			printf("isct,iter:%.3f %.3f MCycles/frame:%.2f\tMRays/sec:%.2f\t"
-					"Coherency:%.2f%% br:%.2f%% fa:%.2f%% %d\n",
+					"Coherency:%.2f%% br:%.2f%% fa:%.2f%% %.0f\n",
 					double(colTests)/nPixels,double(iters)/nPixels,
 				cycles,raysPerSec*0.000001,CoherentPercentage(),
-				BreakingPercentage(),IntersectFailPercentage(),skips);
+				BreakingPercentage(),IntersectFailPercentage(),double(skips));
 	}
 
 	u32 colTests,iters,runs,tracedRays;
@@ -173,7 +173,7 @@ public:
 	SSEPVec3 pMin,pMax;
 	vector<Object> objects;
 
-private:
+//private:
 	vector<KDNode> nodes;
 	vector<u32> objectIds;
 

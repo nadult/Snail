@@ -2,6 +2,11 @@
 #include "rtracer.h"
 
 
+Image::Image()
+	:width(0),height(0)
+{
+}
+
 Image::Image(size_t w,size_t h)
 	:width(w),height(h),buffer(w*h*3)
 {
@@ -26,6 +31,31 @@ void Image::SaveToFile(const char *fileName)
 
 	for(int n=height-1;n>=0;n--)
 		fwrite(&buffer[0]+n*width*3,width*3,1,fptr);
+
+	fclose(fptr);
+}
+
+void Image::LoadFromFile(const char *fileName)
+{
+	FILE *fptr=fopen(fileName,"rb");
+	if(!fptr) throw Exception("Error while opening image file.");
+
+	getc(fptr); getc(fptr); getc(fptr);
+	getc(fptr); getc(fptr);
+	getc(fptr); getc(fptr);
+	getc(fptr);
+	getc(fptr); getc(fptr);
+	getc(fptr); getc(fptr);
+
+	unsigned short w,h;
+	fread(&w,2,1,fptr);
+	fread(&h,2,1,fptr);
+	getc(fptr); getc(fptr);
+	width=w; height=h;
+	buffer.resize(width*height*3);
+
+	for(int n=height-1;n>=0;n--)
+		fread(&buffer[0]+n*width*3,width*3,1,fptr);
 
 	fclose(fptr);
 }

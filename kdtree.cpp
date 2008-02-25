@@ -72,7 +72,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 
 	double size=(tMax.x-tMin.x)*(tMax.y-tMin.y)*(tMax.z-tMin.z);
 	double sceneSize; { float t; Convert((pMax.X()-pMin.X())*(pMax.Y()-pMin.Y())*(pMax.Z()-pMin.Z()),t); sceneSize=t; }
-	if(size/sceneSize<0.000001) return;
+	if(size/sceneSize<0.00000001) return;
 	if(level>MaxLevel) return;
 
 	int axis; float divider;

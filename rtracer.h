@@ -23,10 +23,13 @@ typedef SSEVec3		Vec3q;
 typedef SSEVec4		Vec4q;
 typedef SSEPReal	floatp;
 typedef SSEReal		floatq;
+typedef unsigned long long u64;
 
 using std::vector;
 using std::pair;
 using std::string;
+
+u64 Ticks();
 
 
 class Exception: public std::exception
@@ -89,7 +92,7 @@ public:
 	template <class VecO,class Vec>
 	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const;
 
-	bool BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsilon) const;
+	bool BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC) const;
 
 	void ComputeData() {
 		Vec3p nrm=(b-a)^(c-a);
@@ -142,15 +145,24 @@ typename Vec::TScalar Triangle::Collide(const VecO &rOrig,const Vec &rDir) const
 	return out;
 }
 
-INLINE bool Triangle::BeamCollide(const Vec3p &orig,const Vec3p &dir,float eps) const
+INLINE bool Triangle::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC) const
 {
-	floatp epsilon(eps);
-	floatp t=-((orig-a)|Nrm())*Inv(dir|Nrm());
+	floatp dot=dir|Nrm();
+
+	if(ForAny(dot<=Const<floatp,1,100>::Value()))
+		return 1;
+
+	floatp idot=Inv(dir|Nrm());
+
+	floatp t=-((orig-a)|Nrm())*idot;
 	Vec3p col=orig+dir*t;
-	if(ForAny(t<epsilon)) return 0;
+
+	if(ForAny(t<-floatp(epsC)*idot)) return 0;
+
+	floatp epsilon=(floatp(epsL)*t+floatp(epsC))*idot;
 
 	floatq dist[3]={(col-a)|e1n,(col-b)|e2n,(col-c)|e3n};
-	if(ForAny(Min(dist[0],Min(dist[1],dist[2]))<-t*epsilon)) return 0;
+	if(ForAny(Min(dist[0],Min(dist[1],dist[2]))<-epsilon)) return 0;
 
 	return 1;
 }
@@ -223,10 +235,10 @@ public:
 			return tris[id].Collide(rOrig,rDir);
 		}
 	}
-	INLINE bool BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsilon) const {
+	INLINE bool BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC) const {
 		switch(type) {
 		case T_TRIANGLE:
-			return tris[id].BeamCollide(orig,dir,epsilon);
+			return tris[id].BeamCollide(orig,dir,epsL,epsC);
 		default:
 			return 1;
 		}
@@ -285,8 +297,10 @@ public:
 class Image
 {
 public:
+	Image();
 	Image(size_t w,size_t h);
 	void SaveToFile(const char*fileName);
+	void LoadFromFile(const char *fileName);
 	void Pixel(int x,int y,char r,char g,char b);
 
 	vector<char> buffer;

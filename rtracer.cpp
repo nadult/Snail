@@ -16,7 +16,7 @@ int Object::nObjs=0;
 
 #ifdef __GNUC__
 	#if defined(__i386__)
-	static __inline__ unsigned long long Ticks() {
+	__inline__ unsigned long long Ticks() {
 	unsigned long long int x;
 		__asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
 		return x;
@@ -25,14 +25,14 @@ int Object::nObjs=0;
 
 //	typedef unsigned long long int unsigned long long;
 
-	static __inline__ unsigned long long Ticks() {
+	__inline__ unsigned long long Ticks() {
 		unsigned hi, lo;
 		__asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
 		return ( (unsigned long long)lo)|( ((unsigned long long)hi)<<32 );
 	}
 	#endif
 #else //msvc, intel
-	static INLINE unsigned long long Ticks() {
+	INLINE unsigned long long Ticks() {
 		u32 ddlow,ddhigh;
 
 		__asm{
@@ -82,7 +82,7 @@ public:
 	//	AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-30,-20,0),Vec3f(10,0,1020),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(20,-20,40),Vec3f(100,1000,10),Vec3f(40,40,40),1,1,1);
-	//	AddLight(Vec3f(5.696046,-12.600281,0.779701),Vec3f(500,500,500));
+		AddLight(Vec3f(0,-100,0),Vec3f(4000,4000,4000));
 		
 		startTree=SlowKDTree(objects);
 		tree=KDTree(startTree);
@@ -92,7 +92,7 @@ public:
 		for(int n=0;n<nLights;n+=1)
 			for(int k=n;k<n+1;k++) {
 				Vec3f tmp; Convert(lights[k].pos,tmp);
-				tmp=RotateY((0.05f+(n/1)*0.01f)*0.2f)*(tmp-Vec3f(-2.0f,0.0f,5.0f))+Vec3f(-2.0f,0.0f,5.0f);
+				tmp=RotateY((0.05f+(n/1)*0.01f)*0.2f)*(tmp-Vec3f(0,0,50))+Vec3f(0,0,50);
 				Convert(tmp,lights[k].pos);
 			}
 	}
@@ -112,14 +112,14 @@ public:
 	}
 
 	template <class Vec,class Base>
-	Vec ShadeLight(const Vec &lightColor,const Base &dot,const Base &lightDistSq) const
+	Vec ShadeLight(const Vec &lightColor,const Base &dot,const Base &lightDist) const
 	{
 		Vec out;
-		Base mul=Inv(lightDistSq);
-//		Base spec=dot*dot*dot;
+		Base mul=Inv(lightDist*lightDist);
+		Base spec=dot*dot; spec=spec*spec;
 		out = ( 
 				 lightColor*dot
-//				+lightColor*spec
+				+Vec3q(lightColor.X(),Const<Base,0>::Value(),Const<Base,0>::Value())*spec
 				)*mul;
 		return out;
 	}
@@ -143,10 +143,11 @@ public:
 		const base maxDist=Const<base,10000>::Value();
 		base dst[Group::size];
 
-		int nColTests;
+		int nColTests,nSkips;
 		KDStats stats=tree.stats;
 		tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),group,sel,maxDist,NormalOutput(dst,objId),primary);
 		nColTests=tree.stats.colTests-stats.colTests;
+		nSkips=tree.stats.skips-stats.skips;
 
 		Vec3q nrm[Group::size],colPos[Group::size],reflDir[Group::size],accLight[Group::size];
 		boolv tmask[Group::size];
@@ -169,8 +170,10 @@ public:
 					nrm[q]=Condition(ScalarInfo<base>::ElementMask(n),newNrm,nrm[q]);
 				}
 			}
+	//		accLight[q]=nrm[q]|group.Dir(q);
+			accLight[q]=Const<base,0>::Value();
 
-	//		out[q]=Const<base,1>::Value();
+			out[q]=Const<base,1>::Value();
 	//		out[q].X()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,50>::Value());
 	//		out[q].Y()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,200>::Value());
 	//		out[q].Z()=Abs(Const<base,1>::Value()-dst[q]*Const<base,1,1000>::Value());
@@ -178,7 +181,7 @@ public:
 //			out[q].X()=Condition(refl.X()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
 //			out[q].Y()=Condition(refl.Y()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
 //			out[q].Z()=Condition(refl.Z()>Const<base,0>::Value(),Const<base,8,12>::Value(),Const<base,2,12>::Value());
-			out[q]=nrm[q]|group.Dir(q);
+//			out[q]=nrm[q]|group.Dir(q);
 //			out[q].X()=Condition(group.Dir(q).X()<Const<floatq,0>::Value(),Const<floatq,0,2>::Value(),Const<floatq,1>::Value());
 //			out[q].Y()=Condition(group.Dir(q).Y()<Const<floatq,0>::Value(),Const<floatq,0,2>::Value(),Const<floatq,1>::Value());
 //			out[q].Z()=Condition(group.Dir(q).Z()<Const<floatq,0>::Value(),Const<floatq,0,2>::Value(),Const<floatq,1>::Value());
@@ -186,53 +189,51 @@ public:
 
 		for(int n=0;n<nLights;n++) {
 			const Light &light=lights[n];
-			Vec lightPos=light.pos;
+			Vec3p lightPos=light.pos;
 
 			Vec3q fromLight[Group::size];
-			base lightDistSq[Group::size];
+			base lightDist[Group::size];
 
 			for(int i=0;i<sel.Num();i++) {
 				int q=sel.Idx(i);
 
-				Vec lightVec=lightPos-colPos[q];
-				lightDistSq[q]=lightVec|lightVec;
-
-				base invLightDist=RSqrt(lightDistSq[q]);
-				fromLight[q]=-lightVec*invLightDist;
+				Vec3q lightVec=(colPos[q]-Vec3q(lightPos));
+				lightDist[q]=Sqrt(lightVec|lightVec);
+				fromLight[q]=lightVec*Inv(lightDist[q]);
 			}
 
-			base tDst[Group::size];
-			u32 lightObjId[ScalarInfo<base>::Multiplicity*Group::size] __attribute__((aligned(16))); {
-				RayGroup<Group::recLevel,1> tGroup(fromLight,&lightPos);
-//				tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),tGroup,sel,maxDist,ShadowOutput(tDst),0);
+			RaySelector<Group::size> lsel(sel);
+			base dot[Group::size];
+			for(int i=0;i<lsel.Num();i++) {
+				int q=lsel[i];
+				dot[q]=nrm[q]|fromLight[q]; {
+					boolv mask=dot[q]<=Const<base,0>::Value();
+					if(ForAll(mask)) {
+						lsel.Disable(i--);
+						continue;
+					}
+					dot[q]=Condition(!mask,dot[q]);
+				}
 			}
+
+			base tDst[Group::size]; {
+				Vec3q lPos(lightPos.X(),lightPos.Y(),lightPos.Z());
+				RayGroup<Group::recLevel,1> tGroup(fromLight,&lPos);
+				tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),tGroup,lsel,Const<base,10000>::Value(),ShadowOutput(tDst),1);
+			}
+
 
 			Vec lightColor=light.color;
 
-			for(int i=0;i<sel.Num();i++) {
-				int q=sel.Idx(i);
-//				boolv mask=Const<SSEMask,0>::Value();
-				__m128i a=_mm_load_si128((__m128i*)(objId+q*4)),b=_mm_load_si128((__m128i*)(lightObjId+q*4));
-				boolv mask=_mm_castsi128_ps(_mm_cmpeq_epi32(a,b));
-				base dot=nrm[q]|-fromLight[q]; {
-					boolv mask=dot<=Const<base,0>::Value();
-					if(ForAll(mask)) {
-						if(n==0) accLight[q]=Const<base,0>::Value();
-						continue;
-					}
-					dot=Condition(!mask,dot);
-				}
+			for(int i=0;i<lsel.Num();i++) {
+				int q=lsel.Idx(i);
 
-		//		boolv mask=tDst[q]*tDst[q]<lightDistSq[q]*Const<SSEReal,999,1000>::Value();
+				boolv mask=Abs(tDst[q]-lightDist[q])>Const<base,1,1000>::Value();
 				if(ForAll(mask)) // wszystkie punkty zasloniete
-					continue;
-				
+					continue;	
 
-				Vec col=(//Condition(!mask,
-						ShadeLight(lightColor,dot,lightDistSq[q]));
-
-				if(n==0) accLight[q]=col;
-				else accLight[q]+=col;
+				Vec col=Condition(!mask,ShadeLight(lightColor,dot[q],lightDist[q]));
+				accLight[q]+=col;
 			}
 		}
 
@@ -264,10 +265,14 @@ public:
 
 		ticks=Ticks()-ticks;
 
-		if(rdtscShader) for(int q=0;q<Group::size;q++) {
-			out[q].X()=floatq(sqrt(float(ticks))*0.001f);
-			out[q].Y()=floatq(float(0));
-			out[q].Z()=floatq(float(nColTests)*0.005f);
+		if(rdtscShader) {
+			floatq mul(0.00001f/Group::size);
+			for(int q=0;q<Group::size;q++) {
+				out[q].X()=floatq(float(ticks))*mul;
+				out[q].Y()=floatq(float(ticks))*mul*0.1f;
+			//	out[q].Y()=floatq(float(0));//nSkips)*0.01f);
+				out[q].Z()=floatq(float(0));//nColTests)*0.001f);
+			}
 		}
 	}
 
@@ -326,6 +331,7 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,int pixDoubling,bo
 				Vec3f tmp[4]; Convert(dir[n],tmp);
 				for(int k=0;k<4;k++) tmp[k]=rotMat*tmp[k];
 				Convert(tmp,dir[n]);
+				dir[n]*=RSqrt(dir[n]|dir[n]);
 			}
 			RayGroup<QuadLevels,1> group(dir,&origin);
 
@@ -344,7 +350,6 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,int pixDoubling,bo
 				*buf[ty]++=(char)trgb[tx+ty*PWidth].y;
 				*buf[ty]++=(char)trgb[tx+ty*PWidth].z;
 			} 
-
 		}
 	}
 
@@ -413,17 +418,30 @@ int main(int argc, char **argv)
 		else notFull++;
 	}
 	printf("Objects %d:\nFull KDnode objects: %.2f%%\n\n",full+notFull,100.0*double(full)/double(full+notFull));
+	printf("Nodes: %d\n",scene.tree.nodes.size());
 
 	Image img(resx,resy);
 	Camera cam;
 	cam.plane_dist=0.5f;
+	// pompei?
 //	cam.pos=Vec3f(52.423584,158.399719,51.276756);
 //	cam.front=Vec3f(0.999916,0.000000,-0.013203);
 //	cam.right=Vec3f(-0.013203,0.000000,-0.999916);
 
+	// abrams, lancia from the side
 	cam.pos=Vec3f(-125.014099,-7.600281,115.258301);
 	cam.front=Vec3f(0.907629,0.000000,-0.419782);
 	cam.right=Vec3f(-0.419782,0.000000,-0.907629);
+
+	// abrams from the back
+//	cam.pos=Vec3f(-5.081215,-5.600281,-275.260132);
+//	cam.front=Vec3f(0.023998,0.000000,0.999716);
+//	cam.right=Vec3f(0.999716,0.000000,-0.023998);
+
+	// abrams from the back + camera turned back
+//	cam.pos=Vec3f(-14.741514,-3.600281,-217.086441);
+//	cam.front=Vec3f(-0.181398,0.000000,-0.983413);
+//	cam.right=Vec3f(-0.983413,0.000000,0.181398);
 
 
 
@@ -484,7 +502,7 @@ int main(int argc, char **argv)
 			scene.tree.stats.PrintInfo(resx,resy,lastTicks,ticks);
 
 			Vec3f a,b; Convert(scene.tree.pMin,a); Convert(scene.tree.pMax,b);
-		//	scene.Animate();
+			scene.Animate();
 			out.Render(img);
 		}
 	}
