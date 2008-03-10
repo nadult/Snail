@@ -19,7 +19,8 @@ SDLOutput::SDLOutput(int w, int h,bool full)
 	resx=w; resy=h;
 	if(initiated) throw Exception("SDLOutput alredy created");
   
-    if(SDL_Init(SDL_INIT_VIDEO)<0) throw Exception("Error while initializing SDL");
+    if(SDL_Init(SDL_INIT_VIDEO)<0)
+		throw Exception("Error while initializing SDL");
    
 	if (!(screen = SDL_SetVideoMode(w, h,32,(full?SDL_FULLSCREEN:0)|SDL_SWSURFACE))) {
         SDL_Quit();

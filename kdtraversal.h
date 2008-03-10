@@ -1,19 +1,46 @@
 
+
+template <int size>
+class ObjectIdxBuffer
+{
+public:
+	ObjectIdxBuffer() {
+		for(int n=0;n<size;n++)
+			indices[n]=SSEI32(-1);
+		last=0;
+	}
+	void Insert(u32 idx) {
+		((u32*)indices)[last]=idx;
+		last=(last+1)%(size*4);
+	}
+	bool Find(u32 idx) {
+		SSEI32 tidx(idx),test;
+		test=indices[0]==tidx;
+		for(int n=1;n<size;n++)
+			test=test||indices[n]==tidx;
+		return ForAny(test);
+	}
+	SSEI32 indices[size];
+	int last;
+};
+
+
+
 template <class Output,class Vec,class base>
 void KDTree::FullTraverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output &out) const {	
 	if(Output::objectIdsFlag) {
-		for(int m=0;m<ScalarInfo<base>::Multiplicity;m++)
+		for(int m=0;m<ScalarInfo<base>::multiplicity;m++)
 			out.object[m]=0;
 	}
 	out.dist=maxD;
 
 	for(int n=0;n<Object::nObjs;n++) {
 		base dst=Object::spheres[n].Collide(rOrigin,rDir);
-		typename Vec::TBool col=dst>Const<base,0>::Value()&&dst<out;
+		typename Vec::TBool col=dst>Const<base,0>()&&dst<out;
 
 		if(Output::objectIdsFlag) {
 			u32 msk=ForWhich(col);
-			for(int m=0;m<ScalarInfo<base>::Multiplicity;m++)
+			for(int m=0;m<ScalarInfo<base>::multiplicity;m++)
 				if(msk&(1<<m)) out.object[m]=n;
 		}
 		out.dist=Condition(col,dst,out);
@@ -28,19 +55,17 @@ INLINE void KDTree::TraverseMono(int packetId,const Vec3p &rOrigin,const Vec3p &
 	};
 	Locals4 stackBegin[MaxLevel+16],*stack=stackBegin;
 
-	Vec3p rDir=Vec3p(	tDir.X()+0.000000000001f,
-						tDir.Y()+0.000000000001f,
-						tDir.Z()+0.000000000001f);
+	Vec3p rDir=Vec3p(tDir.X()+0.000000000001f,tDir.Y()+0.000000000001f,tDir.Z()+0.000000000001f);
 	Vec3p invDir=Inv(rDir);
 
 	const float *rStart=(const float*)&rOrigin;
 	const float *irDir=(const float*)&invDir;
-	float tMin=ConstEpsilon<float>::Value(),tMax=maxD;
+	float tMin=ConstEpsilon<float>(),tMax=maxD;
 
 	*outObj=0;
 
-	int dSign[3];
-	GetVecSigns(invDir,dSign);
+	int signMask=SignMask(SSEReal(invDir.m));
+	int dSign[3]={signMask&1?0:1,signMask&2?0:1,signMask&4?0:1};
 	float minRet=maxD;
 
 	const KDNode *node=&nodes[0];
@@ -60,16 +85,16 @@ INLINE void KDTree::TraverseMono(int packetId,const Vec3p &rOrigin,const Vec3p &
 				float eps=0.0001f,ttMin=tMin-eps,ttMax=tMax+eps;
 				
 				for(int n=node->NumObjects();n>0;n--) {
+					localStats.colTests++;
+
 					int tid=*id++;
 					const Object &obj=objs[tid];
 					float ret; Convert(obj.Collide(rOrigin,rDir),ret);
 					
-					bool mask=ret>ttMin&&ret<Min(minRet,ttMax);
-
-					localStats.colTests++;
-					if(mask) *outObj=tid;
-
-					minRet=mask?ret:minRet;
+					if(ret>ttMin&&ret<Min(minRet,ttMax)) {
+						*outObj=tid;
+						minRet=ret;
+					}
 				}
 				if(minRet<maxD) {
 					stats.Update(localStats);
@@ -243,7 +268,7 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 
 		out.dist[q]=maxD;
 		if(Output::objectIdsFlag) {
-			for(int n=0;n<ScalarInfo<floatq>::Multiplicity;n++)
+			for(int n=0;n<ScalarInfo<floatq>::multiplicity;n++)
 				out.object[q*4+n]=0;
 		}
 	}
@@ -289,11 +314,11 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 		Vec3p t[4]; Convert(tmp,t);
 		beamDir=t[0]+t[1]+t[2]+t[3];
 		beamDir*=RSqrt(beamDir|beamDir);
-		beamOrig=(minOR+maxOR)*floatp(0.5f)*negMask;
+		beamOrig=(minOR+maxOR)*0.5f*negMask;
 		Convert(Sqrt((maxOR-minOR)|(maxOR-minOR)),beamA);
 		beamA*=0.5f;
 
-		floatq minDot=Const<floatq,1>::Value();
+		floatq minDot=Const<floatq,1>();
 		Vec3q maxVec=group.Dir(sel[0]),mid=Vec3q(beamDir);
 
 		for(int n=0;n<sel.Num();n++) {
@@ -308,6 +333,7 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 
 		{ float t[4]; Convert(maxDist,t); beamM=Max(Max(t[0],t[1]),Max(t[2],t[3])); }
 	}
+	ObjectIdxBuffer<8> idxBuffer;
 
 	while(true) {
 		localStats.iters++;
@@ -319,7 +345,7 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 				const u32 *oid=objIds+node->FirstObject();
 				
 				SSEPVec3 nodeMin,nodeMax; {
-					SSEPVec3 nodeEps(Const<floatq,1,1000>::Value().m);
+					SSEPVec3 nodeEps(Const<floatq,1,1000>().m);
 					Vec3p tMin=bMin*negMask,tMax=bMax*negMask;
 					nodeMin=Min(tMin,tMax)-nodeEps;
 					nodeMax=Max(tMin,tMax)+nodeEps;
@@ -330,7 +356,9 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 					const Object &obj=objs[tid];
 					const bool fullInNode=obj.fullInNode;
 					
-					if(obj.lastVisit==packetId) { /*localStats.skips++;*/ continue; }
+					if(idxBuffer.Find(tid))
+				//	if(obj.lastVisit==packetId)
+						{ localStats.skips++; continue; }
 
 					bool beamCollision=1;
 					if(sel.Num()>2) {
@@ -338,7 +366,7 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 
 					 	if(!beamCollision) {
 							obj.lastVisit=packetId;
-							localStats.skips++;
+						//	localStats.skips++;
 							continue;
 						}
 					}
@@ -351,7 +379,7 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 						localStats.colTests++;
 
 						floatq ret=obj.Collide(group.Origin(q),group.Dir(q));
-						SSEMask mask=(ret>Const<floatq,0>::Value()&&ret<out.dist[q]);
+						SSEMask mask=(ret>Const<floatq,0>()&&ret<out.dist[q]);
 						u32 msk=ForWhich(mask);
 
 						anyPassed+=msk;
@@ -369,7 +397,7 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 						}
 
 						if(Output::objectIdsFlag) {
-							if(msk) for(int m=0;m<ScalarInfo<floatq>::Multiplicity;m++)
+							if(msk) for(int m=0;m<ScalarInfo<floatq>::multiplicity;m++)
 								if(msk&(1<<m)) out.object[q*4+m]=tid;
 						}
 
@@ -387,7 +415,8 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 					else localStats.intersectFail++;
 
 					if(fullInside) {
-						obj.lastVisit=packetId;
+					//	obj.lastVisit=packetId;
+						idxBuffer.Insert(tid);
 						localStats.notBreaking++;
 					}
 					else localStats.breaking++;
@@ -470,181 +499,241 @@ inline void KDTree::TraverseFast(int packetId,Group &group,const RaySelector<Gro
 	}
 }
 
-template <class Output,class Group>
-void KDTree::TraverseOptimized(int packetId,Group &group,const RaySelector<Group::size> &sel,
-							   const floatq &maxD,const Output &out,bool primary) const {
-	if(!sel.Num()) return;
-
-	RaySelector<Group::size> selectors[9];
-
-	group.GenSelectors(sel,selectors);
-
-	for(int k=0;k<8;k++) if(selectors[k].Num()) {
-		TraverseFast(PacketIdGenerator::Gen(packetId),group,selectors[k],maxD,out);
-		stats.runs++; stats.coherent+=sel.Num();
-	}
-	if(selectors[8].Num()) {
-		RaySelector<Group::size> sel=selectors[8];
-
-		/* for(int i=0;i<sel.Num();i++) {
-			int q=sel[i];
-			Traverse(PacketIdGenerator::Gen(packetId),group.Origin(q),group.Dir(q),maxD,Output(out,q));
-		}*/
-		
-/*		for(int i=0;i<sel.Num();i++) {
-			int q=sel[i];
-			Vec3p orig[4]; Vec3p dir[4]; float fmaxD[4];
-			Convert(group.Origin(q),orig);
-			Convert(group.Dir(q),dir);
-			Convert(maxD,fmaxD);
-
-			float *dist=(float*)(out.dist+q);
-			TraverseMono(0,orig[0],dir[0],fmaxD[0],dist[0],out.object+q*4+0);
-			TraverseMono(0,orig[1],dir[1],fmaxD[1],dist[1],out.object+q*4+1);
-			TraverseMono(0,orig[2],dir[2],fmaxD[2],dist[2],out.object+q*4+2);
-			TraverseMono(0,orig[3],dir[3],fmaxD[3],dist[3],out.object+q*4+3);
-		}*/
-		stats.runs+=sel.Num();
-		stats.nonCoherent+=sel.Num();
-	}
-	stats.tracedRays+=sel.Num()*4;
-}
-
-
-
-/*
- * Disabled, because it needs bounding boxes
- * for every kd node
- */
-/*
-template <class Output,class Vec,class base>
-void KDTree::Traverse(int packetId,const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output &out) const
+template <class Group>
+inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) const
 {
-	struct Locals4 {
-		base tMin,tMax;
-		const KDNode *node;
-	};
-
-	Locals4 stackBegin[MaxLevel+16],*stack=stackBegin;
-	Vec invDir=Inv(rDir);
-
-	const base *rStart=&rOrigin.X();
-	const base *irDir=&invDir.X();
-
-	base tMin=ConstEpsilon<base>::Value(),tMax=maxD;
-
-	if(Output::objectIdsFlag) {
-		for(int n=0;n<ScalarInfo<base>::Multiplicity;n++)
-			out.object[n]=0;
+	int xSign=sel.SignMaskX(),ySign=sel.SignMaskY(),zSign=sel.SignMaskZ();
+	int sign0[3]={xSign==0,ySign==0,zSign==0};
+	
+	Vec3p negMask; int negMaskI[3]; {
+		float negMaskXYZ[4];
+		negMaskXYZ[0]=xSign?-1.0f:1.0f;
+		negMaskXYZ[1]=ySign?-1.0f:1.0f;
+		negMaskXYZ[2]=zSign?-1.0f:1.0f;
+		negMaskXYZ[3]=0.0f;
+		negMaskI[0]=xSign?0x80000000:0;
+		negMaskI[1]=ySign?0x80000000:0;
+		negMaskI[2]=zSign?0x80000000:0;
+		Convert(negMaskXYZ,negMask);
 	}
 
-	int dSign[3];
-	GetVecSigns(invDir,dSign);
+	// Minimized / maximized ray origin
+	Vec3p minOR,maxOR; {
+		ComputeMinMaxOrigin(sel,group,minOR,maxOR);
+		minOR*=negMask; maxOR*=negMask;
+		Vec3p tMin=Min(minOR,maxOR);
+		maxOR=Max(minOR,maxOR); minOR=tMin;	
+	}
 
-	base minRet=maxD;
+	SSEReal pv[3],ov[3];
+	ComputePV(sel,&group.Dir(0),pv);
+	ComputeOV(minOR,maxOR,pv,ov);
+
+	Vec3p boxStack[(MaxLevel+8)*2];
+	const KDNode *nodeStack[MaxLevel+8];
+	int depthStack[MaxLevel+8];
+	u32 stackPos=0;
 
 	const KDNode *node=&nodes[0];
 	const u32 *objIds=&objectIds[0];
 	const Object *objs=&objects[0];
 
-	KDStats localStats;
+	Vec3p bMin,bMax; {
+		Vec3p tMin=pMin*negMask,tMax=pMax*negMask;
+		Vec3p tpMin=Min(tMin,tMax),tpMax=Max(tMin,tMax);
+		bMin=Max(minOR,tpMin);
+		bMax=tpMax;
+	}
+
+	Vec3p beamDir,beamOrig; float beamM,beamA; {
+		beamDir=Vec3p(0,0,0);
+		Vec3q tmp=group.Dir(sel[0]);
+		for(int n=1;n<sel.Num();n++) tmp+=group.Dir(sel[n]);
+		Vec3p t[4]; Convert(tmp,t);
+		beamDir=t[0]+t[1]+t[2]+t[3];
+		beamDir*=RSqrt(beamDir|beamDir);
+		beamOrig=(minOR+maxOR)*0.5f*negMask;
+		Convert(Sqrt((maxOR-minOR)|(maxOR-minOR)),beamA);
+		beamA*=0.5f;
+
+		floatq minDot=Const<floatq,1>();
+		Vec3q maxVec=group.Dir(sel[0]),mid=Vec3q(beamDir);
+
+		for(int n=0;n<sel.Num();n++) {
+			Vec3q &vec=group.Dir(sel[n]);
+			floatq dot=vec|mid;
+			typename Vec3q::TBool mask=dot<minDot;
+			maxVec=Condition(mask,vec,maxVec);
+			minDot=Min(dot,minDot);
+		}
+
+		floatq maxDist=Length(maxVec-mid*minDot);
+
+		{ float t[4]; Convert(maxDist,t); beamM=Max(Max(t[0],t[1]),Max(t[2],t[3])); }
+	}
+	int depth=0;
 
 	while(true) {
-		localStats.iters++;
 		u32 axis=node->Axis();
-
-		if(axis==3) { // leaf
+		if(axis==3) { // Leaf
 			if(node->NumObjects()) {
-				const u32 *id=objIds+node->FirstObject();
+
+				const u32 *oid=objIds+node->FirstObject();
 				
 				SSEPVec3 nodeMin,nodeMax; {
-					int nodeIdx=node-&nodes[0];
-					SSEPVec3 nodeEps(Const<floatq,1,1000>::Value().m);
-					nodeMin=nodeMinMax[nodeIdx*2+0]-nodeEps;
-					nodeMax=nodeMinMax[nodeIdx*2+1]+nodeEps;
+					SSEPVec3 nodeEps(Const<floatq,1,1000>().m);
+					Vec3p tMin=bMin*negMask,tMax=bMax*negMask;
+					nodeMin=Min(tMin,tMax)-nodeEps;
+					nodeMax=Max(tMin,tMax)+nodeEps;
 				}
 
 				for(int n=node->NumObjects();n>0;n--) {
-					int tid=*id++;
+					int tid=*oid++;
 					const Object &obj=objs[tid];
-					base ret=obj.Collide(rOrigin,rDir);
+					const bool fullInNode=obj.fullInNode;
 					
-					if(obj.lastVisit==packetId) { localStats.skips++; continue; }
-					bool fullInside=1;
-					
-					typename Vec::TBool mask=ret>Const<base,0>::Value()&&ret<minRet;
-					u32 msk=ForWhich(mask);	
-	
-					if(!obj.fullInNode) {
-						Vec col=rOrigin+rDir*ret;
-						typename Vec::TBool insideMask=	col.X()>=nodeMin.X()&&col.X()<=nodeMax.X()&&
-														col.Y()>=nodeMin.Y()&&col.Y()<=nodeMax.Y()&&	
-														col.Z()>=nodeMin.Z()&&col.Z()<=nodeMax.Z();
-						
-						u32 insideMsk=ForWhich(insideMask);
-						mask=mask&&insideMask; 
-						// Jakies promienie uderzyly w obiekt poza KD-nodem
-						if(msk^insideMsk) fullInside=0;
-						msk&=insideMsk;
-					}
-
-					localStats.colTests++;
-
-					if(Output::objectIdsFlag) {
-						if(msk) for(int m=0;m<ScalarInfo<base>::Multiplicity;m++)
-							if(msk&(1<<m)) out.object[m]=tid;
-					}
-
-					if(fullInside) {
-						obj.lastVisit=packetId;
-						stats.notBreaking++;
-					}
-					else stats.breaking++;
-
-					minRet=Condition(mask,ret,minRet);
+					bool beamCollision=obj.BeamCollide(beamOrig,beamDir,beamM,beamA);
+				 	if(beamCollision)
+						return depth;
 				}
-
-				if(ForAll(minRet<maxD)) {
-					stats.Update(localStats);
-					out.dist[0]=minRet;
-					return;
-				}
-
 			}
+			if(stackPos==0)
+				return 255;
 
-			if(stack==stackBegin) {
-				stats.Update(localStats);
-				out.dist[0]=minRet;
-				return;
-			}
-			{
-				stack--;
-				tMin=stack->tMin;
-				tMax=stack->tMax;
-				node=stack->node;
-			}
+			stackPos--;
+			bMin=boxStack[stackPos*2+0];
+			bMax=boxStack[stackPos*2+1];
+			node=nodeStack[stackPos];
+			depth=depthStack[stackPos];
 			continue;
 		}
 
-		base tSplit=base(node->Pos()-rStart[axis])*irDir[axis];
+		SSEReal split; {
+			union { float f; int i; };
+			f=node->Pos();
+			i^=negMaskI[axis];
+			split=f;
+		}
 		node+=node->ChildDist();
-		u32 sign=dSign[axis];
+		depth++;
 
-		if(ForAll(tSplit<=tMin)) {
-			tMin=Max(tSplit,tMin); node+=sign;
-			continue;
+		u32 mask=1<<axis;
+		if(_mm_movemask_ps(_mm_cmpgt_ps(bMin.m,split.m))&mask) { node+=sign0[axis]; continue; }
+		if(_mm_movemask_ps(_mm_cmplt_ps(bMax.m,split.m))&mask) { node+=sign0[axis]^1; continue; }
+
+		{
+			SSEReal abab=pv[axis]*split+ov[axis],tmp,tt[3];
+			tmp=_mm_unpacklo_ps(split.m,abab.m);
+			tt[0].m=_mm_shuffle(0+(1<<2)+(3<<4),tmp.m);
+			tt[1].m=_mm_shuffle(1+(0<<2)+(3<<4),tmp.m);
+			tt[2].m=_mm_shuffle(1+(3<<2)+(0<<4),tmp.m);
+			boxStack[stackPos*2+0]=_mm_max_ps(bMin.m,tt[axis].m);
+
+			depthStack[stackPos]=depth;
+			nodeStack[stackPos]=node+sign0[axis];
+			node+=sign0[axis]^1;
+			boxStack[stackPos*2+1]=bMax;
+			stackPos++;
+
+			tmp=_mm_unpackhi_ps(split.m,abab.m);
+			tt[0].m=_mm_shuffle(0+(1<<2)+(3<<4),tmp.m);
+			tt[1].m=_mm_shuffle(1+(0<<2)+(3<<4),tmp.m);
+			tt[2].m=_mm_shuffle(1+(3<<2)+(0<<4),tmp.m);
+			bMax=_mm_min_ps(bMax.m,tt[axis].m);
 		}
-		if(ForAll(tSplit>=tMax)) {
-			tMax=Min(tSplit,tMax); node+=!sign;
-			continue;
-		}
-
-		stack->tMin=Max(tSplit,tMin);
-		stack->tMax=tMax;
-		stack->node=node+sign;
-		stack++;
-
-		tMax=Min(tMax,tSplit); node+=!sign;
 	}
-}*/
+}
+
+
+
+
+
+template <class Output,class Group>
+void KDTree::TraverseMonoGroup(int packetId,Group &group,const RaySelector<Group::size> &sel,
+								const floatq &maxD,const Output &out) const {
+	Vec3p orig[4],dir[4];
+	float fmaxD[4];
+	u32 tmp[4];
+
+//	for(int n=0;n<sel.Num();n++) {
+//		int q=sel[n];
+//		u32 *objId=out.object+q*4;
+//		objId[0]=objId[1]=objId[2]=objId[3]=0;
+//	}
+//	return;
+
+	if(Group::singleOrigin)
+		Convert(group.Origin(sel[0]),orig);
+	Convert(maxD,fmaxD);
+
+	
+	for(int i=0;i<sel.Num();i++) {
+		int q=sel[i];
+		Vec3p dir[4];
+
+		if(!Group::singleOrigin)
+			Convert(group.Origin(q),orig);
+		Convert(group.Dir(q),dir);
+
+		float *dist=(float*)(out.dist+q);
+		u32 *objId=Output::objectIdsFlag?out.object+q*4:tmp;
+		TraverseMono(0,orig[0],dir[0],fmaxD[0],dist[0],objId+0);
+		TraverseMono(0,orig[1],dir[1],fmaxD[1],dist[1],objId+1);
+		TraverseMono(0,orig[2],dir[2],fmaxD[2],dist[2],objId+2);
+		TraverseMono(0,orig[3],dir[3],fmaxD[3],dist[3],objId+3);
+	}
+}
+
+template <class Output,class Group,class Selector>
+void KDTree::TraverseOptimized(int packetId,Group &group,const Selector &sel,
+							   const floatq &maxD,const Output &out,bool primary) const {
+	if(!sel.Num()) return;
+
+	RaySelector<Group::size> selectors[9];
+	group.GenSelectors(sel,selectors);
+
+/*	int depth=primary&&Group::recLevel==2?GetDepth(group,sel):255;
+	if(depth<22) {
+		typedef RayGroup<1,Group::singleOrigin> GroupP;
+		RaySelector<GroupP::size> tsel;
+		for(int n=0;n<4;n++) tsel.Add(n);
+		
+		for(int k=0;k<16;k+=4) {
+			GroupP gr(&group.Dir(k),&group.Origin(k));
+			TraverseOptimized<NormalOutput,GroupP,RaySelector<GroupP::size> >(PacketIdGenerator::Gen(packetId),
+					gr,tsel,maxD,NormalOutput(out.dist+k,out.object+k*4),true);
+		}
+		return;
+	}*/
+
+	for(int k=0;k<8;k++) {
+		RaySelector<Group::size> &sel=selectors[k];
+		if(sel.Num()) {
+			Vec3q &dir0=group.Dir(sel[0]);
+
+			if(!primary) for(int i=1;i<sel.Num();i++) {
+				floatq dot=dir0|group.Dir(sel[i]);
+				if(ForAny(dot<Const<floatq,98,100>())) {
+					selectors[8].Add(sel[i]);
+					sel.Disable(i--);
+				}
+			}
+
+			if(sel.Num()>2) {
+				TraverseFast(PacketIdGenerator::Gen(packetId),group,sel,maxD,out);
+				stats.coherent+=sel.Num();
+			}
+			else while(sel.Num()) { selectors[8].Add(sel[0]); sel.Disable(0); }
+			stats.runs++;
+		}
+	}
+	if(selectors[8].Num()) {
+		const RaySelector<Group::size> &sel=selectors[8];
+
+		TraverseMonoGroup(PacketIdGenerator::Gen(packetId),group,sel,maxD,out);
+		stats.runs+=sel.Num();
+		stats.nonCoherent+=sel.Num();
+	}
+	stats.tracedRays+=sel.Num()*4;
+}
 

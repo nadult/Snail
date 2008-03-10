@@ -1,13 +1,13 @@
 ICCFLAGS=-openmp -inline-level=2 -inline-forceinline -fp-model fast -fp-speculationfast -shared-intel -lstdc++
-GCCFLAGS=-mfpmath=sse -ffast-math -funroll-loops -fopenmp -fno-rtti -fomit-frame-pointer
+GCCFLAGS=-mfpmath=sse -ffast-math -funroll-loops -fopenmp -fno-rtti -g
 
-FLAGS=$(GCCFLAGS) -O3 -msse3 -pthread -I /home/someone/rtracer/veclib
+FLAGS=$(GCCFLAGS) -O3 -msse3 -pthread -I /home/someone/veclib 
 CC=/usr/local/gcc-4.3-20080215/bin/g++
 #CC=icc
 
 all: rtracer
 
-rtracer.gch: rtracer.h kdtree.h kdtraversal.h Makefile
+rtracer.gch: *.h Makefile
 	$(CC) $(FLAGS) -o rtracer.gch rtracer.h
 #	touch rtracer.gch
 
@@ -37,3 +37,4 @@ rtracer: rtracer.o image.o kdtree.o sdlout.o ray_generator.o model.o rtracer.gch
 
 clean:
 	rm rtracer *.o *.gch
+

@@ -21,16 +21,11 @@ typedef SSEPVec4	Vec4p;
 typedef SSEVec2		Vec2q;
 typedef SSEVec3		Vec3q;
 typedef SSEVec4		Vec4q;
-typedef SSEPReal	floatp;
 typedef SSEReal		floatq;
-typedef unsigned long long u64;
 
 using std::vector;
 using std::pair;
 using std::string;
-
-u64 Ticks();
-
 
 class Exception: public std::exception
 {
@@ -41,23 +36,6 @@ public:
 	~Exception() throw() { }
 	const char *what() const throw() { return data.c_str(); }
 };
-
-template <class Vec>
-INLINE void GetVecSigns(const Vec &dir,int *dSign)
-{
-	dSign[0]=SignMask(dir.X());
-	dSign[1]=SignMask(dir.Y());
-	dSign[2]=SignMask(dir.Z());
-
-	// Wszystkie wektorki maja takie same znaki kierunk�
-//	assert(dSign[0]==15||dSign[0]==0);
-//	assert(dSign[1]==15||dSign[1]==0);
-//	assert(dSign[2]==15||dSign[2]==0);
-
-	dSign[0]=dSign[0]?0:1;
-	dSign[1]=dSign[1]?0:1;
-	dSign[2]=dSign[2]?0:1;
-}
 
 class Sphere
 {
@@ -76,7 +54,7 @@ public:
 	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const;
 
 	Vec3p pos;
-	floatp radp2,rad;
+	float radp2,rad;
 };
 
 class Triangle
@@ -120,8 +98,8 @@ typename Vec::TScalar Sphere::Collide(const VecO &rOrigin,const Vec &rDir) const
 	VecO dst=rOrigin-pos;
 	base b=rDir|dst,d=b*b-((dst|dst)-radp2);
 
-	typename Vec::TBool mask=d>=Const<base,0>::Value();
-	return ForAny(mask)?Condition(mask,-b-Sqrt(d),Const<base,-1>::Value()):Const<base,-1>::Value();
+	typename Vec::TBool mask=d>=Const<base,0>();
+	return ForAny(mask)?Condition(mask,-b-Sqrt(d),Const<base,-1>()):Const<base,-1>();
 }
 
 template <class VecO,class Vec>
@@ -130,13 +108,13 @@ typename Vec::TScalar Triangle::Collide(const VecO &rOrig,const Vec &rDir) const
 	typedef typename Vec::TScalar base;
 	typedef typename Vec::TBool Bool;
 
-	base out=Const<base,-1>::Value();
+	base out=Const<base,-1>();
 
 	base det = rDir|e1ce2;
 	VecO tvec = rOrig-VecO(a);
 	base u = rDir|(VecO(b-a)^tvec);
 	base v = rDir|(tvec^VecO(c-a));
-	Bool test=Min(u,v)>=Const<base,0>::Value()&&u+v<=det;
+	Bool test=Min(u,v)>=Const<base,0>()&&u+v<=det;
 	if (ForAny(test)) {
 		base dist=-(tvec|Nrm())*Inv(rDir|Nrm());
 		out=Condition(test,dist,out);
@@ -147,21 +125,21 @@ typename Vec::TScalar Triangle::Collide(const VecO &rOrig,const Vec &rDir) const
 
 INLINE bool Triangle::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC) const
 {
-	floatp dot=dir|Nrm();
+	float dot=dir|Nrm();
 
-	if(ForAny(dot<=Const<floatp,1,100>::Value()))
+	if(ForAny(dot<=Const<float,1,100>()))
 		return 1;
 
-	floatp idot=Inv(dir|Nrm());
+	float idot=Inv(dir|Nrm());
 
-	floatp t=-((orig-a)|Nrm())*idot;
+	float t=-((orig-a)|Nrm())*idot;
 	Vec3p col=orig+dir*t;
 
-	if(ForAny(t<-floatp(epsC)*idot)) return 0;
+	if(ForAny(t<-epsC*idot)) return 0;
 
-	floatp epsilon=(floatp(epsL)*t+floatp(epsC))*idot;
+	float epsilon=(epsL*t+epsC)*idot;
 
-	floatq dist[3]={(col-a)|e1n,(col-b)|e2n,(col-c)|e3n};
+	float dist[3]={(col-a)|e1n,(col-b)|e2n,(col-c)|e3n};
 	if(ForAny(Min(dist[0],Min(dist[1],dist[2]))<-epsilon)) return 0;
 
 	return 1;
@@ -189,8 +167,8 @@ class Object
 public:
 	enum { MaxObjs=1000000 };
 
-	static Triangle tris[MaxObjs];
-	static Sphere spheres[MaxObjs];
+	static Triangle tris[MaxObjs] __attribute__ ((aligned(16)));
+	static Sphere spheres[MaxObjs] __attribute__ ((aligned(16)));
 	static Vec3p bounds[MaxObjs*2];
 	static int nObjs;
 
@@ -290,7 +268,7 @@ public:
 	}
 
 	Vec3p pos,color;
-	floatp zeroDist;
+	float zeroDist;
 };
 
 

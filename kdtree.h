@@ -149,7 +149,6 @@ public:
 	template <class Output,class Vec,class base>
 	void FullTraverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output&) const;
 
-
 	void TraverseMono(int packetId,const Vec3p &rOrigin,const Vec3p &rDir,const float &maxD,float &dist,u32 *obj) const;
 
 //	template <class Output,class Vec,class base>
@@ -160,9 +159,16 @@ public:
 	void TraverseFast(int packetId,Group &group,const RaySelector<Group::size>&,const floatq &maxD,
 			const Output &out) const;
 
+	template <class Output,class Group,class Selector>
+	void TraverseOptimized(int packetId,Group &group,const Selector&,const floatq &maxD,
+			const Output &out,bool primary) const;
+
 	template <class Output,class Group>
-	void TraverseOptimized(int packetId,Group &group,const RaySelector<Group::size>&,const floatq &maxD,
-			const Output &out,bool noncoh) const;
+	void TraverseMonoGroup(int packetId,Group &group,const RaySelector<Group::size>&,const floatq &maxD,
+			const Output &out) const;
+
+	template <class Group>
+	int GetDepth(Group &group,const RaySelector<Group::size>&) const;
 
 	bool TestNode(Vec3f min,Vec3f max,int node) const;
 	bool Test() const;
