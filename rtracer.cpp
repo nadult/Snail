@@ -366,6 +366,8 @@ int main(int argc, char **argv)
 //#endif
 
 #define PRINT_SIZE(cls)		{printf("sizeof(" #cls "): %d\n",sizeof(cls));}
+	PRINT_SIZE(SSEVec3) PRINT_SIZE(SSEVec4)
+	PRINT_SIZE(SSEPVec3) PRINT_SIZE(SSEPVec4)
 	PRINT_SIZE(Object)
 	PRINT_SIZE(KDNode)
 	PRINT_SIZE(Triangle)
@@ -402,14 +404,14 @@ int main(int argc, char **argv)
 	Camera cam;
 	cam.plane_dist=0.5f;
 	// pompei?
-//	cam.pos=Vec3f(52.423584,158.399719,51.276756);
-//	cam.front=Vec3f(0.999916,0.000000,-0.013203);
-//	cam.right=Vec3f(-0.013203,0.000000,-0.999916);
+	cam.pos=Vec3f(52.423584,158.399719,51.276756);
+	cam.front=Vec3f(0.999916,0.000000,-0.013203);
+	cam.right=Vec3f(-0.013203,0.000000,-0.999916);
 
 	// abrams, lancia from the side
-	cam.pos=Vec3f(-125.014099,-7.600281,115.258301);
-	cam.front=Vec3f(0.907629,0.000000,-0.419782);
-	cam.right=Vec3f(-0.419782,0.000000,-0.907629);
+//	cam.pos=Vec3f(-125.014099,-7.600281,115.258301);
+//	cam.front=Vec3f(0.907629,0.000000,-0.419782);
+//	cam.right=Vec3f(-0.419782,0.000000,-0.907629);
 
 	// abrams from the back
 //	cam.pos=Vec3f(-5.081215,-5.600281,-275.260132);
@@ -420,6 +422,16 @@ int main(int argc, char **argv)
 //	cam.pos=Vec3f(-14.741514,-3.600281,-217.086441);
 //	cam.front=Vec3f(-0.181398,0.000000,-0.983413);
 //	cam.right=Vec3f(-0.983413,0.000000,0.181398);
+
+	// bunny, feline, dragon
+//	cam.pos=Vec3f(7.254675,2.399719,39.409294);
+//	cam.front=Vec3f(-0.240041,0.000000,-0.970767);
+//	cam.right=Vec3f(-0.970767,0.000000,0.240041);
+
+	// room
+//	cam.pos=Vec3f(-58.125217,-205.600281,61.583553);
+//	cam.front=Vec3f(0.713451,0.000000,-0.700709);
+//	cam.right=Vec3f(-0.700709,0.000000,-0.713451);
 
 //	Matrix<Vec4f> rotMat=RotateY(-102.7f); cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
 

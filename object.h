@@ -38,10 +38,7 @@ public:
 	}
 
 	u32 id;
-	enum Type {
-		T_SPHERE = 1,
-		T_TRIANGLE = 2,
-	};
+	enum Type { T_SPHERE=1, T_TRIANGLE=2, };
 	char type;
 
 	// Object is complete within the node
@@ -54,16 +51,6 @@ public:
 			return spheres[id].Collide(rOrig,rDir);
 		case T_TRIANGLE:
 			return tris[id].Collide(rOrig,rDir);
-		}
-	}
-	// If you know that every ray collides with triangle
-	template <class VecO,class Vec>
-	typename Vec::TScalar GetDist(const VecO &rOrig,const Vec &rDir) const {
-		switch(type) {
-		case T_SPHERE:
-			return spheres[id].Collide(rOrig,rDir);
-		case T_TRIANGLE:
-			return tris[id].GetDist(rOrig,rDir);
 		}
 	}
 

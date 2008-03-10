@@ -39,3 +39,4 @@ rtracer: build/rtracer.o build/image.o build/kdtree.o build/sdl_output.o build/r
 clean:
 	rm rtracer build/*.o *.gch
 
+# DO NOT DELETE

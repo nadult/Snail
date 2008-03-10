@@ -79,7 +79,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 		SlowKDNode &node=nodes[idx];
 		vector<u32> &objs=node.objects;
 
-		// Szukanie najwiêkszego wolnego obszaru w poszczególnych wymiarach
+		// Szukanie najwiekszego wolnego obszaru w poszczególnych wymiarach
 		vector<PSplit> splits[3];
 		for(int n=0;n<3;n++) splits[n].reserve(objs.size()*2);
 		for(int n=0;n<objs.size();n++) {
@@ -315,7 +315,6 @@ KDTree::KDTree(const SlowKDTree &tree)
 }
 KDTree::~KDTree()
 {
-//	_aligned_free(nodeMinMax);
 }
 
 bool KDTree::TestNode(Vec3f min,Vec3f max,int n) const {

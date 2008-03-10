@@ -375,16 +375,16 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 						localStats.colTests++;
 
 						floatq ret=obj.Collide(group.Origin(q),group.Dir(q));
-						SSEMask mask=(ret>Const<floatq,0>()&&ret<out.dist[q]);
+						SSERealMask mask=(ret>Const<floatq,0>()&&ret<out.dist[q]);
 						u32 msk=ForWhich(mask);
 
 						anyPassed+=msk;
 
 						if(!fullInNode) {
 							SSEVec3 col=group.Origin(q)+group.Dir(q)*ret;
-							SSEMask insideMask=	col.X()>=nodeMin.X()&&col.X()<=nodeMax.X()&&
-												col.Y()>=nodeMin.Y()&&col.Y()<=nodeMax.Y()&&
-												col.Z()>=nodeMin.Z()&&col.Z()<=nodeMax.Z();
+							SSERealMask insideMask=	col.X()>=nodeMin.X()&&col.X()<=nodeMax.X()&&
+													col.Y()>=nodeMin.Y()&&col.Y()<=nodeMax.Y()&&
+													col.Z()>=nodeMin.Z()&&col.Z()<=nodeMax.Z();
 							u32 insideMsk=ForWhich(insideMask);
 							mask=mask&&insideMask; 
 							// Jakies promienie uderzyly w obiekt poza KD-nodem

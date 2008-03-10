@@ -17,10 +17,6 @@ public:
 	template <class VecO,class Vec>
 	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const;
 
-	// If you know that every ray collides with triangle
-	template <class VecO,class Vec>
-	typename Vec::TScalar GetDist(const VecO &rOrig,const Vec &rDir) const;
-
 	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC) const;
 
 	void ComputeData() {
@@ -36,6 +32,7 @@ public:
 		e3n*=RSqrt(e3n|e3n);
 	}
 	Vec3p Nrm() const { return Vec3p(plane); }
+
 	Vec3p a,b,c;
 	Vec4p plane;
 	Vec3p e1ce2,e1n,e2n,e3n;
@@ -58,22 +55,6 @@ INLINE typename Vec::TScalar Triangle::Collide(const VecO &rOrig,const Vec &rDir
 		base dist=-(tvec|Nrm())*Inv(rDir|Nrm());
 		out=Condition(test,dist,out);
 	}
-
-	return out;
-}
-
-
-template <class VecO,class Vec>
-INLINE typename Vec::TScalar Triangle::GetDist(const VecO &rOrig,const Vec &rDir) const
-{
-	typedef typename Vec::TScalar base;
-	typedef typename Vec::TBool Bool;
-
-	base out=Const<base,-1>();
-
-	base det = rDir|e1ce2;
-	VecO tvec = rOrig-VecO(a);
-	out=-(tvec|Nrm())*Inv(rDir|Nrm());
 
 	return out;
 }
