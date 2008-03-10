@@ -1,40 +1,41 @@
 ICCFLAGS=-openmp -inline-level=2 -inline-forceinline -fp-model fast -fp-speculationfast -shared-intel -lstdc++
 GCCFLAGS=-mfpmath=sse -ffast-math -funroll-loops -fopenmp -fno-rtti -g
 
-FLAGS=$(GCCFLAGS) -O3 -msse3 -pthread -I /home/someone/veclib 
+FLAGS=$(GCCFLAGS) -O3 -mssse3 -pthread -I /home/someone/veclib 
 CC=/usr/local/gcc-4.3-20080215/bin/g++
 #CC=icc
 
 all: rtracer
 
-rtracer.gch: *.h Makefile
-	$(CC) $(FLAGS) -o rtracer.gch rtracer.h
-#	touch rtracer.gch
+rtbase.gch: *.h Makefile
+	$(CC) $(FLAGS) -o rtbase.gch rtbase.h
 
-asmsrc: rtracer.cpp rtracer.gch
-	$(CC) $(FLAGS) -c -o src rtracer.cpp -S
+asmsrc: rtracer.cpp rtbase.gch
+	$(CC) $(FLAGS) -c -o build/src rtracer.cpp -S
 
-rtracer.o: rtracer.cpp rtracer.gch
-	$(CC) $(FLAGS) -c -o rtracer.o rtracer.cpp
+build/rtracer.o: rtracer.cpp rtbase.gch
+	$(CC) $(FLAGS) -c -o build/rtracer.o rtracer.cpp
 
-image.o: image.cpp rtracer.gch
-	$(CC) $(FLAGS) -c -o image.o image.cpp
+build/image.o: image.cpp rtbase.gch
+	$(CC) $(FLAGS) -c -o build/image.o image.cpp
 
-kdtree.o: kdtree.cpp rtracer.gch
-	$(CC) $(FLAGS) -c -o kdtree.o kdtree.cpp
+build/kdtree.o: kdtree.cpp rtbase.gch
+	$(CC) $(FLAGS) -c -o build/kdtree.o kdtree.cpp
 
-sdlout.o: sdlout.cpp rtracer.gch
-	$(CC) $(FLAGS) -c -o sdlout.o sdlout.cpp
+build/sdl_output.o: sdl_output.cpp rtbase.gch
+	$(CC) $(FLAGS) -c -o build/sdl_output.o sdl_output.cpp
 
-ray_generator.o: ray_generator.cpp rtracer.gch
-	$(CC) $(FLAGS) -c -o ray_generator.o ray_generator.cpp
+build/ray_generator.o: ray_generator.cpp rtbase.gch
+	$(CC) $(FLAGS) -c -o build/ray_generator.o ray_generator.cpp
 
-model.o: model.cpp rtracer.gch
-	$(CC) $(FLAGS) -c -o model.o model.cpp
+build/loader.o: loader.cpp rtbase.gch
+	$(CC) $(FLAGS) -c -o build/loader.o loader.cpp
 
-rtracer: rtracer.o image.o kdtree.o sdlout.o ray_generator.o model.o rtracer.gch
-	$(CC) $(FLAGS) `sdl-config --static-libs` -o rtracer rtracer.o image.o kdtree.o sdlout.o ray_generator.o model.o
+rtracer: build/rtracer.o build/image.o build/kdtree.o build/sdl_output.o build/ray_generator.o \
+		build/loader.o rtbase.gch
+	$(CC) $(FLAGS) `sdl-config --static-libs` -o rtracer build/rtracer.o build/image.o build/kdtree.o\
+	   	build/sdl_output.o build/ray_generator.o build/loader.o
 
 clean:
-	rm rtracer *.o *.gch
+	rm rtracer build/*.o *.gch
 

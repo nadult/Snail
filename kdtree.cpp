@@ -1,5 +1,4 @@
-#include "stdafx.h"
-#include "rtracer.h"
+#include "kdtree.h"
 #include <algorithm>
 
 SlowKDTree::SlowKDTree(const vector<Object> &objs)
@@ -234,10 +233,10 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 	}
 }
 
-void SlowKDTree::Draw(Image &img,Vec3f minP,Vec3f maxP,
+/*void SlowKDTree::Draw(Image &img,Vec3f minP,Vec3f maxP,
 					  const Camera &cam,u32 n) const
 {
-/*	const SlowKDNode &node=nodes[n];
+	const SlowKDNode &node=nodes[n];
 	float mov=100.0f,scl=2.0f;
 
 #define PIX(x,z,r,g,b)	img.Pixel(mov+(x)*scl,mov+(z)*scl,r,g,b);
@@ -289,8 +288,8 @@ void SlowKDTree::Draw(Image &img,Vec3f minP,Vec3f maxP,
 		PIX(s.pos.x,s.pos.z-s.rad,255,255,255);
 		PIX(s.pos.x,s.pos.z+s.rad,255,255,255);
 	}
-#undef PIX*/
-}
+#undef PIX
+}*/
 
 KDTree::KDTree(const SlowKDTree &tree)
 {
@@ -355,7 +354,3 @@ bool KDTree::Test() const {
 	return TestNode(min,max,0);
 }
 
-void KDTree::Prepare() const {
-	for(int n=0;n<objects.size();n++)
-		objects[n].lastVisit=0;
-}

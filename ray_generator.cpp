@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "ray_generator.h"
 
 RayGenerator::RayGenerator(int level,int w,int h,float pd)

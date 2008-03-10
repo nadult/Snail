@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "rtracer.h"
 #include <SDL/SDL_keysym.h>
 #include <SDL/SDL_timer.h>
@@ -20,9 +19,6 @@ Vec Reflect(const Vec &ray,const Vec &nrm)
 	typename Vec::TScalar dot=(nrm|ray);
 	return ray-nrm*(dot+dot);
 }
-
-int PacketIdGenerator::base[256];
-
 
 
 class Scene
@@ -95,8 +91,7 @@ public:
 	}
 
 	template <class Vec,class Group>
-	void RayTrace(int packetId,Group &group,const RaySelector<Group::size> &startSelector,Vec *out,int maxRefl
-			,bool rdtscShader,bool primary) const
+	void RayTrace(Group &group,const RaySelector<Group::size> &startSelector,Vec *out,int maxRefl,bool rdtscShader,bool primary) const
 	{
 		typedef typename Vec::TScalar base;
 		typedef typename Vec::TBool boolv;
@@ -108,7 +103,8 @@ public:
 		for(int q=0;q<Group::size;q++)
 			out[q]=Vec(Const<base,0>());
 
-		u32 objId[ScalarInfo<base>::multiplicity*Group::size] __attribute__((aligned(16)));
+		SSEI32 objId4[Group::size];
+		u32 *objId=(u32*)objId4;
 
 		const base maxDist=Const<base,10000>();
 		base dst[Group::size];
@@ -116,7 +112,7 @@ public:
 		int nColTests,nSkips,depth; float ncp;
 		KDStats stats=tree.stats;
 //		depth=tree.GetDepth(group,sel);
-		tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),group,sel,maxDist,NormalOutput(dst,objId),primary);
+		tree.TraverseOptimized(group,sel,maxDist,NormalOutput(dst,objId4),primary);
 
 		Vec3q nrm[Group::size],colPos[Group::size],reflDir[Group::size],accLight[Group::size];
 		boolv tmask[Group::size];
@@ -188,7 +184,7 @@ public:
 			base tDst[Group::size]; {
 				Vec3q lPos(lightPos.X(),lightPos.Y(),lightPos.Z());
 				RayGroup<Group::recLevel,1> tGroup(fromLight,&lPos);
-				tree.TraverseOptimized(PacketIdGenerator::Gen(packetId),tGroup,lsel,Const<base,10000>(),ShadowOutput(tDst),1);
+				tree.TraverseOptimized(tGroup,lsel,Const<base,10000>(),ShadowOutput(tDst),1);
 			}
 
 
@@ -215,7 +211,7 @@ public:
 			}
 
 			RayGroup<Group::recLevel,0> tGroup(reflDir,colPos);
-			RayTrace(PacketIdGenerator::Gen(packetId),tGroup,sel,reflColor,maxRefl-1,0,0);
+			RayTrace(tGroup,sel,reflColor,maxRefl-1,0,0);
 
 			for(int i=0;i<sel.Num();i++) {
 				int q=sel.Idx(i);
@@ -242,9 +238,9 @@ public:
 		if(rdtscShader) {
 			floatq mul(0.0002f/Group::size);
 			for(int q=0;q<Group::size;q++) {
-				out[q].X()=floatq(float(ticks))*mul;
-				out[q].Y()=floatq(float(ticks))*mul*0.1f;
-			//	out[q].Y()=floatq(float(0));//nSkips)*0.01f);
+			//	out[q].X()=floatq(float(ticks))*mul;
+			//	out[q].Y()=floatq(float(ticks))*mul*0.1f;
+				out[q].Y()=floatq(float(nSkips)*0.05f);
 				out[q].X()=out[q].Z()=floatq(float(0));//nColTests)*0.001f);
 			//	out[q].Y()=floatq(float(depth)*0.01f);
 			}
@@ -261,6 +257,7 @@ public:
 };
 
 double ticks=0,lastTicks=0,iters=0;
+double minTicks=-1;
 
 template <int QuadLevels>
 void GenImage(const Scene &scene,const Camera &cam,Image &out,int pixDoubling,bool reflections,
@@ -285,10 +282,8 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,int pixDoubling,bo
 	rotMat=Transpose(rotMat);
 
 	Vec3q origin; Broadcast(cam.pos,origin);
-	scene.tree.Prepare();
 
 	RayGenerator rayGen(QuadLevels,w,h,cam.plane_dist);
-	PacketIdGenerator::Init();
 
 	RaySelector<NQuads> allSelector;
 	allSelector.SelectAll();
@@ -311,7 +306,7 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,int pixDoubling,bo
 			RayGroup<QuadLevels,1> group(dir,&origin);
 
 			Vec3q rgb[NQuads];
-			scene.RayTrace(PacketIdGenerator::Gen(),group,allSelector,rgb,reflections?1:0,rdtscShader,1);
+			scene.RayTrace(group,allSelector,rgb,reflections?1:0,rdtscShader,1);
 
 			rayGen.Decompose(rgb,rgb);
 			Vec3f trgb[PWidth*PHeight];
@@ -350,6 +345,7 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,int pixDoubling,bo
 	tick=Ticks()-tick;
 	lastTicks=tick/1000000.0;
 	ticks+=lastTicks; iters++;
+	if(lastTicks<minTicks||minTicks<0) minTicks=lastTicks;
 }
 
 #ifdef _DEBUG
@@ -368,6 +364,13 @@ int main(int argc, char **argv)
 	int resx=512,resy=512;
 	float speed=2.0f;
 //#endif
+
+#define PRINT_SIZE(cls)		{printf("sizeof(" #cls "): %d\n",sizeof(cls));}
+	PRINT_SIZE(Object)
+	PRINT_SIZE(KDNode)
+	PRINT_SIZE(Triangle)
+	PRINT_SIZE(Sphere)
+#undef PRINT_SIZE
 	
 	bool fullscreen=0,nonInteractive=0;
 	int threads=omp_get_num_procs()*8;
@@ -382,7 +385,7 @@ int main(int argc, char **argv)
 	printf("Threads/cores: %d/%d\n",omp_get_max_threads(),omp_get_num_procs());
 
 	int bticks=SDL_GetTicks();
-	Scene scene(modelFile);
+	Scene scene((string("scenes/")+modelFile).c_str());
 	if(!scene.tree.Test()) return 0;
 	bticks=SDL_GetTicks()-bticks;
 	printf("KD Tree build time: %.2f sec\n",double(bticks)*0.001);
@@ -424,7 +427,7 @@ int main(int argc, char **argv)
 
 	if(nonInteractive) {
 		for(int n=atoi(argv[3]);n>=0;n--) GenImage<QuadLevels>(scene,cam,img,0,0,0);
-		img.SaveToFile("output.tga");
+		img.SaveToFile("out/output.tga");
 	}
 	else {
 		SDLOutput out(resx,resy,fullscreen);
@@ -432,7 +435,7 @@ int main(int argc, char **argv)
 
 		while(out.PollEvents()) {
 			if(out.TestKey(SDLK_ESCAPE)) break;
-			if(out.TestKey(SDLK_k)) img.SaveToFile("output.tga");
+			if(out.TestKey(SDLK_k)) img.SaveToFile("out/output.tga");
 			if(out.TestKey(SDLK_p)) pixelDoubling^=1;
 			if(out.TestKey(SDLK_o)) refls^=1;
 			if(out.TestKey(SDLK_i)) rdtscSh^=1;
@@ -480,6 +483,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	printf("Average cycles/frame: %.2f mln\n",ticks/iters);
+	printf("Average cycles/frame: %.2f mln\nMinimum cycles/frame: %.2f mln\n",ticks/iters,minTicks);
 	return 0;
 }
