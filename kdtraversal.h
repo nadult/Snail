@@ -57,7 +57,7 @@ INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const fl
 	};
 	Locals4 stackBegin[MaxLevel+16],*stack=stackBegin;
 
-	Vec3p rDir=Vec3p(tDir.X()+0.000000000001f,tDir.Y()+0.000000000001f,tDir.Z()+0.000000000001f);
+	Vec3p rDir=Vec3p(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
 	Vec3p invDir=Inv(rDir);
 
 	const float *rStart=(const float*)&rOrigin;
@@ -157,28 +157,28 @@ INLINE void ComputePV(const RaySelector<size> &sel,const Vec3q *rDir,floatq *pv)
 	{
 		const Vec3q dir=Abs(rDir[sel[0]]);
 
-		SSEReal ix=Inv(dir.X()),iy=Inv(dir.Y()),iz=Inv(dir.Z());
-		yx[0]=yx[1]=dir.Y()*ix;
-		zx[0]=zx[1]=dir.Z()*ix;
-		xy[0]=xy[1]=dir.X()*iy;
-		zy[0]=zy[1]=dir.Z()*iy;
-		xz[0]=xz[1]=dir.X()*iz;
-		yz[0]=yz[1]=dir.Y()*iz;
+		SSEReal ix=Inv(dir.x),iy=Inv(dir.y),iz=Inv(dir.z);
+		yx[0]=yx[1]=dir.y*ix;
+		zx[0]=zx[1]=dir.z*ix;
+		xy[0]=xy[1]=dir.x*iy;
+		zy[0]=zy[1]=dir.z*iy;
+		xz[0]=xz[1]=dir.x*iz;
+		yz[0]=yz[1]=dir.y*iz;
 	}
 
 	for(int id=1;id<sel.Num();id++) {
 		const Vec3q dir=Abs(rDir[sel[id]]);
 
 		SSEReal t1,t2,i;
-		i=Inv(dir.X()); t1=dir.Y()*i; t2=dir.Z()*i;
+		i=Inv(dir.x); t1=dir.y*i; t2=dir.z*i;
 		yx[0]=Min(t1,yx[0]); yx[1]=Max(t1,yx[1]);
 		zx[0]=Min(t2,zx[0]); zx[1]=Max(t2,zx[1]);
 
-		i=Inv(dir.Y()); t1=dir.X()*i; t2=dir.Z()*i;
+		i=Inv(dir.y); t1=dir.x*i; t2=dir.z*i;
 		xy[0]=Min(t1,xy[0]); xy[1]=Max(t1,xy[1]);
 		zy[0]=Min(t2,zy[0]); zy[1]=Max(t2,zy[1]);
 
-		i=Inv(dir.Z()); t1=dir.X()*i; t2=dir.Y()*i;
+		i=Inv(dir.z); t1=dir.x*i; t2=dir.y*i;
 		xz[0]=Min(t1,xz[0]); xz[1]=Max(t1,xz[1]);
 		yz[0]=Min(t2,yz[0]); yz[1]=Max(t2,yz[1]);
 	}
@@ -382,9 +382,9 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 
 						if(!fullInNode) {
 							SSEVec3 col=group.Origin(q)+group.Dir(q)*ret;
-							SSERealMask insideMask=	col.X()>=nodeMin.X()&&col.X()<=nodeMax.X()&&
-													col.Y()>=nodeMin.Y()&&col.Y()<=nodeMax.Y()&&
-													col.Z()>=nodeMin.Z()&&col.Z()<=nodeMax.Z();
+							SSERealMask insideMask=	col.x>=nodeMin.x&&col.x<=nodeMax.x&&
+													col.y>=nodeMin.y&&col.y<=nodeMax.y&&
+													col.z>=nodeMin.z&&col.z<=nodeMax.z;
 							u32 insideMsk=ForWhich(insideMask);
 							mask=mask&&insideMask; 
 							// Jakies promienie uderzyly w obiekt poza KD-nodem
@@ -498,7 +498,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 template <class Group>
 inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) const
 {
-	int xSign=sel.SignMaskX(),ySign=sel.SignMaskY(),zSign=sel.SignMaskZ();
+	int xSign=sel.SignMas.x,ySign=sel.SignMas.y,zSign=sel.SignMas.z;
 	int sign0[3]={xSign==0,ySign==0,zSign==0};
 	
 	Vec3p negMask; int negMaskI[3]; {

@@ -70,7 +70,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 	if(nodes[idx].objects.size()<1) return;
 
 	double size=(tMax.x-tMin.x)*(tMax.y-tMin.y)*(tMax.z-tMin.z);
-	double sceneSize; { float t; Convert((pMax.X()-pMin.X())*(pMax.Y()-pMin.Y())*(pMax.Z()-pMin.Z()),t); sceneSize=t; }
+	double sceneSize; { float t; Convert((pMax.x-pMin.x)*(pMax.y-pMin.y)*(pMax.z-pMin.z),t); sceneSize=t; }
 	if(size/sceneSize<0.00000001) return;
 	if(level>MaxLevel) return;
 
@@ -88,12 +88,12 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			Convert(obj.BoundMin(),min);
 			Convert(obj.BoundMax(),max);
 
-			splits[0].push_back(PSplit(min.X(),1));
-			splits[1].push_back(PSplit(min.Y(),1));
-			splits[2].push_back(PSplit(min.Z(),1));
-			splits[0].push_back(PSplit(max.X(),0));
-			splits[1].push_back(PSplit(max.Y(),0));
-			splits[2].push_back(PSplit(max.Z(),0));
+			splits[0].push_back(PSplit(min.x,1));
+			splits[1].push_back(PSplit(min.y,1));
+			splits[2].push_back(PSplit(min.z,1));
+			splits[0].push_back(PSplit(max.x,0));
+			splits[1].push_back(PSplit(max.y,0));
+			splits[2].push_back(PSplit(max.z,0));
 		}
 		
 		const float travCost=0.1;
@@ -324,19 +324,19 @@ bool KDTree::TestNode(Vec3f min,Vec3f max,int n) const {
 
 	switch(node.Axis()) {
 	case 0:
-		if(node.Pos()<min.X()||node.Pos()>max.X()) goto ERR;
-		left=TestNode(min,Vec3f(node.Pos(),max.Y(),max.Z()),n+node.ChildDist());
-		right=TestNode(Vec3f(node.Pos(),min.Y(),min.Z()),max,n+node.ChildDist()+1);
+		if(node.Pos()<min.x||node.Pos()>max.x) goto ERR;
+		left=TestNode(min,Vec3f(node.Pos(),max.y,max.z),n+node.ChildDist());
+		right=TestNode(Vec3f(node.Pos(),min.y,min.z),max,n+node.ChildDist()+1);
 		return left&&right;
 	case 1:
-		if(node.Pos()<min.Y()||node.Pos()>max.Y()) goto ERR;
-		left=TestNode(min,Vec3f(max.X(),node.Pos(),max.Z()),n+node.ChildDist());
-		right=TestNode(Vec3f(min.X(),node.Pos(),min.Z()),max,n+node.ChildDist()+1);
+		if(node.Pos()<min.y||node.Pos()>max.y) goto ERR;
+		left=TestNode(min,Vec3f(max.x,node.Pos(),max.z),n+node.ChildDist());
+		right=TestNode(Vec3f(min.x,node.Pos(),min.z),max,n+node.ChildDist()+1);
 		return left&&right;
 	case 2:
-		if(node.Pos()<min.Z()||node.Pos()>max.Z()) goto ERR;
-		left=TestNode(min,Vec3f(max.X(),max.Y(),node.Pos()),n+node.ChildDist());
-		right=TestNode(Vec3f(min.X(),min.Y(),node.Pos()),max,n+node.ChildDist()+1);
+		if(node.Pos()<min.z||node.Pos()>max.z) goto ERR;
+		left=TestNode(min,Vec3f(max.x,max.y,node.Pos()),n+node.ChildDist());
+		right=TestNode(Vec3f(min.x,min.y,node.Pos()),max,n+node.ChildDist()+1);
 		return left&&right;
 	case 3:
 		return 1;

@@ -28,9 +28,9 @@ void LoadWavefrontObj(const char *fileName,vector<Object> &out,float scale) {
 		if(strcmp(type,"v")==0) {
 			Vec3f vert;
 			sscanf(line,"%s %s %s %s",type,a,b,c);
-			vert.X()=atof(a)*sx;
-			vert.Y()=-atof(b)*sy;
-			vert.Z()=atof(c)*sz;
+			vert.x=atof(a)*sx;
+			vert.y=-atof(b)*sy;
+			vert.z=atof(c)*sz;
 			verts.push_back(vert);
 		}
 		else if(strcmp(type,"f")==0) {

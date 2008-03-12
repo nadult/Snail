@@ -22,17 +22,17 @@ void RayGenerator::Decompose(const Vec3q *in,Vec3q *out)
 	if(tLevel>=1) {
 		for(int n=0;n<nQuads;n+=2) {
 			__m128 tmp;
-			tmp				=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpacklo_ps(in[n+0].X().m,in[n+1].X().m));
-			out[n+1].X().m	=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpackhi_ps(in[n+0].X().m,in[n+1].X().m));
-			out[n+0].X().m=tmp;
+			tmp				=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpacklo_ps(in[n+0].x.m,in[n+1].x.m));
+			out[n+1].x.m	=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpackhi_ps(in[n+0].x.m,in[n+1].x.m));
+			out[n+0].x.m=tmp;
 
-			tmp				=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpacklo_ps(in[n+0].Y().m,in[n+1].Y().m));
-			out[n+1].Y().m	=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpackhi_ps(in[n+0].Y().m,in[n+1].Y().m));
-			out[n+0].Y().m=tmp;
+			tmp				=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpacklo_ps(in[n+0].y.m,in[n+1].y.m));
+			out[n+1].y.m	=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpackhi_ps(in[n+0].y.m,in[n+1].y.m));
+			out[n+0].y.m=tmp;
 
-			tmp				=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpacklo_ps(in[n+0].Z().m,in[n+1].Z().m));
-			out[n+1].Z().m	=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpackhi_ps(in[n+0].Z().m,in[n+1].Z().m));
-			out[n+0].Z().m=tmp;
+			tmp				=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpacklo_ps(in[n+0].z.m,in[n+1].z.m));
+			out[n+1].z.m	=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpackhi_ps(in[n+0].z.m,in[n+1].z.m));
+			out[n+0].z.m=tmp;
 		}
 	}
 	if(tLevel>=2) {
@@ -80,8 +80,8 @@ void RayGenerator::Generate(int level,int pw,int ph,int x,int y,Vec3q *out) {
 	if(level==0) {
 		Vec3q coords; Broadcast(Vec3f(float(x),float(y),planeDist),coords);
 
-		coords.X()=(coords.X()+addVec.X())*floatq(invW);
-		coords.Y()=(coords.Y()+addVec.Y())*floatq(invH);
+		coords.x=(coords.x+addVec.x)*floatq(invW);
+		coords.y=(coords.y+addVec.y)*floatq(invH);
 
 		out[0]=coords*RSqrt(coords|coords);
 		return;

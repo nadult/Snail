@@ -85,7 +85,7 @@ public:
 		Base spec=dot*dot; spec=spec*spec;
 		out = ( 
 				 lightColor*dot
-				+Vec3q(lightColor.X(),Const<Base,0>(),Const<Base,0>())*spec
+				+Vec3q(lightColor.x,Const<Base,0>(),Const<Base,0>())*spec
 				)*mul;
 		return out;
 	}
@@ -139,17 +139,17 @@ public:
 			accLight[q]=Const<base,0>();
 
 			out[q]=Const<base,1>();
-	//		out[q].X()=Abs(Const<base,1>()-dst[q]*Const<base,1,50>());
-	//		out[q].Y()=Abs(Const<base,1>()-dst[q]*Const<base,1,200>());
-	//		out[q].Z()=Abs(Const<base,1>()-dst[q]*Const<base,1,1000>());
+	//		out[q].x=Abs(Const<base,1>()-dst[q]*Const<base,1,50>());
+	//		out[q].y=Abs(Const<base,1>()-dst[q]*Const<base,1,200>());
+	//		out[q].z=Abs(Const<base,1>()-dst[q]*Const<base,1,1000>());
 //			Vec3q refl=Reflect(group.Dir(q),nrm[q]);
-//			out[q].X()=Condition(refl.X()>Const<base,0>(),Const<base,8,12>(),Const<base,2,12>());
-//			out[q].Y()=Condition(refl.Y()>Const<base,0>(),Const<base,8,12>(),Const<base,2,12>());
-//			out[q].Z()=Condition(refl.Z()>Const<base,0>(),Const<base,8,12>(),Const<base,2,12>());
+//			out[q].x=Condition(refl.x>Const<base,0>(),Const<base,8,12>(),Const<base,2,12>());
+//			out[q].y=Condition(refl.y>Const<base,0>(),Const<base,8,12>(),Const<base,2,12>());
+//			out[q].z=Condition(refl.z>Const<base,0>(),Const<base,8,12>(),Const<base,2,12>());
 			out[q]=nrm[q]|group.Dir(q);
-//			out[q].X()=Condition(group.Dir(q).X()<Const<floatq,0>(),Const<floatq,0,2>(),Const<floatq,1>());
-//			out[q].Y()=Condition(group.Dir(q).Y()<Const<floatq,0>(),Const<floatq,0,2>(),Const<floatq,1>());
-//			out[q].Z()=Condition(group.Dir(q).Z()<Const<floatq,0>(),Const<floatq,0,2>(),Const<floatq,1>());
+//			out[q].x=Condition(group.Dir(q).x<Const<floatq,0>(),Const<floatq,0,2>(),Const<floatq,1>());
+//			out[q].y=Condition(group.Dir(q).y<Const<floatq,0>(),Const<floatq,0,2>(),Const<floatq,1>());
+//			out[q].z=Condition(group.Dir(q).z<Const<floatq,0>(),Const<floatq,0,2>(),Const<floatq,1>());
 		}
 
 		for(int n=0;n<nLights;n++) {
@@ -182,7 +182,7 @@ public:
 			}
 
 			base tDst[Group::size]; {
-				Vec3q lPos(lightPos.X(),lightPos.Y(),lightPos.Z());
+				Vec3q lPos(lightPos.x,lightPos.y,lightPos.z);
 				RayGroup<Group::recLevel,1> tGroup(fromLight,&lPos);
 				tree.TraverseOptimized(tGroup,lsel,Const<base,10000>(),ShadowOutput(tDst),1);
 			}
@@ -238,11 +238,11 @@ public:
 		if(rdtscShader) {
 			floatq mul(0.0002f/Group::size);
 			for(int q=0;q<Group::size;q++) {
-			//	out[q].X()=floatq(float(ticks))*mul;
-			//	out[q].Y()=floatq(float(ticks))*mul*0.1f;
-				out[q].Y()=floatq(float(nSkips)*0.05f);
-				out[q].X()=out[q].Z()=floatq(float(0));//nColTests)*0.001f);
-			//	out[q].Y()=floatq(float(depth)*0.01f);
+			//	out[q].x=floatq(float(ticks))*mul;
+			//	out[q].y=floatq(float(ticks))*mul*0.1f;
+				out[q].y=floatq(float(nSkips)*0.05f);
+				out[q].x=out[q].z=floatq(float(0));//nColTests)*0.001f);
+			//	out[q].y=floatq(float(depth)*0.01f);
 			}
 		}
 	}
@@ -404,14 +404,14 @@ int main(int argc, char **argv)
 	Camera cam;
 	cam.plane_dist=0.5f;
 	// pompei?
-	cam.pos=Vec3f(52.423584,158.399719,51.276756);
-	cam.front=Vec3f(0.999916,0.000000,-0.013203);
-	cam.right=Vec3f(-0.013203,0.000000,-0.999916);
+//	cam.pos=Vec3f(52.423584,158.399719,51.276756);
+//	cam.front=Vec3f(0.999916,0.000000,-0.013203);
+//	cam.right=Vec3f(-0.013203,0.000000,-0.999916);
 
 	// abrams, lancia from the side
-//	cam.pos=Vec3f(-125.014099,-7.600281,115.258301);
-//	cam.front=Vec3f(0.907629,0.000000,-0.419782);
-//	cam.right=Vec3f(-0.419782,0.000000,-0.907629);
+	cam.pos=Vec3f(-125.014099,-7.600281,115.258301);
+	cam.front=Vec3f(0.907629,0.000000,-0.419782);
+	cam.right=Vec3f(-0.419782,0.000000,-0.907629);
 
 	// abrams from the back
 //	cam.pos=Vec3f(-5.081215,-5.600281,-275.260132);

@@ -147,13 +147,13 @@ public:
 
 		for(int n=0;n<size;n++) {
 			Vec3q &r=Dir(n);
-			int x=SignMask(r.X()),y=SignMask(r.Y()),z=SignMask(r.Z());
+			int x=SignMask(r.x),y=SignMask(r.y),z=SignMask(r.z);
 			raySign[n]=(x?1:0)+(y?2:0)+(z?4:0);
 			if((x>0&&x<15)||(y>0&&y<15)||(z>0&&z<15)) raySign[n]=8;
 			else {
-				if(ForAny(	Abs(r.X())<ConstEpsilon<SSEReal>()||
-							Abs(r.Y())<ConstEpsilon<SSEReal>()||
-							Abs(r.Z())<ConstEpsilon<SSEReal>()))
+				if(ForAny(	Abs(r.x)<ConstEpsilon<SSEReal>()||
+							Abs(r.y)<ConstEpsilon<SSEReal>()||
+							Abs(r.z)<ConstEpsilon<SSEReal>()))
 					raySign[n]=8;
 			}
 		}

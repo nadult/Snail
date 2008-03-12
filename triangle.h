@@ -22,7 +22,7 @@ public:
 	void ComputeData() {
 		Vec3p nrm=(b-a)^(c-a);
 		nrm*=RSqrt(nrm|nrm);
-		plane=Vec4p(nrm.X(),nrm.Y(),nrm.Z(),nrm|a);
+		plane=Vec4p(nrm.x,nrm.y,nrm.z,nrm|a);
 		e1ce2=(b-a)^(c-a);
 		e1n=nrm^(b-a);
 		e2n=nrm^(c-b);
