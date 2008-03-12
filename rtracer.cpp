@@ -311,7 +311,7 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,int pixDoubling,bo
 			rayGen.Decompose(rgb,rgb);
 			Vec3f trgb[PWidth*PHeight];
 			for(int q=0;q<NQuads;q++)
-				Convert(Clamp(rgb[q]*Const<floatq,255>(),
+				Convert(VClamp(rgb[q]*Const<floatq,255>(),
 						Vec3q(Const<floatq,0>()),
 						Vec3q(Const<floatq,255>())),trgb+q*4);
 

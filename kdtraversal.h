@@ -16,7 +16,7 @@ public:
 		last=(last+1)%(size*4);
 	}
 	bool Find(u32 idx) {
-		SSEI32 tidx(idx),test;
+		SSEI32 tidx(idx); SSEI32Mask test;
 		test=indices[0]==tidx;
 		for(int n=1;n<size;n++)
 			test=test||indices[n]==tidx;
@@ -58,7 +58,7 @@ INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const fl
 	Locals4 stackBegin[MaxLevel+16],*stack=stackBegin;
 
 	Vec3p rDir=Vec3p(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
-	Vec3p invDir=Inv(rDir);
+	Vec3p invDir=VInv(rDir);
 
 	const float *rStart=(const float*)&rOrigin;
 	const float *irDir=(const float*)&invDir;
@@ -155,7 +155,7 @@ INLINE void ComputePV(const RaySelector<size> &sel,const Vec3q *rDir,floatq *pv)
 	SSEReal yx[2],zx[2],xy[2],zy[2],xz[2],yz[2];
 
 	{
-		const Vec3q dir=Abs(rDir[sel[0]]);
+		const Vec3q dir=VAbs(rDir[sel[0]]);
 
 		SSEReal ix=Inv(dir.x),iy=Inv(dir.y),iz=Inv(dir.z);
 		yx[0]=yx[1]=dir.y*ix;
@@ -167,7 +167,7 @@ INLINE void ComputePV(const RaySelector<size> &sel,const Vec3q *rDir,floatq *pv)
 	}
 
 	for(int id=1;id<sel.Num();id++) {
-		const Vec3q dir=Abs(rDir[sel[id]]);
+		const Vec3q dir=VAbs(rDir[sel[id]]);
 
 		SSEReal t1,t2,i;
 		i=Inv(dir.x); t1=dir.y*i; t2=dir.z*i;
@@ -212,13 +212,13 @@ INLINE void ComputeMinMaxOrigin(const RaySelector<size> &sel,const Group &group,
 	}
 	else {
 		Vec3p pOR[4]; Convert(group.Origin(sel[0]),pOR);
-		Vec3p tMin=Min(Min(pOR[0],pOR[1]),Min(pOR[2],pOR[3]));
-		Vec3p tMax=Max(Max(pOR[0],pOR[1]),Max(pOR[2],pOR[3]));
+		Vec3p tMin=VMin(VMin(pOR[0],pOR[1]),VMin(pOR[2],pOR[3]));
+		Vec3p tMax=VMax(VMax(pOR[0],pOR[1]),VMax(pOR[2],pOR[3]));
 		for(int i=1;i<sel.Num();i++) {
 			int q=sel[i];
 			Convert(group.Origin(q),pOR);
-			tMin=Min( Min(Min(pOR[0],pOR[1]),Min(pOR[2],pOR[3])), tMin);
-			tMax=Max( Max(Max(pOR[0],pOR[1]),Max(pOR[2],pOR[3])), tMax);
+			tMin=VMin( VMin(VMin(pOR[0],pOR[1]),VMin(pOR[2],pOR[3])), tMin);
+			tMax=VMax( VMax(VMax(pOR[0],pOR[1]),VMax(pOR[2],pOR[3])), tMax);
 		}
 
 		min=tMin;
@@ -275,8 +275,8 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 	Vec3p minOR,maxOR; {
 		ComputeMinMaxOrigin(sel,group,minOR,maxOR);
 		minOR*=negMask; maxOR*=negMask;
-		Vec3p tMin=Min(minOR,maxOR);
-		maxOR=Max(minOR,maxOR); minOR=tMin;	
+		Vec3p tMin=VMin(minOR,maxOR);
+		maxOR=VMax(minOR,maxOR); minOR=tMin;	
 	}
 
 	SSEReal pv[3],ov[3];
@@ -299,8 +299,8 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 
 	Vec3p bMin,bMax; {
 		Vec3p tMin=pMin*negMask,tMax=pMax*negMask;
-		Vec3p tpMin=Min(tMin,tMax),tpMax=Max(tMin,tMax);
-		bMin=Max(minOR,tpMin);
+		Vec3p tpMin=VMin(tMin,tMax),tpMax=VMax(tMin,tMax);
+		bMin=VMax(minOR,tpMin);
 		bMax=tpMax;
 	}
 
@@ -345,8 +345,8 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 				SSEPVec3 nodeMin,nodeMax; {
 					SSEPVec3 nodeEps(Const<floatq,1,1000>().m);
 					Vec3p tMin=bMin*negMask,tMax=bMax*negMask;
-					nodeMin=Min(tMin,tMax)-nodeEps;
-					nodeMax=Max(tMin,tMax)+nodeEps;
+					nodeMin=VMin(tMin,tMax)-nodeEps;
+					nodeMax=VMax(tMin,tMax)+nodeEps;
 				}
 
 				for(int n=node->NumObjects();n>0;n--) {
@@ -393,7 +393,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 						}
 
 						if(Output::objectIdsFlag) {
-							SSEI32 test; Cast(mask,test);
+							SSEI32Mask test; Cast(mask,test);
 							SSEI32 &dst=((SSEI32*)out.object)[q];
 							dst=Condition(test,SSEI32(tid),dst);
 						}
@@ -487,7 +487,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 
 			nodeStack[stackPos]=node+sign0[axis];
 			node+=sign0[axis]^1;
-			boxStack[stackPos*2+0]=Max(pMin,bMin);
+			boxStack[stackPos*2+0]=VMax(pMin,bMin);
 			boxStack[stackPos*2+1]=bMax;
 			bMax=Min(bMax,pMax);
 			stackPos++;
@@ -517,8 +517,8 @@ inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) co
 	Vec3p minOR,maxOR; {
 		ComputeMinMaxOrigin(sel,group,minOR,maxOR);
 		minOR*=negMask; maxOR*=negMask;
-		Vec3p tMin=Min(minOR,maxOR);
-		maxOR=Max(minOR,maxOR); minOR=tMin;	
+		Vec3p tMin=VMin(minOR,maxOR);
+		maxOR=VMax(minOR,maxOR); minOR=tMin;	
 	}
 
 	SSEReal pv[3],ov[3];
@@ -536,8 +536,8 @@ inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) co
 
 	Vec3p bMin,bMax; {
 		Vec3p tMin=pMin*negMask,tMax=pMax*negMask;
-		Vec3p tpMin=Min(tMin,tMax),tpMax=Max(tMin,tMax);
-		bMin=Max(minOR,tpMin);
+		Vec3p tpMin=VMin(tMin,tMax),tpMax=VMax(tMin,tMax);
+		bMin=VMax(minOR,tpMin);
 		bMax=tpMax;
 	}
 
@@ -579,8 +579,8 @@ inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) co
 				SSEPVec3 nodeMin,nodeMax; {
 					SSEPVec3 nodeEps(Const<floatq,1,1000>().m);
 					Vec3p tMin=bMin*negMask,tMax=bMax*negMask;
-					nodeMin=Min(tMin,tMax)-nodeEps;
-					nodeMax=Max(tMin,tMax)+nodeEps;
+					nodeMin=VMin(tMin,tMax)-nodeEps;
+					nodeMax=VMax(tMin,tMax)+nodeEps;
 				}
 
 				for(int n=node->NumObjects();n>0;n--) {

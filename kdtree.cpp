@@ -13,8 +13,8 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 
 	pMin=objs[0].BoundMin(); pMax=objs[0].BoundMax();
 	for(int n=0;n<objs.size();n++) {
-		pMin=Min(objs[n].BoundMin(),pMin);
-		pMax=Max(objs[n].BoundMax(),pMax);
+		pMin=VMin(objs[n].BoundMin(),pMin);
+		pMax=VMax(objs[n].BoundMax(),pMax);
 	}
 	Vec3f min,max;
 	Convert(pMin,min);

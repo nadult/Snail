@@ -31,8 +31,8 @@ public:
 
 		id=nObjs; nObjs++;
 		tris[id]=tr;
-		bounds[id*2+0]=Min(tr.a,Min(tr.b,tr.c));
-		bounds[id*2+1]=Max(tr.a,Max(tr.b,tr.c));
+		bounds[id*2+0]=VMin(tr.a,VMin(tr.b,tr.c));
+		bounds[id*2+1]=VMax(tr.a,VMax(tr.b,tr.c));
 	}
 	~Object() {
 	}
