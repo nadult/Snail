@@ -1,3 +1,6 @@
+#ifndef RTRACER_RAY_GROUP_H
+#define RTRACER_RAY_GROUP_H
+
 //#include <boost/static_assert.hpp>
 #include "veclib.h"
 
@@ -151,9 +154,9 @@ public:
 			raySign[n]=(x?1:0)+(y?2:0)+(z?4:0);
 			if((x>0&&x<15)||(y>0&&y<15)||(z>0&&z<15)) raySign[n]=8;
 			else {
-				if(ForAny(	Abs(r.x)<ConstEpsilon<SSEReal>()||
-							Abs(r.y)<ConstEpsilon<SSEReal>()||
-							Abs(r.z)<ConstEpsilon<SSEReal>()))
+				if(ForAny(	Abs(r.x)<ConstEpsilon<f32x4>()||
+							Abs(r.y)<ConstEpsilon<f32x4>()||
+							Abs(r.z)<ConstEpsilon<f32x4>()))
 					raySign[n]=8;
 			}
 		}
@@ -202,3 +205,6 @@ public:
 	INLINE int Size() const { return size; }
 
 };
+
+#endif
+

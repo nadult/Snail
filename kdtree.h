@@ -3,6 +3,7 @@
 
 #include "object.h"
 #include "ray_group.h"
+#include "tree_stats.h"
 
 
 class SlowKDNode
@@ -74,64 +75,17 @@ struct ShadowOutput
 	floatq *dist;
 	intq *object; // dummy
 };
-
-class KDStats
-{
-public:
-	KDStats() {
-		Init();
-	}
-	INLINE void Update(const KDStats &local) {
-		colTests+=local.colTests;
-		iters+=local.iters;
-		runs+=local.runs;
-		tracedRays+=local.tracedRays;
-		coherent+=local.coherent;
-		nonCoherent+=local.nonCoherent;
-		breaking+=local.breaking;
-		notBreaking+=local.notBreaking;
-		intersectOk+=local.intersectOk;
-		intersectFail+=local.intersectFail;
-		skips+=local.skips;
-	}
-	void Init() {
-		memset(this,0,sizeof(KDStats));
-	}
-	double CoherentPercentage() const {
-		return 100.0*coherent/double(coherent+nonCoherent);
-	}
-	double BreakingPercentage() const {
-		return 100.0*breaking/double(breaking+notBreaking);
-	}
-	double IntersectFailPercentage() const {
-		return 100.0*intersectFail/double(intersectFail+intersectOk);
-	}
-	void PrintInfo(int resx,int resy,double cycles,double msRenderTime) {
-			double raysPerSec=double(tracedRays)*(1000.0/msRenderTime);
-			double nPixels=double(resx*resy);
-
-			printf("isct,iter:%.3f %.3f MCycles/frame:%.2f\tMRays/sec:%.2f\t"
-					"Coherency:%.2f%% br:%.2f%% fa:%.2f%% %.0f\n",
-					double(colTests)/nPixels,double(iters)/nPixels,
-				cycles,raysPerSec*0.000001,CoherentPercentage(),
-				BreakingPercentage(),IntersectFailPercentage(),double(skips));
-	}
-
-	u32 colTests,iters,runs,tracedRays;
-	u32 coherent,nonCoherent;
-
-	u32 breaking,notBreaking;
-	u32 intersectOk,intersectFail;
-	u32 skips;
-};
-
 class KDTree
 {
 public:
 	enum { MaxLevel=SlowKDTree::MaxLevel };
 
+	KDTree(const vector<Object>&);
 	KDTree(const SlowKDTree&);
 	~KDTree();
+
+	void Build(const SlowKDTree&);
+	void PrintInfo() const;
 
 	template <class Output,class Vec,class base>
 	void FullTraverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output&) const;
@@ -156,7 +110,7 @@ public:
 	bool TestNode(Vec3f min,Vec3f max,int node) const;
 	bool Test() const;
 
-	SSEPVec3 pMin,pMax;
+	Vec3p pMin,pMax;
 	vector<Object> objects;
 
 //private:
@@ -164,7 +118,7 @@ public:
 	vector<u32> objectIds;
 
 public:
-	mutable KDStats stats;
+	mutable TreeStats stats;
 };
 
 #include "kdtraversal.h"

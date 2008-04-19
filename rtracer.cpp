@@ -1,17 +1,11 @@
 #include "rtracer.h"
 #include <SDL/SDL_keysym.h>
-#include <SDL/SDL_timer.h>
 #include "ray_generator.h"
 #include <iostream>
+#include "bihtree.h"
 
 using std::cout;
 using std::endl;
-
-
-Triangle Object::tris[Object::MaxObjs];
-Sphere Object::spheres[Object::MaxObjs];
-Vec3p Object::bounds[Object::MaxObjs*2];
-int Object::nObjs=0;
 
 template <class Vec>
 Vec Reflect(const Vec &ray,const Vec &nrm)
@@ -20,13 +14,41 @@ Vec Reflect(const Vec &ray,const Vec &nrm)
 	return ray-nrm*(dot+dot);
 }
 
+// Quick and dirty; dont use it :)
+void SplitObjects(const vector<Object> &in,vector<Object> &out,float desiredSize,uint axis) {
+	for(uint n=0;n<in.size();n++) {
+		const Object &obj=in[n];
+		float size=(&(obj.BoundMax()-obj.BoundMin()).x)[axis];
 
-class Scene
+		if(size>desiredSize) {
+			Object a(obj),b(obj);
+			Vec3p *bounds=Object::bounds+Object::nObjs*2;
+
+			bounds[0]=obj.BoundMin();
+			bounds[1]=obj.BoundMax();
+			bounds[2]=obj.BoundMin();
+			bounds[3]=obj.BoundMax();
+			float mid=Lerp((&bounds[0].x)[axis],(&bounds[1].x)[axis],0.5f);
+
+			(&bounds[1].x)[axis]=mid;
+			(&bounds[2].x)[axis]=mid;
+			a.bid=Object::nObjs;
+			b.bid=Object::nObjs+1;
+			Object::nObjs+=2;
+			out.push_back(a);
+			out.push_back(b);
+		}
+		else out.push_back(obj);
+	}
+}
+
+template <class AccStruct>
+class TScene
 {
 public:
-	Scene(const char *modelFile)
-		:tree(vector<Object>()),startTree(vector<Object>()),nLights(0)
+	TScene(const char *modelFile) :tree(vector<Object>()),nLights(0)
 	{
+		vector<Object> objects;
 //		objects.push_back(Sphere(Vec3f(-2,0,5)*5.0f,4.04f*5));
 //		objects.push_back(Sphere(Vec3f(3,2,10)*5.0f,3*5));
 //		objects.push_back(Sphere(Vec3f(0,0,-2.0)*5.0f,0.3f*5));
@@ -43,15 +65,20 @@ public:
 //							FRand()*1.50f));
 //		}
 
-	LoadWavefrontObj(modelFile,objects,20.0f);
+		LoadWavefrontObj(modelFile,objects,20.0f);
+
+		for(int n=0;n<20;n++) {
+			{ vector<Object> tmp; SplitObjects(objects,tmp,25,0); objects=tmp; }
+			{ vector<Object> tmp; SplitObjects(objects,tmp,25,1); objects=tmp; }
+			{ vector<Object> tmp; SplitObjects(objects,tmp,25,2); objects=tmp; }
+		}
 
 	//	AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-30,-20,0),Vec3f(10,0,1020),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(20,-20,40),Vec3f(100,1000,10),Vec3f(40,40,40),1,1,1);
 	//	AddLight(Vec3f(0,-150,0),Vec3f(4000,4000,4000));
 		
-		startTree=SlowKDTree(objects);
-		tree=KDTree(startTree);
+		tree=AccStruct(objects);
 	}
 	void Animate()
 	{
@@ -103,16 +130,17 @@ public:
 		for(int q=0;q<Group::size;q++)
 			out[q]=Vec(Const<base,0>());
 
-		SSEI32 objId4[Group::size];
+		i32x4 objId4[Group::size];
 		u32 *objId=(u32*)objId4;
 
 		const base maxDist=Const<base,10000>();
 		base dst[Group::size];
 
 		int nColTests,nSkips,depth; float ncp;
-		KDStats stats=tree.stats;
+		TreeStats stats=tree.stats;
 //		depth=tree.GetDepth(group,sel);
-		tree.TraverseOptimized(group,sel,maxDist,NormalOutput(dst,objId4),primary);
+//		tree.TraverseOptimized(group,sel,maxDist,NormalOutput(dst,objId4),primary);
+		tree.TraverseMonoGroup(group,sel,maxDist,NormalOutput(dst,objId4));
 
 		Vec3q nrm[Group::size],colPos[Group::size],reflDir[Group::size],accLight[Group::size];
 		boolv tmask[Group::size];
@@ -147,9 +175,9 @@ public:
 //			out[q].y=Condition(refl.y>Const<base,0>(),Const<base,8,12>(),Const<base,2,12>());
 //			out[q].z=Condition(refl.z>Const<base,0>(),Const<base,8,12>(),Const<base,2,12>());
 			out[q]=nrm[q]|group.Dir(q);
-//			out[q].x=Condition(group.Dir(q).x<Const<floatq,0>(),Const<floatq,0,2>(),Const<floatq,1>());
-//			out[q].y=Condition(group.Dir(q).y<Const<floatq,0>(),Const<floatq,0,2>(),Const<floatq,1>());
-//			out[q].z=Condition(group.Dir(q).z<Const<floatq,0>(),Const<floatq,0,2>(),Const<floatq,1>());
+//			out[q].x=Condition(group.Dir(q).x<Const<floatq,0>(),Const<floatq,1,2>(),Const<floatq,1>());
+//			out[q].y=Condition(group.Dir(q).y<Const<floatq,0>(),Const<floatq,1,2>(),Const<floatq,1>());
+//			out[q].z=Condition(group.Dir(q).z<Const<floatq,0>(),Const<floatq,1,2>(),Const<floatq,1>());
 		}
 
 		for(int n=0;n<nLights;n++) {
@@ -184,7 +212,8 @@ public:
 			base tDst[Group::size]; {
 				Vec3q lPos(lightPos.x,lightPos.y,lightPos.z);
 				RayGroup<Group::recLevel,1> tGroup(fromLight,&lPos);
-				tree.TraverseOptimized(tGroup,lsel,Const<base,10000>(),ShadowOutput(tDst),1);
+			//	tree.TraverseOptimized(tGroup,lsel,Const<base,10000>(),ShadowOutput(tDst),1);
+				tree.TraverseMonoGroup(tGroup,lsel,Const<base,10000>(),ShadowOutput(tDst));
 			}
 
 
@@ -238,23 +267,22 @@ public:
 		if(rdtscShader) {
 			floatq mul(0.0002f/Group::size);
 			for(int q=0;q<Group::size;q++) {
-			//	out[q].x=floatq(float(ticks))*mul;
-			//	out[q].y=floatq(float(ticks))*mul*0.1f;
+				out[q].x=floatq(float(ticks))*mul;
+				out[q].y=floatq(float(ticks))*mul*0.2f;
 				out[q].y=floatq(float(nSkips)*0.05f);
-				out[q].x=out[q].z=floatq(float(0));//nColTests)*0.001f);
+				out[q].z=floatq(float(0));//nColTests)*0.001f);
 			//	out[q].y=floatq(float(depth)*0.01f);
 			}
 		}
 	}
 
-	vector<Object> objects;
-
 	int nLights;
 	Light lights[512];
 
-	SlowKDTree startTree;
-	KDTree tree;
+	AccStruct tree;
 };
+
+typedef TScene<BIHTree> Scene;
 
 double ticks=0,lastTicks=0,iters=0;
 double minTicks=-1;
@@ -355,6 +383,15 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,int pixDoubling,bo
 	int omp_get_thread_num() { return 1; }
 #endif
 
+void PrintBaseSizes() {
+#define PRINT_SIZE(cls)		{printf("sizeof(" #cls "): %d\n",sizeof(cls));}
+	PRINT_SIZE(Object)
+	PRINT_SIZE(KDNode)
+	PRINT_SIZE(Triangle)
+	PRINT_SIZE(Sphere)
+#undef PRINT_SIZE
+}
+
 int main(int argc, char **argv)
 {
 /*#ifdef _DEBUG
@@ -364,19 +401,10 @@ int main(int argc, char **argv)
 	int resx=512,resy=512;
 	float speed=2.0f;
 //#endif
-
-#define PRINT_SIZE(cls)		{printf("sizeof(" #cls "): %d\n",sizeof(cls));}
-	PRINT_SIZE(SSEVec3) PRINT_SIZE(SSEVec4)
-	PRINT_SIZE(SSEPVec3) PRINT_SIZE(SSEPVec4)
-	PRINT_SIZE(Object)
-	PRINT_SIZE(KDNode)
-	PRINT_SIZE(Triangle)
-	PRINT_SIZE(Sphere)
-#undef PRINT_SIZE
 	
 	bool fullscreen=0,nonInteractive=0;
 	int threads=omp_get_num_procs()*8;
-	const char *modelFile="lancia.obj";
+	const char *modelFile="feline.obj";
 
 	if(argc>2) { resx=atoi(argv[1]); resy=atoi(argv[2]); }
 	if(argc>3) { fullscreen=atoi(argv[3])==1; if(atoi(argv[3])>=2) nonInteractive=1; }
@@ -386,19 +414,12 @@ int main(int argc, char **argv)
 	omp_set_num_threads(threads);
 	printf("Threads/cores: %d/%d\n",omp_get_max_threads(),omp_get_num_procs());
 
-	int bticks=SDL_GetTicks();
+	double buildTime=GetTime();
 	Scene scene((string("scenes/")+modelFile).c_str());
-	if(!scene.tree.Test()) return 0;
-	bticks=SDL_GetTicks()-bticks;
-	printf("KD Tree build time: %.2f sec\n",double(bticks)*0.001);
+	buildTime=GetTime()-buildTime;
+	printf("Build time: %.2f sec\n",buildTime);
 
-	int full=0,notFull=0;
-	for(int n=0;n<scene.tree.objects.size();n++) {
-		if(scene.tree.objects[n].fullInNode) full++;
-		else notFull++;
-	}
-	printf("Objects %d:\nFull KDnode objects: %.2f%%\n\n",full+notFull,100.0*double(full)/double(full+notFull));
-	printf("Nodes: %d\n",scene.tree.nodes.size());
+	scene.tree.PrintInfo();
 
 	Image img(resx,resy);
 	Camera cam;
@@ -424,9 +445,9 @@ int main(int argc, char **argv)
 //	cam.right=Vec3f(-0.983413,0.000000,0.181398);
 
 	// bunny, feline, dragon
-//	cam.pos=Vec3f(7.254675,2.399719,39.409294);
-//	cam.front=Vec3f(-0.240041,0.000000,-0.970767);
-//	cam.right=Vec3f(-0.970767,0.000000,0.240041);
+	cam.pos=Vec3f(7.254675,2.399719,39.409294);
+	cam.front=Vec3f(-0.240041,0.000000,-0.970767);
+	cam.right=Vec3f(-0.970767,0.000000,0.240041);
 
 	// room
 //	cam.pos=Vec3f(-58.125217,-205.600281,61.583553);
@@ -435,7 +456,7 @@ int main(int argc, char **argv)
 
 //	Matrix<Vec4f> rotMat=RotateY(-102.7f); cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
 
-	enum { QuadLevels=2 };
+	enum { QuadLevels=1 };
 
 	if(nonInteractive) {
 		for(int n=atoi(argv[3]);n>=0;n--) GenImage<QuadLevels>(scene,cam,img,0,0,0);
@@ -482,12 +503,11 @@ int main(int argc, char **argv)
 			}
 			
 			scene.tree.stats.Init();
-			int ticks=SDL_GetTicks();
+			double time=GetTime();
 			GenImage<QuadLevels>(scene,cam,img,pixelDoubling,refls,rdtscSh);
+			time=GetTime()-time;
 
-			ticks=SDL_GetTicks()-ticks;
-
-			scene.tree.stats.PrintInfo(resx,resy,lastTicks,ticks);
+			scene.tree.stats.PrintInfo(resx,resy,lastTicks,time*1000.0);
 
 			Vec3f a,b; Convert(scene.tree.pMin,a); Convert(scene.tree.pMax,b);
 			scene.Animate();

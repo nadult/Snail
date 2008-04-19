@@ -41,11 +41,10 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 	nodes.push_back(SlowKDNode());
 
 	for(int n=0;n<objects.size();n++) {
-		objects[n].fullInNode=1;
+		objects[n].SetFullInNode(1);
 		nodes[startNode].objects.push_back(n);
 	}
 
-	printf("Building KD Tree...\n");
 	Build(startNode,0,min,max);
 }
 
@@ -202,7 +201,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			float pMax=((float*)&max)[axis];
 
 			if(pMin<divider&&pMax>divider)
-				obj.fullInNode=0;
+				obj.SetFullInNode(0);
 
 			bool added=0;
 			if(pMin<divider) { left.objects.push_back(node.objects[n]); added=1; }
@@ -291,14 +290,20 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 #undef PIX
 }*/
 
-KDTree::KDTree(const SlowKDTree &tree)
-{
+KDTree::KDTree(const vector<Object> &objects) {
+	SlowKDTree slowkd(objects);
+	Build(slowkd);
+}
+
+KDTree::KDTree(const SlowKDTree &tree) {
+	Build(tree);
+}
+
+void KDTree::Build(const SlowKDTree &tree) {
 	pMin=tree.pMin; pMax=tree.pMax;
 
 	nodes.resize(tree.nodes.size());
 	objects=tree.objects;
-
-	printf("Converting...\n");
 
 	for(u32 n=0;n<nodes.size();n++) {
 		const SlowKDNode &sNode=tree.nodes[n];
@@ -313,6 +318,22 @@ KDTree::KDTree(const SlowKDTree &tree)
 		int a=0;
 	}
 }
+
+void KDTree::PrintInfo() const {
+	if(!Test()) {
+		printf("Test not passed!\n");
+	}
+
+	int full=0,notFull=0;
+	for(int n=0;n<objects.size();n++) {
+		if(objects[n].FullInNode()) full++;
+		else notFull++;
+	}
+
+	printf("Objects %d:\nFull KDnode objects: %.2f%%\n\n",full+notFull,100.0*double(full)/double(full+notFull));
+	printf("Nodes: %d\n",nodes.size());
+}
+
 KDTree::~KDTree()
 {
 }

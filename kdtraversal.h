@@ -8,7 +8,7 @@ class ObjectIdxBuffer
 public:
 	ObjectIdxBuffer() {
 		for(int n=0;n<size;n++)
-			indices[n]=SSEI32(-1);
+			indices[n]=i32x4(-1);
 		last=0;
 	}
 	void Insert(u32 idx) {
@@ -16,13 +16,13 @@ public:
 		last=(last+1)%(size*4);
 	}
 	bool Find(u32 idx) {
-		SSEI32 tidx(idx); SSEI32Mask test;
+		i32x4 tidx(idx); i32x4b test;
 		test=indices[0]==tidx;
 		for(int n=1;n<size;n++)
 			test=test||indices[n]==tidx;
 		return ForAny(test);
 	}
-	SSEI32 indices[size];
+	i32x4 indices[size];
 	int last;
 };
 
@@ -37,7 +37,7 @@ void KDTree::FullTraverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,co
 	out.dist=maxD;
 
 	for(int n=0;n<Object::nObjs;n++) {
-		base dst=Object::spheres[n].Collide(rOrigin,rDir);
+		base dst=Object::tris[n].Collide(rOrigin,rDir);
 		typename Vec::TBool col=dst>Const<base,0>()&&dst<out;
 
 		if(Output::objectIdsFlag) {
@@ -66,7 +66,7 @@ INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const fl
 
 	*outObj=0;
 
-	int signMask=SignMask(SSEReal(invDir.m));
+	int signMask=SignMask(floatq(invDir.m));
 	int dSign[3]={signMask&1?0:1,signMask&2?0:1,signMask&4?0:1};
 	float minRet=maxD;
 
@@ -74,7 +74,7 @@ INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const fl
 	const u32 *objIds=&objectIds[0];
 	const Object *objs=&objects[0];
 
-	KDStats localStats;
+	TreeStats localStats;
 
 	while(true) {
 		localStats.iters++;
@@ -152,12 +152,12 @@ template <int size>
 INLINE void ComputePV(const RaySelector<size> &sel,const Vec3q *rDir,floatq *pv)
 {
 	//	ab[k] = k==0? min(a/b)  :   max(a/b)
-	SSEReal yx[2],zx[2],xy[2],zy[2],xz[2],yz[2];
+	floatq yx[2],zx[2],xy[2],zy[2],xz[2],yz[2];
 
 	{
 		const Vec3q dir=VAbs(rDir[sel[0]]);
 
-		SSEReal ix=Inv(dir.x),iy=Inv(dir.y),iz=Inv(dir.z);
+		floatq ix=Inv(dir.x),iy=Inv(dir.y),iz=Inv(dir.z);
 		yx[0]=yx[1]=dir.y*ix;
 		zx[0]=zx[1]=dir.z*ix;
 		xy[0]=xy[1]=dir.x*iy;
@@ -169,7 +169,7 @@ INLINE void ComputePV(const RaySelector<size> &sel,const Vec3q *rDir,floatq *pv)
 	for(int id=1;id<sel.Num();id++) {
 		const Vec3q dir=VAbs(rDir[sel[id]]);
 
-		SSEReal t1,t2,i;
+		floatq t1,t2,i;
 		i=Inv(dir.x); t1=dir.y*i; t2=dir.z*i;
 		yx[0]=Min(t1,yx[0]); yx[1]=Max(t1,yx[1]);
 		zx[0]=Min(t2,zx[0]); zx[1]=Max(t2,zx[1]);
@@ -268,7 +268,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 		int q=sel[i];
 
 		out.dist[q]=maxD;
-		out.object[q]=SSEI32(0);
+		out.object[q]=intq(0);
 	}
 
 	// Minimized / maximized ray origin
@@ -279,11 +279,11 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 		maxOR=VMax(minOR,maxOR); minOR=tMin;	
 	}
 
-	SSEReal pv[3],ov[3];
+	floatq pv[3],ov[3];
 	ComputePV(sel,&group.Dir(0),pv);
 	ComputeOV(minOR,maxOR,pv,ov);
 
-	KDStats localStats;
+	TreeStats localStats;
 
 	Vec3p boxStack[(MaxLevel+8)*2];
 	const KDNode *nodeStack[MaxLevel+8];
@@ -342,8 +342,8 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 
 				const u32 *oid=objIds+node->FirstObject();
 				
-				SSEPVec3 nodeMin,nodeMax; {
-					SSEPVec3 nodeEps(Const<floatq,1,1000>().m);
+				Vec3p nodeMin,nodeMax; {
+					Vec3p nodeEps(Const<floatq,1,1000>().m);
 					Vec3p tMin=bMin*negMask,tMax=bMax*negMask;
 					nodeMin=VMin(tMin,tMax)-nodeEps;
 					nodeMax=VMax(tMin,tMax)+nodeEps;
@@ -352,7 +352,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 				for(int n=node->NumObjects();n>0;n--) {
 					int tid=*oid++;
 					const Object &obj=objs[tid];
-					const bool fullInNode=obj.fullInNode;
+					const bool fullInNode=obj.FullInNode();
 					
 					if(idxBuffer.Find(tid)) { localStats.skips++; continue; }
 
@@ -375,14 +375,14 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 						localStats.colTests++;
 
 						floatq ret=obj.Collide(group.Origin(q),group.Dir(q));
-						SSERealMask mask=(ret>Const<floatq,0>()&&ret<out.dist[q]);
+						f32x4b mask=(ret>Const<floatq,0>()&&ret<out.dist[q]);
 						u32 msk=ForWhich(mask);
 
 						anyPassed+=msk;
 
 						if(!fullInNode) {
-							SSEVec3 col=group.Origin(q)+group.Dir(q)*ret;
-							SSERealMask insideMask=	col.x>=nodeMin.x&&col.x<=nodeMax.x&&
+							Vec3q col=group.Origin(q)+group.Dir(q)*ret;
+							f32x4b	 insideMask=	col.x>=nodeMin.x&&col.x<=nodeMax.x&&
 													col.y>=nodeMin.y&&col.y<=nodeMax.y&&
 													col.z>=nodeMin.z&&col.z<=nodeMax.z;
 							u32 insideMsk=ForWhich(insideMask);
@@ -393,9 +393,9 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 						}
 
 						if(Output::objectIdsFlag) {
-							SSEI32Mask test; Cast(mask,test);
-							SSEI32 &dst=((SSEI32*)out.object)[q];
-							dst=Condition(test,SSEI32(tid),dst);
+							i32x4b test=mask;
+							i32x4 &dst=out.object[q];
+							dst=Condition(test,i32x4(tid),dst);
 						}
 
 						//There are some bugs still...
@@ -433,7 +433,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 			continue;
 		}
 
-		SSEReal split; {
+		f32x4 split; {
 			union { float f; int i; };
 			f=node->Pos();
 			i^=negMaskI[axis];
@@ -446,7 +446,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 		if(_mm_movemask_ps(_mm_cmplt_ps(bMax.m,split.m))&mask) { node+=sign0[axis]^1; continue; }
 
 		{
-			SSEReal abab=pv[axis]*split+ov[axis],tmp,tt[3];
+			f32x4 abab=pv[axis]*split+ov[axis],tmp,tt[3];
 			tmp=_mm_unpacklo_ps(split.m,abab.m);
 			tt[0].m=_mm_shuffle(0+(1<<2)+(3<<4),tmp.m);
 			tt[1].m=_mm_shuffle(1+(0<<2)+(3<<4),tmp.m);
@@ -466,7 +466,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 		}
 
 		/*{
-			SSEReal abab=pv[axis]*split+ov[axis];
+			f32x4 abab=pv[axis]*split+ov[axis];
 			__m128 lo=_mm_unpacklo_ps(split.m,abab.m),hi=_mm_unpackhi_ps(split.m,abab.m);
 			Vec3p pMin,pMax;
 
@@ -521,7 +521,7 @@ inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) co
 		maxOR=VMax(minOR,maxOR); minOR=tMin;	
 	}
 
-	SSEReal pv[3],ov[3];
+	f32x4 pv[3],ov[3];
 	ComputePV(sel,&group.Dir(0),pv);
 	ComputeOV(minOR,maxOR,pv,ov);
 
@@ -576,8 +576,8 @@ inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) co
 
 				const u32 *oid=objIds+node->FirstObject();
 				
-				SSEPVec3 nodeMin,nodeMax; {
-					SSEPVec3 nodeEps(Const<floatq,1,1000>().m);
+				Vec3p nodeMin,nodeMax; {
+					Vec3p nodeEps(Const<floatq,1,1000>().m);
 					Vec3p tMin=bMin*negMask,tMax=bMax*negMask;
 					nodeMin=VMin(tMin,tMax)-nodeEps;
 					nodeMax=VMax(tMin,tMax)+nodeEps;
@@ -586,7 +586,7 @@ inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) co
 				for(int n=node->NumObjects();n>0;n--) {
 					int tid=*oid++;
 					const Object &obj=objs[tid];
-					const bool fullInNode=obj.fullInNode;
+					const bool fullInNode=obj.FullInNode();
 					
 					bool beamCollision=obj.BeamCollide(beamOrig,beamDir,beamM,beamA);
 				 	if(beamCollision)
@@ -604,7 +604,7 @@ inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) co
 			continue;
 		}
 
-		SSEReal split; {
+		f32x4 split; {
 			union { float f; int i; };
 			f=node->Pos();
 			i^=negMaskI[axis];
@@ -618,7 +618,7 @@ inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) co
 		if(_mm_movemask_ps(_mm_cmplt_ps(bMax.m,split.m))&mask) { node+=sign0[axis]^1; continue; }
 
 		{
-			SSEReal abab=pv[axis]*split+ov[axis],tmp,tt[3];
+			f32x4 abab=pv[axis]*split+ov[axis],tmp,tt[3];
 			tmp=_mm_unpacklo_ps(split.m,abab.m);
 			tt[0].m=_mm_shuffle(0+(1<<2)+(3<<4),tmp.m);
 			tt[1].m=_mm_shuffle(1+(0<<2)+(3<<4),tmp.m);
