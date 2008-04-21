@@ -77,7 +77,7 @@ INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const fl
 	TreeStats localStats;
 
 	while(true) {
-		localStats.iters++;
+		localStats.LoopIteration();
 		u32 axis=node->Axis();
 
 		if(axis==3) { // leaf
@@ -87,7 +87,7 @@ INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const fl
 				float eps=0.0001f,ttMin=tMin-eps,ttMax=tMax+eps;
 				
 				for(int n=node->NumObjects();n>0;n--) {
-					localStats.colTests++;
+					localStats.Intersection();
 
 					int tid=*id++;
 					const Object &obj=objs[tid];
@@ -334,7 +334,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 	ObjectIdxBuffer<8> idxBuffer;
 
 	while(true) {
-		localStats.iters++;
+		localStats.LoopIteration();
 
 		u32 axis=node->Axis();
 		if(axis==3) { // Leaf
@@ -372,7 +372,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 
 					for(int i=0;i<sel.Num();i++) {
 						int q=sel[i];
-						localStats.colTests++;
+						localStats.Intersection();
 
 						floatq ret=obj.Collide(group.Origin(q),group.Dir(q));
 						f32x4b mask=(ret>Const<floatq,0>()&&ret<out.dist[q]);
@@ -408,8 +408,8 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 						out.dist[q]=Condition(mask,ret,out.dist[q]);
 					}
 
-					if(!anyPassed) localStats.intersectOk++;
-					else localStats.intersectFail++;
+					if(!anyPassed) localStats.IntersectPass();
+					else localStats.IntersectFail();
 
 					if(fullInside) {
 						idxBuffer.Insert(tid);

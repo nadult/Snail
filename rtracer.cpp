@@ -67,11 +67,11 @@ public:
 
 		LoadWavefrontObj(modelFile,objects,20.0f);
 
-		for(int n=0;n<20;n++) {
-			{ vector<Object> tmp; SplitObjects(objects,tmp,25,0); objects=tmp; }
-			{ vector<Object> tmp; SplitObjects(objects,tmp,25,1); objects=tmp; }
-			{ vector<Object> tmp; SplitObjects(objects,tmp,25,2); objects=tmp; }
-		}
+	//	for(int n=0;n<20;n++) {
+	//		{ vector<Object> tmp; SplitObjects(objects,tmp,25,0); objects=tmp; }
+	//		{ vector<Object> tmp; SplitObjects(objects,tmp,25,1); objects=tmp; }
+	//		{ vector<Object> tmp; SplitObjects(objects,tmp,25,2); objects=tmp; }
+	//	}
 
 	//	AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-30,-20,0),Vec3f(10,0,1020),Vec3f(40,40,40),1,1,1);
@@ -136,7 +136,7 @@ public:
 		const base maxDist=Const<base,10000>();
 		base dst[Group::size];
 
-		int nColTests,nSkips,depth; float ncp;
+		int nSkips,depth; float ncp;
 		TreeStats stats=tree.stats;
 //		depth=tree.GetDepth(group,sel);
 //		tree.TraverseOptimized(group,sel,maxDist,NormalOutput(dst,objId4),primary);
@@ -248,10 +248,12 @@ public:
 			}
 		}
 
-		nColTests=tree.stats.colTests-stats.colTests;
-		nSkips=tree.stats.skips-stats.skips;
-		ncp=float(tree.stats.nonCoherent-stats.nonCoherent)
-			/float(tree.stats.coherent-stats.coherent+tree.stats.nonCoherent-stats.nonCoherent);
+
+		uint nInters=tree.stats.Intersects()-stats.Intersects();
+		uint nLIters=tree.stats.LoopIters()-stats.LoopIters();
+//		nSkips=tree.stats.skips-stats.skips;
+//		ncp=float(tree.stats.nonCoherent-stats.nonCoherent)
+//			/float(tree.stats.coherent-stats.coherent+tree.stats.nonCoherent-stats.nonCoherent);
 
 		if(nLights) for(int i=0;i<sel.Num();i++) {
 			int q=sel[i];
@@ -265,11 +267,10 @@ public:
 		ticks=Ticks()-ticks;
 
 		if(rdtscShader) {
-			floatq mul(0.0002f/Group::size);
 			for(int q=0;q<Group::size;q++) {
-				out[q].x=floatq(float(ticks))*mul;
-				out[q].y=floatq(float(ticks))*mul*0.2f;
-				out[q].y=floatq(float(nSkips)*0.05f);
+				out[q].x=floatq(float(nInters))*(0.05f/Group::size);
+				out[q].y=floatq(float(nLIters))*(0.01f/Group::size);
+//				out[q].y=floatq(float(nSkips)*0.05f);
 				out[q].z=floatq(float(0));//nColTests)*0.001f);
 			//	out[q].y=floatq(float(depth)*0.01f);
 			}
@@ -339,9 +340,9 @@ void GenImage(const Scene &scene,const Camera &cam,Image &out,int pixDoubling,bo
 			rayGen.Decompose(rgb,rgb);
 			Vec3f trgb[PWidth*PHeight];
 			for(int q=0;q<NQuads;q++)
-				Convert(VClamp(rgb[q]*Const<floatq,255>(),
-						Vec3q(Const<floatq,0>()),
-						Vec3q(Const<floatq,255>())),trgb+q*4);
+				Convert(VClamp(	rgb[q]*Const<floatq,255>(),
+								Vec3q(Const<floatq,0>()),
+								Vec3q(Const<floatq,255>())),trgb+q*4);
 
 			for(int ty=0;ty<PHeight;ty++) for(int tx=0;tx<PWidth;tx++) {
 				*buf[ty]++=(char)trgb[tx+ty*PWidth].x;
