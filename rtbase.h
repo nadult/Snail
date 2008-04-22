@@ -1,14 +1,8 @@
 #ifndef RTBASE_H
 #define RTBASE_H
 
-#include <cassert>
-#include <vector>
-#include <exception>
-#include <string>
-#include <memory.h>
-#include "omp.h"
-#include "baselib.h"
-#include "veclib.h"
+#include <baselib.h>
+#include <veclib.h>
 
 
 using namespace baselib;
@@ -26,7 +20,36 @@ typedef vec4f32x4	Vec4q;
 typedef f32x4		floatq;
 typedef i32x4		intq;
 
-using std::pair;
+template <class Vec>
+Vec Reflect(const Vec &ray,const Vec &nrm) {
+	typename Vec::TScalar dot=(nrm|ray);
+	return ray-nrm*(dot+dot);
+}
+
+template <int size>
+class ObjectIdxBuffer
+{
+public:
+	ObjectIdxBuffer() {
+		for(int n=0;n<size;n++)
+			indices[n]=i32x4(-1);
+		last=0;
+	}
+	void Insert(u32 idx) {
+		((u32*)indices)[last]=idx;
+		last=(last+1)%(size*4);
+	}
+	bool Find(u32 idx) {
+		i32x4 tidx(idx); i32x4b test;
+		test=indices[0]==tidx;
+		for(int n=1;n<size;n++)
+			test=test||indices[n]==tidx;
+		return ForAny(test);
+	}
+	i32x4 indices[size];
+	int last;
+};
+
 
 #endif
 

@@ -42,25 +42,30 @@ public:
 		return enabled?100.0*intersectFail/double(intersectFail+intersectPass):0;
 	}
 
-	uint TracedTays() const { return enabled?tracedRays:0; }
+	uint TracedRays() const { return enabled?tracedRays:0; }
 	uint Intersects() const { return enabled?intersects:0; }
 	uint LoopIters() const { return enabled?iters:0; }
 
-	void PrintInfo(int resx,int resy,double cycles,double msRenderTime) {
+	void PrintInfo(int resx,int resy,double msRenderTime) {
 			double raysPerSec=double(tracedRays)*(1000.0/msRenderTime);
 			double nPixels=double(resx*resy);
 
 			if(!enabled) {
-				printf("MCycles/frame:%.2f\tMRays/sec:%.2f\n",cycles,raysPerSec*0.000001);
+				printf("MSec/frame:%6.2f  MRays/sec:%6.2f\n",msRenderTime,raysPerSec*0.000001);
 				return;
 			}
-			printf("isct,iter:%.3f %.3f MCycles/frame:%.2f\tMRays/sec:%.2f\t"
+			printf("isct,iter:%5.2f %5.2f  MSec/frame:%6.2f  MRays/sec:%5.2f  "
 					"Coherency:%.2f%% br:%.2f%% fa:%.2f%% %.0f\n",
 					double(intersects)/nPixels,double(iters)/nPixels,
-					cycles,raysPerSec*0.000001,CoherentPercentage(),
+					msRenderTime,raysPerSec*0.000001,CoherentPercentage(),
 					BreakingPercentage(),IntersectFailPercentage(),double(skips));
 	}
 
+	inline void Breaking(uint val=1) { if(enabled) breaking+=val; }
+	inline void NotBreaking(uint val=1) { if(enabled) notBreaking+=val; }
+
+	inline void Coherent(uint val=1) { if(enabled) coherent+=val; }
+	inline void NonCoherent(uint val=1) { if(enabled) nonCoherent+=val; }
 	inline void LoopIteration(uint val=1) { if(enabled) iters+=val; }
 	inline void Intersection(uint val=1) { if(enabled) intersects+=val; }
 	inline void Run(uint val=1) { if(enabled) runs+=val; }

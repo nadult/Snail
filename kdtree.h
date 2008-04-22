@@ -4,6 +4,7 @@
 #include "object.h"
 #include "ray_group.h"
 #include "tree_stats.h"
+#include "context.h"
 
 
 class SlowKDNode
@@ -23,6 +24,7 @@ class SlowKDTree
 {
 public:
 	enum { MaxLevel=40 };
+	typedef Triangle Object;
 
 	SlowKDTree(const vector<Object> &objects);
 	//void Draw(Image&,Vec3<float>,Vec3<float>,const Camera &cam,u32 node=0) const;
@@ -31,6 +33,7 @@ private:
 	friend class KDTree;
 
 	void Build(u32 node,u32 level,Vec3<float>,Vec3<float>);
+
 	Vec3p pMin,pMax;
 	vector<SlowKDNode> nodes;
 	vector<Object> objects;
@@ -56,29 +59,11 @@ private:
 	u32 val;
 };
 
-struct NormalOutput
-{
-	enum { objectIdsFlag=1 };
-	NormalOutput(floatq *distance,intq *objectIds) :dist(distance),object(objectIds) { }
-	NormalOutput(const NormalOutput &all,int n) :dist(all.dist+n),object(all.object+n*4) { }
-
-	floatq *dist;
-	intq *object;
-};
-
-struct ShadowOutput
-{
-	enum { objectIdsFlag=0 };
-	ShadowOutput(floatq *distance) :dist(distance) { }
-	ShadowOutput(const ShadowOutput &all,int n) :dist(all.dist+n) { }
-
-	floatq *dist;
-	intq *object; // dummy
-};
 class KDTree
 {
 public:
 	enum { MaxLevel=SlowKDTree::MaxLevel };
+	typedef Triangle Object;
 
 	KDTree(const vector<Object>&);
 	KDTree(const SlowKDTree&);
@@ -90,7 +75,8 @@ public:
 	template <class Output,class Vec,class base>
 	void FullTraverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output&) const;
 
-	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,const float &maxD,float &dist,u32 *obj) const;
+	template <class Output>
+	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,const float &maxD,const Output &out) const;
 
 //	template <class Output,class Vec,class base>
 //	void Traverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output &out) const;
@@ -99,7 +85,7 @@ public:
 	void TraverseFast(Group &group,const RaySelector<Group::size>&,const floatq &maxD,const Output &out) const;
 
 	template <class Output,class Group,class Selector>
-	void TraverseOptimized(Group &group,const Selector&,const floatq &maxD,const Output &out,bool primary) const;
+	void TraverseOptimized(Group &group,const Selector&,const floatq &maxD,const Output &out,bool primary=1) const;
 
 	template <class Output,class Group>
 	void TraverseMonoGroup(Group &group,const RaySelector<Group::size>&,const floatq &maxD,const Output &out) const;
@@ -116,9 +102,6 @@ public:
 //private:
 	vector<KDNode> nodes;
 	vector<u32> objectIds;
-
-public:
-	mutable TreeStats stats;
 };
 
 #include "kdtraversal.h"

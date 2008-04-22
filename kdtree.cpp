@@ -1,5 +1,28 @@
 #include "kdtree.h"
 #include <algorithm>
+#include <omp.h>
+
+enum { res=8 };
+
+static bool Test(bool space[res][res][res],int x,int y,int z) {
+	return x<0||y<0||z<0||x>=res||y>=res||z>=res?0:space[x][y][z];
+}
+
+static bool Covered(bool space[res][res][res],int sx,int sy,int sz) {
+	bool left=0,right=0,up=0,down=0,front=0,back=0;
+	int x,y,z;
+
+	x=sx; while(x>0) if(Test(space,x--,y,z)) left=1;
+	x=sx; while(x<res) if(Test(space,x++,y,z)) right=1;
+
+	y=sy; while(y>0) if(Test(space,x,y--,z)) up=1;
+	y=sy; while(y<res) if(Test(space,x,y++,z)) down=1;
+
+	z=sz; while(z>0) if(Test(space,x,y,z--)) front=1;
+	z=sz; while(z<res) if(Test(space,x,y,z++)) back=1;
+
+	return (left&&right)||(up&&down)||(front&&back);
+}
 
 SlowKDTree::SlowKDTree(const vector<Object> &objs)
 :objects(objs)
@@ -19,6 +42,55 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 	Vec3f min,max;
 	Convert(pMin,min);
 	Convert(pMax,max);
+
+	{
+		bool space[res][res][res];
+		memset(space,0,res*res*res);
+		Vec3p voxSize=(pMax-pMin)/float(res);
+		Vec3p iVoxSize=VInv(voxSize);
+
+		for(uint n=0;n<objects.size();n++) {
+			Object &obj=objects[n];
+			obj.SetFlag1(0);
+
+			Vec3p tMin=(obj.BoundMin()-pMin)*iVoxSize;
+			Vec3p tMax=(obj.BoundMax()-pMin)*iVoxSize;
+
+			int sx=tMin.x,sy=tMin.y,sz=tMin.z;
+			int ex=tMax.x,ey=tMax.y,ez=tMax.z;
+			for(int z=sz;z<=ez;z++)
+				for(int y=sy;y<=ey;y++)
+					for(int x=sx;x<=ex;x++)
+						space[x][y][z]=1;
+		}
+
+
+
+		for(int y=0;y<res;y++) {
+			for(int z=0;z<res;z++) {
+				for(int x=0;x<res;x++) {
+					if(!space[x][y][z]) if(Covered(space,x,y,z)) {
+						Vec3f bMin,bMax;
+						Convert(min+voxSize*Vec3p(x,y,z),bMin);
+						Convert(voxSize,bMax); bMax+=bMin;
+
+						Triangle blocker(bMin,bMax,Lerp(bMin,bMax,0.5f));
+						blocker.SetFlag1(1337);
+			//			objects.push_back(blocker);
+			//			printf("%f %f %f    %f %f %f\n",bMin.x,bMin.y,bMin.z,bMax.x,bMax.y,bMax.z);
+					}
+					printf("%c",space[x][y][z]?'X':' ');
+				}
+				printf("\n");
+			}
+			printf("\n\n");
+		}
+	}
+
+	// abrams
+	Triangle tmp(Vec3f(-50,36,-157),Vec3f(55,48,155),Vec3f(55,47,155));	tmp.SetFlag1(1337); objects.push_back(tmp);
+	// sponza
+//	Triangle tmp(Vec3f(-423,-622,-87),Vec3f(423,-4,87),Vec3f(-423,-622,0));	tmp.SetFlag1(1337); objects.push_back(tmp);
 
 	bool cutSides=1;
 	int startNode=0;
@@ -41,7 +113,7 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 	nodes.push_back(SlowKDNode());
 
 	for(int n=0;n<objects.size();n++) {
-		objects[n].SetFullInNode(1);
+	//	objects[n].SetFullInNode(1);
 		nodes[startNode].objects.push_back(n);
 	}
 
@@ -53,20 +125,25 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 class PSplit
 {
 public:
-	PSplit(float p,bool s)
-		:pos(p),start(s) { }
+	PSplit(float p,bool s,bool cant)
+		:pos(p),start(s),cantSplit(cant) { }
 
 	bool operator<(const PSplit& s) const
 		{ return pos<s.pos; }
 
 	float pos;
-	bool start;
+	bool start,cantSplit;
 };
-
 
 void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 {
-	if(nodes[idx].objects.size()<1) return;
+	uint count=0; {
+		SlowKDNode &node=nodes[idx];
+		for(uint n=0;n<node.objects.size();n++)
+			if(objects[node.objects[n]].GetFlag1()==0)
+				count++;
+	}
+	if(count<1) return;
 
 	double size=(tMax.x-tMin.x)*(tMax.y-tMin.y)*(tMax.z-tMin.z);
 	double sceneSize; { float t; Convert((pMax.x-pMin.x)*(pMax.y-pMin.y)*(pMax.z-pMin.z),t); sceneSize=t; }
@@ -86,17 +163,18 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			Vec3f min,max;
 			Convert(obj.BoundMin(),min);
 			Convert(obj.BoundMax(),max);
+			bool cantSplit=obj.GetFlag1()==1337;
 
-			splits[0].push_back(PSplit(min.x,1));
-			splits[1].push_back(PSplit(min.y,1));
-			splits[2].push_back(PSplit(min.z,1));
-			splits[0].push_back(PSplit(max.x,0));
-			splits[1].push_back(PSplit(max.y,0));
-			splits[2].push_back(PSplit(max.z,0));
+			splits[0].push_back(PSplit(min.x,1,cantSplit));
+			splits[1].push_back(PSplit(min.y,1,cantSplit));
+			splits[2].push_back(PSplit(min.z,1,cantSplit));
+			splits[0].push_back(PSplit(max.x,0,cantSplit));
+			splits[1].push_back(PSplit(max.y,0,cantSplit));
+			splits[2].push_back(PSplit(max.z,0,cantSplit));
 		}
 		
 		const float travCost=0.1;
-		const float hitTestCost=1.0;
+		const float hitTestCost=100.0;
 		float noSplitCost=hitTestCost*objs.size();
 
 		float minCost[3],dividers[3];
@@ -117,6 +195,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 
 			float tNodeSize[3]={nodeSize[0],nodeSize[1],nodeSize[2]};
 			int voxelsLeft=0,voxelsRight=objs.size();
+			int cantSplit=0;
 		
 		//	float startSegLen=split[0].pos-sub[s];
 		//	float endSegLen=nodeSize[s]+sub[s]-split.back().pos;
@@ -131,8 +210,10 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 
 			for(int ks=0;ks<split.size();ks++) {
 				float pos=split[ks].pos;
+
 				if(!split[ks].start) {
-					voxelsRight--;
+					if(split[ks].cantSplit) cantSplit--;
+					else voxelsRight--;
 
 				//	if(voxelsLeft+voxelsRight<=objs.size()&&ks+1<split.size()) {
 				//		float seg=split[ks+1].pos-split[ks].pos;
@@ -144,7 +225,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 				}
 				float posInNode=(pos-sub[s])*mul[s];
 
-				if(posInNode>0.0&&posInNode<1.0) {
+				if(!cantSplit) if(posInNode>0.0&&posInNode<1.0) {
 					tNodeSize[s]=nodeSize[s]*posInNode;
 					float leftSize= (tNodeSize[0]*tNodeSize[1]+tNodeSize[0]*tNodeSize[2]+tNodeSize[1]*tNodeSize[2])*iNodeSize;
 					tNodeSize[s]=nodeSize[s]*(1.0-posInNode);
@@ -158,7 +239,10 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 					}
 				}
 
-				if(split[ks].start) voxelsLeft++;
+				if(split[ks].start) {
+					if(split[ks].cantSplit) cantSplit++;
+					else voxelsLeft++;
+				}
 			}
 		}
 
@@ -200,8 +284,8 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			float pMin=((float*)&min)[axis];
 			float pMax=((float*)&max)[axis];
 
-			if(pMin<divider&&pMax>divider)
-				obj.SetFullInNode(0);
+		//	if(pMin<divider&&pMax>divider)
+		//		obj.SetFullInNode(0);
 
 			bool added=0;
 			if(pMin<divider) { left.objects.push_back(node.objects[n]); added=1; }
@@ -311,12 +395,17 @@ void KDTree::Build(const SlowKDTree &tree) {
 
 		if(sNode.type==SlowKDNode::T_LEAF) {
 			node.SetLeaf(objectIds.size(),sNode.objects.size());
-			for(u32 i=0;i<sNode.objects.size();i++)
+			for(u32 i=0;i<sNode.objects.size();i++) {
+				if(objects[sNode.objects[i]].GetFlag1()!=1337)
 				objectIds.push_back(sNode.objects[i]);
+			}
 		}
 		else node.SetNode(sNode.type,sNode.pos,sNode.child-n);
 		int a=0;
 	}
+
+//	nodeBoxes.resize(nodes.size());
+//	if(tree.nodes.size()) EvalNodeBoxes(0);
 }
 
 void KDTree::PrintInfo() const {
@@ -325,11 +414,12 @@ void KDTree::PrintInfo() const {
 	}
 
 	int full=0,notFull=0;
-	for(int n=0;n<objects.size();n++) {
-		if(objects[n].FullInNode()) full++;
-		else notFull++;
-	}
+//	for(int n=0;n<objects.size();n++) {
+//		if(objects[n].FullInNode()) full++;
+//		else notFull++;
+//	}
 
+	printf("Enable flag object.fullinnode\n");
 	printf("Objects %d:\nFull KDnode objects: %.2f%%\n\n",full+notFull,100.0*double(full)/double(full+notFull));
 	printf("Nodes: %d\n",nodes.size());
 }

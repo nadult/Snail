@@ -19,6 +19,9 @@ public:
 	template <class VecO,class Vec>
 	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const;
 
+	Vec3p BoundMin() const { return pos-Vec3p(rad); }
+	Vec3p BoundMax() const { return pos+Vec3p(rad); }
+
 	Vec3p pos;
 	float radp2,rad;
 };

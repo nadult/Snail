@@ -1,12 +1,13 @@
 #include "loader.h"
 #include <iostream>
 #include <fstream>
+#include <string.h>
 
 using std::cout;
 using std::endl;
 
 
-void LoadWavefrontObj(const char *fileName,vector<Object> &out,float scale) {
+void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale) {
 	std::filebuf fb;
 	if(!fb.open (fileName,std::ios::in))
 		return;
@@ -65,7 +66,7 @@ void LoadWavefrontObj(const char *fileName,vector<Object> &out,float scale) {
 	printf("Done loading %s\n",fileName);
 }		
 
-void LoadRaw(const char *filename,vector<Object> &out,float scale) {
+void LoadRaw(const char *filename,vector<Triangle> &out,float scale) {
 	FILE *f=fopen(filename,"rb");
 
 	while(1) {

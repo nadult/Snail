@@ -1,14 +1,13 @@
 #ifndef RTRACER_RAY_GROUP_H
 #define RTRACER_RAY_GROUP_H
 
-//#include <boost/static_assert.hpp>
-#include "veclib.h"
+#include "rtbase.h"
 
 template <int size>
 class RaySelector {
 	int num;
-	unsigned char signMask;
-	unsigned char idx[size];
+	u8 signMask;
+	u8 idx[size];
 public:
 	INLINE RaySelector() :num(0),signMask(8) {
 	}
@@ -72,25 +71,13 @@ class RayStore
 public:
 	INLINE RayStore(Vec3q *d,Vec3q *o) :dir(d),origin(o) {
 	}
-	INLINE Vec3q &Dir(int n) {
-		return dir[n];
-	}
-	INLINE const Vec3q &Dir(int n) const {
-		return dir[n];
-	}
-	INLINE Vec3q &Origin(int n) {
-		return origin[n];
-	}
-	INLINE const Vec3q &Origin(int n) const {
-		return origin[n];
-	}
+	INLINE Vec3q &Dir(int n)				{ return dir[n]; }
+	INLINE const Vec3q &Dir(int n) const	{ return dir[n]; }
+	INLINE Vec3q &Origin(int n)				{ return origin[n]; }
+	INLINE const Vec3q &Origin(int n) const	{ return origin[n]; }
 
-	INLINE Vec3q *DirPtr() {
-		return dir;
-	}
-	INLINE Vec3q *OriginPtr() {
-		return origin;
-	}
+	INLINE Vec3q *DirPtr()		{ return dir; }
+	INLINE Vec3q *OriginPtr()	{ return origin; }
 };
 
 template <int size>
@@ -100,27 +87,15 @@ class RayStore<size,true>
 	Vec3q *dir;
 
 public:
-	INLINE RayStore(Vec3q *d,Vec3q *o) :dir(d),origin(o) {
-	}
-	INLINE Vec3q &Dir(int n) {
-		return dir[n];
-	}
-	INLINE const Vec3q &Dir(int n) const {
-		return dir[n];
-	}
-	INLINE Vec3q &Origin(int n) {
-		return origin[0];
-	}
-	INLINE const Vec3q &Origin(int n) const {
-		return origin[0];
-	}
+	INLINE RayStore(Vec3q *d,Vec3q *o) :dir(d),origin(o) { }
 
-	INLINE Vec3q *DirPtr() {
-		return dir;
-	}
-	INLINE Vec3q *OriginPtr() {
-		return origin;
-	}
+	INLINE Vec3q &Dir(int n)					{ return dir[n]; }
+	INLINE const Vec3q &Dir(int n) const		{ return dir[n]; }
+	INLINE Vec3q &Origin(int n)					{ return origin[0]; }
+	INLINE const Vec3q &Origin(int n) const		{ return origin[0]; }
+
+	INLINE Vec3q *DirPtr()		{ return dir; }
+	INLINE Vec3q *OriginPtr()	{ return origin; }
 };
 
 /*!
@@ -162,6 +137,7 @@ public:
 		}
 		signsCalculated=1;
 	}
+
 	// Last group: mixed rays
 	void GenSelectors(RaySelector<size> sel[9]) {
 		if(!signsCalculated) ComputeSignMasks();
@@ -178,30 +154,18 @@ public:
 			sel[raySign[n]].Add(n);
 		}
 	}
-	INLINE int RaySignMask(int n) const {
-		return raySign[n];
-	}
+	INLINE int RaySignMask(int n) const { return raySign[n]; }
 
-	INLINE RayGroup(RayStore<size,singleOrigin> &ref) :store(ref),signsCalculated(0) {
-	}
-	INLINE RayGroup(Vec3q *dir,Vec3q *origin) :store(dir,origin),signsCalculated(0) {
-	}
+	INLINE RayGroup(RayStore<size,singleOrigin> &ref) :store(ref),signsCalculated(0) { }
+	INLINE RayGroup(Vec3q *dir,Vec3q *origin) :store(dir,origin),signsCalculated(0) { }
 
-	INLINE Vec3q &Dir(int n) {
-		return store.Dir(n);
-	}
-	INLINE const Vec3q &Dir(int n) const {
-		return store.Dir(n);
-	}
+	INLINE Vec3q &Dir(int n)				{ return store.Dir(n); }
+	INLINE const Vec3q &Dir(int n) const	{ return store.Dir(n); }
 
-	INLINE Vec3q &Origin(int n) {
-		return store.Origin(n);
-	}
-	INLINE const Vec3q &Origin(int n) const {
-		return store.Origin(n);
-	}
+	INLINE Vec3q &Origin(int n)				{ return store.Origin(n); }
+	INLINE const Vec3q &Origin(int n) const { return store.Origin(n); }
 
-	// Iloœæ promieni, w tym tych wy³¹czonych
+	// Including disabled rays
 	INLINE int Size() const { return size; }
 
 };
