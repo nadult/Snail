@@ -1,31 +1,35 @@
 #ifndef KDTRAVERSAL_H
 #define KDTRAVERSAL_H
 
-
 template <class Output,class Vec,class base>
-void KDTree::FullTraverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output &out) const {	
+void KDTree::FullTraverse(const Vec &rOrigin,const Vec &rDir,const Output &out) const {	
 	if(Output::objectIdsFlag) {
 		for(int m=0;m<ScalarInfo<base>::multiplicity;m++)
 			out.object[m]=0;
 	}
-	out.dist=maxD;
+
+	TreeStats stats;
+	stats.TracingRay();
 
 	for(int n=0;n<objects.size();n++) {
+		stats.Intersection();
+
 		const Object &obj=objects[n];
 		base dst=obj.Collide(rOrigin,rDir);
-		typename Vec::TBool col=dst>Const<base,0>()&&dst<out;
+		typename Vec::TBool mask=dst>Const<base,0>()&&dst<out.dist[0];
 
 		if(Output::objectIdsFlag) {
-			u32 msk=ForWhich(col);
-			for(int m=0;m<ScalarInfo<base>::multiplicity;m++)
-				if(msk&(1<<m)) out.object[m]=n;
+			i32x4b test=mask;
+			out.object[0]=Condition(test,i32x4(n),out.object[0]);
 		}
-		out.dist=Condition(col,dst,out);
+		out.dist[0]=Condition(mask,dst,out);
 	}
+
+	out.stats->Update(stats);
 }
 
 template <class Output>
-INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const float &maxD,const Output &out) const {
+INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const Output &out) const {
 	struct Locals4 {
 		float tMin,tMax;
 		const KDNode *node;
@@ -37,56 +41,48 @@ INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const fl
 
 	const float *rStart=(const float*)&rOrigin;
 	const float *irDir=(const float*)&invDir;
-	float tMin=ConstEpsilon<float>(),tMax=maxD;
+	float tMin=ConstEpsilon<float>(),tMax=out.dist[0];
 
 	if(Output::objectIndexes)
 		out.object[0]=0;
 
 	int signMask=SignMask(floatq(invDir.m));
 	int dSign[3]={signMask&1?0:1,signMask&2?0:1,signMask&4?0:1};
-	float minRet=maxD;
-
-	Vec3p negMask; {
-		((u32*)&negMask)[0]=signMask&1?0x80000000:0;
-		((u32*)&negMask)[1]=signMask&2?0x80000000:0;
-		((u32*)&negMask)[2]=signMask&4?0x80000000:0;
-		((float*)&negMask)[3]=0.0f;
-	}
 
 	const KDNode *node=&nodes[0];
 	const u32 *objIds=&objectIds[0];
 	const Object *objs=&objects[0];
 
-	TreeStats localStats;
+	TreeStats stats;
+	stats.TracingRay();
 
 	while(true) {
-		localStats.LoopIteration();
+		stats.LoopIteration();
 		u32 axis=node->Axis();
 
 		if(axis==3) { // leaf
 			if(node->NumObjects()) {
 				const u32 *id=objIds+node->FirstObject();
 
-				if(tMin>tMax) localStats.Breaking();
-				else localStats.NotBreaking();
+				float eps=0.0001f,ttMin=tMin-eps,ttMax=tMax+eps;
+				float minRet=out.dist[0];
 
-				float eps=0.0001f,ttMin=tMin-eps,ttMax=Min(minRet,tMax)+eps;
-				
 				for(int n=node->NumObjects();n>0;n--) {
-					localStats.Intersection();
+					stats.Intersection();
 
 					int tid=*id++;
 					const Object &obj=objs[tid];
 					float ret; Convert(obj.Collide(rOrigin,rDir),ret);
-					
+			
 					if(ret>ttMin&&ret<ttMax) {
 						if(Output::objectIndexes)
 							out.object[0]=tid;
-						minRet=ret;
+						minRet=Min(minRet,ret);
 					}
 				}
-				if(minRet<maxD) {
-					out.stats->Update(localStats);
+
+				if(minRet<out.dist[0]) {
+					out.stats->Update(stats);
 					out.dist[0]=minRet;
 					return;
 				}
@@ -94,8 +90,7 @@ INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const fl
 
 POPSTACK:
 			if(stack==stackBegin) {
-				out.stats->Update(localStats);
-				out.dist[0]=minRet;
+				out.stats->Update(stats);
 				return;
 			}
 			{
@@ -103,21 +98,6 @@ POPSTACK:
 				tMin=stack->tMin;
 				tMax=stack->tMax;
 				node=stack->node;
-			/*	{
-					const NodeBox &box=nodeBoxes[0];
-					Vec3p min=box.min;
-					Vec3p max=box.max;
-					if(signMask&1) Swap(min.x,max.x);
-					if(signMask&2) Swap(min.y,max.y);
-					if(signMask&4) Swap(min.z,max.z);
-
-					Vec3p ppMin=(min-rOrigin)*invDir;
-					Vec3p ppMax=(max-rOrigin)*invDir;
-					float ttMin=Max(ppMin.x,Max(ppMin.y,ppMin.z));
-					float ttMax=Min(ppMax.x,Min(ppMax.y,ppMax.z));
-
-					if(ttMax<ttMin||tMax<ttMin||tMin>ttMax) goto POPSTACK;
-				} */
 			}
 			continue;
 		}
@@ -287,7 +267,8 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 	ComputePV(sel,&group.Dir(0),pv);
 	ComputeOV(minOR,maxOR,pv,ov);
 
-	TreeStats localStats;
+	TreeStats stats;
+	stats.TracingPacket(sel.Num()*4);
 
 	Vec3p boxStack[(MaxLevel+8)*2];
 	const KDNode *nodeStack[MaxLevel+8];
@@ -309,7 +290,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 	}
 
 	Vec3p beamDir,beamOrig; float beamM,beamA;
-	if(sel.Num()>2) {
+	if(!Output::shadow) if(sel.Num()>2) {
 		beamDir=Vec3p(0,0,0);
 		Vec3q tmp=group.Dir(sel[0]);
 		for(int n=1;n<sel.Num();n++) tmp+=group.Dir(sel[n]);
@@ -344,7 +325,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 	}
 
 	while(true) {
-		localStats.LoopIteration();
+		stats.LoopIteration();
 
 		axis=node->Axis();
 		if(axis==3) { // Leaf
@@ -364,17 +345,14 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 					const Object &obj=objs[tid];
 					const bool fullInNode=0;//obj.FullInNode();
 					
-					if(idxBuffer.Find(tid)) { localStats.Skip(); continue; }
+					if(idxBuffer.Find(tid)) { stats.Skip(); continue; }
 
 					int beamCollision=1;
-					if(sel.Num()>2) {
+					if(!Output::shadow) if(sel.Num()>2) {
 						beamCollision=obj.BeamCollide(beamOrig,beamDir,beamM,beamA);
 
-					 	if(!beamCollision) {
-							idxBuffer.Insert(tid);
-						//	localStats.skips++;
-							continue;
-						}
+					 	if(!beamCollision) { idxBuffer.Insert(tid); continue; }
+
 						// Visualizing beam collisions
 						/*	for(int i=0;i<sel.Num();i++) {
 							int q=sel[i];
@@ -382,29 +360,26 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 							out.dist[q]=Length(group.Origin(q)-tmp);
 							out.object[q]=i32x4(0);
 						}
-						out.stats->Update(localStats);
-						return;*/
+						out.stats->Update(stats);
+						return; */
 					}
 
-					if(beamCollision==2) localStats.NotBreaking();
-					else localStats.Breaking();
+				//	if(beamCollision==2) stats.NotBreaking();
+				//	else stats.Breaking();
 
 					bool fullInside=1;
-				//	int anyPassed=0;
 
 					bool allCollided=1;
 					floatq newMaxD=Const<floatq,0>();
 
 					for(int i=0;i<sel.Num();i++) {
 						int q=sel[i];
-						localStats.Intersection();
+						stats.Intersection();
 
 						floatq ret=obj.Collide(group.Origin(q),group.Dir(q));
 						f32x4b mask=(ret>Const<floatq,0>()&&ret<out.dist[q]);
 						u32 msk=ForWhich(mask);
 						if(msk!=15) allCollided=0;
-
-					//	anyPassed+=msk;
 
 						if(!fullInNode) {
 							Vec3q col=group.Origin(q)+group.Dir(q)*ret;
@@ -435,9 +410,6 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 						maxNodeDistSq=Min(maxNodeDistSq,newMax*newMax);
 					}
 					
-				//	if(!anyPassed) localStats.IntersectPass();
-				//	else localStats.IntersectFail();
-
 					if(fullInside) idxBuffer.Insert(tid);
 				}
 
@@ -445,11 +417,11 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 					active[i]=active[sel.Num()-1];
 					sel.Disable(i--);
 				}
-				if(sel.Num()==0) { out.stats->Update(localStats); return; }
+				if(sel.Num()==0) { out.stats->Update(stats); return; }
 			}
 
 POPSTACK:
-			if(stackPos==0) { out.stats->Update(localStats); return; }
+			if(stackPos==0) { out.stats->Update(stats); return; }
 
 			stackPos--;
 			bMin=boxStack[stackPos*2+0]; {
@@ -672,9 +644,8 @@ inline int KDTree::GetDepth(Group &group,const RaySelector<Group::size> &sel) co
 
 
 template <class Output,class Group>
-void KDTree::TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,const floatq &maxD,const Output &out) const {
+void KDTree::TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
 	Vec3p orig[4],dir[4];
-	float fmaxD[4];
 	u32 tmp[4];
 
 //	for(int n=0;n<sel.Num();n++) {
@@ -686,8 +657,6 @@ void KDTree::TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,
 
 	if(Group::singleOrigin)
 		Convert(group.Origin(sel[0]),orig);
-	Convert(maxD,fmaxD);
-
 	
 	for(int i=0;i<sel.Num();i++) {
 		int q=sel[i];
@@ -700,10 +669,10 @@ void KDTree::TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,
 		float *dist=(float*)(out.dist+q);
 		u32 *objId=Output::objectIndexes?(u32*)(out.object+q):tmp;
 
-		TraverseMono(orig[0],dir[0],fmaxD[0],NormalOutput<float,u32>(dist+0,objId+0,out.stats));
-		TraverseMono(orig[1],dir[1],fmaxD[1],NormalOutput<float,u32>(dist+1,objId+1,out.stats));
-		TraverseMono(orig[2],dir[2],fmaxD[2],NormalOutput<float,u32>(dist+2,objId+2,out.stats));
-		TraverseMono(orig[3],dir[3],fmaxD[3],NormalOutput<float,u32>(dist+3,objId+3,out.stats));
+		TraverseMono(orig[0],dir[0],NormalOutput<float,u32>(dist+0,objId+0,out.stats));
+		TraverseMono(orig[1],dir[1],NormalOutput<float,u32>(dist+1,objId+1,out.stats));
+		TraverseMono(orig[2],dir[2],NormalOutput<float,u32>(dist+2,objId+2,out.stats));
+		TraverseMono(orig[3],dir[3],NormalOutput<float,u32>(dist+3,objId+3,out.stats));
 	}
 }
 
@@ -731,32 +700,25 @@ void KDTree::TraverseOptimized(Group &group,const Selector &sel,const floatq &ma
 	for(int k=0;k<8;k++) {
 		RaySelector<Group::size> &sel=selectors[k];
 		if(sel.Num()) {
+			// Ulepszyc, ta czworka moze byc popsuta (wektorki w roznych kierunkach)
 			Vec3q &dir0=group.Dir(sel[0]);
 
 			if(!primary) for(int i=1;i<sel.Num();i++) {
-				floatq dot=dir0|group.Dir(sel[i]);
-				if(ForAny(dot<Const<floatq,98,100>())) {
+				floatq dot=group.Dir(sel[i])|dir0;
+				if(ForAny(dot<Const<floatq,998,1000>())) {
 					selectors[8].Add(sel[i]);
 					sel.Disable(i--);
 				}
 			}
 
-			if(sel.Num()>2) {
-				TraverseFast(group,sel,maxD,out);
-				out.stats->Coherent(sel.Num());
-			}
+			if(sel.Num()>2) TraverseFast(group,sel,maxD,out);
 			else while(sel.Num()) { selectors[8].Add(sel[0]); sel.Disable(0); }
-			out.stats->Run();
 		}
 	}
 	if(selectors[8].Num()) {
 		const RaySelector<Group::size> &sel=selectors[8];
-
-		TraverseMonoGroup(group,sel,maxD,out);
-		out.stats->Run(sel.Num());
-		out.stats->NonCoherent(sel.Num());
+		TraverseMonoGroup(group,sel,out);
 	}
-	out.stats->TracingRay(sel.Num()*4);
 }
 
 #endif

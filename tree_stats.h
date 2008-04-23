@@ -8,28 +8,27 @@ class TreeStats
 public:
 	enum { enabled=1 };
 
-	TreeStats() {
+	inline TreeStats() {
 		Init();
 	}
-	INLINE void Update(const TreeStats &local) {
-		if(!enabled) return;
+	inline void Update(const TreeStats &local) {
+		if(enabled) {
+			intersects+=local.intersects;
+			iters+=local.iters;
+			tracedRays+=local.tracedRays;
+			coherent+=local.coherent;
+			nonCoherent+=local.nonCoherent;
+			breaking+=local.breaking;
+			notBreaking+=local.notBreaking;
 
-		intersects+=local.intersects;
-		iters+=local.iters;
-		runs+=local.runs;
-		tracedRays+=local.tracedRays;
-		coherent+=local.coherent;
-		nonCoherent+=local.nonCoherent;
-		breaking+=local.breaking;
-		notBreaking+=local.notBreaking;
+			intersectPass+=local.intersectPass;
+			intersectFail+=local.intersectFail;
 
-		intersectPass+=local.intersectPass;
-		intersectFail+=local.intersectFail;
-
-		skips+=local.skips;
+			skips+=local.skips;
+		}
 	}
 
-	void Init() {
+	inline void Init() {
 		if(enabled) memset(this,0,sizeof(TreeStats));
 	}
 	double CoherentPercentage() const {
@@ -51,33 +50,32 @@ public:
 			double nPixels=double(resx*resy);
 
 			if(!enabled) {
-				printf("MSec/frame:%6.2f  MRays/sec:%6.2f\n",msRenderTime,raysPerSec*0.000001);
+				printf("MSec/frame:%6.2f  MPixels/sec:%6.2f\n",msRenderTime,(resx*resy*(1000.0/msRenderTime))*0.000001);
 				return;
 			}
 			printf("isct,iter:%5.2f %5.2f  MSec/frame:%6.2f  MRays/sec:%5.2f  "
 					"Coherency:%.2f%% br:%.2f%% fa:%.2f%% %.0f\n",
 					double(intersects)/nPixels,double(iters)/nPixels,
 					msRenderTime,raysPerSec*0.000001,CoherentPercentage(),
-					BreakingPercentage(),IntersectFailPercentage(),double(skips));
+					BreakingPercentage(),IntersectFailPercentage(),double(tracedRays));
 	}
 
 	inline void Breaking(uint val=1) { if(enabled) breaking+=val; }
 	inline void NotBreaking(uint val=1) { if(enabled) notBreaking+=val; }
 
-	inline void Coherent(uint val=1) { if(enabled) coherent+=val; }
-	inline void NonCoherent(uint val=1) { if(enabled) nonCoherent+=val; }
 	inline void LoopIteration(uint val=1) { if(enabled) iters+=val; }
 	inline void Intersection(uint val=1) { if(enabled) intersects+=val; }
-	inline void Run(uint val=1) { if(enabled) runs+=val; }
 	inline void Skip(uint val=1) { if(enabled) skips++; }
 
 	inline void IntersectFail(uint val=1) { if(enabled) intersectFail+=val; }
 	inline void IntersectPass(uint val=1) { if(enabled) intersectPass+=val; }
 
-	inline void TracingRay(uint val=1) { if(enabled) tracedRays+=val; }
+	inline void TracingRay(uint val=1) { if(enabled) { tracedRays+=val; nonCoherent+=val; } }
+	inline void TracingPacket(uint val=1) { if(enabled) { tracedRays+=val; coherent+=val; } }
+
 
 private:
-	u32 intersects,iters,runs,tracedRays;
+	u32 intersects,iters,tracedRays;
 	u32 coherent,nonCoherent;
 
 	u32 breaking,notBreaking;

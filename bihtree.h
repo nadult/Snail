@@ -58,9 +58,9 @@ public:
 		if(Output::objectIndexes)
 			output.object[0]=0;
 
-		TreeStats localStats;
+		TreeStats stats;
+		stats.TracingRay();
 
-		localStats.Run();
 		Vec3p rDir=Vec3p(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
 		Vec3p invDir=VInv(rDir);
 
@@ -89,7 +89,7 @@ public:
 			tMin=Max(Max(ttMin.x,ttMin.y),tMin);
 			tMin=Max(ttMin.z,tMin);
 
-			if(tMin>tMax) { localStats.Skip(); goto EXIT; }
+			if(tMin>tMax) { stats.Skip(); goto EXIT; }
 		}
 
 
@@ -102,7 +102,7 @@ public:
 			tMax=Min(stack->tMax,minRet);
 			node=stack->node;
 ENTRANCE:
-			localStats.LoopIteration();
+			stats.LoopIteration();
 			if(tMin>tMax) continue;
 
 			u32 axis=node->Axis();
@@ -110,7 +110,7 @@ ENTRANCE:
 			if(axis==3) {
 				uint objectId=node->Object();
 
-				localStats.Intersection();
+				stats.Intersection();
 				const Object &obj=objects[objectId];
 				float ret=obj.Collide(rOrigin,tDir);
 				if(ret<minRet&&ret>0) {
@@ -119,9 +119,9 @@ ENTRANCE:
 						output.object[0]=objectId;
 
 					tMax=Min(tMax,minRet);
-					localStats.IntersectPass();
+					stats.IntersectPass();
 				}
-				else localStats.IntersectFail();
+				else stats.IntersectFail();
 				
 				continue;
 			}
@@ -163,7 +163,7 @@ ENTRANCE:
 		}
 
 EXIT:
-		output.stats->Update(localStats);
+		output.stats->Update(stats);
 		output.dist[0]=minRet;
 		return;
 	}
@@ -194,7 +194,6 @@ EXIT:
 			TraverseMono(orig[2],dir[2],fmaxD[2],NormalOutput<float,u32>(dist+2,objId+2,out.stats));
 			TraverseMono(orig[3],dir[3],fmaxD[3],NormalOutput<float,u32>(dist+3,objId+3,out.stats));
 		}
-		out.stats->TracingRay(sel.Num()*4);
 	}
 
 	Vec3p pMin,pMax;

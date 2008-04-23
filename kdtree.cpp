@@ -43,7 +43,7 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 	Convert(pMin,min);
 	Convert(pMax,max);
 
-	{
+	/*{
 		bool space[res][res][res];
 		memset(space,0,res*res*res);
 		Vec3p voxSize=(pMax-pMin)/float(res);
@@ -85,7 +85,7 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 			}
 			printf("\n\n");
 		}
-	}
+	} */
 
 	// abrams
 	Triangle tmp(Vec3f(-50,36,-157),Vec3f(55,48,155),Vec3f(55,47,155));	tmp.SetFlag1(1337); objects.push_back(tmp);
@@ -140,7 +140,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 	uint count=0; {
 		SlowKDNode &node=nodes[idx];
 		for(uint n=0;n<node.objects.size();n++)
-			if(objects[node.objects[n]].GetFlag1()==0)
+			if(objects[node.objects[n]].GetFlag1()!=1337)
 				count++;
 	}
 	if(count<1) return;
@@ -184,10 +184,12 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 		float iNodeSize=1.0/(nodeSize[0]*nodeSize[1]+nodeSize[0]*nodeSize[2]+nodeSize[1]*nodeSize[2]);
 		float longestSeg[3]={0,},longestSegP[3];
 
+#ifdef NDEBUG
 		int maxThr=omp_get_max_threads();
 		omp_set_num_threads(objs.size()>100?3:1);
 
 #pragma omp parallel for
+#endif
 		for(int s=0;s<3;s++) {
 			vector<PSplit> &split=splits[s];
 			std::sort(split.begin(),split.end());
@@ -246,7 +248,9 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			}
 		}
 
+#ifdef NDEBUG
 		omp_set_num_threads(maxThr);
+#endif
 
 		/*for(int s=0;s<3;s++) {
 			double nodeSize=(&(tMax-tMin).x)[s];

@@ -73,22 +73,22 @@ public:
 	void PrintInfo() const;
 
 	template <class Output,class Vec,class base>
-	void FullTraverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output&) const;
+	void FullTraverse(const Vec &rOrigin,const Vec &rDir,const Output&) const;
+
 
 	template <class Output>
-	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,const float &maxD,const Output &out) const;
-
-//	template <class Output,class Vec,class base>
-//	void Traverse(const Vec &rOrigin,const Vec &rDir,const base &maxD,const Output &out) const;
+	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,const Output &out) const NOINLINE;
 
 	template <class Output,class Group>
-	void TraverseFast(Group &group,const RaySelector<Group::size>&,const floatq &maxD,const Output &out) const;
+	void TraverseFast(Group &group,const RaySelector<Group::size>&,const floatq &maxD,const Output &out) const NOINLINE;
+
 
 	template <class Output,class Group,class Selector>
-	void TraverseOptimized(Group &group,const Selector&,const floatq &maxD,const Output &out,bool primary=1) const;
+	void TraverseOptimized(Group &group,const Selector&,const floatq &maxD,const Output &out,bool primary=1) const NOINLINE;
 
 	template <class Output,class Group>
-	void TraverseMonoGroup(Group &group,const RaySelector<Group::size>&,const floatq &maxD,const Output &out) const;
+	void TraverseMonoGroup(Group &group,const RaySelector<Group::size>&,const Output &out) const;
+
 
 	template <class Group>
 	int GetDepth(Group &group,const RaySelector<Group::size>&) const;

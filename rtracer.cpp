@@ -85,11 +85,9 @@ struct GenImageTask {
 	Options options;
 
 	void Work() {
-		float ratio=float(width)/float(height);
+		float ratio=float(out->width)/float(out->height);
 
 		enum { NQuads=1<<(QuadLevels*2), PWidth=2<<QuadLevels, PHeight=2<<QuadLevels };
-
-		assert((height%PHeight)==0&&(width%PWidth)==0);
 
 		Matrix<Vec4f> rotMat(Vec4f(camera.right),Vec4f(camera.up),Vec4f(camera.front),Vec4f(0,0,0,1));
 		rotMat=Transpose(rotMat);
@@ -97,11 +95,10 @@ struct GenImageTask {
 		Vec3q origin; Broadcast(camera.pos,origin);
 		RayGenerator rayGen(QuadLevels,out->width,out->height,camera.plane_dist);
 
-		for(int y=0;y<height;y+=PHeight) {
-			char *buf[PHeight];
-			for(int ty=0;ty<PHeight;ty++)
-				buf[ty]=&out->buffer[((startY+y+ty)*out->width+startX)*3];
+		uint pitch=out->width*3;
+		u8 *outPtr=(u8*)&out->buffer[startY*pitch+startX*3];
 
+		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
 				Vec3q dir[NQuads];
 				rayGen.Generate(PWidth,PHeight,startX+x,startY+y,dir);
@@ -129,10 +126,17 @@ struct GenImageTask {
 									Vec3q(Const<floatq,0>()),
 									Vec3q(Const<floatq,255>())),trgb+q*4);
 
-				for(int ty=0;ty<PHeight;ty++) for(int tx=0;tx<PWidth;tx++) {
-					*buf[ty]++=(char)trgb[tx+ty*PWidth].x;
-					*buf[ty]++=(char)trgb[tx+ty*PWidth].y;
-					*buf[ty]++=(char)trgb[tx+ty*PWidth].z;
+				int tWidth =Min(x+PWidth +startX,out->width )-startX-x;
+				int tHeight=Min(y+PHeight+startY,out->height)-startY-y;
+				for(int ty=0;ty<tHeight;ty++) {
+					u8 *ptr=outPtr+x*3+(ty+y)*pitch;
+
+					for(int tx=0;tx<tWidth;tx++) {
+						ptr[0]=trgb[tx+ty*PWidth].x;
+						ptr[1]=trgb[tx+ty*PWidth].y;
+						ptr[2]=trgb[tx+ty*PWidth].z;
+						ptr+=3;
+					}
 				}
 			}
 		}
@@ -152,15 +156,16 @@ template <int QuadLevels>
 TreeStats GenImage(const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	enum { taskSize=64 };
 
-	assert(image.width%taskSize==0&&image.height%taskSize==0);
-	uint numTasks=image.width*image.height/(taskSize*taskSize);
+	uint numTasks=(image.width+taskSize-1)*(image.height+taskSize-1)/(taskSize*taskSize);
 
 	vector<TreeStats> taskStats(numTasks);
 
 	TaskSwitcher<GenImageTask<QuadLevels> > switcher(numTasks);
 	uint num=0;
 	for(uint y=0;y<image.height;y+=taskSize) for(uint x=0;x<image.width;x+=taskSize) {
-		switcher.AddTask(GenImageTask<QuadLevels> (&scene,camera,&image,options,x,y,taskSize,taskSize,&taskStats[num]) );
+		switcher.AddTask(GenImageTask<QuadLevels> (&scene,camera,&image,options,x,y,
+					Min(taskSize,image.width-x),Min(taskSize,image.height-y),
+					&taskStats[num]) );
 		num++;
 	}
 
@@ -199,7 +204,9 @@ Camera GetDefaultCamera(string model) {
 			Vec3f(0.907629,0.000000,-0.419782),
 			Vec3f(-0.419782,0.000000,-0.907629));
 
-			Camera abramsLeak( Vec3f(102.7247,-31.6003,-76.6981), Vec3f(-0.8534,0.0000,-0.5213), Vec3f(-0.5213,0.0000,0.8534) );
+		Camera abramsTop( Vec3f(-118.3508,-93.6003,86.6569), Vec3f(0.8508,0.0000,-0.5254), Vec3f(-0.5254,0.0000,-0.8508) );
+		Camera abramsLeak( Vec3f(102.7247,-31.6003,-76.6981), Vec3f(-0.8534,0.0000,-0.5213), Vec3f(-0.5213,0.0000,0.8534) );
+
 		// abrams from the back
 		Camera abramsBack(
 			Vec3f(-5.081215,-5.600281,-275.260132),
@@ -227,7 +234,7 @@ Camera GetDefaultCamera(string model) {
 
 		cams["pompei.obj"]=pompei;
 		cams["sponza.obj"]=sponza;
-		cams["abrams.obj"]=abrams;
+		cams["abrams.obj"]=abramsTop;
 		cams["lancia.obj"]=abrams;
 		cams["bunny.obj"]=bunny;
 		cams["feline.obj"]=bunny;
@@ -265,7 +272,7 @@ int main(int argc, char **argv)
 	Image img(resx,resy);
 	Camera cam=GetDefaultCamera(modelFile);;
 
-	enum { QuadLevels=2 };
+	enum { QuadLevels=1 };
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 
 	if(nonInteractive) {

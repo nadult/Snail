@@ -52,7 +52,7 @@ public:
 template <class real,class integer>
 struct NormalOutput
 {
-	enum { objectIndexes=1 };
+	enum { objectIndexes=1, shadow=0 };
 
 	NormalOutput(real *d,integer *i,TreeStats *st) :dist(d),object(i),stats(st) { }
 
@@ -68,7 +68,7 @@ struct NormalOutput
 template <class real,class integer>
 struct ShadowOutput
 {
-	enum { objectIndexes=0 };
+	enum { objectIndexes=0, shadow=1 };
 	
 	ShadowOutput(real *d,TreeStats *st) :dist(d),object(0),stats(st) { }
 

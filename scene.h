@@ -54,7 +54,8 @@ void TraceLight(TracingContext<Scene,Group,Vec,integer> &c,const Light &light) {
 		int q=lsel[i];
 		dot[q]=c.normal[q]|fromLight[q]; {
 			boolean mask=dot[q]<=Const<real,0>();
-			if(ForAll(mask)) {
+
+			if(ForAny(mask)) {
 				lsel.Disable(i--);
 				continue;
 			}
@@ -62,17 +63,25 @@ void TraceLight(TracingContext<Scene,Group,Vec,integer> &c,const Light &light) {
 		}
 	}
 
+	if(!lsel.Num()) return;
+
 	real tDst[Group::size]; {
 		Vec3q lPos(lightPos.x,lightPos.y,lightPos.z);
 		RayGroup<Group::recLevel,1> tGroup(fromLight,&lPos);
-		c.scene.Traverse(tGroup,lsel,Const<real,10000>(),ShadowOutput<real,integer>(c));
+
+		for(int i=0;i<lsel.Num();i++) {
+			int q=lsel[i];
+			tDst[q]=lightDist[q]*1.00005f;
+		}
+
+		c.scene.tree.TraverseOptimized(tGroup,lsel,Const<floatq,10000>(),ShadowOutput<real,integer>(tDst,&c.stats),0);
 	}
 
 	Vec lightColor=light.color;
 	for(int i=0;i<lsel.Num();i++) {
 		int q=lsel.Idx(i);
 
-		boolean mask=Abs(tDst[q]-lightDist[q])>Const<real,1,1000>();
+		boolean mask=lightDist[q]-tDst[q]>lightDist[q]*0.0001f;
 		if(ForAll(mask)) // wszystkie punkty zasloniete
 			continue;	
 
@@ -98,7 +107,7 @@ void TraceReflection(TracingContext<Scene,Group,Vec,integer> &c) {
 	rc.options=c.options;
 	rc.options.reflections--;
 
-	c.scene.RayTrace(rc);
+	c.scene.RayTrace(rc,0);
 	c.stats.Update(rc.stats);
 
 	for(int i=0;i<c.selector.Num();i++) {
@@ -120,38 +129,31 @@ public:
 	void AddSoftLight(Vec3f pos,Vec3f col,Vec3f dens,int dx,int dy,int dz);
 
 	template <class Output,class Group>
-	void Traverse(Group &group,const RaySelector<Group::size> &sel,const floatq &maxD,const Output &out) const {
-		tree.TraverseOptimized(group,sel,maxD,out);
+	void Traverse(Group &group,const RaySelector<Group::size> &sel,const floatq &maxD,const Output &out,bool primary=1) const {
+		tree.TraverseOptimized(group,sel,maxD,out,primary);
 	}
 
 	template <class Scene,class Group,class Vec,class integer>
-	void RayTrace(TracingContext<Scene,Group,Vec,integer> &c) const {
+	void RayTrace(TracingContext<Scene,Group,Vec,integer> &c,bool primary=1) const {
 		typedef typename Vec::TScalar real;
 		typedef typename Vec::TBool boolean;
-		Group &group=c.rayGroup;
-
-		Vec *nrm=c.normal,*colPos=c.position,*reflDir=c.reflectionDir,*accLight=c.light;
-		boolean *tmask=c.hitMask; real *dst=c.distance;
-		integer *objId=c.objId;
-
-		unsigned long long ticks=Ticks();
 		const real maxDist=Const<real,10000>();
 
-		Traverse(group,c.selector,maxDist,NormalOutput<real,integer>(c));
+		Traverse(c.rayGroup,c.selector,maxDist,NormalOutput<real,integer>(c),primary);
 
 		for(int i=0;i<c.selector.Num();i++) {
 			int q=c.selector.Idx(i);
 			const Object *obj=&tree.objects[0];
 
-			tmask[q]=dst[q]>=maxDist;
-			if(ForAll(tmask[q])) {
+			c.hitMask[q]=c.distance[q]>=maxDist;
+			if(ForAll(c.hitMask[q])) {
 				c.color[q]=Vec(Const<real,0>());
 				c.selector.Disable(i--);
 				continue;
 			}
 
-			colPos[q]=group.Dir(q)*dst[q]+group.Origin(q);
-			nrm[q]=ExtractNormals(tree.objects,objId[q],colPos[q]);
+			c.position[q]=c.rayGroup.Dir(q)*c.distance[q]+c.rayGroup.Origin(q);
+			c.normal[q]=ExtractNormals(tree.objects,c.objId[q],c.position[q]);
 			
 			InitializationShader(c,q);
 			SimpleLightingShader(c,q);
@@ -164,10 +166,8 @@ public:
 		if(c.options.reflections>0&&c.selector.Num())
 			TraceReflection(c);
 
-		uint nInters=c.stats.Intersects();
-		uint nLIters=c.stats.LoopIters();
-
-		if(lights.size()) for(int i=0;i<c.selector.Num();i++) {
+		if(lights.size())
+			for(int i=0;i<c.selector.Num();i++) {
 			int q=c.selector[i];
 			c.color[q]=Condition(!c.hitMask[q],c.color[q]*c.light[q]);
 		}
