@@ -31,19 +31,14 @@ public:
 	inline void Init() {
 		if(enabled) memset(this,0,sizeof(TreeStats));
 	}
-	double CoherentPercentage() const {
-		return enabled?100.0*coherent/double(coherent+nonCoherent):0;
-	}
-	double BreakingPercentage() const {
-		return enabled?100.0*breaking/double(breaking+notBreaking):0;
-	}
-	double IntersectFailPercentage() const {
-		return enabled?100.0*intersectFail/double(intersectFail+intersectPass):0;
-	}
+	double Coherent() const			{ return enabled?coherent/double(coherent+nonCoherent):0; }
+	double TBreaking() const		{ return enabled?breaking/double(breaking+notBreaking):0; }
+	double TIntersectFail() const	{ return enabled?intersectFail/double(intersectFail+intersectPass):0; }
 
 	uint TracedRays() const { return enabled?tracedRays:0; }
 	uint Intersects() const { return enabled?intersects:0; }
 	uint LoopIters() const { return enabled?iters:0; }
+	uint Skips() const { return enabled?skips:0; }
 
 	void PrintInfo(int resx,int resy,double msRenderTime) {
 			double raysPerSec=double(tracedRays)*(1000.0/msRenderTime);
@@ -56,8 +51,8 @@ public:
 			printf("isct,iter:%5.2f %5.2f  MSec/frame:%6.2f  MRays/sec:%5.2f  "
 					"Coherency:%.2f%% br:%.2f%% fa:%.2f%% %.0f\n",
 					double(intersects)/nPixels,double(iters)/nPixels,
-					msRenderTime,raysPerSec*0.000001,CoherentPercentage(),
-					BreakingPercentage(),IntersectFailPercentage(),double(tracedRays));
+					msRenderTime,raysPerSec*0.000001,Coherent()*100.0f,
+					TBreaking()*100.0f,TIntersectFail()*100.0f,double(skips));
 	}
 
 	inline void Breaking(uint val=1) { if(enabled) breaking+=val; }

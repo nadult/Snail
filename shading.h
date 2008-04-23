@@ -5,9 +5,9 @@
 #include "context.h"
 
 template <class Context>
-void InitializationShader(Context &c,uint i) {
+void InitializationShader(Context &c,uint i,const typename Context::real &maxDist) {
 	Vec3q ambient; Broadcast(Vec3f(0.2,0.2,0.2),ambient);
-	c.distance[i]=Const<typename Context::real,10000>();
+	c.distance[i]=maxDist;
 	c.color[i]=Const<f32x4,0>();
 	c.light[i]=ambient;
 }
@@ -68,8 +68,8 @@ void StatsShader(Context &c,uint i) {
 	typedef typename Context::real real;
 
 	c.color[i].x=float(c.stats.Intersects())*(0.002f/Context::size);
-	c.color[i].y=float(c.stats.LoopIters())*(0.0001f/Context::size);
-	c.color[i].z=float(0);
+	c.color[i].y=float(c.stats.LoopIters())*(0.0005f/Context::size);
+	c.color[i].z=float(0*0.1f*c.stats.Skips());
 }
 	
 

@@ -3,59 +3,84 @@
 
 #include "rtbase.h"
 
+extern f32x4b GetSSEMaskFromBits_array[16];
+
+// bits must be <= 15
+//
+INLINE f32x4b GetSSEMaskFromBits(u8 bits) {
+	assert(bits<=15);
+
+	/*
+	union { u32 tmp[4]; __m128 out; };
+
+	tmp[0]=bits&1?~0:0;
+	tmp[1]=bits&2?~0:0;
+	tmp[2]=bits&4?~0:0;
+	tmp[3]=bits&8?~0:0;
+
+	return out; */
+
+	return GetSSEMaskFromBits_array[bits];
+}
+
+INLINE int CountMaskBits(u8 bits) {
+	assert(bits<=15);
+	char count[16]= { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4 };
+	return count[bits];
+}
+
+typedef int RayIndex;
+
+// Before you start using this class, try to understand how
+// it works, whats most important: there are two kinds of
+// indexes:
+// - RayIndex which never changes, you can use it to address
+//   ray data stored in external array
+// - ray number (of type int) which is used to iterate over
+//   active rays ( from 0 to Num()-1 )
 template <int size>
 class RaySelector {
-	int num;
-	u8 signMask;
 	u8 idx[size];
+	char bits[size];
+	int num;
 public:
-	INLINE RaySelector() :num(0),signMask(8) {
-	}
+	INLINE RaySelector() :num(0) { }
 
-	INLINE int Num() const {
-		return num;
-	}
-	INLINE int Last() const {
-		return idx[num-1];
-	}
-	INLINE int Idx(int n) const {
-		return idx[n];
-	}
-	INLINE int operator[](int n) const {
-		return idx[n];
-	}
+	INLINE int Num() const					{ return num; }
+	INLINE RayIndex Last() const			{ return idx[num-1]; }
+	INLINE RayIndex Idx(int n) const		{ return idx[n]; }
+	INLINE RayIndex operator[](int n) const { return idx[n]; }
+
 	// Moves last index to n,
 	// decreases number of selected rays
-	INLINE void Disable(int n) {
-		idx[n]=idx[--num];
+	INLINE void Disable(int n)				{ idx[n]=idx[--num]; }
+	INLINE bool DisableWithMask(int n,const f32x4b &m) {
+		int i=idx[n];
+		int newMask=_mm_movemask_ps(m.m);
+		bits[i]&=~newMask;
+		bool disable=!bits[i];
+		if(disable) idx[n]=idx[--num];
+		return disable;
 	}
-	INLINE void Add(int n) {
-		idx[num++]=n;
+	INLINE bool DisableWithBitMask(int n,int newMask) {
+		int i=idx[n];
+		bits[i]&=~newMask;
+		bool disable=!bits[i];
+		if(disable) idx[n]=idx[--num];
+		return disable;
 	}
-	INLINE void Clear() {
-		num=0;
-	}
+
+	INLINE void Add(RayIndex i,int bitMask=15)	{ idx[num++]=i; bits[i]=bitMask; }
+	INLINE int  BitMask(RayIndex i) const		{ return bits[i]; }
+	INLINE f32x4b Mask(RayIndex i) const		{ return GetSSEMaskFromBits(bits[i]); }
+
+	INLINE void SetBitMask(RayIndex i,int m) { bits[i]=m; }
+	INLINE void SetMask(RayIndex i,const f32x4b &m) { return bits[i]=_mm_movemask_ps(m.m); }
+
+	INLINE void Clear() { num=0; }
 	INLINE void SelectAll() {
-		num=size; signMask=8;
-		for(int n=0;n<size;n++) idx[n]=n;
-	}
-	INLINE char SignMask() const {
-		return signMask;
-	}
-	INLINE int SignMaskX() const {
-		return signMask&1;
-	}
-	INLINE int SignMaskY() const {
-		return (signMask&2)>>1;
-	}
-	INLINE int SignMaskZ() const {
-		return signMask>>2;
-	}
-	INLINE bool IsCoherent() const {
-		return signMask!=8;
-	}
-	INLINE void SetSignMask(char mask) {
-		signMask=mask;
+		num=size;
+		for(int n=0;n<size;n++) { idx[n]=n; bits[n]=15; }
 	}
 };
 
@@ -148,10 +173,10 @@ public:
 	void GenSelectors(const RaySelector<size> oldSelectors,RaySelector<size> sel[9]) {
 		if(!signsCalculated) ComputeSignMasks();
 
-		for(int n=0;n<9;n++) { sel[n].Clear(); sel[n].SetSignMask(n); }
+		for(int n=0;n<9;n++) sel[n].Clear();
 		for(int i=0;i<oldSelectors.Num();i++) {
 			int n=oldSelectors[i];
-			sel[raySign[n]].Add(n);
+			sel[raySign[n]].Add(n,oldSelectors.BitMask(n));
 		}
 	}
 	INLINE int RaySignMask(int n) const { return raySign[n]; }

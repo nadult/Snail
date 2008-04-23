@@ -23,7 +23,7 @@ public:
 class SlowKDTree
 {
 public:
-	enum { MaxLevel=40 };
+	enum { MaxLevel=24 };
 	typedef Triangle Object;
 
 	SlowKDTree(const vector<Object> &objects);
@@ -65,6 +65,10 @@ public:
 	enum { MaxLevel=SlowKDTree::MaxLevel };
 	typedef Triangle Object;
 
+	// Triangle flags usage:
+	// Flag1:  1337: object is a blocker (there will be no split going through it) 0: normal
+	// Flag2: object is full in node
+
 	KDTree(const vector<Object>&);
 	KDTree(const SlowKDTree&);
 	~KDTree();
@@ -78,16 +82,14 @@ public:
 
 	template <class Output>
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,const Output &out) const NOINLINE;
-
 	template <class Output,class Group>
-	void TraverseFast(Group &group,const RaySelector<Group::size>&,const floatq &maxD,const Output &out) const NOINLINE;
+	void TraverseFast(Group &group,const RaySelector<Group::size>&,const Output &out) const NOINLINE;
 
 
 	template <class Output,class Group,class Selector>
-	void TraverseOptimized(Group &group,const Selector&,const floatq &maxD,const Output &out,bool primary=1) const NOINLINE;
-
+	void TraverseOptimized(Group &group,const Selector&,const Output &out,bool primary=1) const NOINLINE;
 	template <class Output,class Group>
-	void TraverseMonoGroup(Group &group,const RaySelector<Group::size>&,const Output &out) const;
+	void TraverseMonoGroup(Group &group,const RaySelector<Group::size>&,const Output &out) const NOINLINE;
 
 
 	template <class Group>

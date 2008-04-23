@@ -272,7 +272,7 @@ int main(int argc, char **argv)
 	Image img(resx,resy);
 	Camera cam=GetDefaultCamera(modelFile);;
 
-	enum { QuadLevels=1 };
+	enum { QuadLevels=2 };
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 
 	if(nonInteractive) {
@@ -282,6 +282,7 @@ int main(int argc, char **argv)
 	else {
 		SDLOutput out(resx,resy,fullscreen);
 		Options options;
+		options.reflections^=1;
 
 		while(out.PollEvents()) {
 			if(out.TestKey(SDLK_ESCAPE)) break;
@@ -299,6 +300,7 @@ int main(int argc, char **argv)
 
 			if(out.TestKey(SDLK_r)) cam.pos-=cam.up*speed;
 			if(out.TestKey(SDLK_f)) cam.pos+=cam.up*speed;
+			if(out.TestKey(SDLK_y)) scene.monoFlag^=1;
 
 			if(out.TestKey(SDLK_p)) cam.Print();
 
@@ -326,7 +328,7 @@ int main(int argc, char **argv)
 			stats.PrintInfo(resx,resy,time*1000.0);
 
 			Vec3f a,b; Convert(scene.tree.pMin,a); Convert(scene.tree.pMax,b);
-		//	scene.Animate();
+//			scene.Animate();
 			out.Render(img);
 		}
 	}

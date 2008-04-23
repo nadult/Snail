@@ -20,7 +20,7 @@ void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale) {
 
 	int count=0;
 	for(;;) {
-		char line[1000],type[100],a[100],b[100],c[100],d[100];
+		char line[1000],type[100],a[100],b[100],c[100],d[100],e[100],f[100];
 		if(!is.getline(line,1000))
 			break;
 
@@ -59,6 +59,15 @@ void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale) {
 			sx=sx*atof(a);
 			sy=sy*atof(b);
 			sz=sz*atof(c);
+		}
+		else if(strcmp(type,"blocker")==0) {
+			Vec3f min,max;
+			sscanf(line,"%s %s %s %s %s %s %s",type,a,b,c,d,e,f);
+			min.x=atof(a); min.y=atof(b); min.z=atof(c);
+			max.x=atof(d); max.y=atof(e); max.z=atof(f);
+			Triangle blocker(min,max,Lerp(min,max,0.5f));
+			blocker.SetFlag1(1337);
+			out.push_back(blocker);
 		}
 
 	}

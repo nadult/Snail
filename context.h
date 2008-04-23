@@ -38,7 +38,6 @@ public:
 	Vec reflectionDir[size];
 
 	real distance[size];
-	boolean hitMask[size];
 	integer objId[size];
 
 	TreeStats stats;
