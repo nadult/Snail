@@ -11,10 +11,10 @@ public:
 	/*
 		Rays are grouped in recursive Z pattern:
 		(something like Hilbert curve)
-		0  1  4  5  16 17 ...
-		2  3  6  7  18 19
-		8  9  12 13 
-		10 11 14 15
+		0  1  4  5  16 17 20 21
+		2  3  6  7  18 19 22 23
+		8  9  12 13 24 25 28 29
+		10 11 14 15 26 27 30 31
 		32 ...
 
 		0:  x,y

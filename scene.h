@@ -153,7 +153,7 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct> ,Group,Vec,int
 		InitializationShader(c,q,maxDist);
 	}
 
-	c.density=tree.GetDensity(c.rayGroup,c.selector);
+	c.density=tree.GetDensity(c.rayGroup,c.selector,&c.stats);
 	Traverse(c.rayGroup,c.selector,NormalOutput<real,integer>(c),primary);
 
 	for(int i=0;i<c.selector.Num();i++) {

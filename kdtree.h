@@ -95,7 +95,7 @@ public:
 
 
 	template <class Group>
-	float GetDensity(Group &group,const RaySelector<Group::size>&) const NOINLINE;
+	float GetDensity(Group &group,const RaySelector<Group::size>&,TreeStats *stats=0) const NOINLINE;
 
 	bool TestNode(Vec3f min,Vec3f max,int node) const;
 	bool Test() const;

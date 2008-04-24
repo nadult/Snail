@@ -83,7 +83,10 @@ public:
 	template <class VecO,class Vec>
 	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const;
 
-	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *outCollisionPos=0) const NOINLINE;
+	template <class Vec0,class Vec,class real>
+	typename Vec::TScalar Barycentric(const Vec0 &rOrig,const Vec &rDir,real &u,real &v) const;
+
+	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *outCollisionPos=0) const;
 
 	void SetFlag1(uint value) { ((uint*)&a)[3]=value; }
 	void SetFlag2(uint value) { ((uint*)&b)[3]=value; }
@@ -109,24 +112,36 @@ public:
 
 template <template <class> class EN> template <class VecO,class Vec>
 typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) const {
-	typedef typename Vec::TScalar base;
+	typedef typename Vec::TScalar real;
 	typedef typename Vec::TBool Bool;
 
-	base out=Const<base,-1>();
+	real out=Const<real,-1>();
 
-	base det = rDir|e1ce2;
+	real det = rDir|e1ce2;
 	VecO tvec = rOrig-VecO(a);
-	base u = rDir|(VecO(b-a)^tvec);
-	base v = rDir|(tvec^VecO(c-a));
-	Bool test=Min(u,v)>=Const<base,0>()&&u+v<=det;
+	real u = rDir|(VecO(b-a)^tvec);
+	real v = rDir|(tvec^VecO(c-a));
+	Bool test=Min(u,v)>=Const<real,0>()&&u+v<=det;
 
 	if (ForAny(test)) {
-		base dist=-(tvec|Nrm())*Inv(rDir|Nrm());
+		real dist=-(tvec|Nrm())*Inv(rDir|Nrm());
 		out=Condition(test,dist,out);
 	}
 
 	return out;
 }
+
+template <template <class> class EN> template <class VecO,class Vec,class real>
+typename Vec::TScalar TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,real &u,real &v) const {
+	typedef typename Vec::TBool Bool;
+
+	real det = rDir|e1ce2;
+	VecO tvec = rOrig-VecO(a);
+	real idet=Inv(det);
+	u = (rDir|(VecO(b-a)^tvec))*idet;
+	v = (rDir|(tvec^VecO(c-a)))*idet;
+}
+
 
 template <template <class> class EN>
 int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *colPos) const {

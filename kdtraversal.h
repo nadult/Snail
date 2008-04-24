@@ -28,6 +28,7 @@ void KDTree::FullTraverse(const Vec &rOrigin,const Vec &rDir,const Output &out) 
 	out.stats->Update(stats);
 }
 
+
 template <class Output>
 INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const Output &out) const {
 	struct Locals4 { float tMin,tMax; const KDNode *node; };
@@ -457,6 +458,138 @@ POPSTACK:
 #undef NEG
 }
 
+// Indexes of the corner rays
+// 0:top left    1:top right    2:bottom left    3:bottom right
+template <class Group>
+uint GetCornerIndex(uint n) {
+	if(Group::size==4) { int arr[4]={0,0,0,0}; return arr[n]; }
+	if(Group::size==16) { int arr[4]={0,5,10,15}; return arr[n]; }
+	if(Group::size==64) { int arr[4]={0,21,42,63}; return arr[n]; }
+	if(Group::size==256) { int arr[4]={0,0,0,0}; return arr[n]; }
+	return 0;
+}
+
+template <class Group>
+inline float KDTree::GetDensity(Group &group,const RaySelector<Group::size> &sel,TreeStats *tStats) const {
+	typedef floatq base;
+	typedef Vec3q Vec;
+
+	struct Locals4 { base tMin,tMax; const KDNode *node; };
+
+	Vec3q rOrigin,rDir; {
+		Vec3p pDir[4]; Vec3q tmp;
+		rOrigin=group.Origin(sel[0]);
+
+		tmp=group.Dir(GetCornerIndex<Group>(0)); pDir[0]=Vec3p(tmp.x[0],tmp.y[0],tmp.z[0]);
+		tmp=group.Dir(GetCornerIndex<Group>(1)); pDir[1]=Vec3p(tmp.x[1],tmp.y[1],tmp.z[1]);
+		tmp=group.Dir(GetCornerIndex<Group>(2)); pDir[2]=Vec3p(tmp.x[2],tmp.y[2],tmp.z[2]);
+		tmp=group.Dir(GetCornerIndex<Group>(3)); pDir[3]=Vec3p(tmp.x[3],tmp.y[3],tmp.z[3]);
+		Convert(pDir,rDir);
+	}
+
+	Locals4 stackBegin[MaxLevel+2],*stack=stackBegin;
+	Vec invDir=VInv(rDir);
+
+	const base *rStart=&rOrigin.x;
+	const base *irDir=&invDir.x;
+
+	base tMin=0.0f,tMax=10000.0f;
+	int dSign[3]={invDir.x[0]<0?0:1,invDir.y[0]<0?0:1,invDir.z[0]<0?0:1};
+
+	const KDNode *node=&nodes[0];
+	const u32 *objIds=&objectIds[0];
+	const Object *objs=&objects[0];
+
+	TreeStats stats;
+	int tests=0;
+	float maxValue=0.0f;
+
+	while(true) {
+		u32 axis=node->Axis();
+		stats.LoopIteration();
+
+		if(axis==3) { // leaf
+			if(node->NumObjects()) {
+				const u32 *id=objIds+node->FirstObject();
+
+				for(int n=node->NumObjects();n>0;n--) {
+					int tid=*id++;
+					const Object &obj=objs[tid];
+					stats.Intersection();
+					
+					/*
+					floatq ret4=obj.Collide(rOrigin,rDir);
+					float ret=Max(Max(ret4[0],ret4[1]),Max(ret4[2],ret4[3]));
+
+					floatq u,v;
+					obj.Barycentric(rOrigin,rDir,u,v);
+					Vec2p p[4];
+					p[0]=Vec2p(u[0],v[0]);
+					p[1]=Vec2p(u[1],v[1]);
+					p[2]=Vec2p(u[2],v[2]);
+					p[3]=Vec2p(u[3],v[3]);
+					
+					Vec2p pmin=VMin(VMin(p[0],p[1]),VMin(p[2],p[3]));
+					Vec2p pmax=VMax(VMax(p[0],p[1]),VMax(p[2],p[3]));
+					
+					bool collide=pmin.x<=1.0f&&pmax.x>=0.0f&&pmin.y<=1.0f&&pmax.y>=0.0f; */
+
+				//	if(!collide) {
+						float ret=Max(Max(tMax[0],tMax[1]),Max(tMax[2],tMax[3]));
+				//		collide=1;
+				//	}
+
+				 //	if(collide) {
+
+						float e1=LengthSq(obj.Edge1());
+						float e2=LengthSq(obj.Edge2());
+						float e3=LengthSq(obj.Edge3());
+						float sizeSq=Min(e1,Min(e2,e3));
+						maxValue=Max(maxValue,ret*RSqrt(sizeSq)*(0.0005f*Group::size));
+						tests++;
+
+						if(maxValue>1.0f) {
+							if(tStats) tStats->Update(stats);
+							return maxValue;
+						}
+				//	}
+				}
+			}
+
+			if(stack==stackBegin) {
+				if(tStats) tStats->Update(stats);
+				return maxValue;
+			}
+			stack--;
+			tMin=stack->tMin;
+			tMax=stack->tMax;
+			node=stack->node;
+			continue;
+		}
+
+		base tSplit=base(node->Pos()-rStart[axis])*irDir[axis];
+		node+=node->ChildDist();
+		u32 sign=dSign[axis];
+
+		if(ForAll(tSplit<=tMin)) {
+			tMin=Max(tSplit,tMin); node+=sign;
+			continue;
+		}
+		if(ForAll(tSplit>=tMax)) {
+			tMax=Min(tSplit,tMax); node+=!sign;
+			continue;
+		}
+
+		stack->tMin=Max(tSplit,tMin);
+		stack->tMax=tMax;
+		stack->node=node+sign;
+		stack++;
+
+		tMax=Min(tMax,tSplit); node+=!sign;
+	}
+}
+
+/*
 template <class Group>
 inline float KDTree::GetDensity(Group &group,const RaySelector<Group::size> &sel) const
 {
@@ -536,8 +669,7 @@ POPSTACK:
 
 		tMax=Min(tMax,tSplit); node+=!sign;
 	}
-}
-
+}*/
 
 template <class Output,class Group>
 void KDTree::TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
@@ -573,7 +705,7 @@ void KDTree::TraverseOptimized(Group &group,const Selector &sel,const Output &ou
 	RaySelector<Group::size> selectors[9];
 	group.GenSelectors(sel,selectors);
 
-/*	if(Group::recLevel==3&&primary) {
+	if(Group::recLevel==3&&primary) {
 		if(GetDensity(group,sel)>1.0f) {
 			typedef RayGroup<2,Group::singleOrigin> GroupP;
 			RaySelector<GroupP::size> tsel;
@@ -598,7 +730,7 @@ void KDTree::TraverseOptimized(Group &group,const Selector &sel,const Output &ou
 			}
 			return;
 		}
-	}*/
+	}
 
 	for(int k=0;k<8;k++) {
 		RaySelector<Group::size> &sel=selectors[k];
