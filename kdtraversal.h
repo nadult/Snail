@@ -235,11 +235,15 @@ INLINE void ComputeOV(const Vec3p &min,const Vec3p &max,const floatq *pv,floatq 
 		_mm_mul_ps(_mm_shuffle_ps(max.m,min.m,2+2*4+2*16+2*64),pv[2].m)); //zzzz
 }
 
-
 template <class Output,class Group>
 inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tSelector,const Output &out) const
 {
 	assert(tSelector.Num());
+
+	// Zdarzaja sie miejsca w scenie ze promienie 'przeciekaja' przez trojkaty
+	// i potrafia zawedrowac na drugi koniec sceny znacznie opozniajac rendering
+	// te zabezpieczenie sprawdza czy dany node nie ma szans zmniejszyc minDist
+	enum { leakageProtection=1 };
 
 	RaySelector<Group::size> sel=tSelector;
 
@@ -251,32 +255,19 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 	}
 
 	int sign0[3]={xSign==0,ySign==0,zSign==0};
-	
-	Vec3p negMask; int negMaskI[3]; {
-		float negMaskXYZ[4];
-		negMaskXYZ[0]=xSign?-1.0f:1.0f;
-		negMaskXYZ[1]=ySign?-1.0f:1.0f;
-		negMaskXYZ[2]=zSign?-1.0f:1.0f;
-		negMaskXYZ[3]=0.0f;
+
+#define NEG(vec) Vec3p(_mm_xor_ps((vec).m,negMask))	
+	union { int negMaskI[4]; __m128 negMask; }; {
 		negMaskI[0]=xSign?0x80000000:0;
 		negMaskI[1]=ySign?0x80000000:0;
 		negMaskI[2]=zSign?0x80000000:0;
-		Convert(negMaskXYZ,negMask);
-	}
-
-	floatq maxD=out.dist[0];
-	for(int i=0;i<sel.Num();i++) {
-		int q=sel[i];
-
-		maxD=Max(maxD,out.dist[q]);
-	//	if(Output::objectIndexes)
-	//		out.object[q]=intq(0);
+		negMaskI[2]=zSign?0x80000000:0;
 	}
 
 	// Minimized / maximized ray origin
 	Vec3p minOR,maxOR; {
 		ComputeMinMaxOrigin(sel,group,minOR,maxOR);
-		minOR*=negMask; maxOR*=negMask;
+		minOR=NEG(minOR); maxOR=NEG(maxOR);
 		Vec3p tMin=VMin(minOR,maxOR);
 		maxOR=VMax(minOR,maxOR); minOR=tMin;	
 	}
@@ -297,7 +288,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 	const Object *objs=&objects[0];
 
 	Vec3p bMin,bMax; {
-		Vec3p tMin=pMin*negMask,tMax=pMax*negMask;
+		Vec3p tMin=NEG(pMin),tMax=NEG(pMax);
 		Vec3p tpMin=VMin(tMin,tMax),tpMax=VMax(tMin,tMax);
 		bMin=VMax(minOR,tpMin);
 		bMax=tpMax;
@@ -315,7 +306,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 		Vec3p t[4]; Convert(tmp,t);
 		beamDir=t[0]+t[1]+t[2]+t[3];
 		beamDir*=RSqrt(beamDir|beamDir);
-		beamOrig=(minOR+maxOR)*0.5f*negMask;
+		beamOrig=NEG((minOR+maxOR)*0.5f);
 		Convert(Sqrt((maxOR-minOR)|(maxOR-minOR)),beamA);
 		beamA*=0.5f;
 
@@ -332,14 +323,24 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 		}
 
 		floatq maxDist=Length(maxVec-mid*minDot);
-
 		{ float t[4]; Convert(maxDist,t); beamM=Max(Max(t[0],t[1]),Max(t[2],t[3])); }
 	}
 	ObjectIdxBuffer<8> idxBuffer;
-	float maxNodeDistSq,srcSize; {
+	
+	float maxNodeDistSq,srcSize;
+	if(leakageProtection) {
+		float maxD; {
+			floatq maxD4=out.dist[0];
+			for(int i=0;i<sel.Num();i++) {
+				int q=sel[i];
+				maxD4=Max(maxD4,out.dist[q]);
+			}
+			maxD=Max(Max(maxD4[0],maxD4[1]),Max(maxD4[2],maxD4[3]));
+		}
+
 		Vec3p tmp=maxOR-minOR;
 		srcSize=Sqrt(tmp|tmp);
-		maxNodeDistSq=maxD[0]+srcSize;
+		maxNodeDistSq=maxD+srcSize;
 		maxNodeDistSq*=maxNodeDistSq;
 	}
 
@@ -354,7 +355,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 				
 				Vec3p nodeMin,nodeMax; {
 					Vec3p nodeEps(Const<floatq,1,1000>().m);
-					Vec3p tMin=bMin*negMask,tMax=bMax*negMask;
+					Vec3p tMin=NEG(bMin),tMax=NEG(bMax);
 					nodeMin=VMin(tMin,tMax)-nodeEps;
 					nodeMax=VMax(tMin,tMax)+nodeEps;
 				}
@@ -389,8 +390,10 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 
 					bool fullInside=1;
 
-					bool allCollided=1;
-					floatq newMaxD=Const<floatq,0>();
+					bool allCollided; f32x4 newMaxD; if(leakageProtection) {
+						allCollided=1;
+						newMaxD=Const<floatq,0>();
+					}
 
 					for(int i=0;i<sel.Num();i++) {
 						int q=sel[i];
@@ -399,7 +402,9 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 						floatq ret=obj.Collide(group.Origin(q),group.Dir(q));
 						f32x4b mask=(ret>Const<floatq,0>()&&ret<out.dist[q]);
 						u32 msk=ForWhich(mask);
-						if(msk!=15) allCollided=0;
+
+						if(leakageProtection)
+							if(msk!=15) allCollided=0;
 
 						if(!fullInNode) {
 							Vec3q col=group.Origin(q)+group.Dir(q)*ret;
@@ -419,13 +424,14 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 							dst=Condition(test,i32x4(tid),dst);
 						}
 
-						newMaxD=Max(newMaxD,ret);
+						if(leakageProtection) 
+							newMaxD=Max(newMaxD,ret);
 
 						out.dist[q]=Condition(mask,ret,out.dist[q]);
 						sel.SetBitMask(q,sel.BitMask(q)&~msk);
 					}
 
-					if(allCollided) {
+					if(leakageProtection) if(allCollided) {
 						float newMax=Max(Max(newMaxD[0],newMaxD[1]),Max(newMaxD[2],newMaxD[3]))+srcSize;
 						maxNodeDistSq=Min(maxNodeDistSq,newMax*newMax);
 					}
@@ -443,7 +449,8 @@ POPSTACK:
 			if(stackPos==0) { out.stats->Update(stats); return; }
 
 			stackPos--;
-			bMin=boxStack[stackPos*2+0]; {
+			bMin=boxStack[stackPos*2+0];
+			if(leakageProtection) {
 				Vec3p tmp=minOR-bMin;
 				if((tmp|tmp)>maxNodeDistSq) goto POPSTACK;
 			}
@@ -513,6 +520,8 @@ POPSTACK:
 			stackPos++;
 		}*/
 	}
+
+#undef NEG
 }
 
 template <class Group>

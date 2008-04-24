@@ -234,7 +234,7 @@ Camera GetDefaultCamera(string model) {
 
 		cams["pompei.obj"]=pompei;
 		cams["sponza.obj"]=sponza;
-		cams["abrams.obj"]=abramsTop;
+		cams["abrams.obj"]=abramsLeak;
 		cams["lancia.obj"]=abrams;
 		cams["bunny.obj"]=bunny;
 		cams["feline.obj"]=bunny;
@@ -282,7 +282,7 @@ int main(int argc, char **argv)
 	else {
 		SDLOutput out(resx,resy,fullscreen);
 		Options options;
-		options.reflections^=1;
+//		options.reflections^=1;
 
 		while(out.PollEvents()) {
 			if(out.TestKey(SDLK_ESCAPE)) break;
