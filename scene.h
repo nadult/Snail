@@ -130,15 +130,14 @@ public:
 
 	template <class Output,class Group>
 	void Traverse(Group &group,const RaySelector<Group::size> &sel,const Output &out,bool primary=1) const {
-		if(monoFlag) tree.TraverseMonoGroup(group,sel,out);
-		else tree.TraverseOptimized(group,sel,out,primary);
+		//tree.TraverseMonoGroup(group,sel,out);
+		tree.TraverseOptimized(group,sel,out,primary);
 	}
 
 	template <class Group,class Vec,class integer>
 	void RayTrace(TracingContext<TScene<AccStruct>,Group,Vec,integer> &c,bool primary=1) const NOINLINE;
 	vector<Light> lights;
 	AccStruct tree;
-	bool monoFlag;
 };
 
 
@@ -153,7 +152,7 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct> ,Group,Vec,int
 		InitializationShader(c,q,maxDist);
 	}
 
-	c.density=tree.GetDensity(c.rayGroup,c.selector,&c.stats);
+	c.density=0.5f;
 	Traverse(c.rayGroup,c.selector,NormalOutput<real,integer>(c),primary);
 
 	for(int i=0;i<c.selector.Num();i++) {
@@ -189,10 +188,10 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct> ,Group,Vec,int
 		c.color[q]=Condition(c.selector.Mask(q),c.color[q]);
 	}
 
-	if(c.options.rdtscShader)
-		for(int q=0;q<Group::size;q++)
-			c.color[q].x=c.color[q].y=0.0f;
 //	if(c.options.rdtscShader)
+//		for(int q=0;q<Group::size;q++)
+//			c.color[q].x=c.color[q].y=0.0f;
+	if(c.options.rdtscShader)
 		for(int q=0;q<Group::size;q++)
 			StatsShader(c,q);
 }

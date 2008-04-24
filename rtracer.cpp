@@ -231,19 +231,31 @@ Camera GetDefaultCamera(string model) {
 			Vec3f(-0.700709,0.000000,-0.713451) );
 
 		Camera sponza( Vec3f(443.2726,-248.0000,0.8550), Vec3f(-0.9995,0.0000,-0.0324), Vec3f(-0.0324,0.0000,0.9995) );
-
+		Camera feline( Vec3f(-3.0111,-5.6003,-2.8642), Vec3f(0.8327,0.0000,0.5537), Vec3f(0.5537,0.0000,-0.8327) );
+	
 		cams["pompei.obj"]=pompei;
 		cams["sponza.obj"]=sponza;
-		cams["abrams.obj"]=abrams;
+		cams["abrams.obj"]=abramsTop;
 		cams["lancia.obj"]=abrams;
 		cams["bunny.obj"]=bunny;
-		cams["feline.obj"]=bunny;
+		cams["feline.obj"]=feline;
 		cams["dragon.obj"]=bunny;
 		cams["room.obj"]=room;
 	}
 
 	std::map<string,Camera>::iterator iter=cams.find(model);
 	return iter==cams.end()?Camera():iter->second;
+}
+
+TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
+	switch(quadLevels) {
+//	case 0: return GenImage<0>(scene,camera,image,options,tasks);
+	case 1: return GenImage<1>(scene,camera,image,options,tasks);
+	case 2: return GenImage<2>(scene,camera,image,options,tasks);
+	case 3: return GenImage<3>(scene,camera,image,options,tasks);
+//	case 4: return GenImage<4>(scene,camera,image,options,tasks);
+	default: throw Exception("Quad level not supported.");
+	}
 }
 
 int main(int argc, char **argv)
@@ -271,12 +283,14 @@ int main(int argc, char **argv)
 
 	Image img(resx,resy);
 	Camera cam=GetDefaultCamera(modelFile);;
+	cam=Camera( Vec3f(-32.9797,-5.6003,-15.5864), Vec3f(0.8327,0.0000,0.5537), Vec3f(0.5537,0.0000,-0.8327) );
+	
 
-	enum { QuadLevels=3 };
+	uint quadLevels=2;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 
 	if(nonInteractive) {
-		for(int n=atoi(argv[3])-1;n>=0;n--) GenImage<QuadLevels>(scene,cam,img,Options(),threads);
+		for(int n=atoi(argv[3])-1;n>=0;n--) GenImage(quadLevels,scene,cam,img,Options(),threads);
 		img.SaveToFile("out/output.tga");
 	}
 	else {
@@ -300,7 +314,11 @@ int main(int argc, char **argv)
 
 			if(out.TestKey(SDLK_r)) cam.pos-=cam.up*speed;
 			if(out.TestKey(SDLK_f)) cam.pos+=cam.up*speed;
-			if(out.TestKey(SDLK_y)) scene.monoFlag^=1;
+			if(out.TestKey(SDLK_y)) { printf("splitting %s\n",scene.tree.splittingFlag?"off":"on"); scene.tree.splittingFlag^=1; }
+
+			if(out.TestKey(SDLK_1)) { printf("tracing 4x4\n"); quadLevels=1; }
+			if(out.TestKey(SDLK_2)) { printf("tracing 16x4\n"); quadLevels=2; }
+			if(out.TestKey(SDLK_3)) { printf("tracing 64x4\n"); quadLevels=3; }
 
 			if(out.TestKey(SDLK_p)) cam.Print();
 
@@ -322,7 +340,7 @@ int main(int argc, char **argv)
 			
 			TreeStats stats;
 			double time=GetTime();
-			stats=GenImage<QuadLevels>(scene,cam,img,options,threads);
+			stats=GenImage(quadLevels,scene,cam,img,options,threads);
 			time=GetTime()-time; minTime=Min(minTime,time);
 			maxTime=Max(time,maxTime);
 

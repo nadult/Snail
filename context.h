@@ -54,12 +54,13 @@ struct NormalOutput
 {
 	enum { objectIndexes=1, shadow=0 };
 
-	NormalOutput(real *d,integer *i,TreeStats *st) :dist(d),object(i),stats(st) { }
+	NormalOutput(real *d,integer *i,TreeStats *st) :dist(d),object(i),stats(st),density(0) { }
 
 	template <class Scene,class Group>
-	NormalOutput(TracingContext<Scene,Group,Vec3<real>,integer> &c) :dist(c.distance),object(c.objId),stats(&c.stats) { }
-	NormalOutput(const NormalOutput &all,int n) :dist(all.dist+n),object(all.object+n*4),stats(all.stats) { }
+	NormalOutput(TracingContext<Scene,Group,Vec3<real>,integer> &c) :dist(c.distance),object(c.objId),stats(&c.stats),density(&c.density) { }
+	NormalOutput(const NormalOutput &all,int n) :dist(all.dist+n),object(all.object+n*4),stats(all.stats),density(0) { }
 
+	float *density;
 	real *dist;
 	integer *object;
 	TreeStats *stats;
@@ -70,12 +71,13 @@ struct ShadowOutput
 {
 	enum { objectIndexes=0, shadow=1 };
 	
-	ShadowOutput(real *d,TreeStats *st) :dist(d),object(0),stats(st) { }
+	ShadowOutput(real *d,TreeStats *st) :dist(d),object(0),stats(st),density(0) { }
 
 	template <class Scene,class Group>
-	ShadowOutput(TracingContext<Scene,Group,Vec3<real>,integer> &c) :dist(c.distance),object(0),stats(&c.stats) { }
-	ShadowOutput(const ShadowOutput &all,int n) :dist(all.dist+n),object(0),stats(all.stats) { }
+	ShadowOutput(TracingContext<Scene,Group,Vec3<real>,integer> &c) :dist(c.distance),object(0),stats(&c.stats),density(&c.context.density) { }
+	ShadowOutput(const ShadowOutput &all,int n) :dist(all.dist+n),object(0),stats(all.stats),density(0) { }
 
+	float *density;
 	real *dist;
 	integer *object; // dummy
 	TreeStats *stats;

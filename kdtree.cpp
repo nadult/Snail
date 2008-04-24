@@ -317,12 +317,12 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 	}
 }
 
-KDTree::KDTree(const vector<Object> &objects) {
+KDTree::KDTree(const vector<Object> &objects):splittingFlag(1) {
 	SlowKDTree slowkd(objects);
 	Build(slowkd);
 }
 
-KDTree::KDTree(const SlowKDTree &tree) {
+KDTree::KDTree(const SlowKDTree &tree):splittingFlag(1) {
 	Build(tree);
 }
 

@@ -54,7 +54,6 @@ public:
 		a=other.P1(); b=other.P2(); c=other.P3();
 		SetFlag1(other.GetFlag1());
 		SetFlag2(other.GetFlag2());
-		SetFlag3(other.GetFlag3());
 		ComputeData();
 	}
 	TTriangle() {
@@ -74,6 +73,8 @@ public:
 
 	inline Vec3p Nrm() const { return Vec3p(plane); }
 
+	inline float InvSize() const { return ((float*)&c)[3]; }
+
 	inline Vec3p BoundMin() const { return VMin(a,VMin(b,c)); }
 	inline Vec3p BoundMax() const { return VMax(a,VMax(b,c)); }
 
@@ -90,10 +91,8 @@ public:
 
 	void SetFlag1(uint value) { ((uint*)&a)[3]=value; }
 	void SetFlag2(uint value) { ((uint*)&b)[3]=value; }
-	void SetFlag3(uint value) { ((uint*)&c)[3]=value; }
 	uint GetFlag1() const { return ((uint*)&a)[3]; }
 	uint GetFlag2() const { return ((uint*)&b)[3]; }
-	uint GetFlag3() const { return ((uint*)&c)[3]; }
 
 private:
 	void ComputeData() {
@@ -101,6 +100,15 @@ private:
 		nrm*=RSqrt(nrm|nrm);
 		plane=Vec4p(nrm.x,nrm.y,nrm.z,nrm|a);
 		e1ce2=(b-a)^(c-a);
+
+		{ // invSize
+			float e1=Length(b-a);
+			float e2=Length(c-a);
+			float ang=acos(((b-a)|(c-a))/(e1*e2));
+			float size=sin(ang)*e1*e2*0.5f;
+		//	float sizeSq=Min(e1,Min(e2,e3)); // surface area
+			((float*)&c)[3]=Inv(size);	
+		}
 		EdgeNormals::ComputeEdgeNormals(this);
 	}
 

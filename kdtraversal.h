@@ -1,127 +1,6 @@
 #ifndef KDTRAVERSAL_H
 #define KDTRAVERSAL_H
 
-template <class Output,class Vec,class base>
-void KDTree::FullTraverse(const Vec &rOrigin,const Vec &rDir,const Output &out) const {	
-	if(Output::objectIdsFlag) {
-		for(int m=0;m<ScalarInfo<base>::multiplicity;m++)
-			out.object[m]=0;
-	}
-
-	TreeStats stats;
-	stats.TracingRay();
-
-	for(int n=0;n<objects.size();n++) {
-		stats.Intersection();
-
-		const Object &obj=objects[n];
-		base dst=obj.Collide(rOrigin,rDir);
-		typename Vec::TBool mask=dst>Const<base,0>()&&dst<out.dist[0];
-
-		if(Output::objectIdsFlag) {
-			i32x4b test=mask;
-			out.object[0]=Condition(test,i32x4(n),out.object[0]);
-		}
-		out.dist[0]=Condition(mask,dst,out);
-	}
-
-	out.stats->Update(stats);
-}
-
-
-template <class Output>
-INLINE void KDTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const Output &out) const {
-	struct Locals4 { float tMin,tMax; const KDNode *node; };
-	Locals4 stackBegin[MaxLevel+2],*stack=stackBegin;
-
-	Vec3p rDir=Vec3p(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
-	Vec3p invDir=VInv(rDir);
-
-	const float *rStart=(const float*)&rOrigin;
-	const float *irDir=(const float*)&invDir;
-	float tMin=ConstEpsilon<float>(),tMax=out.dist[0];
-
-	if(Output::objectIndexes)
-		out.object[0]=0;
-
-	int signMask=SignMask(floatq(invDir.m));
-	int dSign[3]={signMask&1?0:1,signMask&2?0:1,signMask&4?0:1};
-
-	const KDNode *node=&nodes[0];
-	const u32 *objIds=&objectIds[0];
-	const Object *objs=&objects[0];
-
-	TreeStats stats;
-	stats.TracingRay();
-
-	while(true) {
-		stats.LoopIteration();
-		u32 axis=node->Axis();
-
-		if(axis==3) { // leaf
-			if(node->NumObjects()) {
-				const u32 *id=objIds+node->FirstObject();
-
-				float eps=0.0001f,ttMin=tMin-eps,ttMax=tMax+eps;
-				float minRet=out.dist[0];
-
-				for(int n=node->NumObjects();n>0;n--) {
-					stats.Intersection();
-
-					int tid=*id++;
-					const Object &obj=objs[tid];
-					float ret; Convert(obj.Collide(rOrigin,rDir),ret);
-			
-					if(ret>ttMin&&ret<Min(minRet,ttMax)) {
-						if(Output::objectIndexes) out.object[0]=tid;
-						minRet=ret;
-					}
-				}
-
-				if(minRet<out.dist[0]) {
-					out.stats->Update(stats);
-					out.dist[0]=minRet;
-					return;
-				}
-			}
-
-POPSTACK:
-			if(stack==stackBegin) {
-				out.stats->Update(stats);
-				return;
-			}
-			{
-				stack--;
-				tMin=stack->tMin;
-				tMax=stack->tMax;
-				node=stack->node;
-			}
-			continue;
-		}
-
-		float tSplit=float(node->Pos()-rStart[axis])*irDir[axis];
-		node+=node->ChildDist();
-		u32 sign=dSign[axis];
-
-		if(ForAll(tSplit<=tMin)) {
-			tMin=Max(tSplit,tMin); node+=sign;
-			continue;
-		}
-		if(ForAll(tSplit>=tMax)) {
-			tMax=Min(tSplit,tMax); node+=!sign;
-			continue;
-		}
-
-		stack->tMin=Max(tSplit,tMin);
-		stack->tMax=tMax;
-		stack->node=node+sign;
-		stack++;
-
-		tMax=Min(tMax,tSplit); node+=!sign;
-	}
-}
-
-
 /*!
 	(Absolute)
 	px = [ dy[0].y/dy[0].x	dz[0].z/dz[0].x		dy[1].y/dy[1].x		dz[1].z/dz[1].x	]
@@ -264,96 +143,144 @@ INLINE void ComputeBeam(Group &group,const RaySelector<Group::size> &sel,const V
 
 	floatq maxDist=Length(maxVec-mid*minDot);
 	{ float t[4]; Convert(maxDist,t); beamM=Max(Max(t[0],t[1]),Max(t[2],t[3])); }
-}	
+}
 
-template <class Output,class Group>
-inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tSelector,const Output &out) const
-{
-	assert(tSelector.Num());
 
-	RaySelector<Group::size> sel=tSelector;
+template <class Group,class Selector>
+class TraverseContext {
+public:
+	TraverseContext(Group &group,const Selector &selector,const KDTree &tree,TraverseContext *other) {
+		sel=selector;
 
-	int xSign,ySign,zSign; {
-		Vec3q &dir0=group.Dir(sel[0]);
-		xSign=dir0.x[0]<0;
-		ySign=dir0.y[0]<0;
-		zSign=dir0.z[0]<0;
-	}
+		int xSign,ySign,zSign; {
+			Vec3q &dir0=group.Dir(sel[0]);
+			xSign=dir0.x[0]<0;
+			ySign=dir0.y[0]<0;
+			zSign=dir0.z[0]<0;
+		}
 
-	int sign0[3]={xSign==0,ySign==0,zSign==0};
+		sign0[0]=xSign==0;
+		sign0[1]=ySign==0;
+		sign0[2]=zSign==0;
 
-#define NEG(vec) Vec3p(_mm_xor_ps((vec).m,negMask))	
-	union { int negMaskI[4]; __m128 negMask; }; {
 		negMaskI[0]=xSign?0x80000000:0;
 		negMaskI[1]=ySign?0x80000000:0;
 		negMaskI[2]=zSign?0x80000000:0;
 		negMaskI[3]=0;
+
+		{
+			ComputeMinMaxOrigin(sel,group,minOR,maxOR);
+			minOR=Neg(minOR); maxOR=Neg(maxOR);
+			Vec3p tMin=VMin(minOR,maxOR);
+			maxOR=VMax(minOR,maxOR); minOR=tMin;	
+		}
+
+		ComputePV(sel,&group.Dir(0),pv);
+		ComputeOV(minOR,maxOR,pv,ov);
+
+		stackPos=0;
+
+		node=&tree.nodes[0];
+		objIds=&tree.objectIds[0];
+		objs=&tree.objects[0];
+
+				{
+			Vec3p tMin=Neg(tree.pMin),tMax=Neg(tree.pMax);
+			Vec3p tpMin=VMin(tMin,tMax),tpMax=VMax(tMin,tMax);
+			bMin=VMax(minOR,tpMin);
+			bMax=tpMax;
+		}
+
+		if(sel.Num()>4)
+			ComputeBeam(group,sel,Neg(minOR),Neg(maxOR),beamDir,beamOrig,beamM,beamA);
+
+		if(other) {
+			node=other->node;
+			stackPos=other->stackPos;
+			for(int n=0;n<stackPos;n++) {
+				boxStack[n*2+0]=other->boxStack[n*2+0];
+				boxStack[n*2+1]=other->boxStack[n*2+1];
+				nodeStack[n]=other->nodeStack[n];
+			}
+			bMin=other->bMin;
+			bMax=other->bMax;
+			idxBuffer=other->idxBuffer;
+		}
 	}
 
-	// Minimized / maximized ray origin
-	Vec3p minOR,maxOR; {
-		ComputeMinMaxOrigin(sel,group,minOR,maxOR);
-		minOR=NEG(minOR); maxOR=NEG(maxOR);
-		Vec3p tMin=VMin(minOR,maxOR);
-		maxOR=VMax(minOR,maxOR); minOR=tMin;	
-	}
+	Vec3p Neg(const Vec3p &v) const { return Vec3p(_mm_xor_ps(v.m,negMask)); }
 
+	RaySelector<Group::size> sel;
+
+	int sign0[3];
+	union { int negMaskI[4]; __m128 negMask; };
+
+	Vec3p minOR,maxOR;
 	floatq pv[3],ov[3];
-	ComputePV(sel,&group.Dir(0),pv);
-	ComputeOV(minOR,maxOR,pv,ov);
-
-	TreeStats stats;
-	stats.TracingPacket(sel.Num()*4);
-
-	Vec3p boxStack[(MaxLevel+2)*2];
-	const KDNode *nodeStack[MaxLevel+2];
-	u32 stackPos=0,axis;
-
-	const KDNode *node=&nodes[0];
-	const u32 *objIds=&objectIds[0];
-	const Object *objs=&objects[0];
-
-	Vec3p bMin,bMax; {
-		Vec3p tMin=NEG(pMin),tMax=NEG(pMax);
-		Vec3p tpMin=VMin(tMin,tMax),tpMax=VMax(tMin,tMax);
-		bMin=VMax(minOR,tpMin);
-		bMax=tpMax;
-	}
-
 	Vec3p beamDir,beamOrig; float beamM,beamA;
-	if(sel.Num()>4)
-		ComputeBeam(group,sel,NEG(minOR),NEG(maxOR),beamDir,beamOrig,beamM,beamA);
+	
+	Vec3p boxStack[(KDTree::MaxLevel+2)*2];
+	const KDNode *nodeStack[KDTree::MaxLevel+2];
+	u32 stackPos;
+
+	const KDNode *node;
+	const u32 *objIds;
+	const KDTree::Object *objs;
+	Vec3p bMin,bMax;
 
 	ObjectIdxBuffer<8> idxBuffer;
+};
+
+
+#define NEG(vec) (c.Neg(vec))
+
+template <class Output,class Group>
+inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tSelector,const Output &out,uint splittedYet,
+		TraverseContext<Group,RaySelector<Group::size> > *tContext) const
+{
+	if(tSelector.Num()<3) {
+		TraverseMonoGroup(group,tSelector,out);
+		return;
+	}
+
+	if(!splittingFlag) splittedYet=1;
+
+	TraverseContext<Group,RaySelector<Group::size> > c(group,tSelector,*this,tContext);
+
+	TreeStats stats;
+	stats.TracingPacket(c.sel.Num()*4);
+	u32 axis;
+
 
 	while(true) {
 		stats.LoopIteration();
 
-		axis=node->Axis();
+		axis=c.node->Axis();
 		if(axis==3) { // Leaf
-			if(node->NumObjects()) {
+			if(c.node->NumObjects()) {
 
-				const u32 *oid=objIds+node->FirstObject();
+				const u32 *oid=c.objIds+c.node->FirstObject();
 				
 				Vec3p nodeMin,nodeMax; {
 					Vec3p nodeEps(Const<floatq,1,1000>().m);
-					Vec3p tMin=NEG(bMin),tMax=NEG(bMax);
+					Vec3p tMin=NEG(c.bMin),tMax=NEG(c.bMax);
 					nodeMin=VMin(tMin,tMax)-nodeEps;
 					nodeMax=VMax(tMin,tMax)+nodeEps;
 				}
 
-				for(int n=node->NumObjects();n>0;n--) {
+				float density=0.0f;
+				for(int n=c.node->NumObjects();n>0;n--) {
 					int tid=*oid++;
-					const Object &obj=objs[tid];
+					const Object &obj=c.objs[tid];
 					const bool fullInNode=obj.GetFlag2();
 					
-					if(idxBuffer.Find(tid)) continue;
+					if(c.idxBuffer.Find(tid)) continue;
 
 					int beamCollision=1;
-					if(sel.Num()>4) {
-						beamCollision=obj.BeamCollide(beamOrig,beamDir,beamM,beamA);
+					if(c.sel.Num()>4) {
+						beamCollision=obj.BeamCollide(c.beamOrig,c.beamDir,c.beamM,c.beamA);
 
-					 	if(!beamCollision) { idxBuffer.Insert(tid); stats.Breaking(); continue; }
+					 	if(!beamCollision) { c.idxBuffer.Insert(tid); stats.Breaking(); continue; }
 
 						// Visualizing beam collisions
 						/*	for(int i=0;i<sel.Num();i++) {
@@ -367,18 +294,23 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 						stats.NotBreaking();
 					}
 
-				//	if(beamCollision==2) stats.NotBreaking();
-				//	else stats.Breaking();
+		//			if(beamCollision==2) {
+		//				stats.NotBreaking();
+		//			}
+		//			else stats.Breaking();
 
 					bool fullInside=1;
+					floatq retMax=0.0f;
 
-					for(int i=0;i<sel.Num();i++) {
-						int q=sel[i];
+					for(int i=0;i<c.sel.Num();i++) {
+						int q=c.sel[i];
 						stats.Intersection();
 
 						floatq ret=obj.Collide(group.Origin(q),group.Dir(q));
 						f32x4b mask=(ret>Const<floatq,0>()&&ret<out.dist[q]);
 						u32 msk=ForWhich(mask);
+						retMax=Max(retMax,ret);
+
 
 						if(!fullInNode) {
 							Vec3q col=group.Origin(q)+group.Dir(q)*ret;
@@ -399,64 +331,77 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 						}
 
 						out.dist[q]=Condition(mask,ret,out.dist[q]);
-						sel.SetBitMask(q,sel.BitMask(q)&~msk);
+						c.sel.SetBitMask(q,c.sel.BitMask(q)&~msk);
 					}
-					
-					if(fullInside) idxBuffer.Insert(tid);
+	
+					{
+						float r=Max(Max(retMax[0],retMax[1]),Max(retMax[2],retMax[3]));
+						density=Max(density,r*obj.InvSize()*(0.0005f*Group::size));
+					}	
+					if(fullInside) c.idxBuffer.Insert(tid);
 				}
 
-				for(int i=0;i<sel.Num();i++)
-					if(!sel.BitMask(sel[i]))
-						sel.Disable(i--);
-				if(sel.Num()==0) { out.stats->Update(stats); return; }
+				for(int i=0;i<c.sel.Num();i++)
+					if(!c.sel.BitMask(c.sel[i]))
+						c.sel.Disable(i--);
+				if(c.sel.Num()==0) { out.stats->Update(stats); return; }
+	
+			if(out.density) *out.density=density;
+			if(Group::recLevel>1&&density>1.0f&&splittedYet==0&&c.sel.Num()>Group::size*2/3) { // Too many triangles / ray, splitting
+				stats.Skip();
+				TraverseSplitted(group,c.sel,out,&c);
+				out.stats->Update(stats);
+				return;
 			}
+		}
 
 POPSTACK:
-			if(stackPos==0) { out.stats->Update(stats); return; }
+			if(c.stackPos==0) { out.stats->Update(stats); return; }
 
-			stackPos--;
-			bMin=boxStack[stackPos*2+0];
-			bMax=boxStack[stackPos*2+1];
-			node=nodeStack[stackPos];
+			c.stackPos--;
+			c.bMin=c.boxStack[c.stackPos*2+0];
+			c.bMax=c.boxStack[c.stackPos*2+1];
+			c.node=c.nodeStack[c.stackPos];
 
 			continue;
 		}
 
 		f32x4 split; {
 			union { float f; int i; };
-			f=node->Pos();
-			i^=negMaskI[axis];
+			f=c.node->Pos();
+			i^=c.negMaskI[axis];
 			split=f;
 		}
-		node+=node->ChildDist();
+		c.node+=c.node->ChildDist();
 
 		u32 mask=1<<axis;
-		if(_mm_movemask_ps(_mm_cmpgt_ps(bMin.m,split.m))&mask) { node+=sign0[axis]; continue; }
-		if(_mm_movemask_ps(_mm_cmplt_ps(bMax.m,split.m))&mask) { node+=sign0[axis]^1; continue; }
+		if(_mm_movemask_ps(_mm_cmpgt_ps(c.bMin.m,split.m))&mask) { c.node+=c.sign0[axis]; continue; }
+		if(_mm_movemask_ps(_mm_cmplt_ps(c.bMax.m,split.m))&mask) { c.node+=c.sign0[axis]^1; continue; }
 
 		{
-			f32x4 abab=pv[axis]*split+ov[axis],tmp,tt[3];
+			f32x4 abab=c.pv[axis]*split+c.ov[axis],tmp,tt[3];
 			tmp=_mm_unpacklo_ps(split.m,abab.m);
 			tt[0].m=_mm_shuffle(0+(1<<2)+(3<<4),tmp.m);
 			tt[1].m=_mm_shuffle(1+(0<<2)+(3<<4),tmp.m);
 			tt[2].m=_mm_shuffle(1+(3<<2)+(0<<4),tmp.m);
-			boxStack[stackPos*2+0]=_mm_max_ps(bMin.m,tt[axis].m);
+			c.boxStack[c.stackPos*2+0]=_mm_max_ps(c.bMin.m,tt[axis].m);
 
-			nodeStack[stackPos]=node+sign0[axis];
-			node+=sign0[axis]^1;
-			boxStack[stackPos*2+1]=bMax;
-			stackPos++;
+			c.nodeStack[c.stackPos]=c.node+c.sign0[axis];
+			c.node+=c.sign0[axis]^1;
+			c.boxStack[c.stackPos*2+1]=c.bMax;
+			c.stackPos++;
 
 			tmp=_mm_unpackhi_ps(split.m,abab.m);
 			tt[0].m=_mm_shuffle(0+(1<<2)+(3<<4),tmp.m);
 			tt[1].m=_mm_shuffle(1+(0<<2)+(3<<4),tmp.m);
 			tt[2].m=_mm_shuffle(1+(3<<2)+(0<<4),tmp.m);
-			bMax=_mm_min_ps(bMax.m,tt[axis].m);
+			c.bMax=_mm_min_ps(c.bMax.m,tt[axis].m);
 		}
 	}
 
 #undef NEG
 }
+
 
 // Indexes of the corner rays
 // 0:top left    1:top right    2:bottom left    3:bottom right
@@ -469,233 +414,45 @@ uint GetCornerIndex(uint n) {
 	return 0;
 }
 
-template <class Group>
-inline float KDTree::GetDensity(Group &group,const RaySelector<Group::size> &sel,TreeStats *tStats) const {
-	typedef floatq base;
-	typedef Vec3q Vec;
+template <class Output,class Group,class Selector>
+void KDTree::TraverseSplitted(Group &group,const Selector &sel,const Output &out,
+							TraverseContext<Group,Selector> *tContext) const {
+	bool primary=1;
 
-	struct Locals4 { base tMin,tMax; const KDNode *node; };
-
-	Vec3q rOrigin,rDir; {
-		Vec3p pDir[4]; Vec3q tmp;
-		rOrigin=group.Origin(sel[0]);
-
-		tmp=group.Dir(GetCornerIndex<Group>(0)); pDir[0]=Vec3p(tmp.x[0],tmp.y[0],tmp.z[0]);
-		tmp=group.Dir(GetCornerIndex<Group>(1)); pDir[1]=Vec3p(tmp.x[1],tmp.y[1],tmp.z[1]);
-		tmp=group.Dir(GetCornerIndex<Group>(2)); pDir[2]=Vec3p(tmp.x[2],tmp.y[2],tmp.z[2]);
-		tmp=group.Dir(GetCornerIndex<Group>(3)); pDir[3]=Vec3p(tmp.x[3],tmp.y[3],tmp.z[3]);
-		Convert(pDir,rDir);
+	if(primary) {
+		RaySelector<Group::size> tsel[4];
+		for(int n=0;n<sel.Num();n++) {
+			tsel[sel[n]/(Group::size/4)].Add(sel[n],sel.BitMask(sel[n]));
+		}
+		for(int s=0;s<4;s++)
+			TraverseFast(group,tsel[s],out,1,tContext);
+		return;
 	}
 
-	Locals4 stackBegin[MaxLevel+2],*stack=stackBegin;
-	Vec invDir=VInv(rDir);
-
-	const base *rStart=&rOrigin.x;
-	const base *irDir=&invDir.x;
-
-	base tMin=0.0f,tMax=10000.0f;
-	int dSign[3]={invDir.x[0]<0?0:1,invDir.y[0]<0?0:1,invDir.z[0]<0?0:1};
-
-	const KDNode *node=&nodes[0];
-	const u32 *objIds=&objectIds[0];
-	const Object *objs=&objects[0];
-
-	TreeStats stats;
-	int tests=0;
-	float maxValue=0.0f;
-
-	while(true) {
-		u32 axis=node->Axis();
-		stats.LoopIteration();
-
-		if(axis==3) { // leaf
-			if(node->NumObjects()) {
-				const u32 *id=objIds+node->FirstObject();
-
-				for(int n=node->NumObjects();n>0;n--) {
-					int tid=*id++;
-					const Object &obj=objs[tid];
-					stats.Intersection();
-					
-					/*
-					floatq ret4=obj.Collide(rOrigin,rDir);
-					float ret=Max(Max(ret4[0],ret4[1]),Max(ret4[2],ret4[3]));
-
-					floatq u,v;
-					obj.Barycentric(rOrigin,rDir,u,v);
-					Vec2p p[4];
-					p[0]=Vec2p(u[0],v[0]);
-					p[1]=Vec2p(u[1],v[1]);
-					p[2]=Vec2p(u[2],v[2]);
-					p[3]=Vec2p(u[3],v[3]);
-					
-					Vec2p pmin=VMin(VMin(p[0],p[1]),VMin(p[2],p[3]));
-					Vec2p pmax=VMax(VMax(p[0],p[1]),VMax(p[2],p[3]));
-					
-					bool collide=pmin.x<=1.0f&&pmax.x>=0.0f&&pmin.y<=1.0f&&pmax.y>=0.0f; */
-
-				//	if(!collide) {
-						float ret=Max(Max(tMax[0],tMax[1]),Max(tMax[2],tMax[3]));
-				//		collide=1;
-				//	}
-
-				 //	if(collide) {
-
-						float e1=LengthSq(obj.Edge1());
-						float e2=LengthSq(obj.Edge2());
-						float e3=LengthSq(obj.Edge3());
-						float sizeSq=Min(e1,Min(e2,e3));
-						maxValue=Max(maxValue,ret*RSqrt(sizeSq)*(0.0005f*Group::size));
-						tests++;
-
-						if(maxValue>1.0f) {
-							if(tStats) tStats->Update(stats);
-							return maxValue;
-						}
-				//	}
-				}
-			}
-
-			if(stack==stackBegin) {
-				if(tStats) tStats->Update(stats);
-				return maxValue;
-			}
-			stack--;
-			tMin=stack->tMin;
-			tMax=stack->tMax;
-			node=stack->node;
-			continue;
-		}
-
-		base tSplit=base(node->Pos()-rStart[axis])*irDir[axis];
-		node+=node->ChildDist();
-		u32 sign=dSign[axis];
-
-		if(ForAll(tSplit<=tMin)) {
-			tMin=Max(tSplit,tMin); node+=sign;
-			continue;
-		}
-		if(ForAll(tSplit>=tMax)) {
-			tMax=Min(tSplit,tMax); node+=!sign;
-			continue;
-		}
-
-		stack->tMin=Max(tSplit,tMin);
-		stack->tMax=tMax;
-		stack->node=node+sign;
-		stack++;
-
-		tMax=Min(tMax,tSplit); node+=!sign;
-	}
-}
-
-/*
-template <class Group>
-inline float KDTree::GetDensity(Group &group,const RaySelector<Group::size> &sel) const
-{
-	struct Locals4 { float tMin,tMax; const KDNode *node; };
-	Locals4 stackBegin[MaxLevel+2],*stack=stackBegin;
-
-	Vec3p beamDir,beamOrig; float beamM,beamA; {
-		Vec3p minOR,maxOR;
-		ComputeMinMaxOrigin(sel,group,minOR,maxOR);
-		ComputeBeam(group,sel,minOR,maxOR,beamDir,beamOrig,beamM,beamA);
+	enum { numSplits=4 };
+	Vec3q selDirs[numSplits];
+	for(int n=0;n<numSplits;n++) {
+		uint id=(n*sel.Num())/numSplits+sel.Num()/(numSplits*4);
+		selDirs[n]=group.Dir(sel[id]);
 	}
 
-	Vec3p rDir=Vec3p(beamDir.x+0.000000000001f,beamDir.y+0.000000000001f,beamDir.z+0.000000000001f);
-	Vec3p invDir=VInv(rDir);
+	RaySelector<Group::size> tsel[numSplits];
 
-	const float *rStart=(const float*)&beamOrig;
-	const float *irDir=(const float*)&invDir;
-	float tMin=ConstEpsilon<float>(),tMax=10000.0f;
+	for(int n=0;n<sel.Num();n++) {
+		floatq dst=selDirs[0]|group.Dir(sel[n]);
+		uint target=0;
 
-	int signMask=SignMask(floatq(invDir.m));
-	int dSign[3]={signMask&1?0:1,signMask&2?0:1,signMask&4?0:1};
-
-	const KDNode *node=&nodes[0];
-	const u32 *objIds=&objectIds[0];
-	const Object *objs=&objects[0];
-
-	while(true) {
-		u32 axis=node->Axis();
-
-		if(axis==3) { // leaf
-			if(node->NumObjects()) {
-				const u32 *id=objIds+node->FirstObject();
-
-				for(int n=node->NumObjects();n>0;n--) {
-
-					int tid=*id++;
-					const Object &obj=objs[tid];
-				
-					float ret=obj.Collide(beamOrig,beamDir);
-				 	if(ret>0.0f) {
-						float e1=LengthSq(obj.Edge1());
-						float e2=LengthSq(obj.Edge2());
-						float e3=LengthSq(obj.Edge3());
-						float sizeSq=Min(e1,Min(e2,e3));
-
-						return ret*RSqrt(sizeSq)*(0.0005f*Group::size);
-					}
-				}
-			}
-
-POPSTACK:
-			if(stack==stackBegin) return 0;
-			stack--;
-			tMin=stack->tMin;
-			tMax=stack->tMax;
-			node=stack->node;
-			continue;
+		for(int s=1;s<numSplits;s++) {
+			floatq tmp=selDirs[s]|group.Dir(sel[n]);
+			int bits=CountMaskBits(_mm_movemask_ps((tmp>dst).m));
+			if(bits>=2) { dst=tmp; target=s; }
 		}
 
-		float tSplit=float(node->Pos()-rStart[axis])*irDir[axis];
-		node+=node->ChildDist();
-		u32 sign=dSign[axis];
-
-		if(ForAll(tSplit<=tMin)) {
-			tMin=Max(tSplit,tMin); node+=sign;
-			continue;
-		}
-		if(ForAll(tSplit>=tMax)) {
-			tMax=Min(tSplit,tMax); node+=!sign;
-			continue;
-		}
-
-		stack->tMin=Max(tSplit,tMin);
-		stack->tMax=tMax;
-		stack->node=node+sign;
-		stack++;
-
-		tMax=Min(tMax,tSplit); node+=!sign;
+		tsel[target].Add(sel[n],sel.BitMask(sel[n]));
 	}
-}*/
 
-template <class Output,class Group>
-void KDTree::TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
-	Vec3p orig[4];
-
-	if(Group::singleOrigin)
-		Convert(group.Origin(sel[0]),orig);
-	
-	for(int i=0;i<sel.Num();i++) {
-		int q=sel[i];
-		Vec3p dir[4];
-		int msk=sel.BitMask(q);
-
-		if(!Group::singleOrigin)
-			Convert(group.Origin(q),orig);
-		Convert(group.Dir(q),dir);
-
-		float *dist=(float*)(out.dist+q); u32 tmp[4];
-		u32 *objId=Output::objectIndexes?(u32*)(out.object+q):tmp;
-
-		if(msk&1) TraverseMono(orig[0],dir[0],NormalOutput<float,u32>(dist+0,objId+0,out.stats));
-		if(msk&2) TraverseMono(orig[1],dir[1],NormalOutput<float,u32>(dist+1,objId+1,out.stats));
-		if(msk&4) TraverseMono(orig[2],dir[2],NormalOutput<float,u32>(dist+2,objId+2,out.stats));
-		if(msk&8) TraverseMono(orig[3],dir[3],NormalOutput<float,u32>(dist+3,objId+3,out.stats));
-
-	}
+	for(int s=0;s<numSplits;s++)
+		TraverseFast(group,tsel[s],out,1,tContext);
 }
 
 template <class Output,class Group,class Selector>
@@ -704,33 +461,6 @@ void KDTree::TraverseOptimized(Group &group,const Selector &sel,const Output &ou
 
 	RaySelector<Group::size> selectors[9];
 	group.GenSelectors(sel,selectors);
-
-	if(Group::recLevel==3&&primary) {
-		if(GetDensity(group,sel)>1.0f) {
-			typedef RayGroup<2,Group::singleOrigin> GroupP;
-			RaySelector<GroupP::size> tsel;
-			for(int n=0;n<16;n++) tsel.Add(n);
-		
-			for(int k=0;k<64;k+=16) {
-				GroupP gr(&group.Dir(k),&group.Origin(k));
-				TraverseOptimized(gr,tsel,NormalOutput<floatq,i32x4>(out.dist+k,out.object+k,out.stats));
-			}
-			return;
-		}
-	}
-	if(Group::recLevel==2&&primary) {
-		if(GetDensity(group,sel)>1.0f) {
-			typedef RayGroup<1,Group::singleOrigin> GroupP;
-			RaySelector<GroupP::size> tsel;
-			for(int n=0;n<4;n++) tsel.Add(n);
-		
-			for(int k=0;k<16;k+=4) {
-				GroupP gr(&group.Dir(k),&group.Origin(k));
-				TraverseOptimized(gr,tsel,NormalOutput<floatq,i32x4>(out.dist+k,out.object+k,out.stats));
-			}
-			return;
-		}
-	}
 
 	for(int k=0;k<8;k++) {
 		RaySelector<Group::size> &sel=selectors[k];
@@ -747,9 +477,7 @@ void KDTree::TraverseOptimized(Group &group,const Selector &sel,const Output &ou
 				floatq dot=group.Dir(q)|dir0;
 				if(ForAny(dot<Const<floatq,998,1000>())) { selectors[8].Add(q); sel.Disable(i--); continue; 	}
 			}
-
-			if(sel.Num()>2) TraverseFast(group,sel,out);
-			else while(sel.Num()) { selectors[8].Add(sel[0]); sel.Disable(0); }
+			TraverseFast(group,sel,out);
 		}
 	}
 	if(selectors[8].Num()) {

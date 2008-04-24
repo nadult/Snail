@@ -61,6 +61,8 @@ private:
 	u32 val;
 };
 
+template <class Group,class Selector> class TraverseContext;
+
 class KDTree
 {
 public:
@@ -81,33 +83,34 @@ public:
 	template <class Output,class Vec,class base>
 	void FullTraverse(const Vec &rOrigin,const Vec &rDir,const Output&) const;
 
-
 	template <class Output>
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,const Output &out) const NOINLINE;
 	template <class Output,class Group>
-	void TraverseFast(Group &group,const RaySelector<Group::size>&,const Output &out) const NOINLINE;
+	void TraverseFast(Group &group,const RaySelector<Group::size>&,const Output &out,uint splitted=0,
+						TraverseContext<Group,RaySelector<Group::size> > *tContext=0) const NOINLINE;
 
+	template <class Output,class Group,class Selector>
+	void TraverseSplitted(Group &group,const Selector&,const Output &out,
+							TraverseContext<Group,Selector> *tContext=0) const NOINLINE;
 
 	template <class Output,class Group,class Selector>
 	void TraverseOptimized(Group &group,const Selector&,const Output &out,bool primary=1) const NOINLINE;
 	template <class Output,class Group>
 	void TraverseMonoGroup(Group &group,const RaySelector<Group::size>&,const Output &out) const NOINLINE;
 
-
-	template <class Group>
-	float GetDensity(Group &group,const RaySelector<Group::size>&,TreeStats *stats=0) const NOINLINE;
-
 	bool TestNode(Vec3f min,Vec3f max,int node) const;
 	bool Test() const;
 
 	Vec3p pMin,pMax;
 	vector<Object> objects;
+	bool splittingFlag;
 
 //private:
 	vector<KDNode> nodes;
 	vector<u32> objectIds;
 };
 
+#include "kdtraverse_mono.h"
 #include "kdtraversal.h"
 
 
