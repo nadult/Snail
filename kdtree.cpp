@@ -354,17 +354,28 @@ void KDTree::Build(const SlowKDTree &tree) {
 }
 
 void KDTree::PrintInfo() const {
-	if(!Test()) {
-		printf("Test not passed!\n");
-	}
-
+//	if(!Test()) {
+//		printf("Test not passed!\n");
+//	}
 	int full=0,notFull=0;
+	double objPerLeaf=0,leafs=0;
+
 	for(int n=0;n<objects.size();n++) {
 		if(objects[n].GetFlag2()) full++;
 		else notFull++;
 	}
+	for(uint n=0;n<nodes.size();n++) if(nodes[n].Leaf()) {
+		objPerLeaf+=nodes[n].NumObjects();
+		leafs++;
+	}
+	objPerLeaf/=leafs;
 
-	printf("Objects: %7d    Nodes: %7d    Single node objects: %.2f%%\n",full+notFull,nodes.size(),100.0*double(full)/double(full+notFull));
+	printf("Objects: %7d    Nodes: %7d    Single node objects: %.2f%%\n",
+			full+notFull,nodes.size(),100.0*double(full)/double(full+notFull));
+	printf("Objects mem: %6.2fMB     Nodes mem: %6.2fMB + %6.2fMB (indices)\n",
+			double(objects.size()*sizeof(Object))*0.000001,double(nodes.size()*sizeof(KDNode))*0.000001,
+			double(objectIds.size()*sizeof(u32))*0.000001);
+	printf("Leafs:  %7.0f    Objects per leaf: %4.2f\n",leafs,objPerLeaf);
 }
 
 KDTree::~KDTree()

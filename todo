@@ -1,5 +1,4 @@
 - Poprawnie wyliczyc epsilon w Triangle::BeamCollide
-- Problem z epsilonem w MonoTracerze (przy poprawianiu promieni z jakims komponentem == 0)
 - Zapamietac: Bindy sie hujowo rozwijaja :(((
 - Zapamietac: JEBANE GCC AKCEPTUJE FUNKCJE ZWRACAJACE COS, NIE ZAWIERAJACE RETURNA
 - Obsluzyc beamCollision == 2

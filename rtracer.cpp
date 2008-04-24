@@ -234,7 +234,7 @@ Camera GetDefaultCamera(string model) {
 
 		cams["pompei.obj"]=pompei;
 		cams["sponza.obj"]=sponza;
-		cams["abrams.obj"]=abramsLeak;
+		cams["abrams.obj"]=abrams;
 		cams["lancia.obj"]=abrams;
 		cams["bunny.obj"]=bunny;
 		cams["feline.obj"]=bunny;
@@ -272,7 +272,7 @@ int main(int argc, char **argv)
 	Image img(resx,resy);
 	Camera cam=GetDefaultCamera(modelFile);;
 
-	enum { QuadLevels=2 };
+	enum { QuadLevels=3 };
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 
 	if(nonInteractive) {
@@ -282,7 +282,7 @@ int main(int argc, char **argv)
 	else {
 		SDLOutput out(resx,resy,fullscreen);
 		Options options;
-//		options.reflections^=1;
+	//	options.reflections^=1;
 
 		while(out.PollEvents()) {
 			if(out.TestKey(SDLK_ESCAPE)) break;
@@ -305,17 +305,19 @@ int main(int argc, char **argv)
 			if(out.TestKey(SDLK_p)) cam.Print();
 
 			{
-				int dx=out.TestKey(SDLK_SPACE)?out.MouseDX():0;
+				int dx=out.TestKey(SDLK_SPACE)?out.MouseDX():0,dy=0;
 				if(out.TestKey(SDLK_n)) dx-=20;
 				if(out.TestKey(SDLK_m)) dx+=20;
+				if(out.TestKey(SDLK_v)) dy-=20;
+				if(out.TestKey(SDLK_b)) dy+=20;
 				if(dx) {
 					Matrix<Vec4f> rotMat=RotateY(dx*0.003f);
 					cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
 				}
-				//if(out.MouseDY()) {
-				//	Matrix<Vec4f> rotMat(Quat(AxisAngle(cam.right,-out.MouseDY()*0.002f)));
-				//	cam.up=rotMat*cam.up; cam.front=rotMat*cam.front;
-				//}
+			//	if(dy) {
+			//		Matrix<Vec4f> rotMat(Quat(AxisAngle(cam.right,-dy*0.002f)));
+			//		cam.up=rotMat*cam.up; cam.front=rotMat*cam.front;
+			//	}
 			}
 			
 			TreeStats stats;

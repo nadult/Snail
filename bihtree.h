@@ -6,6 +6,8 @@
 #include "tree_stats.h"
 #include "context.h"
 
+typedef TTriangle<SlowEdgeNormals> BIHTriangle;
+
 
 // Generalnie:
 // Lisc moze odwolywac sie maksymalnie do jednego obiektu
@@ -40,7 +42,7 @@ public:
 	};
 };
 
-template <class TObject>
+template <class TObject=BIHTriangle>
 class BIHTree {
 public:
 	typedef TObject Object;
@@ -52,8 +54,8 @@ public:
 	void Build(uint nNode,int first,int last,Vec3p min,Vec3p max,uint level);
 
 	template <class Output>
-	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,const float &maxD,Output output) const {
-		float min=maxD+10;
+	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const {
+		float maxD=output.dist[0];
 
 		if(Output::objectIndexes)
 			output.object[0]=0;
@@ -169,18 +171,17 @@ EXIT:
 	}
 
 	template <class Output,class Group>
-	void TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,const floatq &maxD,const Output &out) const {
+	void TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
 		Vec3p orig[4],dir[4];
-		float fmaxD[4];
 		u32 tmp[4];
 
 		if(Group::singleOrigin)
 			Convert(group.Origin(sel[0]),orig);
-		Convert(maxD,fmaxD);
 		
 		for(int i=0;i<sel.Num();i++) {
 			int q=sel[i];
 			Vec3p dir[4];
+			int bmask=sel.BitMask(q);
 
 			if(!Group::singleOrigin)
 				Convert(group.Origin(q),orig);
@@ -189,11 +190,16 @@ EXIT:
 			float *dist=(float*)(out.dist+q);
 			u32 *objId=Output::objectIndexes?(u32*)(out.object+q):tmp;
 
-			TraverseMono(orig[0],dir[0],fmaxD[0],NormalOutput<float,u32>(dist+0,objId+0,out.stats));
-			TraverseMono(orig[1],dir[1],fmaxD[1],NormalOutput<float,u32>(dist+1,objId+1,out.stats));
-			TraverseMono(orig[2],dir[2],fmaxD[2],NormalOutput<float,u32>(dist+2,objId+2,out.stats));
-			TraverseMono(orig[3],dir[3],fmaxD[3],NormalOutput<float,u32>(dist+3,objId+3,out.stats));
+			if(bmask&1) TraverseMono(orig[0],dir[0],NormalOutput<float,u32>(dist+0,objId+0,out.stats));
+			if(bmask&2) TraverseMono(orig[1],dir[1],NormalOutput<float,u32>(dist+1,objId+1,out.stats));
+			if(bmask&4) TraverseMono(orig[2],dir[2],NormalOutput<float,u32>(dist+2,objId+2,out.stats));
+			if(bmask&8) TraverseMono(orig[3],dir[3],NormalOutput<float,u32>(dist+3,objId+3,out.stats));
 		}
+	}
+
+	template <class Output,class Group>
+	void TraverseOptimized(Group &group,const RaySelector<Group::size> &sel,const Output &out,bool primary=1) const {
+		TraverseMonoGroup(group,sel,out);
 	}
 
 	Vec3p pMin,pMax;

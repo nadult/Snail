@@ -41,6 +41,7 @@ public:
 	integer objId[size];
 
 	TreeStats stats;
+	float density;
 };
 
 //

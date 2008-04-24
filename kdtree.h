@@ -20,11 +20,13 @@ public:
 	vector<u32> objects;
 };
 
+typedef TTriangle<FastEdgeNormals> KDTriangle;
+
 class SlowKDTree
 {
 public:
 	enum { MaxLevel=24 };
-	typedef Triangle Object;
+	typedef KDTriangle Object;
 
 	SlowKDTree(const vector<Object> &objects);
 	//void Draw(Image&,Vec3<float>,Vec3<float>,const Camera &cam,u32 node=0) const;
@@ -63,7 +65,7 @@ class KDTree
 {
 public:
 	enum { MaxLevel=SlowKDTree::MaxLevel };
-	typedef Triangle Object;
+	typedef KDTriangle Object;
 
 	// Triangle flags usage:
 	// Flag1:  1337: object is a blocker (there will be no split going through it) 0: normal
@@ -93,7 +95,7 @@ public:
 
 
 	template <class Group>
-	int GetDepth(Group &group,const RaySelector<Group::size>&) const;
+	float GetDensity(Group &group,const RaySelector<Group::size>&) const NOINLINE;
 
 	bool TestNode(Vec3f min,Vec3f max,int node) const;
 	bool Test() const;

@@ -153,6 +153,7 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct> ,Group,Vec,int
 		InitializationShader(c,q,maxDist);
 	}
 
+	c.density=tree.GetDensity(c.rayGroup,c.selector);
 	Traverse(c.rayGroup,c.selector,NormalOutput<real,integer>(c),primary);
 
 	for(int i=0;i<c.selector.Num();i++) {
@@ -189,6 +190,9 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct> ,Group,Vec,int
 	}
 
 	if(c.options.rdtscShader)
+		for(int q=0;q<Group::size;q++)
+			c.color[q].x=c.color[q].y=0.0f;
+//	if(c.options.rdtscShader)
 		for(int q=0;q<Group::size;q++)
 			StatsShader(c,q);
 }
