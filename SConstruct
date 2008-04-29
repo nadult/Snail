@@ -8,7 +8,7 @@ libs = [ 'pthread', 'SDL', 'baselib' ]
 
 release = Environment (
 		CXX = '/usr/local/gcc-4.3/bin/g++ -fopenmp',
-		CXXFLAGS = includes + '-O3 -msse3 -ffast-math -mfpmath=sse -fno-rtti -DNDEBUG -g',
+		CXXFLAGS = includes + '-O3 -msse3 -ffast-math -mfpmath=sse -funroll-loops -fno-rtti -DNDEBUG -g',
 		CPPPATH = '.',
 		LIBPATH = libsPaths
 	)

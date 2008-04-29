@@ -283,7 +283,7 @@ int main(int argc, char **argv)
 
 	Image img(resx,resy);
 	Camera cam=GetDefaultCamera(modelFile);;
-	cam=Camera( Vec3f(-32.9797,-5.6003,-15.5864), Vec3f(0.8327,0.0000,0.5537), Vec3f(0.5537,0.0000,-0.8327) );
+//	cam=Camera( Vec3f(-32.9797,-5.6003,-15.5864), Vec3f(0.8327,0.0000,0.5537), Vec3f(0.5537,0.0000,-0.8327) );
 	
 
 	uint quadLevels=2;

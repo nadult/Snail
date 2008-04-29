@@ -1,6 +1,18 @@
 #ifndef KDTRAVERSAL_H
 #define KDTRAVERSAL_H
 
+// Indexes of the corner rays
+// 0:top left    1:top right    2:bottom left    3:bottom right
+template <int groupSize>
+uint GetCornerIndex(uint n) {
+	if(groupSize==4) { int arr[4]={0,1,2,3}; return arr[n]; }
+	if(groupSize==16) { int arr[4]={0,5,10,15}; return arr[n]; }
+	if(groupSize==64) { int arr[4]={0,21,42,63}; return arr[n]; }
+	if(groupSize==256) { int arr[4]={0,0,0,0}; return arr[n]; }
+	return 0;
+}
+
+
 /*!
 	(Absolute)
 	px = [ dy[0].y/dy[0].x	dz[0].z/dz[0].x		dy[1].y/dy[1].x		dz[1].z/dz[1].x	]
@@ -16,28 +28,41 @@ INLINE void ComputePV(const RaySelector<size> &sel,const Vec3q *rDir,floatq *pv)
 	yx[0]=zx[0]=xy[0]=zy[0]=xz[0]=yz[0]=floatq(1.0f/0.0f);  // +inf
 	yx[1]=zx[1]=xy[1]=zy[1]=xz[1]=yz[1]=floatq(-1.0f/0.0f); // -inf
 
-	for(int id=0;id<sel.Num();id++) {
-		const Vec3q dir=VAbs(rDir[sel[id]]);
-		f32x4b mask=sel.Mask(sel[id]);
+#define INSERT(id) { int tid=(id); \
+		const Vec3q dir=VAbs(rDir[tid]); \
+		f32x4b mask=sel.Mask(tid); \
+	\
+		floatq t1,t2,i; \
+		i=Inv(dir.x); t1=dir.y*i; t2=dir.z*i; \
+		yx[0]=Condition(t1<yx[0]&&mask,t1,yx[0]);\
+		yx[1]=Condition(t1>yx[1]&&mask,t1,yx[1]);\
+		zx[0]=Condition(t2<zx[0]&&mask,t2,zx[0]);\
+		zx[1]=Condition(t2>zx[1]&&mask,t2,zx[1]);\
+\
+		i=Inv(dir.y); t1=dir.x*i; t2=dir.z*i;\
+		xy[0]=Condition(t1<xy[0]&&mask,t1,xy[0]);\
+		xy[1]=Condition(t1>xy[1]&&mask,t1,xy[1]);\
+		zy[0]=Condition(t2<zy[0]&&mask,t2,zy[0]);\
+		zy[1]=Condition(t2>zy[1]&&mask,t2,zy[1]);\
+\
+		i=Inv(dir.z); t1=dir.x*i; t2=dir.y*i;\
+		xz[0]=Condition(t1<xz[0]&&mask,t1,xz[0]);\
+		xz[1]=Condition(t1>xz[1]&&mask,t1,xz[1]);\
+		yz[0]=Condition(t2<yz[0]&&mask,t2,yz[0]);\
+		yz[1]=Condition(t2>yz[1]&&mask,t2,yz[1]);\
+	}\
 
-		floatq t1,t2,i;
-		i=Inv(dir.x); t1=dir.y*i; t2=dir.z*i;
-		yx[0]=Condition(t1<yx[0]&&mask,t1,yx[0]);
-		yx[1]=Condition(t1>yx[1]&&mask,t1,yx[1]);
-		zx[0]=Condition(t2<zx[0]&&mask,t2,zx[0]);
-		zx[1]=Condition(t2>zx[1]&&mask,t2,zx[1]);
 
-		i=Inv(dir.y); t1=dir.x*i; t2=dir.z*i;
-		xy[0]=Condition(t1<xy[0]&&mask,t1,xy[0]);
-		xy[1]=Condition(t1>xy[1]&&mask,t1,xy[1]);
-		zy[0]=Condition(t2<zy[0]&&mask,t2,zy[0]);
-		zy[1]=Condition(t2>zy[1]&&mask,t2,zy[1]);
-
-		i=Inv(dir.z); t1=dir.x*i; t2=dir.y*i;
-		xz[0]=Condition(t1<xz[0]&&mask,t1,xz[0]);
-		xz[1]=Condition(t1>xz[1]&&mask,t1,xz[1]);
-		yz[0]=Condition(t2<yz[0]&&mask,t2,yz[0]);
-		yz[1]=Condition(t2>yz[1]&&mask,t2,yz[1]);
+	bool primary=1;
+	if(primary&&size==sel.Num()) {
+		INSERT(GetCornerIndex<size>(0));
+		INSERT(GetCornerIndex<size>(1));
+		INSERT(GetCornerIndex<size>(2));
+		INSERT(GetCornerIndex<size>(3));
+	}
+	else {
+		for(int id=0;id<sel.Num();id++)
+			INSERT(sel[id])
 	}
 
 	__m128 tp1,tp2;
@@ -178,18 +203,6 @@ public:
 		ComputePV(sel,&group.Dir(0),pv);
 		ComputeOV(minOR,maxOR,pv,ov);
 
-		stackPos=0;
-
-		node=&tree.nodes[0];
-		objIds=&tree.objectIds[0];
-		objs=&tree.objects[0];
-
-				{
-			Vec3p tMin=Neg(tree.pMin),tMax=Neg(tree.pMax);
-			Vec3p tpMin=VMin(tMin,tMax),tpMax=VMax(tMin,tMax);
-			bMin=VMax(minOR,tpMin);
-			bMax=tpMax;
-		}
 
 		if(sel.Num()>4)
 			ComputeBeam(group,sel,Neg(minOR),Neg(maxOR),beamDir,beamOrig,beamM,beamA);
@@ -205,6 +218,16 @@ public:
 			bMin=other->bMin;
 			bMax=other->bMax;
 			idxBuffer=other->idxBuffer;
+		}
+		else {
+			// Compute bMin, bMax
+			Vec3p tMin=Neg(tree.pMin),tMax=Neg(tree.pMax);
+			Vec3p tpMin=VMin(tMin,tMax),tpMax=VMax(tMin,tMax);
+			bMin=VMax(minOR,tpMin);
+			bMax=tpMax;
+
+			node=&tree.nodes[0];
+			stackPos=0;
 		}
 	}
 
@@ -224,15 +247,11 @@ public:
 	u32 stackPos;
 
 	const KDNode *node;
-	const u32 *objIds;
-	const KDTree::Object *objs;
 	Vec3p bMin,bMax;
 
 	ObjectIdxBuffer<8> idxBuffer;
 };
 
-
-#define NEG(vec) (c.Neg(vec))
 
 template <class Output,class Group>
 inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tSelector,const Output &out,uint splittedYet,
@@ -247,10 +266,12 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 
 	TraverseContext<Group,RaySelector<Group::size> > c(group,tSelector,*this,tContext);
 
+	const u32 *objIds=&objectIds[0];
+	const KDTree::Object *objs=&objects[0];
+
 	TreeStats stats;
 	stats.TracingPacket(c.sel.Num()*4);
 	u32 axis;
-
 
 	while(true) {
 		stats.LoopIteration();
@@ -259,11 +280,11 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 		if(axis==3) { // Leaf
 			if(c.node->NumObjects()) {
 
-				const u32 *oid=c.objIds+c.node->FirstObject();
+				const u32 *oid=objIds+c.node->FirstObject();
 				
 				Vec3p nodeMin,nodeMax; {
 					Vec3p nodeEps(Const<floatq,1,1000>().m);
-					Vec3p tMin=NEG(c.bMin),tMax=NEG(c.bMax);
+					Vec3p tMin=c.Neg(c.bMin),tMax=c.Neg(c.bMax);
 					nodeMin=VMin(tMin,tMax)-nodeEps;
 					nodeMax=VMax(tMin,tMax)+nodeEps;
 				}
@@ -271,7 +292,7 @@ inline void KDTree::TraverseFast(Group &group,const RaySelector<Group::size> &tS
 				float density=0.0f;
 				for(int n=c.node->NumObjects();n>0;n--) {
 					int tid=*oid++;
-					const Object &obj=c.objs[tid];
+					const Object &obj=objs[tid];
 					const bool fullInNode=obj.GetFlag2();
 					
 					if(c.idxBuffer.Find(tid)) continue;
@@ -398,20 +419,6 @@ POPSTACK:
 			c.bMax=_mm_min_ps(c.bMax.m,tt[axis].m);
 		}
 	}
-
-#undef NEG
-}
-
-
-// Indexes of the corner rays
-// 0:top left    1:top right    2:bottom left    3:bottom right
-template <class Group>
-uint GetCornerIndex(uint n) {
-	if(Group::size==4) { int arr[4]={0,0,0,0}; return arr[n]; }
-	if(Group::size==16) { int arr[4]={0,5,10,15}; return arr[n]; }
-	if(Group::size==64) { int arr[4]={0,21,42,63}; return arr[n]; }
-	if(Group::size==256) { int arr[4]={0,0,0,0}; return arr[n]; }
-	return 0;
 }
 
 template <class Output,class Group,class Selector>
