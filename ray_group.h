@@ -5,11 +5,8 @@
 
 extern f32x4b GetSSEMaskFromBits_array[16];
 
-// bits must be <= 15
-//
 INLINE f32x4b GetSSEMaskFromBits(u8 bits) {
 	assert(bits<=15);
-
 	/*
 	union { u32 tmp[4]; __m128 out; };
 
@@ -19,7 +16,6 @@ INLINE f32x4b GetSSEMaskFromBits(u8 bits) {
 	tmp[3]=bits&8?~0:0;
 
 	return out; */
-
 	return GetSSEMaskFromBits_array[bits];
 }
 
@@ -31,15 +27,13 @@ INLINE int CountMaskBits(u8 bits) {
 
 typedef int RayIndex;
 
-// Before you start using this class, try to understand how
-// it works, whats most important: there are two kinds of
-// indexes:
-// - RayIndex which never changes, you can use it to address
-//   ray data stored in external array
-// - ray number (of type int) which is used to iterate over
-//   active rays ( from 0 to Num()-1 )
-template <int size>
+// this class stores a list of active rays
+// with their masks
+template <int size_>
 class RaySelector {
+public:
+	enum { size=size_ };
+private:
 	u8 idx[size];
 	char bits[size];
 	int num;
@@ -53,29 +47,33 @@ public:
 
 	// Moves last index to n,
 	// decreases number of selected rays
-	INLINE void Disable(int n)				{ idx[n]=idx[--num]; }
+	INLINE void Disable(int n)				{ idx[n]=idx[--num]; bits[n]=bits[num]; }
 	INLINE bool DisableWithMask(int n,const f32x4b &m) {
-		int i=idx[n];
 		int newMask=_mm_movemask_ps(m.m);
-		bits[i]&=~newMask;
-		bool disable=!bits[i];
-		if(disable) idx[n]=idx[--num];
+		bits[n]&=~newMask;
+		bool disable=!bits[n];
+		if(disable) Disable(n);
 		return disable;
 	}
 	INLINE bool DisableWithBitMask(int n,int newMask) {
-		int i=idx[n];
-		bits[i]&=~newMask;
-		bool disable=!bits[i];
-		if(disable) idx[n]=idx[--num];
+		bits[n]&=~newMask;
+		bool disable=!bits[n];
+		if(disable) Disable(n);
 		return disable;
 	}
 
-	INLINE void Add(RayIndex i,int bitMask=15)	{ idx[num++]=i; bits[i]=bitMask; }
-	INLINE int  BitMask(RayIndex i) const		{ return bits[i]; }
-	INLINE f32x4b Mask(RayIndex i) const		{ return GetSSEMaskFromBits(bits[i]); }
+	INLINE void Add(RayIndex i,int bitMask=15) {
+		assert(num<size);
+		bits[num]=bitMask;
+		idx[num++]=i;
+	}
+	template <class Selector>
+	INLINE void Add(const Selector &other,int n)	{ Add(other[n],other.BitMask(n)); }
 
-	INLINE void SetBitMask(RayIndex i,int m) { bits[i]=m; }
-	INLINE void SetMask(RayIndex i,const f32x4b &m) { return bits[i]=_mm_movemask_ps(m.m); }
+	INLINE int  BitMask(int n) const			{ return bits[n]; }
+	INLINE f32x4b Mask(int n) const				{ return GetSSEMaskFromBits(bits[n]); }
+	INLINE void SetBitMask(int n,int m)			{ bits[n]=m; }
+	INLINE void SetMask(int n,const f32x4b &m)	{ return bits[n]=_mm_movemask_ps(m.m); }
 
 	INLINE void Clear() { num=0; }
 	INLINE void SelectAll() {
@@ -84,115 +82,60 @@ public:
 	}
 };
 
-template <int tRecLevel,bool tSingleOrigin>
-class RayGroup;
+// returns 8 for mixed rays
+inline int GetVecSign(const Vec3q &dir) {
+	int x=SignMask(dir.x),y=SignMask(dir.y),z=SignMask(dir.z);
+	int out=(x?1:0)+(y?2:0)+(z?4:0);
 
-template <int size,bool singleOrigin>
-class RayStore
-{
-	Vec3q *dir;
-	Vec3q *origin;
+	if((x>0&&x<15)||(y>0&&y<15)||(z>0&&z<15)) out=8;
+	else if(ForAny(	Min(Abs(dir.x),Min(Abs(dir.y),Abs(dir.z)))<ConstEpsilon<f32x4>() )) out=8;
 
-public:
-	INLINE RayStore(Vec3q *d,Vec3q *o) :dir(d),origin(o) {
+	return out;
+}
+
+template <class Selector1,class Selector2>
+inline void SplitSelectorsBySign(const Selector1 &in,Selector2 out[9],Vec3q *dir) {
+	for(int n=0;n<9;n++) out[n].Clear();
+	for(int i=0;i<in.Num();i++) {
+		int n=in[i];
+		out[GetVecSign(dir[n])].Add(in,i);
 	}
-	INLINE Vec3q &Dir(int n)				{ return dir[n]; }
-	INLINE const Vec3q &Dir(int n) const	{ return dir[n]; }
-	INLINE Vec3q &Origin(int n)				{ return origin[n]; }
-	INLINE const Vec3q &Origin(int n) const	{ return origin[n]; }
+}
+	
 
-	INLINE Vec3q *DirPtr()		{ return dir; }
-	INLINE Vec3q *OriginPtr()	{ return origin; }
-};
-
-template <int size>
-class RayStore<size,true>
-{
-	Vec3q *origin;
-	Vec3q *dir;
-
-public:
-	INLINE RayStore(Vec3q *d,Vec3q *o) :dir(d),origin(o) { }
-
-	INLINE Vec3q &Dir(int n)					{ return dir[n]; }
-	INLINE const Vec3q &Dir(int n) const		{ return dir[n]; }
-	INLINE Vec3q &Origin(int n)					{ return origin[0]; }
-	INLINE const Vec3q &Origin(int n) const		{ return origin[0]; }
-
-	INLINE Vec3q *DirPtr()		{ return dir; }
-	INLINE Vec3q *OriginPtr()	{ return origin; }
-};
-
-/*!
-	recLevel:	nQuads		resolution:
-	0:			1			2x2
-	1:			4			4x4
-	2:			16			8x8
-	3:			64			16x16
-
-	Functions starting with E return
-	data for nth enabled ray
-*/
-template <int tRecLevel,bool tSingleOrigin>
+template <int size_,bool tSharedOrigin=0,bool tPrecomputedInverses=0>
 class RayGroup
 {
 public:
-	enum { recLevel=tRecLevel, size=1<<recLevel*2, singleOrigin=tSingleOrigin };
+	enum { sharedOrigin=tSharedOrigin, precomputedInverses=tPrecomputedInverses, size=size_ };
+
+	template <class Selector1,class Selector2>
+	void GenSelectors(const Selector1 &oldSelector,Selector2 sel[9]) {
+		SplitSelectorsBySign(oldSelector,sel,&Dir(0));
+	}
+
+	INLINE RayGroup(Vec3q *d,Vec3q *o,Vec3q *i=0) :dir(d),origin(o),idir(i) { assert(!precomputedInverses||idir); }
+
+	template <int tSize,bool tPrecomputed>
+	INLINE RayGroup(RayGroup<tSize,sharedOrigin,tPrecomputed> &other,int shift)
+		:dir(other.dir+shift)
+		,origin(sharedOrigin?other.origin:other.origin+shift)
+		,idir(precomputedInverses?tPrecomputed?other.idir+shift:0:0) { }
+
+	INLINE Vec3q &Dir(int n)				{ return dir[n]; }
+	INLINE const Vec3q &Dir(int n) const	{ return dir[n]; }
+
+	INLINE Vec3q &Origin(int n)				{ return origin[sharedOrigin?0:n]; }
+	INLINE const Vec3q &Origin(int n) const { return origin[sharedOrigin?0:n]; }
+
+	INLINE Vec3q IDir(int n) const			{ return precomputedInverses?idir[n]:VInv(dir[n]); }
+
+	INLINE Vec3q *DirPtr()		{ return dir; }
+	INLINE Vec3q *OriginPtr()	{ return origin; }
+	INLINE Vec3q *IDirPtr()		{ return precomputedInverses?idir:0; }
 
 private:
-	RayStore<size,singleOrigin> store;
-	bool signsCalculated;
-	char raySign[size]; //0 - 7: all rays in group has same dir   8: mixed
-
-public:
-	void ComputeSignMasks() {
-		if(signsCalculated) return;
-
-		for(int n=0;n<size;n++) {
-			Vec3q &r=Dir(n);
-			int x=SignMask(r.x),y=SignMask(r.y),z=SignMask(r.z);
-			raySign[n]=(x?1:0)+(y?2:0)+(z?4:0);
-			if((x>0&&x<15)||(y>0&&y<15)||(z>0&&z<15)) raySign[n]=8;
-			else {
-				if(ForAny(	Abs(r.x)<ConstEpsilon<f32x4>()||
-							Abs(r.y)<ConstEpsilon<f32x4>()||
-							Abs(r.z)<ConstEpsilon<f32x4>()))
-					raySign[n]=8;
-			}
-		}
-		signsCalculated=1;
-	}
-
-	// Last group: mixed rays
-	void GenSelectors(RaySelector<size> sel[9]) {
-		if(!signsCalculated) ComputeSignMasks();
-
-		for(int n=0;n<9;n++) { sel[n].Clear(); sel[n].SetSignMask(n); }
-		for(int n=0;n<size;n++) sel[raySign[n]].Add(n);
-	}
-	void GenSelectors(const RaySelector<size> oldSelectors,RaySelector<size> sel[9]) {
-		if(!signsCalculated) ComputeSignMasks();
-
-		for(int n=0;n<9;n++) sel[n].Clear();
-		for(int i=0;i<oldSelectors.Num();i++) {
-			int n=oldSelectors[i];
-			sel[raySign[n]].Add(n,oldSelectors.BitMask(n));
-		}
-	}
-	INLINE int RaySignMask(int n) const { return raySign[n]; }
-
-	INLINE RayGroup(RayStore<size,singleOrigin> &ref) :store(ref),signsCalculated(0) { }
-	INLINE RayGroup(Vec3q *dir,Vec3q *origin) :store(dir,origin),signsCalculated(0) { }
-
-	INLINE Vec3q &Dir(int n)				{ return store.Dir(n); }
-	INLINE const Vec3q &Dir(int n) const	{ return store.Dir(n); }
-
-	INLINE Vec3q &Origin(int n)				{ return store.Origin(n); }
-	INLINE const Vec3q &Origin(int n) const { return store.Origin(n); }
-
-	// Including disabled rays
-	INLINE int Size() const { return size; }
-
+	Vec3q *dir,*idir,*origin;
 };
 
 #endif

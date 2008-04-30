@@ -13,26 +13,37 @@ struct TracingOptions {
 	bool rdtscShader;
 };
 
-template <class Scene,class Group,class Vec,class integer>
+template <class Scene,class Rays,class Selector>
 class TracingContext {
 public:
-	TracingContext(const Scene &scn,RayStore<Group::size,Group::singleOrigin> &rStore) :scene(scn),rayGroup(rStore) {
+	TracingContext(const Scene &scn,const Rays &tRays) :scene(scn),rays(tRays) {
 		selector.SelectAll();
 	}
-	TracingContext(const Scene &scn,RayStore<Group::size,Group::singleOrigin> &rStore,const RaySelector<Group::size> &sel)
-		:scene(scn),rayGroup(rStore),selector(sel) {
-		}
+	TracingContext(const Scene &scn,const Rays &tRays,const Selector &sel)
+		:scene(scn),rays(tRays),selector(sel) {
+	}
 
+	Vec3q &RayDir(int n)				{ return rays.Dir(n); }
+	const Vec3q &RayDir(int n) const	{ return rays.Dir(n); }
+
+	Vec3q &RayOrigin(int n)				{ return rays.Origin(n); }
+	const Vec3q &RayOrigin(int n) const	{ return rays.Origin(n); }
+
+	Vec3q RayIDir(int n) const { return rays.IDir(n); }
+
+	typedef Vec3q Vec;
 	typedef typename Vec::TScalar real;
 	typedef typename Vec::TBool boolean;
 	typedef typename Scene::Object Object;
-	enum { size=Group::size };
+	typedef i32x4 integer;
+
+	enum { size=Rays::size };
 
 	TracingOptions options;
 	const Scene &scene;
 
-	Group rayGroup;
-	RaySelector<size> selector;
+	Rays rays;
+	Selector selector;
 
 	Vec color[size],normal[size],position[size],light[size];
 	Vec reflectionDir[size];
@@ -44,42 +55,31 @@ public:
 	float density;
 };
 
+enum OutputType {
+	otNormal,
+	otPrimary,
+	otShadow,
+};
+
 //
 // Output classes hold pointers, so you can
 // still modify the data when referencing to class
 // with a const reference
 
-template <class real,class integer>
-struct NormalOutput
+template <OutputType type_,class real,class integer>
+struct Output
 {
-	enum { objectIndexes=1, shadow=0 };
+	enum { objectIndexes=type_!=otShadow, type=type_ };
 
-	NormalOutput(real *d,integer *i,TreeStats *st) :dist(d),object(i),stats(st),density(0) { }
+	Output(real *d,integer *i,TreeStats *st) :dist(d),object(i),stats(st),density(0) { }
 
-	template <class Scene,class Group>
-	NormalOutput(TracingContext<Scene,Group,Vec3<real>,integer> &c) :dist(c.distance),object(c.objId),stats(&c.stats),density(&c.density) { }
-	NormalOutput(const NormalOutput &all,int n) :dist(all.dist+n),object(all.object+n*4),stats(all.stats),density(0) { }
+	template <class Scene,class Group,class Selector>
+	Output(TracingContext<Scene,Group,Selector> &c) :dist(c.distance),object(c.objId),stats(&c.stats),density(&c.density) { }
+	Output(const Output &all,int n) :dist(all.dist+n),object(all.object+n*4),stats(all.stats),density(0) { }
 
 	float *density;
 	real *dist;
 	integer *object;
-	TreeStats *stats;
-};
-
-template <class real,class integer>
-struct ShadowOutput
-{
-	enum { objectIndexes=0, shadow=1 };
-	
-	ShadowOutput(real *d,TreeStats *st) :dist(d),object(0),stats(st),density(0) { }
-
-	template <class Scene,class Group>
-	ShadowOutput(TracingContext<Scene,Group,Vec3<real>,integer> &c) :dist(c.distance),object(0),stats(&c.stats),density(&c.context.density) { }
-	ShadowOutput(const ShadowOutput &all,int n) :dist(all.dist+n),object(0),stats(all.stats),density(0) { }
-
-	float *density;
-	real *dist;
-	integer *object; // dummy
 	TreeStats *stats;
 };
 

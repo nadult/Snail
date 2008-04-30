@@ -170,7 +170,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			splits[2].push_back(PSplit(max.z,0,cantSplit));
 		}
 		
-		const float travCost=0.2;
+		const float travCost=0.01;
 		const float hitTestCost=1.0;
 		float noSplitCost=hitTestCost*objs.size();
 

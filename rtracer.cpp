@@ -7,55 +7,6 @@
 #include "scene.h"
 #include <map>
 
-
-/*
-enum ParameterType {
-	pSurfaceNormal,
-	pRayDirection,
-	pDistance,
-	pRayOrigin,
-	pPosition,
-	pColor,
-};
-
-template <class a,class b> class ReflectT { };
-template <class lvalue,class rvalue> class SetT { };
-
-template <int ttype> struct Parameter {
-	enum { type=ttype };
-
-	template <class r>
-	SetT<Parameter<type>,r> operator=(r) { }
-};
-
-
-typedef Parameter<pSurfaceNormal> SurfaceNormalT;
-typedef Parameter<pRayDirection> RayDirectionT;
-typedef Parameter<pColor> ColorT;
-
-ColorT color;
-SurfaceNormalT surfaceNormal;
-RayDirectionT rayDirection;
-
-
-template <int a,int b>
-ReflectT<Parameter<a> ,Parameter<b> > Reflect(const Parameter<a>&,const Parameter<b>&) { }
-
-
-float func() { return 0; }
-
-typedef typeof(
-
-	color = Reflect( surfaceNormal, rayDirection)
-
-	) ReflShader;
-
-template <class T> class Print { Print() { } };
-
-Print<ReflShader> a; void t() { a.x=0; }
-*/
-
-
 using std::cout;
 using std::endl;
 typedef TScene< KDTree > Scene;
@@ -100,7 +51,7 @@ struct GenImageTask {
 
 		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
-				Vec3q dir[NQuads];
+				Vec3q dir[NQuads],idir[NQuads];
 				rayGen.Generate(PWidth,PHeight,startX+x,startY+y,dir);
 
 				for(int n=0;n<NQuads;n++) {
@@ -108,15 +59,15 @@ struct GenImageTask {
 					for(int k=0;k<4;k++) tmp[k]=rotMat*tmp[k];
 					Convert(tmp,dir[n]);
 					dir[n]*=RSqrt(dir[n]|dir[n]);
+					idir[n]=VInv(dir[n]);
 				}
 
-				RayStore<NQuads,1> rayStore(dir,&origin);
-				TracingContext<Scene,RayGroup<QuadLevels,1>,Vec3q,i32x4> context(*scene,rayStore);
+				TracingContext<Scene,RayGroup<NQuads,1,1>,RaySelector<NQuads> > context(*scene,RayGroup<NQuads,1,1>(dir,&origin,idir));
 				Vec3q *rgb=context.color;
 
 				context.options=TracingOptions(options.reflections?1:0,options.rdtscShader);
 				
-				scene->RayTrace(context);
+				scene->RayTracePrimary(context);
 				outStats->Update(context.stats);
 
 				rayGen.Decompose(rgb,rgb);
@@ -249,7 +200,7 @@ Camera GetDefaultCamera(string model) {
 
 TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	switch(quadLevels) {
-//	case 0: return GenImage<0>(scene,camera,image,options,tasks);
+	case 0: return GenImage<0>(scene,camera,image,options,tasks);
 	case 1: return GenImage<1>(scene,camera,image,options,tasks);
 	case 2: return GenImage<2>(scene,camera,image,options,tasks);
 	case 3: return GenImage<3>(scene,camera,image,options,tasks);
@@ -316,6 +267,7 @@ int main(int argc, char **argv)
 			if(out.TestKey(SDLK_f)) cam.pos+=cam.up*speed;
 			if(out.TestKey(SDLK_y)) { printf("splitting %s\n",scene.tree.splittingFlag?"off":"on"); scene.tree.splittingFlag^=1; }
 
+			if(out.TestKey(SDLK_0)) { printf("tracing 2x2\n"); quadLevels=0; }
 			if(out.TestKey(SDLK_1)) { printf("tracing 4x4\n"); quadLevels=1; }
 			if(out.TestKey(SDLK_2)) { printf("tracing 16x4\n"); quadLevels=2; }
 			if(out.TestKey(SDLK_3)) { printf("tracing 64x4\n"); quadLevels=3; }

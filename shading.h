@@ -14,13 +14,13 @@ void InitializationShader(Context &c,uint i,const typename Context::real &maxDis
 
 template <class Context>
 void SimpleLightingShader(Context &c,uint i) {
-	c.color[i]=c.rayGroup.Dir(i)|c.normal[i];
+	c.color[i]=c.RayDir(i)|c.normal[i];
 }
 
 template <class Context>
 void ReflectionShader(Context &c,uint i) {
 	typedef typename Context::real real;
-	Vec3q refl=Reflect(c.rayGroup.Dir(i),c.normal[i]);
+	Vec3q refl=Reflect(c.RayDir(i),c.normal[i]);
 
 	c.color[i].x=Condition(refl.x>Const<real,0>(),Const<real,8,12>(),Const<real,2,12>());
 	c.color[i].y=Condition(refl.y>Const<real,0>(),Const<real,8,12>(),Const<real,2,12>());
@@ -30,7 +30,7 @@ void ReflectionShader(Context &c,uint i) {
 
 template <class Context>
 void RayDirectionShader(Context &c,uint i) {
-	Vec3q dir=c.rayGroup.Dir(i);
+	Vec3q dir=c.RayDir(i);
 
 	c.color[i].x=Condition(dir.x<Const<floatq,0>(),Const<floatq,1,2>(),Const<floatq,1>());
 	c.color[i].y=Condition(dir.y<Const<floatq,0>(),Const<floatq,1,2>(),Const<floatq,1>());

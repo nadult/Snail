@@ -25,7 +25,7 @@ typedef TTriangle<FastEdgeNormals> KDTriangle;
 class SlowKDTree
 {
 public:
-	enum { MaxLevel=24 };
+	enum { MaxLevel=50 };
 	typedef KDTriangle Object;
 
 	SlowKDTree(const vector<Object> &objects);
@@ -85,18 +85,17 @@ public:
 
 	template <class Output>
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,const Output &out) const NOINLINE;
-	template <class Output,class Group>
-	void TraverseFast(Group &group,const RaySelector<Group::size>&,const Output &out,uint splitted=0,
-						TraverseContext<Group,RaySelector<Group::size> > *tContext=0) const NOINLINE;
+	template <class Output,class Group,class Selector,class OtherContext>
+	void TraverseFast(Group &group,const Selector&,const Output &out,OtherContext *tContext) const NOINLINE;
 
 	template <class Output,class Group,class Selector>
 	void TraverseSplitted(Group &group,const Selector&,const Output &out,
 							TraverseContext<Group,Selector> *tContext=0) const NOINLINE;
 
 	template <class Output,class Group,class Selector>
-	void TraverseOptimized(Group &group,const Selector&,const Output &out,bool primary=1) const NOINLINE;
-	template <class Output,class Group>
-	void TraverseMonoGroup(Group &group,const RaySelector<Group::size>&,const Output &out) const NOINLINE;
+	void TraverseOptimized(Group &group,const Selector&,const Output &out) const NOINLINE;
+	template <class Output,class Group,class Selector>
+	void TraverseMonoGroup(Group &group,const Selector&,const Output &out) const NOINLINE;
 
 	bool TestNode(Vec3f min,Vec3f max,int node) const;
 	bool Test() const;

@@ -132,7 +132,7 @@ typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) 
 	Bool test=Min(u,v)>=Const<real,0>()&&u+v<=det;
 
 	if (ForAny(test)) {
-		real dist=-(tvec|Nrm())*Inv(rDir|Nrm());
+		real dist=-(tvec|Nrm())/(rDir|Nrm());
 		out=Condition(test,dist,out);
 	}
 
