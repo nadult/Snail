@@ -35,12 +35,70 @@ public:
 
 	float left;
 	float right;
-	uint val;
+	union {
+		uint val;
+		float fval;
+	};
 	union {
 		uint parent;
 		uint flags;
 	};
 };
+
+template <class T>
+class Vector
+{
+public:
+	typedef T value_type;
+
+	Vector() :tab(0),count(0) { }
+
+	template <class Container>
+	Vector(const Container &obj) :tab(0) {
+		Alloc(obj.size());
+		for(uint n=0;n<count;n++) tab[n]=obj[n];
+	}
+	Vector(const Vector &obj) :tab(0) {
+		Alloc(obj.size());
+		for(uint n=0;n<count;n++) tab[n]=obj[n];
+	}
+	const Vector &operator=(const Vector &obj) {
+		if(&obj==this) return *this;
+		return operator=<Vector>(obj);
+	}
+	template <class Container>
+	const Vector &operator=(const Container &obj) {
+		Alloc(obj.size());
+		for(uint n=0;n<count;n++) tab[n]=obj[n];
+		return *this;
+	}
+	~Vector() { Free(); }
+
+	inline size_t size() const { return count; }
+	inline const T &operator[](uint n) const { return tab[n]; }
+	inline T &operator[](uint n) { return tab[n]; }
+
+private:
+	void Alloc(size_t newS) { Free(); count=newS; tab=count?new T[count]:0; }
+	void Free() { if(tab) delete[] tab; } 
+
+	T *tab;
+	size_t count;
+};
+
+class BIHIdx {
+public:
+	BIHIdx() { }
+	BIHIdx(uint i,const Vec3f &mi,const Vec3f &ma) :idx(i),min(mi),max(ma) {
+		Vec3f vsize=max-min;
+		size=Max(vsize.x,Max(vsize.y,vsize.z));
+	}
+
+	Vec3f min,max;
+	float size;
+	uint idx;
+};
+
 
 template <class TObject=BIHTriangle>
 class BIHTree {
@@ -49,9 +107,10 @@ public:
 	enum { maxLevel=60 };
 
 	BIHTree(const vector<Object> &obj);
+
 	uint FindSimilarParent(uint nNode,uint axis) const;
 	void PrintInfo(uint nNode=0,uint level=0) const;
-	void Build(uint nNode,int first,int last,Vec3p min,Vec3p max,uint level);
+	void Build(vector<BIHIdx> &indices,uint nNode,int first,int last,Vec3p min,Vec3p max,uint level);
 
 	template <class Output>
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const {
@@ -93,7 +152,6 @@ public:
 
 			if(tMin>tMax) { stats.Skip(); goto EXIT; }
 		}
-
 
 		goto ENTRANCE;
 
@@ -180,9 +238,7 @@ EXIT:
 		TreeStats stats;
 		stats.TracingRay();
 
-		Vec3q rDir=Vec3q(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
-		Vec3q invDir=VInv(rDir);
-
+		Vec3q invDir=VInv(Vec3q(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f));
 		floatq tinv[3]={invDir.x,invDir.y,invDir.z};
 		floatq torig[3]={rOrigin.x,rOrigin.y,rOrigin.z};
 
@@ -209,23 +265,19 @@ EXIT:
 			
 			tMin=Max(Max(ttMin.x,ttMin.y),tMin);
 			tMin=Max(ttMin.z,tMin);
-
-			if(ForAll(tMin>tMax)) { stats.Skip(); goto EXIT; }
 		}
-
 
 		goto ENTRANCE;
 
 		while(true) {
 			if(stack==stackBegin) goto EXIT;
+
 			stack--;
 			tMin=stack->tMin;
 			tMax=Min(stack->tMax,minRet);
 			node=stack->node;
 ENTRANCE:
 			stats.LoopIteration();
-			if(ForAll(tMin>tMax)) continue;
-
 			u32 axis=node->Axis();
 		
 			if(axis==3) {
@@ -290,7 +342,6 @@ EXIT:
 		return;
 	}
 
-
 	template <class Output,class Group>
 	void TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
 		Vec3p orig[4],dir[4];
@@ -331,9 +382,11 @@ EXIT:
 
 
 	template <class Output,class Group>
-	void TraverseOptimized(Group &group,const RaySelector<Group::size> &sel,const Output &out,bool primary=1) const {
-	//	TraverseMonoGroup(group,sel,out);
-	//	return;
+	void TraverseOptimized(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
+		if(Output::type!=otPrimary) {
+			TraverseMonoGroup(group,sel,out);
+			return;
+		}
 
 		RaySelector<Group::size> selectors[9];
 		group.GenSelectors(sel,selectors);
@@ -344,7 +397,7 @@ EXIT:
 
 	Vec3p pMin,pMax;
 	vector<BIHNode> nodes;
-	vector<Object> objects;
+	Vector<BIHTriangle> objects;
 };
 
 #include "bihtree.inl"

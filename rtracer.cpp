@@ -206,8 +206,8 @@ template <class Scene>
 TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	switch(quadLevels) {
 //	case 0: return GenImage<0>(scene,camera,image,options,tasks);
-//	case 1: return GenImage<1>(scene,camera,image,options,tasks);
-	case 2: return GenImage<2>(scene,camera,image,options,tasks);
+	case 1: return GenImage<1>(scene,camera,image,options,tasks);
+//	case 2: return GenImage<2>(scene,camera,image,options,tasks);
 //	case 3: return GenImage<3>(scene,camera,image,options,tasks);
 //	case 4: return GenImage<4>(scene,camera,image,options,tasks);
 	default: throw Exception("Quad level not supported.");
@@ -240,7 +240,7 @@ int main(int argc, char **argv)
 	bihScene.tree.PrintInfo();
 
 	buildTime=GetTime();
-	TScene<KDTree>				kdScene (fileName.c_str());
+	TScene<KDTree>				kdScene (/*fileName.c_str()*/"" );
 	buildTime=GetTime()-buildTime;
 	printf("KDTree build time: %.2f sec\n",buildTime);
 	kdScene.tree.PrintInfo();
@@ -249,7 +249,7 @@ int main(int argc, char **argv)
 	Camera cam=GetDefaultCamera(modelFile);;
 //	cam=Camera( Vec3f(-32.9797,-5.6003,-15.5864), Vec3f(0.8327,0.0000,0.5537), Vec3f(0.5537,0.0000,-0.8327) );	
 
-	uint quadLevels=2;
+	uint quadLevels=1;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	bool useKdTree=0;
 
@@ -265,7 +265,7 @@ int main(int argc, char **argv)
 	//	options.reflections^=1;
 
 		while(out.PollEvents()) {
-			if(out.KeyDown(Key_esc)) break;
+			if(out.Key(Key_lctrl)&&out.Key('C')) break;
 			if(out.KeyDown('K')) img.SaveToFile("out/output.tga");
 			if(out.KeyDown('P')) options.pixDoubling^=1;
 			if(out.KeyDown('O')) options.reflections^=1;
@@ -282,7 +282,7 @@ int main(int argc, char **argv)
 			if(out.Key('R')) cam.pos-=cam.up*speed;
 			if(out.Key('F')) cam.pos+=cam.up*speed;
 
-			if(out.KeyDown('Q')) {
+			if(out.KeyDown('T')) {
 				printf("mode: %s\n",useKdTree?"BIH":"KD");
 				useKdTree^=1;
 			}
@@ -292,8 +292,8 @@ int main(int argc, char **argv)
 			}
 
 		//	if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
-		//	if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
-			if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
+			if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
+		//	if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
 		//	if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 
 			if(out.KeyDown('P')) cam.Print();

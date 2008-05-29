@@ -4,7 +4,7 @@ includesGlfw = '-D_REENTRANT -I/usr/local/include' #os.popen('pkg-config --cflag
 includes = includesGlfw + ' -I /home/someone/veclib -I /home/someone/baselib '
 
 libsPaths = [ '/usr/local/lib', '/home/someone/baselib/', '/usr/X11R6/lib' ]
-libs = [ 'pthread', 'GL', 'glfw', 'baselib' ]
+libs = [ 'pthread', 'Xrandr', 'GL', 'glfw', 'baselib' ]
 
 release = Environment (
 		CXX = '/usr/local/gcc-4.3/bin/g++ -fopenmp',

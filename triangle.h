@@ -46,12 +46,16 @@ public:
 	typedef TEdgeNormals< TTriangle<TEdgeNormals> > EdgeNormals;
 
 	TTriangle(const Vec3f &ta,const Vec3f &tb,const Vec3f &tc) {
+		Vec3p b,c;
 		Convert(ta,a); Convert(tb,b); Convert(tc,c);
+		ba=b-a; ca=c-a;
 		ComputeData();
 	}
 	template <template <class> class T1>
 	TTriangle(const TTriangle<T1> &other) {
-		a=other.P1(); b=other.P2(); c=other.P3();
+		a=other.P1(); Vec3p b=other.P2(),c=other.P3();
+		ba=b-a; ca=c-a;
+
 		SetFlag1(other.GetFlag1());
 		SetFlag2(other.GetFlag2());
 		ComputeData();
@@ -60,12 +64,12 @@ public:
 	}
 
 	inline Vec3p P1() const { return a; }
-	inline Vec3p P2() const { return b; }
-	inline Vec3p P3() const { return c; }
+	inline Vec3p P2() const { return ba+a; }
+	inline Vec3p P3() const { return ca+a; }
 
-	inline Vec3p Edge1() const { return b-a; }
-	inline Vec3p Edge2() const { return c-b; }
-	inline Vec3p Edge3() const { return a-c; }
+	inline Vec3p Edge1() const { return ba; }
+	inline Vec3p Edge2() const { return ca-ba; }
+	inline Vec3p Edge3() const { return -ca; }
 
 	inline Vec3p Edge1Normal() const { return EdgeNormals::Edge1Normal(this); }
 	inline Vec3p Edge2Normal() const { return EdgeNormals::Edge2Normal(this); }
@@ -73,8 +77,8 @@ public:
 
 	inline Vec3p Nrm() const { return Vec3p(plane); }
 
-	inline Vec3p BoundMin() const { return VMin(a,VMin(b,c)); }
-	inline Vec3p BoundMax() const { return VMax(a,VMax(b,c)); }
+	inline Vec3p BoundMin() const { return VMin(P1(),VMin(P2(),P3())); }
+	inline Vec3p BoundMax() const { return VMax(P1(),VMax(P2(),P3())); }
 
 	template <class Vec>
 	inline Vec Normal(const Vec&) const { return Vec(Nrm()); }
@@ -88,25 +92,24 @@ public:
 	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *outCollisionPos=0) const NOINLINE;
 
 	void SetFlag1(uint value) { ((uint*)&a)[3]=value; }
-	void SetFlag2(uint value) { ((uint*)&b)[3]=value; }
+	void SetFlag2(uint value) { ((uint*)&ba)[3]=value; }
 	uint GetFlag1() const { return ((uint*)&a)[3]; }
-	uint GetFlag2() const { return ((uint*)&b)[3]; }
+	uint GetFlag2() const { return ((uint*)&ba)[3]; }
 
 private:
 	void ComputeData() {
-		Vec3p nrm=(b-a)^(c-a);
+		Vec3p nrm=(ba)^(ca);
 		float e1ce2Len=Length(nrm);
 		nrm/=e1ce2Len;
-		((float*)&c)[3]=e1ce2Len;
+		((float*)&ca)[3]=e1ce2Len;
 		plane=Vec4p(nrm.x,nrm.y,nrm.z,nrm|a);
 
 		EdgeNormals::ComputeEdgeNormals(this);
 	}
 
 public:
-	Vec3p a,b,c;
+	Vec3p a,ba,ca;
 	Vec4p plane;
-	Vec3p dummy;
 };
 
 template <template <class> class EN> template <class VecO,class Vec>
@@ -118,9 +121,9 @@ typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) 
 
 	real det = rDir|Nrm();
 	VecO tvec = rOrig-VecO(a);
-	real u = rDir|(VecO(b-a)^tvec);
-	real v = rDir|(tvec^VecO(c-a));
-	Bool test=Min(u,v)>=Const<real,0>()&&u+v<=det*real(((float*)&c)[3]);
+	real u = rDir|(VecO(ba)^tvec);
+	real v = rDir|(tvec^VecO(ca));
+	Bool test=Min(u,v)>=Const<real,0>()&&u+v<=det*real(((float*)&ca)[3]);
 
 	if (ForAny(test)) {
 		real dist=-(tvec|Nrm())/det;
@@ -134,11 +137,11 @@ template <template <class> class EN> template <class VecO,class Vec,class real>
 typename Vec::TScalar TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,real &u,real &v) const {
 	typedef typename Vec::TBool Bool;
 
-	real det = (rDir|Nrm())*((float*)&c)[3];
+	real det = (rDir|Nrm())*((float*)&ca)[3];
 	VecO tvec = rOrig-VecO(a);
 	real idet=Inv(det);
-	u = (rDir|(VecO(b-a)^tvec))*idet;
-	v = (rDir|(tvec^VecO(c-a)))*idet;
+	u = (rDir|(VecO(ba)^tvec))*idet;
+	v = (rDir|(tvec^VecO(ca)))*idet;
 }
 
 
@@ -163,8 +166,8 @@ int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,flo
 	float epsilon=Min(50.0f,(epsL*t+epsC)*idot);
 
 	float distA=(col-a)|Edge1Normal();
-	float distB=(col-b)|Edge2Normal();
-	float distC=(col-c)|Edge3Normal();
+	float distB=(col-(ba+a))|Edge2Normal();
+	float distC=(col-(ca+a))|Edge3Normal();
 	float min=Min(distA,Min(distB,distC));
 
 	return min<-epsilon?0:(min>epsilon?2:1);

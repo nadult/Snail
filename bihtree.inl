@@ -1,3 +1,4 @@
+void GenBIHIndices(const vector<Triangle> &tris,vector<BIHIdx> &out,float maxSize,uint maxSplits);
 
 template <class Object>
 BIHTree<Object>::BIHTree(const vector<Object> &obj) :objects(obj) {
@@ -6,13 +7,24 @@ BIHTree<Object>::BIHTree(const vector<Object> &obj) :objects(obj) {
 	pMin=objects[0].BoundMin();
 	pMax=objects[0].BoundMax();
 
+	Vec3p sumSize(0,0,0);
 	for(uint n=1;n<objects.size();n++) {
-		pMin=VMin(pMin,objects[n].BoundMin());
-		pMax=VMax(pMax,objects[n].BoundMax());
+		Vec3p min=objects[n].BoundMin(),max=objects[n].BoundMax();
+		sumSize+=max-min;
+
+		pMin=VMin(pMin,min);
+		pMax=VMax(pMax,max);
 	}
 	nodes.push_back(BIHNode(0));
 	
-	Build(0,0,objects.size()-1,pMin,pMax,0);
+	double avgSize=sumSize.x+sumSize.y+sumSize.z;
+	avgSize/=3.0*objects.size();
+
+	vector<BIHIdx> indices;
+	GenBIHIndices(obj,indices,avgSize*1.75f,16*objects.size());
+
+	Build(indices,0,0,indices.size()-1,pMin,pMax,0);
+	printf("Indices: %d Avg size: %.2f\n",indices.size(),avgSize);
 
 	for(uint n=0;n<nodes.size();n++) {
 		BIHNode &node=nodes[n];
@@ -44,12 +56,11 @@ void BIHTree<Object>::PrintInfo(uint nNode,uint level) const {
 			const BIHNode &node=nodes[n];
 		}
 
-		printf(	"Objects:%8d    Nodes:%8d\n",objects.size(),nodes.size());
-		printf("Objects mem: %6.2fMB     Nodes mem: %6.2fMB\n",
-				double(objects.size()*sizeof(Object))*0.000001,double(nodes.size()*sizeof(BIHNode))*0.000001);
-		double objSize=0;
+		printf("Objects:%8d * %2d = %6.2fMB\n",objects.size(),sizeof(Object),double(objects.size()*sizeof(Object))*0.000001);
+		printf("Nodes:  %8d * %2d = %6.2fMB\n\n",nodes.size(),sizeof(BIHNode),double(nodes.size()*sizeof(BIHNode))*0.000001);
 		return;
 
+		double objSize=0;
 		for(int n=0;n<objects.size();n++) {
 			const Object &o=objects[n];
 			Vec3p bMin=o.BoundMin(),bMax=o.BoundMax();
@@ -79,12 +90,12 @@ inline uint MaxAxis(Vec3p size) {
 }
 
 template <class Object>
-void BIHTree<Object>::Build(uint nNode,int first,int last,Vec3p min,Vec3p max,uint level) {
+void BIHTree<Object>::Build(vector<BIHIdx> &indices,uint nNode,int first,int last,Vec3p min,Vec3p max,uint level) {
 	int count=last-first+1;
 
 	if(count<=1) {
 		if(count==0) throw Exception("Error while building BIHTree: there should be no empty leafs!");
-		nodes[nNode].SetLeaf(first);
+		nodes[nNode].SetLeaf(indices[first].idx);
 		return;
 	}
 
@@ -97,8 +108,8 @@ void BIHTree<Object>::Build(uint nNode,int first,int last,Vec3p min,Vec3p max,ui
 	if(level>=maxLevel) { // Od teraz dzielimy obiekty rowno po polowie
 		double sum=0;
 		for(int n=first;n<=last;n++) {
-			float min=(&objects[n].BoundMin().x)[axis];
-			float max=(&objects[n].BoundMax().x)[axis];
+			float min=(&indices[n].min.x)[axis];
+			float max=(&indices[n].max.x)[axis];
 			sum+=Lerp(min,max,0.5f);
 		}
 		sum/=double(count);
@@ -107,12 +118,12 @@ void BIHTree<Object>::Build(uint nNode,int first,int last,Vec3p min,Vec3p max,ui
 
 	for(int n=first;n<=right;n++) {
 		float pos,min,max; {
-			min=(&objects[n].BoundMin().x)[axis];
-			max=(&objects[n].BoundMax().x)[axis];
+			min=(&indices[n].min.x)[axis];
+			max=(&indices[n].max.x)[axis];
 			pos=Lerp(min,max,0.5f);
 		}
 		if(pos>=split) {
-			Swap(objects[n--],objects[right--]);
+			Swap(indices[n--],indices[right--]);
 			rightMin=Min(rightMin,min);
 		}
 		else {
@@ -125,8 +136,8 @@ void BIHTree<Object>::Build(uint nNode,int first,int last,Vec3p min,Vec3p max,ui
 		leftMax=(&pMin.x)[axis];
 		rightMin=(&pMax.x)[axis];
 		for(int n=first;n<=last;n++) {
-			float min=(&objects[n].BoundMin().x)[axis];
-			float max=(&objects[n].BoundMax().x)[axis];
+			float min=(&indices[n].min.x)[axis];
+			float max=(&indices[n].max.x)[axis];
 			if(n<=right) rightMin=Min(rightMin,min);
 			else leftMax=Max(leftMax,max);
 		}
@@ -141,8 +152,8 @@ void BIHTree<Object>::Build(uint nNode,int first,int last,Vec3p min,Vec3p max,ui
 	if((numLeft==0||numRight==0)) {
 		uint sameAxisParent=FindSimilarParent(nodes[nNode].parent,axis);
 		if(sameAxisParent!=~0) {
-			if(numLeft==0) Build(nNode,first,last,minR,max,level+1);
-			if(numRight==0) Build(nNode,first,last,min,maxL,level+1);
+			if(numLeft==0) Build(indices,nNode,first,last,minR,max,level+1);
+			if(numRight==0) Build(indices,nNode,first,last,min,maxL,level+1);
 			return;
 		}
 	}
@@ -165,8 +176,8 @@ void BIHTree<Object>::Build(uint nNode,int first,int last,Vec3p min,Vec3p max,ui
 		nodes.push_back(BIHNode(nNode));
 	}
 
-	if(numLeft) Build(cLeft,first,right,min,maxL,level+1);
-	if(numRight) Build(cRight,right+1,last,minR,max,level+1);
+	if(numLeft) Build(indices,cLeft,first,right,min,maxL,level+1);
+	if(numRight) Build(indices,cRight,right+1,last,minR,max,level+1);
 }
 
 

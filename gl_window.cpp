@@ -175,7 +175,7 @@ namespace
 		for(;;) {
 			glfwPollEvents();
 			// Aplikacja jest zminimalizowana -> uspij na 50msec
-			if(glfwGetWindowParam(GLFW_ICONIFIED)) { glfwSleep(0.05); continue; }
+			if(glfwGetWindowParam(GLFW_ICONIFIED)) { Sleep(0.05); continue; }
 			break;
 		}
 		int width,height; glfwGetWindowSize(&width,&height);

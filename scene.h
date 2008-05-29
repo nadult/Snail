@@ -7,9 +7,10 @@
 #include "context.h"
 
 
-template <class Object,class integer,class Vec>
-Vec ExtractNormals(const vector<Object> &objects,const integer &objId,const Vec &position)  {
+template <class Container,class integer,class Vec>
+Vec ExtractNormals(const Container &objects,const integer &objId,const Vec &position)  {
 	typedef typename Vec::TScalar real;
+	typedef typename Container::value_type Object;
 
 	const Object *obj0=&objects[objId[0]];
 	Vec nrm=obj0->Normal(position);

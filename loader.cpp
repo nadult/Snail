@@ -6,6 +6,29 @@
 using std::cout;
 using std::endl;
 
+enum { maxTris=1000000 };
+
+namespace {
+
+	void SplitTriangle(const Vec3f &a,const Vec3f &b,const Vec3f &c,vector<Triangle> &out);
+
+	void NewTri(const Vec3f &a,const Vec3f &b,const Vec3f &c,vector<Triangle> &out) {
+	//	const float maxLen=30.0f;
+
+	//	if(Length(b-a)>maxLen||Length(c-b)>maxLen||Length(a-c)>maxLen)
+	//		SplitTriangle(a,b,c,out);
+	//	else
+			if(out.size()<maxTris) out.push_back(Triangle(a,b,c));
+	}
+
+	void SplitTriangle(const Vec3f &a,const Vec3f &b,const Vec3f &c,vector<Triangle> &out) {
+		Vec3f ab=(a+b)*0.5f,bc=(b+c)*0.5f,ac=(a+c)*0.5f;
+		NewTri(a,ab,ac,out);
+		NewTri(b,bc,ab,out);
+		NewTri(c,ac,bc,out);
+		NewTri(ac,ab,bc,out);
+	}
+}
 
 void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale) {
 	std::filebuf fb;
@@ -18,7 +41,6 @@ void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale) {
 
 	float sx=scale,sy=scale,sz=scale;
 
-	int count=0;
 	for(;;) {
 		char line[1000],type[100],a[100],b[100],c[100],d[100],e[100],f[100];
 		if(!is.getline(line,1000))
@@ -35,15 +57,15 @@ void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale) {
 			verts.push_back(vert);
 		}
 		else if(strcmp(type,"f")==0) {
-			if(count++>750000) break;
 			int v[3];
 
 			char *buf;
 			buf=strchr(line,' ')+1; v[0]=atoi(buf)-1; 
 			buf=strchr(buf ,' ')+1; v[1]=atoi(buf)-1;
 			buf=strchr(buf ,' ')+1; v[2]=atoi(buf)-1;
-			if(flipSides) out.push_back(Triangle(verts[v[2]],verts[v[1]],verts[v[0]]));
-			else out.push_back(Triangle(verts[v[0]],verts[v[1]],verts[v[2]]));
+
+			if(flipSides) NewTri(verts[v[2]],verts[v[1]],verts[v[0]],out);
+			else NewTri(verts[v[0]],verts[v[1]],verts[v[2]],out);
 			
 			/*char *buf=strchr(line,' ')+1;
 			while(buf=strchr(buf,' ')) {
@@ -60,15 +82,15 @@ void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale) {
 			sy=sy*atof(b);
 			sz=sz*atof(c);
 		}
-		else if(strcmp(type,"blocker")==0) {
+		/*else if(strcmp(type,"blocker")==0) {
 			Vec3f min,max;
 			sscanf(line,"%s %s %s %s %s %s %s",type,a,b,c,d,e,f);
 			min.x=atof(a); min.y=atof(b); min.z=atof(c);
 			max.x=atof(d); max.y=atof(e); max.z=atof(f);
 			Triangle blocker(min,max,Lerp(min,max,0.5f));
 			blocker.SetFlag1(1337);
-			out.push_back(blocker);
-		}
+			out.push_back(blocker); 
+		}*/
 
 	}
 	fb.close();
