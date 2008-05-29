@@ -112,12 +112,15 @@ public:
 	void PrintInfo(uint nNode=0,uint level=0) const;
 	void Build(vector<BIHIdx> &indices,uint nNode,int first,int last,Vec3p min,Vec3p max,uint level);
 
+	void FillDSignArray(int dirMask,int *dSign) const {
+		dSign[0]=dirMask&1?1:0;
+		dSign[1]=dirMask&2?1:0;
+		dSign[2]=dirMask&4?1:0;
+	}
+
 	template <class Output>
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const {
 		float maxD=output.dist[0];
-
-		if(Output::objectIndexes)
-			output.object[0]=0;
 
 		TreeStats stats;
 		stats.TracingRay();
@@ -229,11 +232,8 @@ EXIT:
 	}
 
 	template <class Output>
-	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output) const {
+	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask) const {
 		floatq maxD=output.dist[0];
-
-		if(Output::objectIndexes)
-			output.object[0]=i32x4(0);
 
 		TreeStats stats;
 		stats.TracingRay();
@@ -242,7 +242,7 @@ EXIT:
 		floatq tinv[3]={invDir.x,invDir.y,invDir.z};
 		floatq torig[3]={rOrigin.x,rOrigin.y,rOrigin.z};
 
-		int dSign[3]={invDir.x[0]<0.0f?1:0,invDir.y[0]<0.0f?1:0,invDir.z[0]<0.0f?1:0};
+		int dSign[3]; FillDSignArray(dirMask,dSign);
 		floatq minRet=maxD,tMin=ConstEpsilon<floatq>(),tMax=maxD;
 
 		struct Locals4 {
@@ -342,6 +342,13 @@ EXIT:
 		return;
 	}
 
+	void TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *stats,int dirMask) const {
+		TraverseQuad(rOrigin[0],tDir[0],::Output<otNormal,f32x4,i32x4>(out+0,object+0,stats),dirMask);
+		TraverseQuad(rOrigin[1],tDir[1],::Output<otNormal,f32x4,i32x4>(out+1,object+1,stats),dirMask);
+		TraverseQuad(rOrigin[2],tDir[2],::Output<otNormal,f32x4,i32x4>(out+2,object+2,stats),dirMask);
+		TraverseQuad(rOrigin[3],tDir[3],::Output<otNormal,f32x4,i32x4>(out+3,object+3,stats),dirMask);
+	}
+
 	template <class Output,class Group>
 	void TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
 		Vec3p orig[4],dir[4];
@@ -370,13 +377,31 @@ EXIT:
 	}
 
 	template <class Output,class Group>
-	void TraverseQuadGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
+	void TraverseQuadGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out,int dirMask) const {
 		i32x4 tmp;
-		for(int i=0;i<sel.Num();i++) {
+		int i;
+		for(i=0;i+3<sel.Num();i+=4) {
+			int q[4]={sel[i],sel[i+1],sel[i+2],sel[i+3]};
+			Vec3q tOrig[4],tDir[4];
+			floatq dist[4]; i32x4 obj[4];
+
+			dist[0]=out.dist[q[0]]; dist[1]=out.dist[q[1]]; dist[2]=out.dist[q[2]]; dist[3]=out.dist[q[3]];
+			obj[0]=out.object[q[0]]; obj[1]=out.object[q[1]]; obj[2]=out.object[q[2]]; obj[3]=out.object[q[3]];
+			tOrig[0]=group.Origin(q[0]); tOrig[1]=group.Origin(q[1]);
+			tOrig[2]=group.Origin(q[2]); tOrig[3]=group.Origin(q[3]);
+			tDir[0]=group.Dir(q[0]); tDir[1]=group.Dir(q[1]);
+			tDir[2]=group.Dir(q[2]); tDir[3]=group.Dir(q[3]);
+
+			TraverseQuad4(tOrig,tDir,dist,obj,out.stats,dirMask);
+
+			out.dist[q[0]]=dist[0]; out.dist[q[1]]=dist[1]; out.dist[q[2]]=dist[2]; out.dist[q[3]]=dist[3];
+			out.object[q[0]]=obj[0]; out.object[q[1]]=obj[1]; out.object[q[2]]=obj[2]; out.object[q[3]]=obj[3];
+		}
+		for(;i<sel.Num();i++) {
 			int q=sel[i];
 			//int bmask=sel.BitMask(q);
 
-			TraverseQuad(group.Origin(q),group.Dir(q),::Output<otNormal,f32x4,i32x4>(out.dist+q,out.object+q,out.stats));
+			TraverseQuad(group.Origin(q),group.Dir(q),::Output<otNormal,f32x4,i32x4>(out.dist+q,out.object+q,out.stats),dirMask);
 		}
 	}
 
@@ -391,7 +416,8 @@ EXIT:
 		RaySelector<Group::size> selectors[9];
 		group.GenSelectors(sel,selectors);
 
-		for(int s=0;s<8;s++) TraverseQuadGroup(group,selectors[s],out);
+		for(int s=0;s<8;s++)
+			TraverseQuadGroup(group,selectors[s],out,s);
 		TraverseMonoGroup(group,selectors[8],out);
 	}
 

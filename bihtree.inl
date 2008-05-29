@@ -52,10 +52,6 @@ uint BIHTree<Object>::FindSimilarParent(uint nNode,uint axis) const {
 template <class Object>
 void BIHTree<Object>::PrintInfo(uint nNode,uint level) const {
 	if(nNode==0) {
-		for(uint n=0;n<nodes.size();n++) {
-			const BIHNode &node=nodes[n];
-		}
-
 		printf("Objects:%8d * %2d = %6.2fMB\n",objects.size(),sizeof(Object),double(objects.size()*sizeof(Object))*0.000001);
 		printf("Nodes:  %8d * %2d = %6.2fMB\n\n",nodes.size(),sizeof(BIHNode),double(nodes.size()*sizeof(BIHNode))*0.000001);
 		return;

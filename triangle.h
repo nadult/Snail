@@ -117,13 +117,13 @@ typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) 
 	typedef typename Vec::TScalar real;
 	typedef typename Vec::TBool Bool;
 
-	real out=Const<real,-1>();
+	real out=-1.0f;
 
 	real det = rDir|Nrm();
 	VecO tvec = rOrig-VecO(a);
 	real u = rDir|(VecO(ba)^tvec);
 	real v = rDir|(tvec^VecO(ca));
-	Bool test=Min(u,v)>=Const<real,0>()&&u+v<=det*real(((float*)&ca)[3]);
+	Bool test=Min(u,v)>=0.0f&&u+v<=det*real(((float*)&ca)[3]);
 
 	if (ForAny(test)) {
 		real dist=-(tvec|Nrm())/det;
