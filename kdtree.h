@@ -1,5 +1,5 @@
-#ifndef KDTREE_H
-#define KDTREE_H
+#ifndef RTRACER_KDTREE_H
+#define RTRACER_KDTREE_H
 
 #include "object.h"
 #include "ray_group.h"
@@ -61,7 +61,7 @@ private:
 	u32 val;
 };
 
-template <class Group,class Selector> class TraverseContext;
+template <class Rays,class Selector> class TraverseContext;
 
 class KDTree
 {
@@ -73,39 +73,41 @@ public:
 	// Flag1:  1337: object is a blocker (there will be no split going through it) 0: normal
 	// Flag2: object is full in node
 
-	KDTree(const vector<Object>&);
+	KDTree(const vector<Object>&) NOINLINE;
 	KDTree(const SlowKDTree&);
 	~KDTree();
 
 	void Build(const SlowKDTree&);
 	void PrintInfo() const;
 
-	template <class Output,class Vec,class base>
-	void FullTraverse(const Vec &rOrigin,const Vec &rDir,const Output&) const;
+	template <class Output,class Vec>
+	void FullTraverse(const Vec &rOrigin,const Vec &rDir,const Output&) const NOINLINE;
 
 	template <class Output>
-	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,const Output &out) const NOINLINE;
-	template <class Output,class Group,class Selector,class OtherContext>
-	void TraverseFast(Group &group,const Selector&,const Output &out,OtherContext *tContext) const NOINLINE;
+	void Traverse(const Vec3p &origin,const Vec3p &dir,const Output&) const NOINLINE;
 
-	template <class Output,class Group,class Selector>
-	void TraverseSplitted(Group &group,const Selector&,const Output &out,
-							TraverseContext<Group,Selector> *tContext=0) const NOINLINE;
+	template <class Output,class Rays,class Selector,class OtherContext>
+	void TraverseFast(Rays&,const Selector&,const Output&,OtherContext*) const NOINLINE;
 
-	template <class Output,class Group,class Selector>
-	void TraverseOptimized(Group &group,const Selector&,const Output &out) const NOINLINE;
-	template <class Output,class Group,class Selector>
-	void TraverseMonoGroup(Group &group,const Selector&,const Output &out) const NOINLINE;
+	template <class Output,class Rays,class Selector,class TContext>
+	void TraverseSplitted(Rays&,const Selector&,const Output&,TContext*) const NOINLINE;
 
-	bool TestNode(Vec3f min,Vec3f max,int node) const;
+	template <class Output,class Rays,class Selector>
+	void TraverseOptimized(Rays&,const Selector&,const Output&) const NOINLINE;
+
+	template <class Output,class Rays,class Selector>
+	void TraverseMono(Rays&,const Selector&,const Output&) const NOINLINE;
+
 	bool Test() const;
 
 	Vec3p pMin,pMax;
 	vector<Object> objects;
 	bool splittingFlag;
 
-//private:
 	vector<KDNode> nodes;
+private:
+	bool TestNode(Vec3f min,Vec3f max,int node) const;
+
 	vector<u32> objectIds;
 };
 

@@ -1,15 +1,19 @@
-#include "rtracer.h"
-#include <SDL/SDL_keysym.h>
-#include "ray_generator.h"
+#include <map>
 #include <iostream>
-#include "bihtree.h"
+#include <memory.h>
+
+#include "ray_generator.h"
 #include "task_switcher.h"
 #include "scene.h"
-#include <map>
+#include "camera.h"
+
+#include "bihtree.h"
+#include "kdtree.h"
+
+#include "gl_window.h"
 
 using std::cout;
 using std::endl;
-typedef TScene< KDTree > Scene;
 
 struct Options {
 	Options(bool pixD,bool gd,bool refl,bool rdtsc) :pixDoubling(pixD),grid(gd),reflections(refl),rdtscShader(rdtsc) { }
@@ -20,7 +24,7 @@ struct Options {
 };
 
 
-template <int QuadLevels>
+template <class Scene,int QuadLevels>
 struct GenImageTask {
 	GenImageTask(const Scene *scn,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,uint tw,uint th,TreeStats *outSt)
 		:scene(scn),camera(cam),out(tOut),options(opt),startX(tx),startY(ty),width(tw),height(th),outStats(outSt) {
@@ -103,7 +107,7 @@ struct GenImageTask {
 };
 
 
-template <int QuadLevels>
+template <int QuadLevels,class Scene>
 TreeStats GenImage(const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	enum { taskSize=64 };
 
@@ -111,10 +115,10 @@ TreeStats GenImage(const Scene &scene,const Camera &camera,Image &image,const Op
 
 	vector<TreeStats> taskStats(numTasks);
 
-	TaskSwitcher<GenImageTask<QuadLevels> > switcher(numTasks);
+	TaskSwitcher<GenImageTask<Scene,QuadLevels> > switcher(numTasks);
 	uint num=0;
 	for(uint y=0;y<image.height;y+=taskSize) for(uint x=0;x<image.width;x+=taskSize) {
-		switcher.AddTask(GenImageTask<QuadLevels> (&scene,camera,&image,options,x,y,
+		switcher.AddTask(GenImageTask<Scene,QuadLevels> (&scene,camera,&image,options,x,y,
 					Min(taskSize,image.width-x),Min(taskSize,image.height-y),
 					&taskStats[num]) );
 		num++;
@@ -198,12 +202,13 @@ Camera GetDefaultCamera(string model) {
 	return iter==cams.end()?Camera():iter->second;
 }
 
+template <class Scene>
 TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	switch(quadLevels) {
-	case 0: return GenImage<0>(scene,camera,image,options,tasks);
-	case 1: return GenImage<1>(scene,camera,image,options,tasks);
+//	case 0: return GenImage<0>(scene,camera,image,options,tasks);
+//	case 1: return GenImage<1>(scene,camera,image,options,tasks);
 	case 2: return GenImage<2>(scene,camera,image,options,tasks);
-	case 3: return GenImage<3>(scene,camera,image,options,tasks);
+//	case 3: return GenImage<3>(scene,camera,image,options,tasks);
 //	case 4: return GenImage<4>(scene,camera,image,options,tasks);
 	default: throw Exception("Quad level not supported.");
 	}
@@ -225,61 +230,80 @@ int main(int argc, char **argv)
 
 	printf("Threads/cores: %d/%d\n",threads,GetCoresNum());
 
-	double buildTime=GetTime();
-	Scene scene((string("scenes/")+modelFile).c_str());
-	buildTime=GetTime()-buildTime;
-	printf("Build time: %.2f sec\n",buildTime);
+	double buildTime;
+	const string fileName=string("scenes/")+modelFile;
 
-	scene.tree.PrintInfo();
+	buildTime=GetTime();
+	TScene<BIHTree<Triangle> >	bihScene (fileName.c_str());
+	buildTime=GetTime()-buildTime;
+	printf("BIHTree build time: %.2f sec\n",buildTime);
+	bihScene.tree.PrintInfo();
+
+	buildTime=GetTime();
+	TScene<KDTree>				kdScene (fileName.c_str());
+	buildTime=GetTime()-buildTime;
+	printf("KDTree build time: %.2f sec\n",buildTime);
+	kdScene.tree.PrintInfo();
 
 	Image img(resx,resy);
 	Camera cam=GetDefaultCamera(modelFile);;
-//	cam=Camera( Vec3f(-32.9797,-5.6003,-15.5864), Vec3f(0.8327,0.0000,0.5537), Vec3f(0.5537,0.0000,-0.8327) );
-	
+//	cam=Camera( Vec3f(-32.9797,-5.6003,-15.5864), Vec3f(0.8327,0.0000,0.5537), Vec3f(0.5537,0.0000,-0.8327) );	
 
 	uint quadLevels=2;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
+	bool useKdTree=0;
 
 	if(nonInteractive) {
-		for(int n=atoi(argv[3])-1;n>=0;n--) GenImage(quadLevels,scene,cam,img,Options(),threads);
+		for(int n=atoi(argv[3])-1;n>=0;n--)
+			if(useKdTree) GenImage(quadLevels,kdScene,cam,img,Options(),threads);
+			else GenImage(quadLevels,bihScene,cam,img,Options(),threads);
 		img.SaveToFile("out/output.tga");
 	}
 	else {
-		SDLOutput out(resx,resy,fullscreen);
+		GLWindow out(resx,resy,fullscreen);
 		Options options;
 	//	options.reflections^=1;
 
 		while(out.PollEvents()) {
-			if(out.TestKey(SDLK_ESCAPE)) break;
-			if(out.TestKey(SDLK_k)) img.SaveToFile("out/output.tga");
-			if(out.TestKey(SDLK_p)) options.pixDoubling^=1;
-			if(out.TestKey(SDLK_o)) options.reflections^=1;
-			if(out.TestKey(SDLK_i)) options.rdtscShader^=1;
-			if(out.TestKey(SDLK_g)) options.grid^=1;
+			if(out.KeyDown(Key_esc)) break;
+			if(out.KeyDown('K')) img.SaveToFile("out/output.tga");
+			if(out.KeyDown('P')) options.pixDoubling^=1;
+			if(out.KeyDown('O')) options.reflections^=1;
+			if(out.KeyDown('I')) options.rdtscShader^=1;
+			if(out.KeyDown('G')) options.grid^=1;
 
-			if(out.TestKey(SDLK_w)) cam.pos+=cam.front*speed;
-			if(out.TestKey(SDLK_s)) cam.pos-=cam.front*speed;
+			if(out.Key('W')) cam.pos+=cam.front*speed;
+			if(out.Key('S')) cam.pos-=cam.front*speed;
 
-			if(out.TestKey(SDLK_a)) cam.pos-=cam.right*speed;
-			if(out.TestKey(SDLK_d)) cam.pos+=cam.right*speed;
+			if(out.Key('A')) cam.pos-=cam.right*speed;
+			if(out.Key('D')) cam.pos+=cam.right*speed;
 
-			if(out.TestKey(SDLK_r)) cam.pos-=cam.up*speed;
-			if(out.TestKey(SDLK_f)) cam.pos+=cam.up*speed;
-			if(out.TestKey(SDLK_y)) { printf("splitting %s\n",scene.tree.splittingFlag?"off":"on"); scene.tree.splittingFlag^=1; }
 
-			if(out.TestKey(SDLK_0)) { printf("tracing 2x2\n"); quadLevels=0; }
-			if(out.TestKey(SDLK_1)) { printf("tracing 4x4\n"); quadLevels=1; }
-			if(out.TestKey(SDLK_2)) { printf("tracing 16x4\n"); quadLevels=2; }
-			if(out.TestKey(SDLK_3)) { printf("tracing 64x4\n"); quadLevels=3; }
+			if(out.Key('R')) cam.pos-=cam.up*speed;
+			if(out.Key('F')) cam.pos+=cam.up*speed;
 
-			if(out.TestKey(SDLK_p)) cam.Print();
+			if(out.KeyDown('Q')) {
+				printf("mode: %s\n",useKdTree?"BIH":"KD");
+				useKdTree^=1;
+			}
+			if(out.KeyDown('Y')) {
+				printf("splitting %s\n",kdScene.tree.splittingFlag?"off":"on");
+				kdScene.tree.splittingFlag^=1;
+			}
+
+		//	if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
+		//	if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
+			if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
+		//	if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
+
+			if(out.KeyDown('P')) cam.Print();
 
 			{
-				int dx=out.TestKey(SDLK_SPACE)?out.MouseDX():0,dy=0;
-				if(out.TestKey(SDLK_n)) dx-=20;
-				if(out.TestKey(SDLK_m)) dx+=20;
-				if(out.TestKey(SDLK_v)) dy-=20;
-				if(out.TestKey(SDLK_b)) dy+=20;
+				int dx=out.KeyDown(Key_space)?out.MouseMove().x:0,dy=0;
+				if(out.Key('N')) dx-=20;
+				if(out.Key('M')) dx+=20;
+				if(out.Key('V')) dy-=20;
+				if(out.Key('B')) dy+=20;
 				if(dx) {
 					Matrix<Vec4f> rotMat=RotateY(dx*0.003f);
 					cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
@@ -292,16 +316,19 @@ int main(int argc, char **argv)
 			
 			TreeStats stats;
 			double time=GetTime();
-			stats=GenImage(quadLevels,scene,cam,img,options,threads);
+			stats=useKdTree?	GenImage(quadLevels,kdScene,cam,img,options,threads):
+								GenImage(quadLevels,bihScene,cam,img,options,threads);
+
+			stats.tracedRays=resx*resy;
 			time=GetTime()-time; minTime=Min(minTime,time);
 			maxTime=Max(time,maxTime);
 
 			int lastTicks=0;
 			stats.PrintInfo(resx,resy,time*1000.0);
 
-			Vec3f a,b; Convert(scene.tree.pMin,a); Convert(scene.tree.pMax,b);
 //			scene.Animate();
-			out.Render(img);
+			out.RenderImage(img);
+			out.SwapBuffers();
 		}
 	}
 

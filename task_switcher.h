@@ -1,5 +1,5 @@
-#ifndef NEWBORN_TASK_SWITCHER_H
-#define NEWBORN_TASK_SWITCHER_H
+#ifndef RTRACER_TASK_SWITCHER_H
+#define RTRACER_TASK_SWITCHER_H
 
 #include <baselib.h>
 

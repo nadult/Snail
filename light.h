@@ -1,5 +1,5 @@
-#ifndef LIGHT_H
-#define LIGHT_H
+#ifndef RTRACER_LIGHT_H
+#define RTRACER_LIGHT_H
 
 #include "rtbase.h"
 

@@ -1,5 +1,5 @@
-#ifndef OBJECT_H
-#define OBJECT_H
+#ifndef RTRACER_OBJECT_H
+#define RTRACER_OBJECT_H
 
 #include "rtbase.h"
 #include "sphere.h"

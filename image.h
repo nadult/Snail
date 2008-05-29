@@ -1,5 +1,5 @@
-#ifndef IMAGE_H
-#define IMAGE_H
+#ifndef RTRACER_IMAGE_H
+#define RTRACER_IMAGE_H
 
 #include "rtbase.h"
 

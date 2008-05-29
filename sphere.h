@@ -1,5 +1,5 @@
-#ifndef SPHERE_H
-#define SPHERE_H
+#ifndef RTRACER_SPHERE_H
+#define RTRACER_SPHERE_H
 
 #include "rtbase.h"
 

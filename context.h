@@ -3,6 +3,7 @@
 
 #include "rtbase.h"
 #include "ray_group.h"
+#include "tree_stats.h"
 
 
 struct TracingOptions {
@@ -56,10 +57,17 @@ public:
 };
 
 enum OutputType {
-	otNormal,
-	otPrimary,
-	otShadow,
+	otNormal	=0,
+	otPrimary	=1,
+	otShadow	=2,
 };
+
+// Only to eliminate some idiotic warnings
+inline bool operator==(const OutputType &a,int b) { return int(a)==b; }
+inline bool operator==(int a,const OutputType &b) { return a==int(b); }
+
+inline bool operator!=(const OutputType &a,int b) { return int(a)!=b; }
+inline bool operator!=(int a,const OutputType &b) { return a!=int(b); }
 
 //
 // Output classes hold pointers, so you can
@@ -75,7 +83,7 @@ struct Output
 
 	template <class Scene,class Group,class Selector>
 	Output(TracingContext<Scene,Group,Selector> &c) :dist(c.distance),object(c.objId),stats(&c.stats),density(&c.density) { }
-	Output(const Output &all,int n) :dist(all.dist+n),object(all.object+n*4),stats(all.stats),density(0) { }
+	Output(const Output &all,int n) :dist(all.dist+n),object(all.object+n),stats(all.stats),density(0) { }
 
 	float *density;
 	real *dist;

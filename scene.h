@@ -2,13 +2,9 @@
 #define RTRACER_SCENE_H
 
 #include "rtbase.h"
+#include "light.h"
 #include "shading.h"
 #include "context.h"
-#include <boost/type_traits/function_traits.hpp>
-#include <boost/bind.hpp>
-
-using boost::bind;
-using boost::function_traits;
 
 
 template <class Object,class integer,class Vec>

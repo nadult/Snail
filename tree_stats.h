@@ -1,16 +1,14 @@
 #ifndef RTRACER_TREE_STATS_H
 #define RTRACER_TREE_STATS_H
 
-#include <memory.h>
+#include "rtbase.h"
 
 class TreeStats
 {
 public:
 	enum { enabled=1 };
 
-	inline TreeStats() {
-		Init();
-	}
+	inline TreeStats() { Init(); }
 	inline void Update(const TreeStats &local) {
 		if(enabled) {
 			intersects+=local.intersects;
@@ -29,7 +27,7 @@ public:
 	}
 
 	inline void Init() {
-		if(enabled) memset(this,0,sizeof(TreeStats));
+		if(enabled) for(int n=0;n<sizeof(TreeStats)/sizeof(u32);n++) ((u32*)this)[n]=0;
 	}
 	double Coherent() const			{ return enabled?coherent/double(coherent+nonCoherent):0; }
 	double TBreaking() const		{ return enabled?breaking/double(breaking+notBreaking):0; }
@@ -40,20 +38,7 @@ public:
 	uint LoopIters() const { return enabled?iters:0; }
 	uint Skips() const { return enabled?skips:0; }
 
-	void PrintInfo(int resx,int resy,double msRenderTime) {
-			double raysPerSec=double(tracedRays)*(1000.0/msRenderTime);
-			double nPixels=double(resx*resy);
-
-			if(!enabled) {
-				printf("MSec/frame:%6.2f  MPixels/sec:%6.2f\n",msRenderTime,(resx*resy*(1000.0/msRenderTime))*0.000001);
-				return;
-			}
-			printf("isct,iter:%5.2f %5.2f  MSec/frame:%6.2f  MRays/sec:%5.2f  "
-					"Coherency:%.2f%% br:%.2f%% fa:%.2f%% %.0f\n",
-					double(intersects)/nPixels,double(iters)/nPixels,
-					msRenderTime,raysPerSec*0.000001,Coherent()*100.0f,
-					TBreaking()*100.0f,TIntersectFail()*100.0f,double(skips));
-	}
+	void PrintInfo(int resx,int resy,double msRenderTime);
 
 	inline void Breaking(uint val=1) { if(enabled) breaking+=val; }
 	inline void NotBreaking(uint val=1) { if(enabled) notBreaking+=val; }
@@ -69,7 +54,7 @@ public:
 	inline void TracingPacket(uint val=1) { if(enabled) { tracedRays+=val; coherent+=val; } }
 
 
-private:
+//private:
 	u32 intersects,iters,tracedRays;
 	u32 coherent,nonCoherent;
 

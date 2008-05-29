@@ -1,10 +1,10 @@
 import os
 
-includesSDL = '-I/usr/include/SDL -D_GNU_SOURCE=1 -D_REENTRANT' #os.popen('sdl-config --cflags').read() 
-includes = includesSDL + ' -I /home/someone/veclib -I /home/someone/baselib '
+includesGlfw = '-D_REENTRANT -I/usr/local/include' #os.popen('pkg-config --cflags libglfw').read() 
+includes = includesGlfw + ' -I /home/someone/veclib -I /home/someone/baselib '
 
 libsPaths = [ '/usr/local/lib', '/home/someone/baselib/', '/usr/X11R6/lib' ]
-libs = [ 'pthread', 'SDL', 'baselib' ]
+libs = [ 'pthread', 'GL', 'glfw', 'baselib' ]
 
 release = Environment (
 		CXX = '/usr/local/gcc-4.3/bin/g++ -fopenmp',

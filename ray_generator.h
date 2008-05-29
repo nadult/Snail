@@ -1,4 +1,7 @@
-#include "rtracer.h"
+#ifndef RTRACER_RAY_GENERATOR_H
+#define RTRACER_RAY_GENERATOR_H
+
+#include "rtbase.h"
 
 /*!
 	Generates primary ray packets
@@ -47,3 +50,6 @@ private:
 	float invW,invH,planeDist;
 	int tLevel;
 };
+
+#endif
+

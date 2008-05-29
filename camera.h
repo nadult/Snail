@@ -1,5 +1,5 @@
-#ifndef CAMERA_H
-#define CAMERA_H
+#ifndef RTRACER_CAMERA_H
+#define RTRACER_CAMERA_H
 
 #include "rtbase.h"
 

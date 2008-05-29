@@ -1,5 +1,5 @@
-#ifndef TRIANGLE_H
-#define TRIANGLE_H
+#ifndef RTRACER_TRIANGLE_H
+#define RTRACER_TRIANGLE_H
 
 #include "rtbase.h"
 
@@ -73,8 +73,6 @@ public:
 
 	inline Vec3p Nrm() const { return Vec3p(plane); }
 
-	inline float InvSize() const { return ((float*)&c)[3]; }
-
 	inline Vec3p BoundMin() const { return VMin(a,VMin(b,c)); }
 	inline Vec3p BoundMax() const { return VMax(a,VMax(b,c)); }
 
@@ -82,12 +80,12 @@ public:
 	inline Vec Normal(const Vec&) const { return Vec(Nrm()); }
 
 	template <class VecO,class Vec>
-	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const;
+	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
 
 	template <class Vec0,class Vec,class real>
 	typename Vec::TScalar Barycentric(const Vec0 &rOrig,const Vec &rDir,real &u,real &v) const;
 
-	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *outCollisionPos=0) const;
+	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *outCollisionPos=0) const NOINLINE;
 
 	void SetFlag1(uint value) { ((uint*)&a)[3]=value; }
 	void SetFlag2(uint value) { ((uint*)&b)[3]=value; }
@@ -97,25 +95,18 @@ public:
 private:
 	void ComputeData() {
 		Vec3p nrm=(b-a)^(c-a);
-		nrm*=RSqrt(nrm|nrm);
+		float e1ce2Len=Length(nrm);
+		nrm/=e1ce2Len;
+		((float*)&c)[3]=e1ce2Len;
 		plane=Vec4p(nrm.x,nrm.y,nrm.z,nrm|a);
-		e1ce2=(b-a)^(c-a);
 
-		{ // invSize
-			float e1=Length(b-a);
-			float e2=Length(c-a);
-			float ang=acos(((b-a)|(c-a))/(e1*e2));
-			float size=sin(ang)*e1*e2*0.5f;
-		//	float sizeSq=Min(e1,Min(e2,e3)); // surface area
-			((float*)&c)[3]=Inv(size);	
-		}
 		EdgeNormals::ComputeEdgeNormals(this);
 	}
 
 public:
 	Vec3p a,b,c;
 	Vec4p plane;
-	Vec3p e1ce2;
+	Vec3p dummy;
 };
 
 template <template <class> class EN> template <class VecO,class Vec>
@@ -125,14 +116,14 @@ typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) 
 
 	real out=Const<real,-1>();
 
-	real det = rDir|e1ce2;
+	real det = rDir|Nrm();
 	VecO tvec = rOrig-VecO(a);
 	real u = rDir|(VecO(b-a)^tvec);
 	real v = rDir|(tvec^VecO(c-a));
-	Bool test=Min(u,v)>=Const<real,0>()&&u+v<=det;
+	Bool test=Min(u,v)>=Const<real,0>()&&u+v<=det*real(((float*)&c)[3]);
 
 	if (ForAny(test)) {
-		real dist=-(tvec|Nrm())/(rDir|Nrm());
+		real dist=-(tvec|Nrm())/det;
 		out=Condition(test,dist,out);
 	}
 
@@ -143,7 +134,7 @@ template <template <class> class EN> template <class VecO,class Vec,class real>
 typename Vec::TScalar TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,real &u,real &v) const {
 	typedef typename Vec::TBool Bool;
 
-	real det = rDir|e1ce2;
+	real det = (rDir|Nrm())*((float*)&c)[3];
 	VecO tvec = rOrig-VecO(a);
 	real idet=Inv(det);
 	u = (rDir|(VecO(b-a)^tvec))*idet;
@@ -153,10 +144,13 @@ typename Vec::TScalar TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rD
 
 template <template <class> class EN>
 int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *colPos) const {
-	float dot=Abs(dir|Nrm());
+	float dot=dir|Nrm();
 
-	if(ForAny(Abs(dot)<=Const<float,1,100000>()))
-		return 1;
+//	if(ForAny(dot<=Const<float,1,100000>()))
+//		return 1;
+
+//	epsL=0.0f;
+	epsC=0.0f;
 
 	float idot=Inv(dot);
 
@@ -164,15 +158,14 @@ int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,flo
 	Vec3p col=orig+dir*t;
 	if(colPos) *colPos=col;
 
-	if(ForAny(t<-epsC*idot)) return 0;
+	if(t<-epsC*idot) return 0;
 
-	float epsilon=(epsL*t+epsC)*idot;
+	float epsilon=Min(50.0f,(epsL*t+epsC)*idot);
 
-	float dist[3]={
-		(col-a)|Edge1Normal(),
-		(col-b)|Edge2Normal(),
-		(col-c)|Edge3Normal() };
-	float min=Min(dist[0],Min(dist[1],dist[2]));
+	float distA=(col-a)|Edge1Normal();
+	float distB=(col-b)|Edge2Normal();
+	float distC=(col-c)|Edge3Normal();
+	float min=Min(distA,Min(distB,distC));
 
 	return min<-epsilon?0:(min>epsilon?2:1);
 }

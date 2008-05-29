@@ -1,4 +1,4 @@
-#include "rtracer.h"
+#include "image.h"
 
 
 Image::Image()

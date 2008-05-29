@@ -1,5 +1,5 @@
-#ifndef LOADER_H
-#define LOADER_H
+#ifndef RTRACER_LOADER_H
+#define RTRACER_LOADER_H
 
 #include "rtbase.h"
 #include "object.h"

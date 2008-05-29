@@ -66,8 +66,6 @@ SlowKDTree::SlowKDTree(const vector<Object> &objs)
 						space[x][y][z]=1;
 		}
 
-
-
 		for(int y=0;y<res;y++) {
 			for(int z=0;z<res;z++) {
 				for(int x=0;x<res;x++) {
