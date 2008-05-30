@@ -450,53 +450,74 @@ ENTRANCE:
 				uint objectId=node->Object();
  
 				if(mailbox.Find(objectId)) continue;
+				mailbox.Insert(objectId);
 
 				const Object &obj=objects[objectId];
-				floatq ret[4]; f32x4b mask[4];
-				bool all=1;
+				stats.Intersection(4);
 
-				if(ForAny(tMin[0]<=tMax[0])) {				
-					stats.Intersection();
-					ret[0]=obj.Collide(rOrigin[0],tDir[0]);
-					mask[0]=ret[0]<minRet[0]&&ret[0]>0.0f;
-					minRet[0]=Condition(mask[0],ret[0],minRet[0]);
-					object[0]=Condition(i32x4b(mask[0]),i32x4(objectId),object[0]);
-					tMax[0]=Min(tMax[0],minRet[0]);
+				Vec3q tvec[4]; {
+					Vec3q a=obj.a;
+					tvec[0]=rOrigin[0]-a;
+					tvec[1]=rOrigin[1]-a;
+					tvec[2]=rOrigin[2]-a;
+					tvec[3]=rOrigin[3]-a;
 				}
-				else all=0;
+				floatq u[4],v[4]; {
+					Vec3q ba=obj.ba,ca=obj.ca;
+					u[0]=tDir[0]|(ba^tvec[0]);
+					v[0]=tDir[0]|(tvec[0]^ca);
+					u[1]=tDir[1]|(ba^tvec[1]);
+					v[1]=tDir[1]|(tvec[1]^ca);
+					u[2]=tDir[2]|(ba^tvec[2]);
+					v[2]=tDir[2]|(tvec[2]^ca);
+					u[3]=tDir[3]|(ba^tvec[3]);
+					v[3]=tDir[3]|(tvec[3]^ca);
+				}
 
-				if(ForAny(tMin[1]<=tMax[1])) {				
-					stats.Intersection();
-					ret[1]=obj.Collide(rOrigin[1],tDir[1]);
-					mask[1]=ret[1]<minRet[1]&&ret[1]>0.0f;
-					minRet[1]=Condition(mask[1],ret[1],minRet[1]);
-					object[1]=Condition(i32x4b(mask[1]),i32x4(objectId),object[1]);
-					tMax[1]=Min(tMax[1],minRet[1]);
-				}
-				else all=0;
-			
-				if(ForAny(tMin[2]<=tMax[2])) {				
-					stats.Intersection();
-					ret[2]=obj.Collide(rOrigin[2],tDir[2]);
-					mask[2]=ret[2]<minRet[2]&&ret[2]>0.0f;
-					minRet[2]=Condition(mask[2],ret[2],minRet[2]);
-					object[2]=Condition(i32x4b(mask[2]),i32x4(objectId),object[2]);
-					tMax[2]=Min(tMax[2],minRet[2]);
-				}
-				else all=0;
+				Vec3p nrm=obj.Nrm();
+				floatq nrmLen=floatq( ((float*)&obj.ca)[3] );
 
-				if(ForAny(tMin[3]<=tMax[3])) {				
-					stats.Intersection();
-					ret[3]=obj.Collide(rOrigin[3],tDir[3]);
-					mask[3]=ret[3]<minRet[3]&&ret[3]>0.0f;
-					minRet[3]=Condition(mask[3],ret[3],minRet[3]);
-					object[3]=Condition(i32x4b(mask[3]),i32x4(objectId),object[3]);
-					tMax[3]=Min(tMax[3],minRet[3]);
+				{
+					floatq det=tDir[0]|nrm;
+					f32x4b mask=Min(u[0],v[0])>=0.0f&&u[0]+v[0]<=det*nrmLen;
+					if(ForAny(mask)) {
+						floatq dist=Condition(mask,-(tvec[0]|nrm)/det,minRet[0]);
+						mask=dist<minRet[0];
+						minRet[0]=Min(minRet[0],dist);
+						object[0]=Condition(i32x4b(mask),i32x4(objectId),object[0]);
+					}
 				}
-				else all=0;
+				{
+					floatq det=tDir[1]|nrm;
+					f32x4b mask=Min(u[1],v[1])>=0.0f&&u[1]+v[1]<=det*nrmLen;
+					if(ForAny(mask)) {
+						floatq dist=Condition(mask,-(tvec[1]|nrm)/det,minRet[1]);
+						mask=dist<minRet[1];
+						minRet[1]=Min(minRet[1],dist);
+						object[1]=Condition(i32x4b(mask),i32x4(objectId),object[1]);
+					}
+				}
+				{
+					floatq det=tDir[2]|nrm;
+					f32x4b mask=Min(u[2],v[2])>=0.0f&&u[2]+v[2]<=det*nrmLen;
+					if(ForAny(mask)) {
+						floatq dist=Condition(mask,-(tvec[2]|nrm)/det,minRet[2]);
+						mask=dist<minRet[2];
+						minRet[2]=Min(minRet[2],dist);
+						object[2]=Condition(i32x4b(mask),i32x4(objectId),object[2]);
+					}
+				}
+				{
+					floatq det=tDir[3]|nrm;
+					f32x4b mask=Min(u[3],v[3])>=0.0f&&u[3]+v[3]<=det*nrmLen;
+					if(ForAny(mask)) {
+						floatq dist=Condition(mask,-(tvec[3]|nrm)/det,minRet[3]);
+						mask=dist<minRet[3];
+						minRet[3]=Min(minRet[3],dist);
+						object[3]=Condition(i32x4b(mask),i32x4(objectId),object[3]);
+					}
+				}
 
-				if(all) mailbox.Insert(objectId);
-				
 				continue;
 			}
 

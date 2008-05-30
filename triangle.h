@@ -107,6 +107,7 @@ private:
 		EdgeNormals::ComputeEdgeNormals(this);
 	}
 
+// BUT DONT EVEN THINK ABOUT MODIFYING IT :)
 public:
 	Vec3p a,ba,ca;
 	Vec4p plane;
