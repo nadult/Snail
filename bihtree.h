@@ -342,11 +342,226 @@ EXIT:
 		return;
 	}
 
-	void TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *stats,int dirMask) const {
-		TraverseQuad(rOrigin[0],tDir[0],::Output<otNormal,f32x4,i32x4>(out+0,object+0,stats),dirMask);
-		TraverseQuad(rOrigin[1],tDir[1],::Output<otNormal,f32x4,i32x4>(out+1,object+1,stats),dirMask);
-		TraverseQuad(rOrigin[2],tDir[2],::Output<otNormal,f32x4,i32x4>(out+2,object+2,stats),dirMask);
-		TraverseQuad(rOrigin[3],tDir[3],::Output<otNormal,f32x4,i32x4>(out+3,object+3,stats),dirMask);
+	void TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const {
+		enum { psize=4 };
+
+		floatq maxD[4]={out[0],out[1],out[2],out[3]};
+
+		TreeStats stats;
+		stats.TracingRay();
+
+		Vec3q invDir[4]={
+			VInv(Vec3q(tDir[0].x+0.000000000001f,tDir[0].y+0.000000000001f,tDir[0].z+0.000000000001f)),
+			VInv(Vec3q(tDir[1].x+0.000000000001f,tDir[1].y+0.000000000001f,tDir[1].z+0.000000000001f)),
+			VInv(Vec3q(tDir[2].x+0.000000000001f,tDir[2].y+0.000000000001f,tDir[2].z+0.000000000001f)),
+			VInv(Vec3q(tDir[3].x+0.000000000001f,tDir[3].y+0.000000000001f,tDir[3].z+0.000000000001f)) };
+		floatq tinv[3][4]={
+			{invDir[0].x,invDir[1].x,invDir[2].x,invDir[3].x},
+			{invDir[0].y,invDir[1].y,invDir[2].y,invDir[3].y},
+			{invDir[0].z,invDir[1].z,invDir[2].z,invDir[3].z} };
+		floatq torig[3][4]={
+			{rOrigin[0].x,rOrigin[1].x,rOrigin[2].x,rOrigin[3].x},
+			{rOrigin[0].y,rOrigin[1].y,rOrigin[2].y,rOrigin[3].y},
+			{rOrigin[0].z,rOrigin[1].z,rOrigin[2].z,rOrigin[3].z} };
+
+		int dSign[3]; FillDSignArray(dirMask,dSign);
+		floatq minRet[4]={maxD[0],maxD[1],maxD[2],maxD[3]},tMin[4],tMax[4];
+		tMin[0]=tMin[1]=tMin[2]=tMin[3]=ConstEpsilon<floatq>();
+		tMax[0]=Min(maxD[0],minRet[0]);
+		tMax[1]=Min(maxD[1],minRet[1]);
+		tMax[2]=Min(maxD[2],minRet[2]);
+		tMax[3]=Min(maxD[3],minRet[3]);
+
+		floatq fStackBegin[8*(maxLevel+2)],*fStack=fStackBegin;
+		const BIHNode *nStackBegin[maxLevel+2],**nStack=nStackBegin;
+
+		const BIHNode *node=&nodes[0],*node0=&nodes[0];
+
+		{
+			Vec3q ttMin[4]={
+				(Vec3q(pMin)-rOrigin[0])*invDir[0],
+				(Vec3q(pMin)-rOrigin[1])*invDir[1],
+				(Vec3q(pMin)-rOrigin[2])*invDir[2],
+				(Vec3q(pMin)-rOrigin[3])*invDir[3] };
+			Vec3q ttMax[4]={
+				(Vec3q(pMax)-rOrigin[0])*invDir[0],
+				(Vec3q(pMax)-rOrigin[1])*invDir[1],
+				(Vec3q(pMax)-rOrigin[2])*invDir[2],
+				(Vec3q(pMax)-rOrigin[3])*invDir[3] };
+
+			if(dSign[0]) {
+				Swap(ttMin[0].x,ttMax[0].x);
+				Swap(ttMin[1].x,ttMax[1].x);
+				Swap(ttMin[2].x,ttMax[2].x);
+				Swap(ttMin[3].x,ttMax[3].x); }
+			if(dSign[1]) {
+				Swap(ttMin[0].y,ttMax[0].y);
+				Swap(ttMin[1].y,ttMax[1].y);
+				Swap(ttMin[2].y,ttMax[2].y);
+				Swap(ttMin[3].y,ttMax[3].y); }
+			if(dSign[2]) {
+				Swap(ttMin[0].z,ttMax[0].z);
+				Swap(ttMin[1].z,ttMax[1].z);
+				Swap(ttMin[2].z,ttMax[2].z);
+				Swap(ttMin[3].z,ttMax[3].z); }
+
+			tMax[0]=Min(Min(ttMax[0].x,ttMax[0].y),tMax[0]);
+			tMax[1]=Min(Min(ttMax[1].x,ttMax[1].y),tMax[1]);
+			tMax[2]=Min(Min(ttMax[2].x,ttMax[2].y),tMax[2]);
+			tMax[3]=Min(Min(ttMax[3].x,ttMax[3].y),tMax[3]);
+
+			tMax[0]=Min(ttMax[0].z,tMax[0]);
+			tMax[1]=Min(ttMax[1].z,tMax[1]);
+			tMax[2]=Min(ttMax[2].z,tMax[2]);
+			tMax[3]=Min(ttMax[3].z,tMax[3]);
+			
+			tMin[0]=Max(Max(ttMin[0].x,ttMin[0].y),tMin[0]);
+			tMin[1]=Max(Max(ttMin[1].x,ttMin[1].y),tMin[1]);
+			tMin[2]=Max(Max(ttMin[2].x,ttMin[2].y),tMin[2]);
+			tMin[3]=Max(Max(ttMin[3].x,ttMin[3].y),tMin[3]);
+
+			tMin[0]=Max(ttMin[0].z,tMin[0]);
+			tMin[1]=Max(ttMin[1].z,tMin[1]);
+			tMin[2]=Max(ttMin[2].z,tMin[2]);
+			tMin[3]=Max(ttMin[3].z,tMin[3]);
+		}
+
+		goto ENTRANCE;
+
+		while(true) {
+			if(fStack==fStackBegin) goto EXIT;
+
+			fStack-=8;
+			tMin[0]=fStack[0];
+			tMin[1]=fStack[1];
+			tMin[2]=fStack[2];
+			tMin[3]=fStack[3];
+			tMax[0]=Min(fStack[4],minRet[0]);
+			tMax[1]=Min(fStack[5],minRet[1]);
+			tMax[2]=Min(fStack[6],minRet[2]);
+			tMax[3]=Min(fStack[7],minRet[3]);
+			--nStack; node=*nStack;
+ENTRANCE:
+			stats.LoopIteration();
+			u32 axis=node->Axis();
+		
+			if(axis==3) {
+				uint objectId=node->Object();
+
+				const Object &obj=objects[objectId];
+				floatq ret[4]; f32x4b mask[4];
+
+				if(ForAny(tMin[0]<=tMax[0])) {				
+					stats.Intersection();
+					ret[0]=obj.Collide(rOrigin[0],tDir[0]);
+					mask[0]=ret[0]<minRet[0]&&ret[0]>0.0f;
+					minRet[0]=Condition(mask[0],ret[0],minRet[0]);
+					object[0]=Condition(i32x4b(mask[0]),i32x4(objectId),object[0]);
+					tMax[0]=Min(tMax[0],minRet[0]);
+				}
+
+				if(ForAny(tMin[1]<=tMax[1])) {				
+					stats.Intersection();
+					ret[1]=obj.Collide(rOrigin[1],tDir[1]);
+					mask[1]=ret[1]<minRet[1]&&ret[1]>0.0f;
+					minRet[1]=Condition(mask[1],ret[1],minRet[1]);
+					object[1]=Condition(i32x4b(mask[1]),i32x4(objectId),object[1]);
+					tMax[1]=Min(tMax[1],minRet[1]);
+				}
+				
+				if(ForAny(tMin[2]<=tMax[2])) {				
+					stats.Intersection();
+					ret[2]=obj.Collide(rOrigin[2],tDir[2]);
+					mask[2]=ret[2]<minRet[2]&&ret[2]>0.0f;
+					minRet[2]=Condition(mask[2],ret[2],minRet[2]);
+					object[2]=Condition(i32x4b(mask[2]),i32x4(objectId),object[2]);
+					tMax[2]=Min(tMax[2],minRet[2]);
+				}
+
+				if(ForAny(tMin[3]<=tMax[3])) {				
+					stats.Intersection();
+					ret[3]=obj.Collide(rOrigin[3],tDir[3]);
+					mask[3]=ret[3]<minRet[3]&&ret[3]>0.0f;
+					minRet[3]=Condition(mask[3],ret[3],minRet[3]);
+					object[3]=Condition(i32x4b(mask[3]),i32x4(objectId),object[3]);
+					tMax[3]=Min(tMax[3],minRet[3]);
+				}
+				
+				continue;
+			}
+
+			bool onlyOneChild=node->OnlyOneChild();
+			uint sign=dSign[axis];
+			floatq near[4],far[4]; {
+				floatq start[4]={torig[axis][0],torig[axis][1],torig[axis][2],torig[axis][3]};
+				floatq inv[4]={tinv[axis][0],tinv[axis][1],tinv[axis][2],tinv[axis][3]};
+
+				float tnear=node->ClipLeft(),tfar=node->ClipRight();
+				if(sign) Swap(tnear,tfar);
+
+				near[0]=Min( (floatq(tnear)-start[0])*inv[0], tMax[0]);
+				near[1]=Min( (floatq(tnear)-start[1])*inv[1], tMax[1]);
+				near[2]=Min( (floatq(tnear)-start[2])*inv[2], tMax[2]);
+				near[3]=Min( (floatq(tnear)-start[3])*inv[3], tMax[3]);
+
+				far [0]=Max( (floatq(tfar) -start[0])*inv[0], tMin[0]);
+				far [1]=Max( (floatq(tfar) -start[1])*inv[1], tMin[1]);
+				far [2]=Max( (floatq(tfar) -start[2])*inv[2], tMin[2]);
+				far [3]=Max( (floatq(tfar) -start[3])*inv[3], tMin[3]);
+			}
+			node=node0+node->Child();
+
+			f32x4b test1=tMin[0]>near[0]&&tMin[1]>near[1]&&tMin[2]>near[2]&&tMin[3]>near[3];
+			f32x4b test2=tMax[0]<far [0]&&tMax[1]<far [1]&&tMax[2]<far [2]&&tMax[3]<far [3];
+
+			if(ForAll(test1)) {
+				if(ForAll(test2)) continue;
+
+				tMin[0]=far[0];
+				tMin[1]=far[1];
+				tMin[2]=far[2];
+				tMin[3]=far[3];
+				if(!onlyOneChild) node+=(sign^1);
+				goto ENTRANCE;
+			}
+			if(ForAll(test2)) {
+				if(ForAll(test1)) continue;
+
+				tMax[0]=near[0];
+				tMax[1]=near[1];
+				tMax[2]=near[2];
+				tMax[3]=near[3];
+				if(!onlyOneChild) node+=sign;
+				goto ENTRANCE;
+			}
+
+			fStack[0]=far[0];
+			fStack[1]=far[1];
+			fStack[2]=far[2];
+			fStack[3]=far[3];
+			fStack[4]=tMax[0];
+			fStack[5]=tMax[1];
+			fStack[6]=tMax[2];
+			fStack[7]=tMax[3];
+			fStack+=8;
+
+			*nStack=node+(sign^1);
+			nStack++;
+
+			tMax[0]=near[0];
+			tMax[1]=near[1];
+			tMax[2]=near[2];
+			tMax[3]=near[3];
+			node+=sign;
+			goto ENTRANCE;
+		}
+
+EXIT:
+		if(tstats) tstats->Update(stats);
+		out[0]=minRet[0];
+		out[1]=minRet[1];
+		out[2]=minRet[2];
+		out[3]=minRet[3];
 	}
 
 	template <class Output,class Group>
@@ -379,8 +594,8 @@ EXIT:
 	template <class Output,class Group>
 	void TraverseQuadGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out,int dirMask) const {
 		i32x4 tmp;
-		int i;
-		for(i=0;i+3<sel.Num();i+=4) {
+		int i=0;
+		for(;i+3<sel.Num();i+=4) {
 			int q[4]={sel[i],sel[i+1],sel[i+2],sel[i+3]};
 			Vec3q tOrig[4],tDir[4];
 			floatq dist[4]; i32x4 obj[4];
