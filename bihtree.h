@@ -89,9 +89,9 @@ private:
 class BIHIdx {
 public:
 	BIHIdx() { }
-	BIHIdx(uint i,const Vec3f &mi,const Vec3f &ma) :idx(i),min(mi),max(ma) {
+	BIHIdx(uint i,const Vec3f &mi,const Vec3f &ma,float mul) :idx(i),min(mi),max(ma) {
 		Vec3f vsize=max-min;
-		size=Max(vsize.x,Max(vsize.y,vsize.z));
+		size=Max(vsize.x,Max(vsize.y,vsize.z))*mul;
 	}
 
 	Vec3f min,max;
@@ -425,6 +425,7 @@ EXIT:
 			tMin[2]=Max(ttMin[2].z,tMin[2]);
 			tMin[3]=Max(ttMin[3].z,tMin[3]);
 		}
+		ObjectIdxBuffer<4> mailbox;
 
 		goto ENTRANCE;
 
@@ -447,9 +448,12 @@ ENTRANCE:
 		
 			if(axis==3) {
 				uint objectId=node->Object();
+ 
+				if(mailbox.Find(objectId)) continue;
 
 				const Object &obj=objects[objectId];
 				floatq ret[4]; f32x4b mask[4];
+				bool all=1;
 
 				if(ForAny(tMin[0]<=tMax[0])) {				
 					stats.Intersection();
@@ -459,6 +463,7 @@ ENTRANCE:
 					object[0]=Condition(i32x4b(mask[0]),i32x4(objectId),object[0]);
 					tMax[0]=Min(tMax[0],minRet[0]);
 				}
+				else all=0;
 
 				if(ForAny(tMin[1]<=tMax[1])) {				
 					stats.Intersection();
@@ -468,7 +473,8 @@ ENTRANCE:
 					object[1]=Condition(i32x4b(mask[1]),i32x4(objectId),object[1]);
 					tMax[1]=Min(tMax[1],minRet[1]);
 				}
-				
+				else all=0;
+			
 				if(ForAny(tMin[2]<=tMax[2])) {				
 					stats.Intersection();
 					ret[2]=obj.Collide(rOrigin[2],tDir[2]);
@@ -477,6 +483,7 @@ ENTRANCE:
 					object[2]=Condition(i32x4b(mask[2]),i32x4(objectId),object[2]);
 					tMax[2]=Min(tMax[2],minRet[2]);
 				}
+				else all=0;
 
 				if(ForAny(tMin[3]<=tMax[3])) {				
 					stats.Intersection();
@@ -486,6 +493,9 @@ ENTRANCE:
 					object[3]=Condition(i32x4b(mask[3]),i32x4(objectId),object[3]);
 					tMax[3]=Min(tMax[3],minRet[3]);
 				}
+				else all=0;
+
+				if(all) mailbox.Insert(objectId);
 				
 				continue;
 			}

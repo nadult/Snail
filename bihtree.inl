@@ -21,7 +21,7 @@ BIHTree<Object>::BIHTree(const vector<Object> &obj) :objects(obj) {
 	avgSize/=3.0*objects.size();
 
 	vector<BIHIdx> indices;
-	GenBIHIndices(obj,indices,avgSize*1.75f,16*objects.size());
+	GenBIHIndices(obj,indices,avgSize*1.75f,32*objects.size());
 
 	Build(indices,0,0,indices.size()-1,pMin,pMax,0);
 	printf("Indices: %d Avg size: %.2f\n",indices.size(),avgSize);
@@ -89,7 +89,16 @@ template <class Object>
 void BIHTree<Object>::Build(vector<BIHIdx> &indices,uint nNode,int first,int last,Vec3p min,Vec3p max,uint level) {
 	int count=last-first+1;
 
-	if(count<=1) {
+	bool sameIndex=0; {
+		sameIndex=1;
+		int idx=indices[first].idx;
+		for(int n=first+1;n<=last;n++) if(indices[n].idx!=idx) {
+			sameIndex=0;
+			break;
+		}
+	}
+
+	if(count<=1||sameIndex) {
 		if(count==0) throw Exception("Error while building BIHTree: there should be no empty leafs!");
 		nodes[nNode].SetLeaf(indices[first].idx);
 		return;

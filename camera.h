@@ -11,7 +11,7 @@ public:
 	Camera(Vec3f p,Vec3f f,Vec3f r,Vec3f u=Vec3f(0,1,0)) :pos(p),right(r),front(f),up(u),plane_dist(0.5f) { }
 
 	void Print() {
-		printf("Camera( Vec3f(%.4f,%.4f,%.4f), Vec3f(%.4f,%.4f,%.4f), Vec3f(%.4f,%.4f,%.4f) )\n",
+		printf("Camera(Vec3f(%.4f,%.4f,%.4f),Vec3f(%.4f,%.4f,%.4f),Vec3f(%.4f,%.4f,%.4f));\n",
 				pos.x,pos.y,pos.z,front.x,front.y,front.z,right.x,right.y,right.z);
 	}
 

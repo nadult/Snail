@@ -1,5 +1,6 @@
 #include <set>
 #include <algorithm>
+#include <float.h>
 #include "bihtree.h"
 
 namespace {
@@ -88,6 +89,15 @@ namespace {
 		return count>0;
 	}
 
+	// The closer to the worse case, the bigger value
+	float GetTriMultiplier(const Triangle &tri) {
+		const float min=1.0f,max=4.0f;
+
+		Vec3p worse(0.577350269,0.577350269,0.577350269);
+		float out=Lerp(min,max,VAbs(tri.Nrm())|worse);
+		return out>=min&&out<=max?out:1.0f;
+	}
+
 	template <class Container>
 	void Split(const Triangle &tri,const BIHIdx &idx,Container &out) {
 		Vec3f size=idx.max-idx.min;
@@ -98,11 +108,13 @@ namespace {
 		float split=Lerp((&idx.min.x)[axis],(&idx.max.x)[axis],0.5f);
 		(&max1.x)[axis]=(&min2.x)[axis]=split;
 
+		float mult=GetTriMultiplier(tri);
+
 		bool add1=MinimizeTriBound(p1,p2,p3,min1,max1);
 		bool add2=MinimizeTriBound(p1,p2,p3,min2,max2);
 		
-		if(add1) out.insert(BIHIdx(idx.idx,min1,max1));
-		if(add2) out.insert(BIHIdx(idx.idx,min2,max2));
+		if(add1) out.insert(BIHIdx(idx.idx,min1,max1,mult));
+		if(add2) out.insert(BIHIdx(idx.idx,min2,max2,mult));
 	}
 
 	struct SortByIdx { bool operator()(const BIHIdx &a,const BIHIdx &b) const { return a.idx<b.idx; } };
@@ -115,7 +127,7 @@ void GenBIHIndices(const vector<Triangle> &tris,vector<BIHIdx> &out,float maxSiz
 
 	for(int n=0;n<tris.size();n++) {
 		Vec3p min=tris[n].BoundMin(),max=tris[n].BoundMax();
-		indices.insert(BIHIdx(n,Vec3f(min.x,min.y,min.z),Vec3f(max.x,max.y,max.z)));
+		indices.insert(BIHIdx(n,Vec3f(min.x,min.y,min.z),Vec3f(max.x,max.y,max.z),GetTriMultiplier(tris[n])));
 	}
 
 	for(int s=0;s<maxSplits;s++) {

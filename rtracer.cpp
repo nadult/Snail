@@ -168,6 +168,11 @@ Camera GetDefaultCamera(string model) {
 			Vec3f(0.023998,0.000000,0.999716),
 			Vec3f(0.999716,0.000000,-0.023998) );
 
+		Camera abramsBadCase(
+				Vec3f(-23.2355,-77.6003,-2.7983),
+				Vec3f(0.6772,0.0000,0.7357),
+				Vec3f(0.7357,0.0000,-0.6772) );
+
 		// abrams from the back + camera turned back
 		Camera abramsBackTurned(
 			Vec3f(-14.741514,-3.600281,-217.086441),
@@ -185,12 +190,14 @@ Camera GetDefaultCamera(string model) {
 			Vec3f(0.713451,0.000000,-0.700709),
 			Vec3f(-0.700709,0.000000,-0.713451) );
 
-		Camera sponza( Vec3f(443.2726,-248.0000,0.8550), Vec3f(-0.9995,0.0000,-0.0324), Vec3f(-0.0324,0.0000,0.9995) );
+		Camera sponza(Vec3f(443.2726,-248.0000,0.8550),Vec3f(-0.9995,0.0000,-0.0324),Vec3f(-0.0324,0.0000,0.9995));
+		Camera sponzaBadCase(Vec3f(-353.3055,-326.0000,147.0938),Vec3f(0.0815,0.0000,-0.9967),Vec3f(-0.9967,0.0000,-0.0815));
+			
 		Camera feline( Vec3f(-3.0111,-5.6003,-2.8642), Vec3f(0.8327,0.0000,0.5537), Vec3f(0.5537,0.0000,-0.8327) );
 	
 		cams["pompei.obj"]=pompei;
 		cams["sponza.obj"]=sponza;
-		cams["abrams.obj"]=abramsTop;
+		cams["abrams.obj"]=abramsBadCase;
 		cams["lancia.obj"]=abrams;
 		cams["bunny.obj"]=bunny;
 		cams["feline.obj"]=feline;
@@ -247,7 +254,7 @@ int main(int argc, char **argv)
 
 	Image img(resx,resy);
 	Camera cam=GetDefaultCamera(modelFile);;
-
+	
 	uint quadLevels=1;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	bool useKdTree=0;
