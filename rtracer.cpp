@@ -246,23 +246,23 @@ int main(int argc, char **argv)
 	printf("BIHTree build time: %.2f sec\n",buildTime);
 	bihScene.tree.PrintInfo();
 
-	buildTime=GetTime();
-	TScene<KDTree>				kdScene (fileName.c_str());
-	buildTime=GetTime()-buildTime;
-	printf("KDTree build time: %.2f sec\n",buildTime);
-	kdScene.tree.PrintInfo();
+//	buildTime=GetTime();
+//	TScene<KDTree>				kdScene (fileName.c_str());
+//	buildTime=GetTime()-buildTime;
+//	printf("KDTree build time: %.2f sec\n",buildTime);
+//	kdScene.tree.PrintInfo();
 
 	Image img(resx,resy);
 	Camera cam=GetDefaultCamera(modelFile);;
 	
 	uint quadLevels=1;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
-	bool useKdTree=0;
+//	bool useKdTree=0;
 
 	if(nonInteractive) {
 		for(int n=atoi(argv[3])-1;n>=0;n--)
-			if(useKdTree) GenImage(quadLevels,kdScene,cam,img,Options(),threads);
-			else GenImage(quadLevels,bihScene,cam,img,Options(),threads);
+			/*if(useKdTree) GenImage(quadLevels,kdScene,cam,img,Options(),threads);
+			else*/ GenImage(quadLevels,bihScene,cam,img,Options(),threads);
 		img.SaveToFile("out/output.tga");
 	}
 	else {
@@ -288,14 +288,14 @@ int main(int argc, char **argv)
 			if(out.Key('R')) cam.pos-=cam.up*speed;
 			if(out.Key('F')) cam.pos+=cam.up*speed;
 
-			if(out.KeyDown('T')) {
-				printf("mode: %s\n",useKdTree?"BIH":"KD");
-				useKdTree^=1;
-			}
-			if(out.KeyDown('Y')) {
-				printf("splitting %s\n",kdScene.tree.splittingFlag?"off":"on");
-				kdScene.tree.splittingFlag^=1;
-			}
+		//	if(out.KeyDown('T')) {
+		//		printf("mode: %s\n",useKdTree?"BIH":"KD");
+		//		useKdTree^=1;
+		//	}
+		//	if(out.KeyDown('Y')) {
+		//		printf("splitting %s\n",kdScene.tree.splittingFlag?"off":"on");
+		//		kdScene.tree.splittingFlag^=1;
+		//	}
 
 		//	if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
 			if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
@@ -322,17 +322,16 @@ int main(int argc, char **argv)
 			
 			TreeStats stats;
 			double time=GetTime();
-			stats=useKdTree?	GenImage(quadLevels,kdScene,cam,img,options,threads):
+			stats=/*useKdTree?	GenImage(quadLevels,kdScene,cam,img,options,threads):*/
 								GenImage(quadLevels,bihScene,cam,img,options,threads);
 
-			stats.tracedRays=resx*resy;
 			time=GetTime()-time; minTime=Min(minTime,time);
 			maxTime=Max(time,maxTime);
 
 			int lastTicks=0;
 			stats.PrintInfo(resx,resy,time*1000.0);
 
-//			scene.Animate();
+		//	bihScene.Animate();
 			out.RenderImage(img);
 			out.SwapBuffers();
 		}

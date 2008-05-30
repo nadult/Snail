@@ -8,41 +8,29 @@
 
 typedef TTriangle<SlowEdgeNormals> BIHTriangle;
 
-
-// Generalnie:
-// Lisc moze odwolywac sie maksymalnie do jednego obiektu
-// Liscie bez obiektow nie sa przechowywane w drzewie, ojcowie ktorzy maja
-// po jednym synu maja ustawiona flage OnlyOneChild
-// Normalnie (jesli ojciec ma dwoch synow) to lewy syn jest na pozycji Child()+0
-// a prawy na Child()+1
-
+// Liscie nie sa przechowywane w drzewie
+// Zamiast odnosnika do liscia jest od razu odnosnik do obiektu
 class BIHNode {
 public:
-	BIHNode(uint par) :parent(par) { }
+	enum { leafMask=1<<29, idxMask=0x1fffffff };
 
-	u32 Child() const { return val&0x3fffffff; }
-	u32 Object() const { return val&0x3fffffff; }
+	inline i32 Child1() const { return val[0]&0x1fffffff; }
+	inline i32 Child2() const { return val[1]&0x1fffffff; }
+	inline i32 Child(uint idx) const { return val[idx]&0x1fffffff; }
 
-	u32 Axis() const { return (val>>30); }
-	bool IsLeaf() const { return (val>>30)==3; }
-	float ClipLeft() const { return left; }
-	float ClipRight() const { return right; }
+	inline bool Child1IsLeaf() const { return val[0]&leafMask; }
+	inline bool Child2IsLeaf() const { return val[1]&leafMask; }
+	inline bool ChildIsLeaf(uint idx) const { return val[idx]&leafMask; }
 
-	void SetLeaf(u32 object) { val=object|(3u<<30); }
-	void SetNode(u32 axis,float l,float r,u32 child) { left=l; right=r; val=child|(axis<<30); }
+	inline int Axis() const { return (val[0]>>30); }
+	inline float ClipLeft() const { return clip[0]; }
+	inline float ClipRight() const { return clip[1]; }
 
-	bool OnlyOneChild() const { return flags&1; }
+	inline bool HasChild1() const { return val[1]&(1<<30); }
+	inline bool HasChild2() const { return val[1]&(1<<31); }
 
-	float left;
-	float right;
-	union {
-		uint val;
-		float fval;
-	};
-	union {
-		uint parent;
-		uint flags;
-	};
+	float clip[2];
+	u32 val[2];
 };
 
 template <class T>
@@ -56,11 +44,11 @@ public:
 	template <class Container>
 	Vector(const Container &obj) :tab(0) {
 		Alloc(obj.size());
-		for(uint n=0;n<count;n++) tab[n]=obj[n];
+		for(int n=0;n<count;n++) tab[n]=obj[n];
 	}
 	Vector(const Vector &obj) :tab(0) {
 		Alloc(obj.size());
-		for(uint n=0;n<count;n++) tab[n]=obj[n];
+		for(int n=0;n<count;n++) tab[n]=obj[n];
 	}
 	const Vector &operator=(const Vector &obj) {
 		if(&obj==this) return *this;
@@ -69,14 +57,14 @@ public:
 	template <class Container>
 	const Vector &operator=(const Container &obj) {
 		Alloc(obj.size());
-		for(uint n=0;n<count;n++) tab[n]=obj[n];
+		for(int n=0;n<count;n++) tab[n]=obj[n];
 		return *this;
 	}
 	~Vector() { Free(); }
 
 	inline size_t size() const { return count; }
-	inline const T &operator[](uint n) const { return tab[n]; }
-	inline T &operator[](uint n) { return tab[n]; }
+	inline const T &operator[](int n) const { return tab[n]; }
+	inline T &operator[](int n) { return tab[n]; }
 
 private:
 	void Alloc(size_t newS) { Free(); count=newS; tab=count?new T[count]:0; }
@@ -89,14 +77,14 @@ private:
 class BIHIdx {
 public:
 	BIHIdx() { }
-	BIHIdx(uint i,const Vec3f &mi,const Vec3f &ma,float mul) :idx(i),min(mi),max(ma) {
+	BIHIdx(int i,const Vec3f &mi,const Vec3f &ma,float mul) :idx(i),min(mi),max(ma) {
 		Vec3f vsize=max-min;
 		size=Max(vsize.x,Max(vsize.y,vsize.z))*mul;
 	}
 
 	Vec3f min,max;
 	float size;
-	uint idx;
+	i32 idx;
 };
 
 
@@ -108,9 +96,9 @@ public:
 
 	BIHTree(const vector<Object> &obj);
 
-	uint FindSimilarParent(uint nNode,uint axis) const;
-	void PrintInfo(uint nNode=0,uint level=0) const;
-	void Build(vector<BIHIdx> &indices,uint nNode,int first,int last,Vec3p min,Vec3p max,uint level);
+	void PrintInfo() const;
+	uint FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const;
+	void Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,int first,int last,Vec3p min,Vec3p max,uint level);
 
 	void FillDSignArray(int dirMask,int *dSign) const {
 		dSign[0]=dirMask&1?1:0;
@@ -132,12 +120,10 @@ public:
 		int dSign[3]={signMask&1?1:0,signMask&2?1:0,signMask&4?1:0};
 		float minRet=maxD,tMin=ConstEpsilon<float>(),tMax=maxD;
 
-		struct Locals4 {
-			float tMin,tMax;
-			const BIHNode *node;
-		} stackBegin[maxLevel+2],*stack=stackBegin;
+		struct Locals { float tMin,tMax; u32 idx; } stackBegin[maxLevel+2],*stack=stackBegin;
+		const BIHNode *node,*node0=&nodes[0];
+		int idx=0;
 
-		const BIHNode *node=&nodes[0],*node0=&nodes[0];
 		tMax=Min(tMax,minRet);
 
 		{
@@ -152,83 +138,71 @@ public:
 			
 			tMin=Max(Max(ttMin.x,ttMin.y),tMin);
 			tMin=Max(ttMin.z,tMin);
-
-			if(tMin>tMax) { stats.Skip(); goto EXIT; }
 		}
 
-		goto ENTRANCE;
-
 		while(true) {
-			if(stack==stackBegin) goto EXIT;
-			stack--;
-			tMin=stack->tMin;
-			tMax=Min(stack->tMax,minRet);
-			node=stack->node;
-ENTRANCE:
 			stats.LoopIteration();
-			if(tMin>tMax) continue;
-
-			u32 axis=node->Axis();
+			if(tMin>tMax) goto POP_STACK;
 		
-			if(axis==3) {
-				uint objectId=node->Object();
+			if(idx&BIHNode::leafMask) {
+				idx&=BIHNode::idxMask;
+				{
+					stats.Intersection();
+					const Object &obj=objects[idx];
+					float ret=obj.Collide(rOrigin,tDir);
+					if(ret<minRet&&ret>0) {
+						minRet=ret;
+						if(Output::objectIndexes)
+							output.object[0]=idx;
 
-				stats.Intersection();
-				const Object &obj=objects[objectId];
-				float ret=obj.Collide(rOrigin,tDir);
-				if(ret<minRet&&ret>0) {
-					minRet=ret;
-					if(Output::objectIndexes)
-						output.object[0]=objectId;
-
-					tMax=Min(tMax,minRet);
-					stats.IntersectPass();
+						tMax=Min(tMax,minRet);
+					}	
 				}
-				else stats.IntersectFail();
-				
+POP_STACK:
+				if(stack==stackBegin) break;
+				stack--;
+				tMin=stack->tMin;
+				tMax=Min(stack->tMax,minRet);
+				idx=stack->idx;
 				continue;
 			}
 
-			bool onlyOneChild=node->OnlyOneChild();
-			uint sign=dSign[axis];
-			float nearSplit,farSplit; {
+			node=node0+(idx&BIHNode::idxMask);
+			int axis=node->Axis();
+			int nidx=dSign[axis],fidx=nidx^1;
+
+			float near,far; {
 				float start=(&rOrigin.x)[axis],inv=(&invDir.x)[axis];
-				float near=node->ClipLeft(),far=node->ClipRight();
-				if(sign) Swap(near,far);
-
-				nearSplit=(near-start)*inv;
-				farSplit =(far -start)*inv;
-			}
-			node=node0+node->Child();
-
-			if(tMin>nearSplit) {
-				if(tMax<farSplit) continue;
-
-				tMin=Max(tMin,farSplit);
-				if(!onlyOneChild) node+=(sign^1);
-				goto ENTRANCE;
-			}
-			if(tMax<farSplit) {
-				if(tMin>nearSplit) continue;
-
-				tMax=Min(tMax,nearSplit);
-				if(!onlyOneChild) node+=sign;
-				goto ENTRANCE;
+				near=(node->clip[nidx]-start)*inv;
+				far =(node->clip[fidx]-start)*inv;
 			}
 
-			stack->tMin=Max(tMin,farSplit);
+			if(tMin>near) {
+				if(tMax<far) goto POP_STACK;
+
+				tMin=Max(tMin,far);
+				idx=node->val[fidx];
+				continue;
+			}
+			if(tMax<far) {
+				if(tMin>near) goto POP_STACK;
+
+				tMax=Min(tMax,near);
+				idx=node->val[nidx];
+				continue;
+			}
+
+			stack->tMin=Max(tMin,far);
 			stack->tMax=tMax;
-			stack->node=node+(sign^1); stack++;
+			stack->idx=node->val[fidx];
+			stack++;
 
-			tMax=Min(tMax,nearSplit);
-			node+=sign;
-			goto ENTRANCE;
+			tMax=Min(tMax,near);
+			idx=node->val[nidx];
 		}
 
-EXIT:
 		output.stats->Update(stats);
 		output.dist[0]=minRet;
-		return;
 	}
 
 	template <class Output>
@@ -236,7 +210,7 @@ EXIT:
 		floatq maxD=output.dist[0];
 
 		TreeStats stats;
-		stats.TracingRay();
+		stats.TracingPacket(4);
 
 		Vec3q invDir=VInv(Vec3q(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f));
 		floatq tinv[3]={invDir.x,invDir.y,invDir.z};
@@ -245,12 +219,9 @@ EXIT:
 		int dSign[3]; FillDSignArray(dirMask,dSign);
 		floatq minRet=maxD,tMin=ConstEpsilon<floatq>(),tMax=maxD;
 
-		struct Locals4 {
-			floatq tMin,tMax;
-			const BIHNode *node;
-		} stackBegin[maxLevel+2],*stack=stackBegin;
+		floatq fStackBegin[2*(maxLevel+2)],*fStack=fStackBegin;
+		u32 stackBegin[maxLevel+2],*stack=stackBegin;
 
-		const BIHNode *node=&nodes[0],*node0=&nodes[0];
 		tMax=Min(tMax,minRet);
 
 		{
@@ -267,88 +238,87 @@ EXIT:
 			tMin=Max(ttMin.z,tMin);
 		}
 
-		goto ENTRANCE;
+		const BIHNode *node0=&nodes[0],*node;
+		int idx=0;
 
 		while(true) {
-			if(stack==stackBegin) goto EXIT;
-
-			stack--;
-			tMin=stack->tMin;
-			tMax=Min(stack->tMax,minRet);
-			node=stack->node;
-ENTRANCE:
 			stats.LoopIteration();
-			u32 axis=node->Axis();
 		
-			if(axis==3) {
-				uint objectId=node->Object();
+			if(idx&BIHNode::leafMask) {
+				idx&=BIHNode::idxMask;
 
-				stats.Intersection();
-				const Object &obj=objects[objectId];
-				floatq ret=obj.Collide(rOrigin,tDir);
-				f32x4b mask=ret<minRet&&ret>0.0f;
+				{
+					stats.Intersection();
+					const Object &obj=objects[idx];
+					floatq ret=obj.Collide(rOrigin,tDir);
+					f32x4b mask=ret<minRet&&ret>0.0f;
 
-				if(ForAny(mask)) {
-					minRet=Condition(mask,ret,minRet);
-					if(Output::objectIndexes)
-						output.object[0]=Condition(i32x4b(mask),i32x4(objectId),output.object[0]);
-
-					tMax=Min(tMax,minRet);
+					if(ForAny(mask)) {
+						minRet=Condition(mask,ret,minRet);
+						if(Output::objectIndexes)
+							output.object[0]=Condition(i32x4b(mask),i32x4(idx),output.object[0]);
+	
+						tMax=Min(tMax,minRet);
+					}
 				}
 				
+			POP_STACK:
+				if(stack==stackBegin) break;
+
+				fStack-=2;
+				tMin=fStack[0];
+				tMax=Min(fStack[1],minRet);
+				idx=*--stack;
 				continue;
 			}
 
-			bool onlyOneChild=node->OnlyOneChild();
-			uint sign=dSign[axis];
-			floatq nearSplit,farSplit; {
+			node=node0+(idx&BIHNode::idxMask);
+			int axis=node->Axis();
+			int sign=dSign[axis];
+			floatq near,far; {
 				floatq start=torig[axis],inv=tinv[axis];
-				float near=node->ClipLeft(),far=node->ClipRight();
-				if(sign) Swap(near,far);
+				float tnear=node->ClipLeft(),tfar=node->ClipRight();
+				if(sign) Swap(tnear,tfar);
 
-				nearSplit=(floatq(near)-start)*inv;
-				farSplit =(floatq(far) -start)*inv;
-			}
-			node=node0+node->Child();
-
-			f32x4b invalid=tMin>tMax;
-			if(ForAll(tMin>nearSplit||invalid)) {
-				if(ForAll(tMax<farSplit||invalid)) continue;
-
-				tMin=Max(tMin,floatq(farSplit));
-				if(!onlyOneChild) node+=(sign^1);
-				goto ENTRANCE;
-			}
-			if(ForAll(tMax<farSplit||invalid)) {
-				if(ForAll(tMin>nearSplit||invalid)) continue;
-
-				tMax=Min(tMax,floatq(nearSplit));
-				if(!onlyOneChild) node+=sign;
-				goto ENTRANCE;
+				near=Min( (floatq(tnear)-start)*inv, tMax);
+				far =Max( (floatq(tfar) -start)*inv, tMin);
 			}
 
-			stack->tMin=Max(tMin,floatq(farSplit));
-			stack->tMax=tMax;
-			stack->node=node+(sign^1); stack++;
+			if(ForAll(tMin>near)) {
+				if(ForAll(tMax<far)) goto POP_STACK;
 
-			tMax=Min(tMax,floatq(nearSplit));
-			node+=sign;
-			goto ENTRANCE;
+				// ARGH!!!!!!!!! this: tMin=far; is slower than:
+				tMin=Max(tMin,far);
+				idx=node->val[sign^1];
+				continue;
+			}
+			if(ForAll(tMax<far)) {
+				if(ForAll(tMin>near)) goto POP_STACK;
+
+				tMax=Min(tMax,near); //ARGH!
+				idx=node->val[sign];
+				continue;
+			}
+
+			fStack[0]=far;
+			fStack[1]=tMax;
+			fStack+=2;
+			*stack++=node->val[sign^1];
+
+			tMax=Min(tMax,near);//ARGH!
+			idx=node->val[sign];
 		}
 
-EXIT:
 		output.stats->Update(stats);
 		output.dist[0]=minRet;
-		return;
 	}
 
+	template <class Output>
 	void TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const {
-		enum { psize=4 };
-
 		floatq maxD[4]={out[0],out[1],out[2],out[3]};
 
 		TreeStats stats;
-		stats.TracingRay();
+		stats.TracingPacket(16);
 
 		Vec3q invDir[4]={
 			VInv(Vec3q(tDir[0].x+0.000000000001f,tDir[0].y+0.000000000001f,tDir[0].z+0.000000000001f)),
@@ -373,9 +343,7 @@ EXIT:
 		tMax[3]=Min(maxD[3],minRet[3]);
 
 		floatq fStackBegin[8*(maxLevel+2)],*fStack=fStackBegin;
-		const BIHNode *nStackBegin[maxLevel+2],**nStack=nStackBegin;
-
-		const BIHNode *node=&nodes[0],*node0=&nodes[0];
+		u32 nStackBegin[maxLevel+2],*nStack=nStackBegin;
 
 		{
 			Vec3q ttMin[4]={
@@ -427,108 +395,120 @@ EXIT:
 		}
 		ObjectIdxBuffer<4> mailbox;
 
-		goto ENTRANCE;
+		const BIHNode *node0=&nodes[0];
+		int idx=0;
+
+		int done[4]={0,0,0,0};
 
 		while(true) {
-			if(fStack==fStackBegin) goto EXIT;
-
-			fStack-=8;
-			tMin[0]=fStack[0];
-			tMin[1]=fStack[1];
-			tMin[2]=fStack[2];
-			tMin[3]=fStack[3];
-			tMax[0]=Min(fStack[4],minRet[0]);
-			tMax[1]=Min(fStack[5],minRet[1]);
-			tMax[2]=Min(fStack[6],minRet[2]);
-			tMax[3]=Min(fStack[7],minRet[3]);
-			--nStack; node=*nStack;
-ENTRANCE:
 			stats.LoopIteration();
-			u32 axis=node->Axis();
-		
-			if(axis==3) {
-				uint objectId=node->Object();
- 
-				if(mailbox.Find(objectId)) continue;
-				mailbox.Insert(objectId);
 
-				const Object &obj=objects[objectId];
-				stats.Intersection(4);
+			if(idx&BIHNode::leafMask) {
+				idx&=BIHNode::idxMask;
 
-				Vec3q tvec[4]; {
-					Vec3q a=obj.a;
-					tvec[0]=rOrigin[0]-a;
-					tvec[1]=rOrigin[1]-a;
-					tvec[2]=rOrigin[2]-a;
-					tvec[3]=rOrigin[3]-a;
-				}
-				floatq u[4],v[4]; {
-					Vec3q ba=obj.ba,ca=obj.ca;
-					u[0]=tDir[0]|(ba^tvec[0]);
-					v[0]=tDir[0]|(tvec[0]^ca);
-					u[1]=tDir[1]|(ba^tvec[1]);
-					v[1]=tDir[1]|(tvec[1]^ca);
-					u[2]=tDir[2]|(ba^tvec[2]);
-					v[2]=tDir[2]|(tvec[2]^ca);
-					u[3]=tDir[3]|(ba^tvec[3]);
-					v[3]=tDir[3]|(tvec[3]^ca);
-				}
+				if(!mailbox.Find(idx)) {
+					mailbox.Insert(idx);
+					stats.Intersection(4);
 
-				Vec3p nrm=obj.Nrm();
-				floatq nrmLen=floatq( ((float*)&obj.ca)[3] );
+					const Object &obj=objects[idx];
 
-				{
-					floatq det=tDir[0]|nrm;
-					f32x4b mask=Min(u[0],v[0])>=0.0f&&u[0]+v[0]<=det*nrmLen;
-					if(ForAny(mask)) {
-						floatq dist=Condition(mask,-(tvec[0]|nrm)/det,minRet[0]);
-						mask=dist<minRet[0];
-						minRet[0]=Min(minRet[0],dist);
-						object[0]=Condition(i32x4b(mask),i32x4(objectId),object[0]);
+					Vec3q tvec[4]; {
+						Vec3q a(obj.a.x,obj.a.y,obj.a.z);
+						tvec[0]=rOrigin[0]-a;
+						tvec[1]=rOrigin[1]-a;
+						tvec[2]=rOrigin[2]-a;
+						tvec[3]=rOrigin[3]-a;
 					}
-				}
-				{
-					floatq det=tDir[1]|nrm;
-					f32x4b mask=Min(u[1],v[1])>=0.0f&&u[1]+v[1]<=det*nrmLen;
-					if(ForAny(mask)) {
-						floatq dist=Condition(mask,-(tvec[1]|nrm)/det,minRet[1]);
-						mask=dist<minRet[1];
-						minRet[1]=Min(minRet[1],dist);
-						object[1]=Condition(i32x4b(mask),i32x4(objectId),object[1]);
+					floatq u[4],v[4]; {
+						Vec3q ba(obj.ba.x,obj.ba.y,obj.ba.z),ca(obj.ca.x,obj.ca.y,obj.ca.z);
+						u[0]=tDir[0]|(ba^tvec[0]);
+						v[0]=tDir[0]|(tvec[0]^ca);
+						u[1]=tDir[1]|(ba^tvec[1]);
+						v[1]=tDir[1]|(tvec[1]^ca);
+						u[2]=tDir[2]|(ba^tvec[2]);
+						v[2]=tDir[2]|(tvec[2]^ca);
+						u[3]=tDir[3]|(ba^tvec[3]);
+						v[3]=tDir[3]|(tvec[3]^ca);
 					}
-				}
-				{
-					floatq det=tDir[2]|nrm;
-					f32x4b mask=Min(u[2],v[2])>=0.0f&&u[2]+v[2]<=det*nrmLen;
-					if(ForAny(mask)) {
-						floatq dist=Condition(mask,-(tvec[2]|nrm)/det,minRet[2]);
-						mask=dist<minRet[2];
-						minRet[2]=Min(minRet[2],dist);
-						object[2]=Condition(i32x4b(mask),i32x4(objectId),object[2]);
+
+					Vec3p nrm=obj.Nrm();
+					floatq nrmLen=floatq( ((float*)&obj.ca)[3] );
+					{
+						floatq det=tDir[0]|nrm;
+						f32x4b mask=Min(u[0],v[0])>=0.0f&&u[0]+v[0]<=det*nrmLen;
+						if(ForAny(mask)) {
+							floatq dist=Condition(mask,-(tvec[0]|nrm)/det,minRet[0]);
+							mask=dist<minRet[0]&&dist>0.0f;
+							if(Output::type==otShadow) done[0]|=ForWhich(mask);
+							minRet[0]=Condition(mask,dist,minRet[0]);
+							if(Output::objectIndexes)
+								object[0]=Condition(i32x4b(mask),i32x4(idx),object[0]);
+						}
+					} {
+						floatq det=tDir[1]|nrm;
+						f32x4b mask=Min(u[1],v[1])>=0.0f&&u[1]+v[1]<=det*nrmLen;
+						if(ForAny(mask)) {
+							floatq dist=Condition(mask,-(tvec[1]|nrm)/det,minRet[1]);
+							mask=dist<minRet[1]&&dist>0.0f;
+							if(Output::type==otShadow) done[1]|=ForWhich(mask);
+							minRet[1]=Condition(mask,dist,minRet[1]);
+							if(Output::objectIndexes)
+								object[1]=Condition(i32x4b(mask),i32x4(idx),object[1]);
+						}
+					} {
+						floatq det=tDir[2]|nrm;
+						f32x4b mask=Min(u[2],v[2])>=0.0f&&u[2]+v[2]<=det*nrmLen;
+						if(ForAny(mask)) {
+							floatq dist=Condition(mask,-(tvec[2]|nrm)/det,minRet[2]);
+							mask=dist<minRet[2]&&dist>0.0f;
+							if(Output::type==otShadow) done[2]|=ForWhich(mask);
+							minRet[2]=Condition(mask,dist,minRet[2]);
+							if(Output::objectIndexes)
+								object[2]=Condition(i32x4b(mask),i32x4(idx),object[2]);
+						}
+					} {
+						floatq det=tDir[3]|nrm;
+						f32x4b mask=Min(u[3],v[3])>=0.0f&&u[3]+v[3]<=det*nrmLen;
+						if(ForAny(mask)) {
+							floatq dist=Condition(mask,-(tvec[3]|nrm)/det,minRet[3]);
+							mask=dist<minRet[3]&&dist>0.0f;
+							if(Output::type==otShadow) done[3]|=ForWhich(mask);
+							minRet[3]=Condition(mask,dist,minRet[3]);
+							if(Output::objectIndexes)
+								object[3]=Condition(i32x4b(mask),i32x4(idx),object[3]);
+						}
 					}
-				}
-				{
-					floatq det=tDir[3]|nrm;
-					f32x4b mask=Min(u[3],v[3])>=0.0f&&u[3]+v[3]<=det*nrmLen;
-					if(ForAny(mask)) {
-						floatq dist=Condition(mask,-(tvec[3]|nrm)/det,minRet[3]);
-						mask=dist<minRet[3];
-						minRet[3]=Min(minRet[3],dist);
-						object[3]=Condition(i32x4b(mask),i32x4(objectId),object[3]);
-					}
+
+					if(Output::type==otShadow)
+						if((done[0]&done[1]&done[2]&done[3])==15)
+							break;
 				}
 
+			POP_STACK:
+				if(fStack==fStackBegin) break;
+
+				fStack-=8;
+				tMin[0]=fStack[0];
+				tMin[1]=fStack[1];
+				tMin[2]=fStack[2];
+				tMin[3]=fStack[3];
+				tMax[0]=Min(fStack[4],minRet[0]);
+				tMax[1]=Min(fStack[5],minRet[1]);
+				tMax[2]=Min(fStack[6],minRet[2]);
+				tMax[3]=Min(fStack[7],minRet[3]);
+				--nStack;
+				idx=*nStack;
 				continue;
 			}
 
-			bool onlyOneChild=node->OnlyOneChild();
-			uint sign=dSign[axis];
+			const BIHNode *node=node0+(idx&BIHNode::idxMask);
+			int axis=node->Axis();
+			int nidx=dSign[axis];
 			floatq near[4],far[4]; {
-				floatq start[4]={torig[axis][0],torig[axis][1],torig[axis][2],torig[axis][3]};
-				floatq inv[4]={tinv[axis][0],tinv[axis][1],tinv[axis][2],tinv[axis][3]};
+				floatq *start=torig[axis],*inv=tinv[axis];
 
 				float tnear=node->ClipLeft(),tfar=node->ClipRight();
-				if(sign) Swap(tnear,tfar);
+				if(nidx) Swap(tnear,tfar);
 
 				near[0]=Min( (floatq(tnear)-start[0])*inv[0], tMax[0]);
 				near[1]=Min( (floatq(tnear)-start[1])*inv[1], tMax[1]);
@@ -540,30 +520,29 @@ ENTRANCE:
 				far [2]=Max( (floatq(tfar) -start[2])*inv[2], tMin[2]);
 				far [3]=Max( (floatq(tfar) -start[3])*inv[3], tMin[3]);
 			}
-			node=node0+node->Child();
 
 			f32x4b test1=tMin[0]>near[0]&&tMin[1]>near[1]&&tMin[2]>near[2]&&tMin[3]>near[3];
 			f32x4b test2=tMax[0]<far [0]&&tMax[1]<far [1]&&tMax[2]<far [2]&&tMax[3]<far [3];
 
 			if(ForAll(test1)) {
-				if(ForAll(test2)) continue;
+				if(ForAll(test2)) goto POP_STACK;
 
 				tMin[0]=far[0];
 				tMin[1]=far[1];
 				tMin[2]=far[2];
 				tMin[3]=far[3];
-				if(!onlyOneChild) node+=(sign^1);
-				goto ENTRANCE;
+				idx=node->val[nidx^1];
+				continue;
 			}
 			if(ForAll(test2)) {
-				if(ForAll(test1)) continue;
+				if(ForAll(test1)) goto POP_STACK;
 
 				tMax[0]=near[0];
 				tMax[1]=near[1];
 				tMax[2]=near[2];
 				tMax[3]=near[3];
-				if(!onlyOneChild) node+=sign;
-				goto ENTRANCE;
+				idx=node->val[nidx];
+				continue;
 			}
 
 			fStack[0]=far[0];
@@ -576,18 +555,17 @@ ENTRANCE:
 			fStack[7]=tMax[3];
 			fStack+=8;
 
-			*nStack=node+(sign^1);
+			*nStack=node->val[nidx^1];
 			nStack++;
 
 			tMax[0]=near[0];
 			tMax[1]=near[1];
 			tMax[2]=near[2];
 			tMax[3]=near[3];
-			node+=sign;
-			goto ENTRANCE;
+			
+			idx=node->val[nidx];
 		}
 
-EXIT:
 		if(tstats) tstats->Update(stats);
 		out[0]=minRet[0];
 		out[1]=minRet[1];
@@ -622,51 +600,71 @@ EXIT:
 		}
 	}
 
-	template <class Output,class Group>
-	void TraverseQuadGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out,int dirMask) const {
-		i32x4 tmp;
+	template <class Output,class Rays>
+	void TraverseQuadGroup(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out,int dirMask) const {
 		int i=0;
 		for(;i+3<sel.Num();i+=4) {
 			int q[4]={sel[i],sel[i+1],sel[i+2],sel[i+3]};
 			Vec3q tOrig[4],tDir[4];
 			floatq dist[4]; i32x4 obj[4];
 
-			dist[0]=out.dist[q[0]]; dist[1]=out.dist[q[1]]; dist[2]=out.dist[q[2]]; dist[3]=out.dist[q[3]];
-			obj[0]=out.object[q[0]]; obj[1]=out.object[q[1]]; obj[2]=out.object[q[2]]; obj[3]=out.object[q[3]];
-			tOrig[0]=group.Origin(q[0]); tOrig[1]=group.Origin(q[1]);
-			tOrig[2]=group.Origin(q[2]); tOrig[3]=group.Origin(q[3]);
-			tDir[0]=group.Dir(q[0]); tDir[1]=group.Dir(q[1]);
-			tDir[2]=group.Dir(q[2]); tDir[3]=group.Dir(q[3]);
+			dist[0]=out.dist[q[0]]; dist[1]=out.dist[q[1]];
+			dist[2]=out.dist[q[2]]; dist[3]=out.dist[q[3]];
+			if(Output::objectIndexes) {
+				obj[0]=out.object[q[0]]; obj[1]=out.object[q[1]];
+				obj[2]=out.object[q[2]]; obj[3]=out.object[q[3]];
+			}
+			tOrig[0]=rays.Origin(q[0]); tOrig[1]=rays.Origin(q[1]);
+			tOrig[2]=rays.Origin(q[2]); tOrig[3]=rays.Origin(q[3]);
+			tDir[0]=rays.Dir(q[0]); tDir[1]=rays.Dir(q[1]);
+			tDir[2]=rays.Dir(q[2]); tDir[3]=rays.Dir(q[3]);
 
-			TraverseQuad4(tOrig,tDir,dist,obj,out.stats,dirMask);
+			TraverseQuad4<Output>(tOrig,tDir,dist,obj,out.stats,dirMask);
 
-			out.dist[q[0]]=dist[0]; out.dist[q[1]]=dist[1]; out.dist[q[2]]=dist[2]; out.dist[q[3]]=dist[3];
-			out.object[q[0]]=obj[0]; out.object[q[1]]=obj[1]; out.object[q[2]]=obj[2]; out.object[q[3]]=obj[3];
+			out.dist[q[0]]=dist[0]; out.dist[q[1]]=dist[1];
+			out.dist[q[2]]=dist[2]; out.dist[q[3]]=dist[3];
+			if(Output::objectIndexes) {
+				out.object[q[0]]=obj[0]; out.object[q[1]]=obj[1];
+				out.object[q[2]]=obj[2]; out.object[q[3]]=obj[3];
+			}
 		}
 		for(;i<sel.Num();i++) {
 			int q=sel[i];
-			//int bmask=sel.BitMask(q);
-
-			TraverseQuad(group.Origin(q),group.Dir(q),::Output<otNormal,f32x4,i32x4>(out.dist+q,out.object+q,out.stats),dirMask);
+			TraverseQuad(rays.Origin(q),rays.Dir(q),Output(out.dist+q,out.object+q,out.stats),dirMask);
 		}
 	}
 
 
-	template <class Output,class Group>
-	void TraverseOptimized(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
-		if(Output::type!=otPrimary) {
-			TraverseMonoGroup(group,sel,out);
-			return;
+	template <class Output,class Rays>
+	void TraverseOptimized(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out) const {
+		if(!sel.Num()) return;
+
+		RaySelector<Rays::size> selectors[9];
+		rays.GenSelectors(sel,selectors);
+
+		for(int k=0;k<8;k++) {
+			RaySelector<Rays::size> &sel=selectors[k];
+			if(sel.Num()) {
+				// Ulepszyc, ta czworka moze byc popsuta (wektorki w roznych kierunkach)
+				Vec3q dir0=rays.Dir(sel[0]);
+
+				if(Output::type!=otPrimary) for(int i=1;i<sel.Num();i++) {
+					int q=sel[i];
+
+					int bitMask=sel.BitMask(i);
+					if(bitMask!=15) { selectors[8].Add(q,bitMask); sel.Disable(i--); continue; }
+	
+					floatq dot=rays.Dir(q)|dir0;
+					if(ForAny(dot<Const<floatq,998,1000>())) { selectors[8].Add(q); sel.Disable(i--); continue; }
+				}
+				TraverseQuadGroup(rays,sel,out,k);
+			}
 		}
-
-		RaySelector<Group::size> selectors[9];
-		group.GenSelectors(sel,selectors);
-
-		for(int s=0;s<8;s++)
-			TraverseQuadGroup(group,selectors[s],out,s);
-		TraverseMonoGroup(group,selectors[8],out);
+		if(selectors[8].Num())
+			TraverseMonoGroup(rays,selectors[8],out);
 	}
 
+	int vLeafs;
 	Vec3p pMin,pMax;
 	vector<BIHNode> nodes;
 	Vector<BIHTriangle> objects;

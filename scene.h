@@ -63,13 +63,13 @@ void TraceLight(TracingContext<Scene,Group,Selector> &c,const Light &light) {
 
 		for(int i=0;i<lsel.Num();i++) {
 			int q=lsel[i];
-			tDst[q]=lightDist[q]+1000.0f;
+			tDst[q]=lightDist[q]*0.99999f;
 		}
 
 		c.scene.Traverse(tGroup,lsel,Output<otShadow,floatq,i32x4>(tDst,0,&c.stats));
 	}
 
-	Vec3q lightColor=light.color;
+	Vec3q lightColor(light.color);
 	for(int i=0;i<lsel.Num();i++) {
 		int q=lsel.Idx(i);
 
