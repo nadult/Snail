@@ -1,5 +1,7 @@
 
 
+	// Its fast when hitting big triangles (relatively)
+	// When you have a lot of small triangles, TraverseQuad4 will be faster
 	template <class AccStruct> template <class Output>
 	void BIHTree<AccStruct>:: TraverseQuad4Primary(const Vec3q *tOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const {
 		TreeStats stats;

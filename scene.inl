@@ -10,7 +10,7 @@
 	};
 
 	template <class AccStruct>
-	TScene<AccStruct>::TScene(const char *modelFile) :tree(vector<Object>()) {
+	TScene<AccStruct>::TScene(const char *modelFile) :tree(vector<Object>()),lightsEnabled(1) {
 		vector<Object> objects;
 //		objects.push_back(Sphere(Vec3f(-2,0,5)*5.0f,4.04f*5));
 //		objects.push_back(Sphere(Vec3f(3,2,10)*5.0f,3*5));
@@ -35,7 +35,7 @@
 				objects[n]=tris[n];
 		}
 
-//		AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
+	//	AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-100,-100,0),Vec3f(0,0,20000),Vec3f(1,1,1),1,1,1);
 		AddSoftLight(Vec3f(100,-180,0),Vec3f(0,20000,5000),Vec3f(1,1,1),1,1,1);
 		AddLight(Vec3f(0,-150,0),Vec3f(15000,20000,0));

@@ -16,10 +16,10 @@ using std::cout;
 using std::endl;
 
 struct Options {
-	Options(bool pixD,bool gd,bool refl,bool rdtsc) :pixDoubling(pixD),grid(gd),reflections(refl),rdtscShader(rdtsc) { }
+	Options(bool pixD,bool refl,bool rdtsc) :pixDoubling(pixD),reflections(refl),rdtscShader(rdtsc) { }
 	Options() { memset(this,0,sizeof(Options)); }
 
-	bool pixDoubling,grid;
+	bool pixDoubling;
 	bool reflections,rdtscShader;
 };
 
@@ -76,33 +76,25 @@ struct GenImageTask {
 				outStats->Update(context.stats);
 
 				rayGen.Decompose(rgb,rgb);
-				Vec3f trgb[PWidth*PHeight];
-				for(int q=0;q<NQuads;q++)
-					Convert(VClamp(	rgb[q]*Const<floatq,255>(),
-									Vec3q(Const<floatq,0>()),
-									Vec3q(Const<floatq,255>())),trgb+q*4);
+				Vec3f trgb[PWidth*PHeight]; {
+					floatq max=255.0f,zero=0.0f;
+					for(int q=0;q<NQuads;q++) Convert(VClamp(rgb[q]*max,Vec3q(zero),Vec3q(max)),trgb+q*4);
+				}
 
 				int tWidth =Min(x+PWidth +startX,out->width )-startX-x;
 				int tHeight=Min(y+PHeight+startY,out->height)-startY-y;
 				for(int ty=0;ty<tHeight;ty++) {
 					u8 *ptr=outPtr+x*3+(ty+y)*pitch;
+					Vec3f *src=trgb+ty*PWidth;
 
 					for(int tx=0;tx<tWidth;tx++) {
-						ptr[0]=trgb[tx+ty*PWidth].x;
-						ptr[1]=trgb[tx+ty*PWidth].y;
-						ptr[2]=trgb[tx+ty*PWidth].z;
+						ptr[0]=src[tx].x;
+						ptr[1]=src[tx].y;
+						ptr[2]=src[tx].z;
 						ptr+=3;
 					}
 				}
 			}
-		}
-
-		if(options.grid) for(int y=0;y<height;y++) {
-			int addX=y%PHeight==0?1:PWidth;
-			unsigned char *buf=(unsigned char*)&out->buffer[((startY+y)*out->width+startX)*3];
-
-			for(int x=0;x<width;x+=addX)
-				{ buf[x*3+0]=255; buf[x*3+1]=0; buf[x*3+2]=0; }
 		}
 	}
 };
@@ -273,7 +265,7 @@ int main(int argc, char **argv)
 	else {
 		GLWindow out(resx,resy,fullscreen);
 		Options options;
-	//	options.reflections^=1;
+		bihScene.lightsEnabled=0;
 
 		while(out.PollEvents()) {
 			if(out.Key(Key_lctrl)&&out.Key('C')) break;
@@ -281,7 +273,6 @@ int main(int argc, char **argv)
 			if(out.KeyDown('P')) options.pixDoubling^=1;
 			if(out.KeyDown('O')) options.reflections^=1;
 			if(out.KeyDown('I')) options.rdtscShader^=1;
-			if(out.KeyDown('G')) options.grid^=1;
 
 			if(out.Key('W')) cam.pos+=cam.front*speed;
 			if(out.Key('S')) cam.pos-=cam.front*speed;
@@ -289,7 +280,7 @@ int main(int argc, char **argv)
 			if(out.Key('A')) cam.pos-=cam.right*speed;
 			if(out.Key('D')) cam.pos+=cam.right*speed;
 
-
+			if(out.Key('L')) { printf("Lights %s\n",bihScene.lightsEnabled?"disabled":"enabled"); bihScene.lightsEnabled^=1; }
 			if(out.Key('R')) cam.pos-=cam.up*speed;
 			if(out.Key('F')) cam.pos+=cam.up*speed;
 

@@ -115,9 +115,9 @@ public:
 			tDir[0]=rays.Dir(q[0]); tDir[1]=rays.Dir(q[1]);
 			tDir[2]=rays.Dir(q[2]); tDir[3]=rays.Dir(q[3]);
 
-			if(Output::type==otPrimary)
-				 TraverseQuad4Primary<Output>(tOrig,tDir,dist,obj,out.stats,dirMask);
-			else
+		//	if(Output::type==otPrimary)
+		//		 TraverseQuad4Primary<Output>(tOrig,tDir,dist,obj,out.stats,dirMask);
+		//	else
 				TraverseQuad4<Output,Rays::sharedOrigin>(tOrig,tDir,dist,obj,out.stats,dirMask);
 
 			out.dist[q[0]]=dist[0]; out.dist[q[1]]=dist[1];

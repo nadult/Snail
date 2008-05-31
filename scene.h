@@ -102,6 +102,8 @@ public:
 	void RayTracePrimary(TracingContext<TScene<AccStruct>,Group,Selector> &c) const { RayTrace<Group,Selector,1>(c); }
 	template <class Group,class Selector>
 	void RayTraceSecondary(TracingContext<TScene<AccStruct>,Group,Selector> &c) const { RayTrace<Group,Selector,0>(c); }
+
+	bool lightsEnabled;
 	vector<Light> lights;
 	AccStruct tree;
 };
@@ -165,13 +167,13 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector
 		SimpleLightingShader(c,q);
 	}
 
-	for(int n=0;n<lights.size();n++)
+	if(lightsEnabled) for(int n=0;n<lights.size();n++)
 		TraceLight(c,lights[n]);
 
 	if(c.options.reflections>0&&c.selector.Num())
 		TraceReflection(c);
 
-	if(lights.size())
+	if(lights.size()&&lightsEnabled)
 		for(int i=0;i<c.selector.Num();i++) {
 		int q=c.selector[i];
 		c.color[q]=Condition(c.selector.Mask(i),c.color[q]*c.light[q]);
