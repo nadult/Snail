@@ -26,6 +26,11 @@ Vec Reflect(const Vec &ray,const Vec &nrm) {
 	return ray-nrm*(dot+dot);
 }
 
+inline float Maximize(const floatq &t) { return Max(Max(t[0],t[1]),Max(t[2],t[3])); }
+inline float Minimize(const floatq &t) { return Min(Min(t[0],t[1]),Min(t[2],t[3])); }
+inline Vec3p Maximize(const Vec3q &v) { return Vec3p(Maximize(v.x),Maximize(v.y),Maximize(v.z)); }
+inline Vec3p Minimize(const Vec3q &v) { return Vec3p(Minimize(v.x),Minimize(v.y),Minimize(v.z)); }
+	
 template <int size>
 class ObjectIdxBuffer
 {
@@ -48,6 +53,47 @@ public:
 	}
 	i32x4 indices[size];
 	int last;
+};
+
+template <class T>
+class Vector
+{
+public:
+	typedef T value_type;
+
+	Vector() :tab(0),count(0) { }
+
+	template <class Container>
+	Vector(const Container &obj) :tab(0) {
+		Alloc(obj.size());
+		for(int n=0;n<count;n++) tab[n]=obj[n];
+	}
+	Vector(const Vector &obj) :tab(0) {
+		Alloc(obj.size());
+		for(int n=0;n<count;n++) tab[n]=obj[n];
+	}
+	const Vector &operator=(const Vector &obj) {
+		if(&obj==this) return *this;
+		return operator=<Vector>(obj);
+	}
+	template <class Container>
+	const Vector &operator=(const Container &obj) {
+		Alloc(obj.size());
+		for(int n=0;n<count;n++) tab[n]=obj[n];
+		return *this;
+	}
+	~Vector() { Free(); }
+
+	inline size_t size() const { return count; }
+	inline const T &operator[](int n) const { return tab[n]; }
+	inline T &operator[](int n) { return tab[n]; }
+
+private:
+	void Alloc(size_t newS) { Free(); count=newS; tab=count?new T[count]:0; }
+	void Free() { if(tab) delete[] tab; } 
+
+	T *tab;
+	size_t count;
 };
 
 

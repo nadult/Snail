@@ -4,13 +4,12 @@
 		floatq maxD=output.dist[0];
 
 		TreeStats stats;
-		stats.TracingPacket(4);
+		stats.TracingRay(4);
 
 		Vec3q invDir=VInv(Vec3q(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f));
 		floatq tinv[3]={invDir.x,invDir.y,invDir.z};
 		floatq torig[3]={rOrigin.x,rOrigin.y,rOrigin.z};
 
-		int dSign[3]; FillDSignArray(dirMask,dSign);
 		floatq minRet=maxD,tMin=ConstEpsilon<floatq>(),tMax=maxD;
 
 		floatq fStackBegin[2*(maxLevel+2)],*fStack=fStackBegin;
@@ -21,9 +20,9 @@
 		{
 			Vec3q ttMin=(Vec3q(pMin)-rOrigin)*invDir;
 			Vec3q ttMax=(Vec3q(pMax)-rOrigin)*invDir;
-			if(dSign[0]) Swap(ttMin.x,ttMax.x);
-			if(dSign[1]) Swap(ttMin.y,ttMax.y);
-			if(dSign[2]) Swap(ttMin.z,ttMax.z);
+			if(dirMask&1) Swap(ttMin.x,ttMax.x);
+			if(dirMask&2) Swap(ttMin.y,ttMax.y);
+			if(dirMask&4) Swap(ttMin.z,ttMax.z);
 
 			tMax=Min(Min(ttMax.x,ttMax.y),tMax);
 			tMax=Min(ttMax.z,tMax);
@@ -68,7 +67,7 @@
 
 			node=node0+(idx&BIHNode::idxMask);
 			int axis=node->Axis();
-			int sign=dSign[axis];
+			int sign=dirMask&(1<<axis)?1:0;
 			floatq near,far; {
 				floatq start=torig[axis],inv=tinv[axis];
 				float tnear=node->ClipLeft(),tfar=node->ClipRight();

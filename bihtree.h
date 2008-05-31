@@ -33,47 +33,6 @@ public:
 	u32 val[2];
 };
 
-template <class T>
-class Vector
-{
-public:
-	typedef T value_type;
-
-	Vector() :tab(0),count(0) { }
-
-	template <class Container>
-	Vector(const Container &obj) :tab(0) {
-		Alloc(obj.size());
-		for(int n=0;n<count;n++) tab[n]=obj[n];
-	}
-	Vector(const Vector &obj) :tab(0) {
-		Alloc(obj.size());
-		for(int n=0;n<count;n++) tab[n]=obj[n];
-	}
-	const Vector &operator=(const Vector &obj) {
-		if(&obj==this) return *this;
-		return operator=<Vector>(obj);
-	}
-	template <class Container>
-	const Vector &operator=(const Container &obj) {
-		Alloc(obj.size());
-		for(int n=0;n<count;n++) tab[n]=obj[n];
-		return *this;
-	}
-	~Vector() { Free(); }
-
-	inline size_t size() const { return count; }
-	inline const T &operator[](int n) const { return tab[n]; }
-	inline T &operator[](int n) { return tab[n]; }
-
-private:
-	void Alloc(size_t newS) { Free(); count=newS; tab=count?new T[count]:0; }
-	void Free() { if(tab) delete[] tab; } 
-
-	T *tab;
-	size_t count;
-};
-
 class BIHIdx {
 public:
 	BIHIdx() { }
@@ -100,17 +59,12 @@ public:
 	uint FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const;
 	void Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,int first,int last,Vec3p min,Vec3p max,uint level);
 
-	void FillDSignArray(int dirMask,int *dSign) const {
-		dSign[0]=dirMask&1?1:0;
-		dSign[1]=dirMask&2?1:0;
-		dSign[2]=dirMask&4?1:0;
-	}
 	template <class Output>
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const;
 
 	template <class Output>
 	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask) const;
-	template <class Output>
+	template <class Output,bool shared>
 	void TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const;
 	template <class Output>
 	void TraverseQuad4Primary(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const;
@@ -163,7 +117,8 @@ public:
 
 			if(Output::type==otPrimary)
 				 TraverseQuad4Primary<Output>(tOrig,tDir,dist,obj,out.stats,dirMask);
-			else TraverseQuad4<Output>(tOrig,tDir,dist,obj,out.stats,dirMask);
+			else
+				TraverseQuad4<Output,Rays::sharedOrigin>(tOrig,tDir,dist,obj,out.stats,dirMask);
 
 			out.dist[q[0]]=dist[0]; out.dist[q[1]]=dist[1];
 			out.dist[q[2]]=dist[2]; out.dist[q[3]]=dist[3];

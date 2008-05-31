@@ -62,7 +62,7 @@ struct GenImageTask {
 					Vec3f tmp[4]; Convert(dir[n],tmp);
 					for(int k=0;k<4;k++) tmp[k]=rotMat*tmp[k];
 					Convert(tmp,dir[n]);
-			//		dir[n]*=RSqrt(dir[n]|dir[n]);
+					dir[n]*=RSqrt(dir[n]|dir[n]);
 			//		idir[n]=VInv(dir[n]);
 				}
 
@@ -260,9 +260,14 @@ int main(int argc, char **argv)
 //	bool useKdTree=0;
 
 	if(nonInteractive) {
-		for(int n=atoi(argv[3])-1;n>=0;n--)
+		for(int n=atoi(argv[3])-1;n>0;n--) {
+			double time=GetTime();
 			/*if(useKdTree) GenImage(quadLevels,kdScene,cam,img,Options(),threads);
 			else*/ GenImage(quadLevels,bihScene,cam,img,Options(),threads);
+			time=GetTime()-time;
+			minTime=Min(minTime,time);
+			maxTime=Max(maxTime,time);
+		}
 		img.SaveToFile("out/output.tga");
 	}
 	else {
@@ -331,7 +336,7 @@ int main(int argc, char **argv)
 			int lastTicks=0;
 			stats.PrintInfo(resx,resy,time*1000.0);
 
-//			bihScene.Animate();
+			bihScene.Animate();
 			out.RenderImage(img);
 			out.SwapBuffers();
 		}

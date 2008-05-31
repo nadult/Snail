@@ -9,8 +9,7 @@ template <class AccStruct> template <class Output>
 		Vec3p rDir=Vec3p(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
 		Vec3p invDir=VInv(rDir);
 
-		int signMask=SignMask(floatq(invDir.m));
-		int dSign[3]={signMask&1?1:0,signMask&2?1:0,signMask&4?1:0};
+		int dirMask=SignMask(floatq(invDir.m));
 		float minRet=maxD,tMin=ConstEpsilon<float>(),tMax=maxD;
 
 		struct Locals { float tMin,tMax; u32 idx; } stackBegin[maxLevel+2],*stack=stackBegin;
@@ -22,9 +21,9 @@ template <class AccStruct> template <class Output>
 		{
 			Vec3p ttMin=(pMin-rOrigin)*invDir;
 			Vec3p ttMax=(pMax-rOrigin)*invDir;
-			if(dSign[0]) Swap(ttMin.x,ttMax.x);
-			if(dSign[1]) Swap(ttMin.y,ttMax.y);
-			if(dSign[2]) Swap(ttMin.z,ttMax.z);
+			if(dirMask&1) Swap(ttMin.x,ttMax.x);
+			if(dirMask&2) Swap(ttMin.y,ttMax.y);
+			if(dirMask&4) Swap(ttMin.z,ttMax.z);
 
 			tMax=Min(Min(ttMax.x,ttMax.y),tMax);
 			tMax=Min(ttMax.z,tMax);
@@ -62,7 +61,7 @@ POP_STACK:
 
 			node=node0+(idx&BIHNode::idxMask);
 			int axis=node->Axis();
-			int nidx=dSign[axis],fidx=nidx^1;
+			int nidx=dirMask&(1<<axis)?1:0,fidx=nidx^1;
 
 			float near,far; {
 				float start=(&rOrigin.x)[axis],inv=(&invDir.x)[axis];

@@ -1,5 +1,5 @@
 
-	template <class AccStruct> template <class Output>
+	template <class AccStruct> template <class Output,bool sharedOrigin>
 	void BIHTree<AccStruct>:: TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const {
 		floatq maxD[4]={out[0],out[1],out[2],out[3]};
 
@@ -21,7 +21,6 @@
 			{rOrigin[0].y,rOrigin[1].y,rOrigin[2].y,rOrigin[3].y},
 			{rOrigin[0].z,rOrigin[1].z,rOrigin[2].z,rOrigin[3].z} };
 
-		int dSign[3]; FillDSignArray(dirMask,dSign);
 		floatq minRet[4]={maxD[0],maxD[1],maxD[2],maxD[3]};
 
 		floatq tMin[4],tMax[4];
@@ -35,34 +34,22 @@
 		u32 nStackBegin[maxLevel+2],*nStack=nStackBegin;
 
 		{
-			Vec3q ttMin[4]={
-				(Vec3q(pMin)-rOrigin[0])*invDir[0],
-				(Vec3q(pMin)-rOrigin[1])*invDir[1],
-				(Vec3q(pMin)-rOrigin[2])*invDir[2],
-				(Vec3q(pMin)-rOrigin[3])*invDir[3],
-			}; Vec3q ttMax[4]={
-				(Vec3q(pMax)-rOrigin[0])*invDir[0],
-				(Vec3q(pMax)-rOrigin[1])*invDir[1],
-				(Vec3q(pMax)-rOrigin[2])*invDir[2],
-				(Vec3q(pMax)-rOrigin[3])*invDir[3],
-			};
+			Vec3p rMin=pMin,rMax=pMax;
+			if(dirMask&1) Swap(rMin.x,rMax.x);
+			if(dirMask&2) Swap(rMin.y,rMax.y);
+			if(dirMask&4) Swap(rMin.z,rMax.z);
 
-			if(dSign[0]) {
-				Swap(ttMin[0].x,ttMax[0].x);
-				Swap(ttMin[1].x,ttMax[1].x);
-				Swap(ttMin[2].x,ttMax[2].x);
-				Swap(ttMin[3].x,ttMax[3].x);
-			} if(dSign[1]) {
-				Swap(ttMin[0].y,ttMax[0].y);
-				Swap(ttMin[1].y,ttMax[1].y);
-				Swap(ttMin[2].y,ttMax[2].y);
-				Swap(ttMin[3].y,ttMax[3].y);
-			} if(dSign[2]) {
-				Swap(ttMin[0].z,ttMax[0].z);
-				Swap(ttMin[1].z,ttMax[1].z);
-				Swap(ttMin[2].z,ttMax[2].z);
-				Swap(ttMin[3].z,ttMax[3].z);
-			}
+			Vec3q ttMin[4]={
+				(Vec3q(rMin)-rOrigin[0])*invDir[0],
+				(Vec3q(rMin)-rOrigin[1])*invDir[1],
+				(Vec3q(rMin)-rOrigin[2])*invDir[2],
+				(Vec3q(rMin)-rOrigin[3])*invDir[3],
+			}; Vec3q ttMax[4]={
+				(Vec3q(rMax)-rOrigin[0])*invDir[0],
+				(Vec3q(rMax)-rOrigin[1])*invDir[1],
+				(Vec3q(rMax)-rOrigin[2])*invDir[2],
+				(Vec3q(rMax)-rOrigin[3])*invDir[3],
+			};
 
 			ttMax[0].x=Min(ttMax[0].x,ttMax[0].y);
 			ttMax[1].x=Min(ttMax[1].x,ttMax[1].y);
@@ -101,28 +88,47 @@
 
 					const Object &obj=objects[idx];
 
-					Vec3q tvec[4]; {
-						Vec3q a(obj.a.x,obj.a.y,obj.a.z);
-						tvec[0]=rOrigin[0]-a;
-						tvec[1]=rOrigin[1]-a;
-						tvec[2]=rOrigin[2]-a;
-						tvec[3]=rOrigin[3]-a;
+					Vec3p nrm=obj.Nrm();
+					floatq u[4],v[4],val[4];
+					if(sharedOrigin) {
+						Vec3q tvec=rOrigin[0]-Vec3q(obj.a);
+						Vec3q ba(obj.ba.x,obj.ba.y,obj.ba.z),ca(obj.ca.x,obj.ca.y,obj.ca.z);
+						Vec3q cross1=ba^tvec,cross2=tvec^ca;
+
+						u[0]=tDir[0]|cross1; v[0]=tDir[0]|cross2;
+						u[1]=tDir[1]|cross1; v[1]=tDir[1]|cross2;
+						u[2]=tDir[2]|cross1; v[2]=tDir[2]|cross2;
+						u[3]=tDir[3]|cross1; v[3]=tDir[3]|cross2;
+
+						val[0]=-(tvec|nrm);
+						val[1]=val[2]=val[3]=val[0];
 					}
-					floatq u[4],v[4]; {
+					else {
+						Vec3q tvec[4]; {
+							Vec3q a(obj.a.x,obj.a.y,obj.a.z);
+							tvec[0]=rOrigin[0]-a;
+							tvec[1]=rOrigin[1]-a;
+							tvec[2]=rOrigin[2]-a;
+							tvec[3]=rOrigin[3]-a;
+						}
+						val[0]=-(tvec[0]|nrm);
+						val[1]=-(tvec[1]|nrm);
+						val[2]=-(tvec[2]|nrm);
+						val[3]=-(tvec[3]|nrm);
+
 						Vec3q ba(obj.ba.x,obj.ba.y,obj.ba.z),ca(obj.ca.x,obj.ca.y,obj.ca.z);
 						u[0]=tDir[0]|(ba^tvec[0]); v[0]=tDir[0]|(tvec[0]^ca);
 						u[1]=tDir[1]|(ba^tvec[1]); v[1]=tDir[1]|(tvec[1]^ca);
 						u[2]=tDir[2]|(ba^tvec[2]); v[2]=tDir[2]|(tvec[2]^ca);
 						u[3]=tDir[3]|(ba^tvec[3]); v[3]=tDir[3]|(tvec[3]^ca);
 					}
-
-					Vec3p nrm=obj.Nrm();
+				
 					floatq nrmLen=floatq( ((float*)&obj.ca)[3] );
 					{
 						floatq det=tDir[0]|nrm;
 						f32x4b mask=Min(u[0],v[0])>=0.0f&&u[0]+v[0]<=det*nrmLen;
 						if(ForAny(mask)) {
-							floatq dist=Condition(mask,-(tvec[0]|nrm)/det,minRet[0]);
+							floatq dist=Condition(mask,val[0]/det,minRet[0]);
 							mask=dist<minRet[0]&&dist>0.0f;
 							minRet[0]=Condition(mask,Output::type==otShadow?0.00001f:dist,minRet[0]);
 							if(Output::objectIndexes)
@@ -133,7 +139,7 @@
 						floatq det=tDir[1]|nrm;
 						f32x4b mask=Min(u[1],v[1])>=0.0f&&u[1]+v[1]<=det*nrmLen;
 						if(ForAny(mask)) {
-							floatq dist=Condition(mask,-(tvec[1]|nrm)/det,minRet[1]);
+							floatq dist=Condition(mask,val[1]/det,minRet[1]);
 							mask=dist<minRet[1]&&dist>0.0f;
 							minRet[1]=Condition(mask,Output::type==otShadow?0.00001f:dist,minRet[1]);
 							if(Output::objectIndexes)
@@ -144,7 +150,7 @@
 						floatq det=tDir[2]|nrm;
 						f32x4b mask=Min(u[2],v[2])>=0.0f&&u[2]+v[2]<=det*nrmLen;
 						if(ForAny(mask)) {
-							floatq dist=Condition(mask,-(tvec[2]|nrm)/det,minRet[2]);
+							floatq dist=Condition(mask,val[2]/det,minRet[2]);
 							mask=dist<minRet[2]&&dist>0.0f;
 							minRet[2]=Condition(mask,Output::type==otShadow?0.00001f:dist,minRet[2]);
 							if(Output::objectIndexes)
@@ -155,7 +161,7 @@
 						floatq det=tDir[3]|nrm;
 						f32x4b mask=Min(u[3],v[3])>=0.0f&&u[3]+v[3]<=det*nrmLen;
 						if(ForAny(mask)) {
-							floatq dist=Condition(mask,-(tvec[3]|nrm)/det,minRet[3]);
+							floatq dist=Condition(mask,val[3]/det,minRet[3]);
 							mask=dist<minRet[3]&&dist>0.0f;
 							minRet[3]=Condition(mask,Output::type==otShadow?0.00001f:dist,minRet[3]);
 							if(Output::objectIndexes)
@@ -184,7 +190,7 @@
 
 			const BIHNode *node=node0+(idx&BIHNode::idxMask);
 			int axis=node->Axis();
-			int nidx=dSign[axis];
+			int nidx=dirMask&(1<<axis)?1:0;
 
 			floatq near[4],far[4]; {
 				floatq *start=torig[axis],*inv=tinv[axis];

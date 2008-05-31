@@ -1,18 +1,13 @@
 
-	inline float Maximize(const floatq &t) { return Max(Max(t[0],t[1]),Max(t[2],t[3])); }
-	inline float Minimize(const floatq &t) { return Min(Min(t[0],t[1]),Min(t[2],t[3])); }
-	inline Vec3p Maximize(const Vec3q &v) { return Vec3p(Maximize(v.x),Maximize(v.y),Maximize(v.z)); }
-	inline Vec3p Minimize(const Vec3q &v) { return Vec3p(Minimize(v.x),Minimize(v.y),Minimize(v.z)); }
 
 	template <class AccStruct> template <class Output>
-	void BIHTree<AccStruct>:: TraverseQuad4Primary(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const {
+	void BIHTree<AccStruct>:: TraverseQuad4Primary(const Vec3q *tOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const {
 		TreeStats stats;
 		stats.TracingPacket(16);
 
-		Vec3p tCornerOrig=Vec3p(rOrigin[0].x[0],rOrigin[0].y[0],rOrigin[0].z[0]);
-		int dSign[3]; FillDSignArray(dirMask,dSign);
-
-		Vec3p cMaxInv,cMinInv; {
+		Vec3p orig=Vec3p(tOrigin[0].x[0],tOrigin[0].y[0],tOrigin[0].z[0]);
+			
+		Vec3p maxInv,minInv; {
 			Vec3q aDir[4]={VAbs(tDir[0]),VAbs(tDir[1]),VAbs(tDir[2]),VAbs(tDir[3])};
 			Vec3p tMax=Maximize( VMax(VMax(aDir[0],aDir[1]),VMax(aDir[2],aDir[3])) );
 			Vec3p tMin=Minimize( VMin(VMin(aDir[0],aDir[1]),VMin(aDir[2],aDir[3])) );
@@ -20,30 +15,30 @@
 			(&tMin.x)[3]=(&tMax.x)[3]=1.0f;
 			tMin=VInv(tMin+shift);
 			tMax=VInv(tMax+shift);
-			if(dSign[0]) { tMin.x=-tMin.x; tMax.x=-tMax.x; }
-			if(dSign[1]) { tMin.y=-tMin.y; tMax.y=-tMax.y; }
-			if(dSign[2]) { tMin.z=-tMin.z; tMax.z=-tMax.z; }
-			cMaxInv=VMax(tMin,tMax);
-			cMinInv=VMin(tMin,tMax);
+			if(dirMask&1) { tMin.x=-tMin.x; tMax.x=-tMax.x; }
+			if(dirMask&2) { tMin.y=-tMin.y; tMax.y=-tMax.y; }
+			if(dirMask&4) { tMin.z=-tMin.z; tMax.z=-tMax.z; }
+			maxInv=VMax(tMin,tMax);
+			minInv=VMin(tMin,tMax);
 		}
 
 		floatq minRet[4]={out[0],out[1],out[2],out[3]};
-		float cMaxMax=Maximize( Max(Max(minRet[0],minRet[1]),Max(minRet[2],minRet[3])) );
+		float tMaxMax=Maximize( Max(Max(minRet[0],minRet[1]),Max(minRet[2],minRet[3])) );
 
 		float fStackBegin[2*(maxLevel+2)],*fStack=fStackBegin;
 		u32 nStackBegin[maxLevel+2],*nStack=nStackBegin;
 
-		float cMax,cMin; {
+		float tMax,tMin; {
 			Vec3p rMin=pMin,rMax=pMax;
-			if(dSign[0]) Swap(rMin.x,rMax.x);
-			if(dSign[1]) Swap(rMin.y,rMax.y);
-			if(dSign[2]) Swap(rMin.z,rMax.z);
+			if(dirMask&1) Swap(rMin.x,rMax.x);
+			if(dirMask&2) Swap(rMin.y,rMax.y);
+			if(dirMask&4) Swap(rMin.z,rMax.z);
 
-			Vec3p ttMin=(rMin-tCornerOrig)*cMaxInv;
-			Vec3p ttMax=(rMax-tCornerOrig)*cMinInv;
+			Vec3p ttMin=VMin((rMin-orig)*minInv,(rMin-orig)*maxInv);
+			Vec3p ttMax=VMax((rMax-orig)*minInv,(rMax-orig)*maxInv);
 
-			cMin=Max(Max(ConstEpsilon<float>(),ttMin.x),Max(ttMin.y,ttMin.z));
-			cMax=Min(Min(cMaxMax			  ,ttMax.x),Min(ttMax.y,ttMax.z));
+			tMin=Max(Max(ConstEpsilon<float>(),ttMin.x),Max(ttMin.y,ttMin.z));
+			tMax=Min(Min(tMaxMax			  ,ttMax.x),Min(ttMax.y,ttMax.z));
 		}
 		ObjectIdxBuffer<4> mailbox;
 
@@ -64,7 +59,7 @@
 
 					Vec3p nrm=obj.Nrm();
 					floatq u[4],v[4],val; {
-						Vec3q tvec=rOrigin[0]-Vec3q(obj.a);
+						Vec3q tvec=tOrigin[0]-Vec3q(obj.a);
 						Vec3q ba(obj.ba.x,obj.ba.y,obj.ba.z),ca(obj.ca.x,obj.ca.y,obj.ca.z);
 						Vec3q cross1=ba^tvec,cross2=tvec^ca;
 
@@ -122,15 +117,15 @@
 							stats.IntersectPass();
 						} else stats.IntersectFail();
 					}
-					cMaxMax=Maximize( Max(Max(minRet[0],minRet[1]),Max(minRet[2],minRet[3])) );
+					tMaxMax=Maximize( Max(Max(minRet[0],minRet[1]),Max(minRet[2],minRet[3])) );
 				}
 
 			POP_STACK:
 				if(fStack==fStackBegin) break;
 
 				fStack-=2;
-				cMin=fStack[0];
-				cMax=Min(cMaxMax,fStack[1]);
+				tMin=fStack[0];
+				tMax=Min(fStack[1],tMaxMax);
 
 				--nStack;
 				idx=*nStack;
@@ -139,42 +134,42 @@
 
 			const BIHNode *node=node0+(idx&BIHNode::idxMask);
 			int axis=node->Axis();
-			int nidx=dSign[axis];
+			int nidx=dirMask&(1<<axis)?1:0;
 
-			float cNear,cFar; {
-				float tnear=node->ClipLeft()-(&tCornerOrig.x)[axis];
-				float tfar=node->ClipRight()-(&tCornerOrig.x)[axis];
-				if(nidx) Swap(tnear,tfar);
+			float near,far; {
+				float tNear=node->clip[0]-(&orig.x)[axis];
+				float tFar=node->clip[1]-(&orig.x)[axis];
+				if(nidx) Swap(tNear,tFar);
 
-				cNear=(tnear<0?(&cMinInv.x)[axis]:(&cMaxInv.x)[axis])*tnear;
-				cFar =(tfar <0?(&cMaxInv.x)[axis]:(&cMinInv.x)[axis])*tfar;
+				near=Max((&minInv.x)[axis]*tNear,(&maxInv.x)[axis]*tNear);
+				near=Min(near,tMax);
 
-				cNear=Min(cNear, cMax);
-				cFar =Max(cFar , cMin);
+				far =Min((&minInv.x)[axis]*tFar	,(&maxInv.x)[axis]*tFar);
+				far =Max(far,tMin);
 			}
 		
-			if(cMin>cNear) {
-				if(cMax<cFar) goto POP_STACK;
+			if(tMin>near) {
+				if(tMax<far) goto POP_STACK;
 
-				cMin=cFar;
+				tMin=far;
 				idx=node->val[nidx^1];
 				continue;
 			}
-			if(cMax<cFar) {
-				cMax=cNear;
+			if(tMax<far) {
+				tMax=near;
 				idx=node->val[nidx];
 				continue;
 			}
 
 			
-			fStack[0]=cFar;
-			fStack[1]=cMax;
+			fStack[0]=far;
+			fStack[1]=tMax;
 			fStack+=2;
 
 			*nStack=node->val[nidx^1];
 			nStack++;
 
-			cMax=cNear;
+			tMax=near;
 			idx=node->val[nidx];
 		}
 
