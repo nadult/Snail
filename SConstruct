@@ -49,6 +49,6 @@ def ExcludeFromList(tList,tObj):
 			outList.append(obj)
 	return outList
 
-baseObjects = BuildObjects( ListCppFiles('./'), './')
+baseObjects = BuildObjects( ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
 
 env.Program('rtracer', baseObjects, LIBS=libs )

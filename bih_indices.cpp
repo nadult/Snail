@@ -5,7 +5,8 @@
 
 namespace {
 
-	int ClipTri(const Vec3f *tri,Vec3f *out,int axis,float pos,bool less) {
+	template <int axis,bool less>
+	int ClipTri(const Vec3f *tri,Vec3f *out,float pos) {
 		int okSide[3];
 		okSide[0]=((&tri[0].x)[axis]<pos)==less;
 		okSide[1]=((&tri[1].x)[axis]<pos)==less;
@@ -42,12 +43,12 @@ namespace {
 		}
 	}
 
-	int ClipTris(const Vec3f *tris,int count,Vec3f *out,int axis,float pos,float dir) {
+	template <int axis,bool less>
+	int ClipTris(const Vec3f *tris,int count,Vec3f *out,float pos) {
 		int nOut=0;
-		bool less=dir<0.0f;
 
 		for(int n=0;n<count;n++)
-			nOut+=ClipTri(tris+n*3,out+nOut*3,axis,pos,less);
+			nOut+=ClipTri<axis,less>(tris+n*3,out+nOut*3,pos);
 		return nOut;
 	}
 
@@ -59,16 +60,16 @@ namespace {
 
 		src[0]=p1; src[1]=p2; src[2]=p3; count=1;
 		if(max.x-min.x>eps) {
-			count=ClipTris(src,count,dst,0,min.x,+1); Swap(src,dst);
-			count=ClipTris(src,count,dst,0,max.x,-1); Swap(src,dst);
+			count=ClipTris<0,0>(src,count,dst,min.x); Swap(src,dst);
+			count=ClipTris<0,1>(src,count,dst,max.x); Swap(src,dst);
 		}
 		if(max.y-min.y>eps) {
-			count=ClipTris(src,count,dst,1,min.y,+1); Swap(src,dst);
-			count=ClipTris(src,count,dst,1,max.y,-1); Swap(src,dst);
+			count=ClipTris<1,0>(src,count,dst,min.y); Swap(src,dst);
+			count=ClipTris<1,1>(src,count,dst,max.y); Swap(src,dst);
 		}
 		if(max.z-min.z>eps) {
-			count=ClipTris(src,count,dst,2,min.z,+1); Swap(src,dst);
-			count=ClipTris(src,count,dst,2,max.z,-1); Swap(src,dst);
+			count=ClipTris<2,0>(src,count,dst,min.z); Swap(src,dst);
+			count=ClipTris<2,1>(src,count,dst,max.z); Swap(src,dst);
 		}
 
 		if(count) {

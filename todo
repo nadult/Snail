@@ -1,4 +1,12 @@
-- Poprawnie wyliczyc epsilon w Triangle::BeamCollide
+BIH:
+- przyspieszyc budowe; optymalizacje boxow otaczajacych robic na krawedziach a nie trojkatach
+- uzyc RayGroup::IDir
+- poprawic bug na sponzie
+
 - Zapamietac: Bindy sie hujowo rozwijaja :(((
 - Zapamietac: JEBANE GCC AKCEPTUJE FUNKCJE ZWRACAJACE COS, NIE ZAWIERAJACE RETURNA
+
+
+Kdtree: ( olac :) )
+- Poprawnie wyliczyc epsilon w Triangle::BeamCollide
 - Obsluzyc beamCollision == 2

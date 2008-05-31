@@ -62,11 +62,12 @@ struct GenImageTask {
 					Vec3f tmp[4]; Convert(dir[n],tmp);
 					for(int k=0;k<4;k++) tmp[k]=rotMat*tmp[k];
 					Convert(tmp,dir[n]);
-					dir[n]*=RSqrt(dir[n]|dir[n]);
-					idir[n]=VInv(dir[n]);
+			//		dir[n]*=RSqrt(dir[n]|dir[n]);
+			//		idir[n]=VInv(dir[n]);
 				}
 
-				TracingContext<Scene,RayGroup<NQuads,1,1>,RaySelector<NQuads> > context(*scene,RayGroup<NQuads,1,1>(dir,&origin,idir));
+				TracingContext<Scene,RayGroup<NQuads,1,0>,RaySelector<NQuads> >
+					context(*scene,RayGroup<NQuads,1,0>(dir,&origin,0));
 				Vec3q *rgb=context.color;
 
 				context.options=TracingOptions(options.reflections?1:0,options.rdtscShader);
@@ -147,13 +148,11 @@ Camera GetDefaultCamera(string model) {
 	static std::map< string, Camera> cams;
 	if(!initialized) {
 		initialized=1;
-			// pompei?
 		Camera pompei(
 			Vec3f(52.423584,158.399719,51.276756),
 			Vec3f(0.999916,0.000000,-0.013203),
 			Vec3f(-0.013203,0.000000,-0.999916));
 
-		// abrams, lancia from the side
 		Camera abrams(
 			Vec3f(-125.014099,-7.600281,115.258301),
 			Vec3f(0.907629,0.000000,-0.419782),
@@ -162,7 +161,6 @@ Camera GetDefaultCamera(string model) {
 		Camera abramsTop( Vec3f(-118.3508,-93.6003,86.6569), Vec3f(0.8508,0.0000,-0.5254), Vec3f(-0.5254,0.0000,-0.8508) );
 		Camera abramsLeak( Vec3f(102.7247,-31.6003,-76.6981), Vec3f(-0.8534,0.0000,-0.5213), Vec3f(-0.5213,0.0000,0.8534) );
 
-		// abrams from the back
 		Camera abramsBack(
 			Vec3f(-5.081215,-5.600281,-275.260132),
 			Vec3f(0.023998,0.000000,0.999716),
@@ -173,13 +171,11 @@ Camera GetDefaultCamera(string model) {
 				Vec3f(0.6772,0.0000,0.7357),
 				Vec3f(0.7357,0.0000,-0.6772) );
 
-		// abrams from the back + camera turned back
 		Camera abramsBackTurned(
 			Vec3f(-14.741514,-3.600281,-217.086441),
 			Vec3f(-0.181398,0.000000,-0.983413),
 			Vec3f(-0.983413,0.000000,0.181398) );
 
-		// bunny, feline, dragon
 		Camera bunny(
 			Vec3f(7.254675,2.399719,39.409294),
 			Vec3f(-0.240041,0.000000,-0.970767),
@@ -194,15 +190,19 @@ Camera GetDefaultCamera(string model) {
 		Camera sponzaBadCase(Vec3f(-353.3055,-326.0000,147.0938),Vec3f(0.0815,0.0000,-0.9967),Vec3f(-0.9967,0.0000,-0.0815));
 			
 		Camera feline( Vec3f(-3.0111,-5.6003,-2.8642), Vec3f(0.8327,0.0000,0.5537), Vec3f(0.5537,0.0000,-0.8327) );
-	
+		Camera box(Vec3f(-12.7319,0.0000,-26.7225),Vec3f(0.3523,0.0000,0.9359),Vec3f(0.9359,0.0000,-0.3523));
+
+		Camera sponzaBug(Vec3f(-281.2263,-104.0000,240.5235),Vec3f(0.8898,0.0000,0.4565),Vec3f(0.4565,0.0000,-0.8898));
+		
 		cams["pompei.obj"]=pompei;
 		cams["sponza.obj"]=sponza;
-		cams["abrams.obj"]=abramsBadCase;
+		cams["abrams.obj"]=abrams;
 		cams["lancia.obj"]=abrams;
 		cams["bunny.obj"]=bunny;
 		cams["feline.obj"]=feline;
 		cams["dragon.obj"]=bunny;
 		cams["room.obj"]=room;
+		cams["box.obj"]=box;
 	}
 
 	std::map<string,Camera>::iterator iter=cams.find(model);
@@ -331,7 +331,7 @@ int main(int argc, char **argv)
 			int lastTicks=0;
 			stats.PrintInfo(resx,resy,time*1000.0);
 
-		//	bihScene.Animate();
+//			bihScene.Animate();
 			out.RenderImage(img);
 			out.SwapBuffers();
 		}

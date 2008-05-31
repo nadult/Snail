@@ -1,7 +1,6 @@
 
 #include "triangle.h"
 #include "loader.h"
-//#include <algorithm>
 
 	struct SortTris {
 		bool operator()(const Triangle &a,const Triangle &b) const {
@@ -34,13 +33,12 @@
 			objects.resize(tris.size());
 			for(uint n=0;n<objects.size();n++)
 				objects[n]=tris[n];
-//			std::sort(objects.begin(),objects.end(),SortTris());
 		}
 
 //		AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-100,-100,0),Vec3f(0,0,20000),Vec3f(1,1,1),1,1,1);
-		AddSoftLight(Vec3f(100,-180,0),Vec3f(0,20000,5000),Vec3f(1,1,1),1,1,1);
-		AddLight(Vec3f(0,-150,0),Vec3f(15000,20000,0));
+//		AddSoftLight(Vec3f(100,-180,0),Vec3f(0,20000,5000),Vec3f(1,1,1),1,1,1);
+//		AddLight(Vec3f(0,-150,0),Vec3f(15000,20000,0));
 		
 		tree=AccStruct(objects);
 	}

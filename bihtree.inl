@@ -16,9 +16,12 @@ template <class Object>
 BIHTree<Object>::BIHTree(const vector<Object> &obj) :objects(obj) {
 	if(!objects.size()) return;
 
+	double tPrecomp,tIndices,tBuild;
+
 	pMin=objects[0].BoundMin();
 	pMax=objects[0].BoundMax();
 
+	tPrecomp=GetTime();
 	Vec3p sumSize(0,0,0);
 	for(uint n=1;n<objects.size();n++) {
 		Vec3p min=objects[n].BoundMin(),max=objects[n].BoundMax();
@@ -31,21 +34,29 @@ BIHTree<Object>::BIHTree(const vector<Object> &obj) :objects(obj) {
 	
 	double avgSize=sumSize.x+sumSize.y+sumSize.z;
 	avgSize/=3.0*objects.size();
+	tPrecomp=GetTime()-tPrecomp;
 
+	tIndices=GetTime();
 	vector<BIHIdx> indices;
 	GenBIHIndices(obj,indices,avgSize*1.75f,32*objects.size());
-	printf("Indices: %d Avg size: %.2f\n",indices.size(),avgSize);
+//	printf("Indices: %d Avg size: %.2f\n",indices.size(),avgSize);
+	tIndices=GetTime()-tIndices;
 
-	vLeafs=0;
+	tBuild=GetTime();
 	vector<u32> parents; parents.push_back(0);
 	Build(indices,parents,0,0,indices.size()-1,pMin,pMax,0);
+	tBuild=GetTime()-tBuild;
+
+	printf("Precomp: %2.4f sec  Indices: %2.4f sec  Build: %2.4f sec\n",tPrecomp,tIndices,tBuild);
 }
 
 template <class Object>
 void BIHTree<Object>::PrintInfo() const {
-	printf("Objects:%8d * %2d = %6.2fMB\n",objects.size(),sizeof(Object),double(objects.size()*sizeof(Object))*0.000001);
-	printf("Nodes:  %8d * %2d = %6.2fMB\n",nodes.size(),sizeof(BIHNode),double(nodes.size()*sizeof(BIHNode))*0.000001);
-	printf("vleafs: %8d * %2d = %6.2fMB (they are not stored)\n\n",vLeafs,sizeof(BIHNode),double(vLeafs*sizeof(BIHNode))*0.000001);
+	double nodeBytes=nodes.size()*sizeof(BIHNode);
+	double objBytes=objects.size()*sizeof(Object);
+	printf("Objects:%8d * %2d = %6.2fMB\n",objects.size(),sizeof(Object),nodeBytes*0.000001);
+	printf("Nodes:  %8d * %2d = %6.2fMB\n",nodes.size(),sizeof(BIHNode),objBytes*0.000001);
+	printf("~ %.0f bytes per triangle\n\n",(nodeBytes+objBytes)/double(objects.size()));
 }
 
 // Znajduje ojca z taka sama osia podzialu i ktory ma tylko
@@ -140,10 +151,7 @@ void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nN
 			int idx=indices[first].idx; leftLeaf=1;
 			for(int n=first+1;n<=right;n++) if(indices[n].idx!=idx) { leftLeaf=0; break; }
 		}
-		if(leftLeaf) {
-			nodes[nNode].val[0]|=indices[first].idx|BIHNode::leafMask;
-			vLeafs++;
-		}
+		if(leftLeaf) nodes[nNode].val[0]|=indices[first].idx|BIHNode::leafMask;
 		else {
 			nodes[nNode].val[0]|=nodes.size();
 			parents.push_back(nNode);
@@ -157,10 +165,7 @@ void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nN
 			int idx=indices[right+1].idx; rightLeaf=1;
 			for(int n=right+2;n<=last;n++) if(indices[n].idx!=idx) { rightLeaf=0; break; }
 		}
-		if(rightLeaf) {
-			nodes[nNode].val[1]|=indices[right+1].idx|BIHNode::leafMask;
-			vLeafs++;
-		}
+		if(rightLeaf) nodes[nNode].val[1]|=indices[right+1].idx|BIHNode::leafMask;
 		else {
 			nodes[nNode].val[1]|=nodes.size();
 			parents.push_back(nNode);
