@@ -201,6 +201,7 @@ public:
 
 	mutable MemPattern pattern;
 
+	float avgSize;
 	Vec3p pMin,pMax;
 	vector<BIHNode> nodes;
 	Vector<BIHTriangle> objects;

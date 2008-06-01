@@ -230,8 +230,8 @@ Camera GetDefaultCamera(string model) {
 template <class Scene>
 TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	switch(quadLevels) {
-//	case 0: return GenImage<0>(scene,camera,image,options,tasks);
-//	case 1: return GenImage<1>(scene,camera,image,options,tasks);
+	case 0: return GenImage<0>(scene,camera,image,options,tasks);
+	case 1: return GenImage<1>(scene,camera,image,options,tasks);
 	case 2: return GenImage<2>(scene,camera,image,options,tasks);
 //	case 3: return GenImage<3>(scene,camera,image,options,tasks);
 //	case 4: return GenImage<4>(scene,camera,image,options,tasks);
@@ -261,13 +261,13 @@ int main(int argc, char **argv)
 	buildTime=GetTime();
 	TScene<BIHTree<Triangle> >	scene (fileName.c_str());
 	buildTime=GetTime()-buildTime;
-	printf("BIHTree build time: %.2f sec\n",buildTime);
+	printf("BIHTree build (faster) time: %.2f sec\n",buildTime);
 	scene.tree.PrintInfo();
 
 	Image img(resx,resy,16);
 	Camera cam=GetDefaultCamera(modelFile);;
 	
-	uint quadLevels=2;
+	uint quadLevels=0;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 
 	if(nonInteractive) {
@@ -299,26 +299,23 @@ int main(int argc, char **argv)
 			if(out.Key('A')) cam.pos-=cam.right*speed;
 			if(out.Key('D')) cam.pos+=cam.right*speed;
 
-			if(out.KeyDown('L')) { printf("Lights %s\n",scene.lightsEnabled?"disabled":"enabled"); scene.lightsEnabled^=1; }
+			if(out.KeyDown('L')) {
+				printf("Lights %s\n",scene.lightsEnabled?"disabled":"enabled");
+				scene.lightsEnabled^=1;
+			}
 			if(out.Key('R')) cam.pos-=cam.up*speed;
 			if(out.Key('F')) cam.pos+=cam.up*speed;
 
-		/*	if(out.KeyDown('Y')) {
-				printf("splitting %s\n",scene.tree.split?"off":"on");
-				scene.tree.split^=1;
-			}
-			if(out.KeyDown('[')) {
-				scene.tree.maxDensity/=2.0f;
-				printf("maxdensity: %.0f\n",scene.tree.maxDensity);
-			}
-			if(out.KeyDown(']')) {
-				scene.tree.maxDensity*=2.0f;
-				printf("maxdensity: %.0f\n",scene.tree.maxDensity);
-			} */
+		//	if(out.KeyDown('Y')) {
+		//		printf("splitting %s\n",scene.tree.split?"off":"on");
+		//		scene.tree.split^=1;
+		//	}
+			if(out.KeyDown('[')) { scene.tree.maxDensity/=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
+			if(out.KeyDown(']')) { scene.tree.maxDensity*=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
 
-		//	if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
-		//	if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
-		//	if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
+			if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
+			if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
+			if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
 		//	if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 
 			if(out.KeyDown('P')) cam.Print();

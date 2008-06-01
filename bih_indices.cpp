@@ -100,22 +100,26 @@ namespace {
 	}
 
 	template <class Container>
-	void Split(const Triangle &tri,const BIHIdx &idx,Container &out) {
-		Vec3f size=idx.max-idx.min;
-		int axis=size.x>size.y?(size.z>size.x?2:0):(size.z>size.y?2:1);
-
+	int Split(const Triangle &tri,const BIHIdx &idx,Container &out,int axis,float split) {
 		Vec3f min1=idx.min,min2=idx.min,max1=idx.max,max2=idx.max;
 		Vec3f p1,p2,p3;	Convert(tri.P1(),p1); Convert(tri.P2(),p2); Convert(tri.P3(),p3);
-		float split=Lerp((&idx.min.x)[axis],(&idx.max.x)[axis],0.5f);
 		(&max1.x)[axis]=(&min2.x)[axis]=split;
 
 		float mult=GetTriMultiplier(tri);
 
-		bool add1=MinimizeTriBound(p1,p2,p3,min1,max1);
-		bool add2=MinimizeTriBound(p1,p2,p3,min2,max2);
+		int add1=MinimizeTriBound(p1,p2,p3,min1,max1);
+		int add2=MinimizeTriBound(p1,p2,p3,min2,max2);
 		
-		if(add1) out.insert(BIHIdx(idx.idx,min1,max1,mult));
-		if(add2) out.insert(BIHIdx(idx.idx,min2,max2,mult));
+		if(add1) out.insert(out.end(),BIHIdx(idx.idx,min1,max1,mult));
+		if(add2) out.insert(out.end(),BIHIdx(idx.idx,min2,max2,mult));
+	}
+
+
+	template <class Container>
+	void Split(const Triangle &tri,const BIHIdx &idx,Container &out) {
+		Vec3f size=idx.max-idx.min;
+		int axis=size.x>size.y?(size.z>size.x?2:0):(size.z>size.y?2:1);
+		Split(tri,idx,out, axis, Lerp((&idx.min.x)[axis],(&idx.max.x)[axis],0.5f) );
 	}
 
 	struct SortByIdx { bool operator()(const BIHIdx &a,const BIHIdx &b) const { return a.idx<b.idx; } };
@@ -123,24 +127,16 @@ namespace {
 
 }
 
-void GenBIHIndices(const Vector<Triangle> &tris,vector<BIHIdx> &out,float maxSize,uint maxSplits) {
-	std::multiset<BIHIdx,SortBySize> indices;
+void SplitIndices(const Vector<Triangle> &tris,vector<BIHIdx> &inds,int axis,float pos,float maxSize) {
+	if(inds.size()<=8) return;
 
-	for(int n=0;n<tris.size();n++) {
-		Vec3p min=tris[n].BoundMin(),max=tris[n].BoundMax();
-		indices.insert(BIHIdx(n,Vec3f(min.x,min.y,min.z),Vec3f(max.x,max.y,max.z),GetTriMultiplier(tris[n])));
+	for(int n=0;n<inds.size();n++) {
+		BIHIdx idx=inds[n];
+		if(idx.size<maxSize) continue;
+		if((&idx.min.x)[axis]>=pos||(&idx.max.x)[axis]<=pos) continue;
+
+		Split(tris[idx.idx],idx,inds,axis,pos);
+		inds[n]=inds.back(); inds.pop_back(); n--;
 	}
-
-	for(int s=0;s<maxSplits;s++) {
-		BIHIdx idx=*indices.begin();
-		if(idx.size<maxSize) break;
-		indices.erase(indices.begin());
-		Split(tris[idx.idx],idx,indices);
-	}
-	std::set<BIHIdx,SortBySize>::iterator it=indices.begin();
-	out.reserve(indices.size());
-
-	while(it!=indices.end()) out.push_back(*it++);
-	std::sort(out.begin(),out.end(),SortByIdx());
 }
 
