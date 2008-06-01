@@ -30,7 +30,8 @@ inline float Maximize(const floatq &t) { return Max(Max(t[0],t[1]),Max(t[2],t[3]
 inline float Minimize(const floatq &t) { return Min(Min(t[0],t[1]),Min(t[2],t[3])); }
 inline Vec3p Maximize(const Vec3q &v) { return Vec3p(Maximize(v.x),Maximize(v.y),Maximize(v.z)); }
 inline Vec3p Minimize(const Vec3q &v) { return Vec3p(Minimize(v.x),Minimize(v.y),Minimize(v.z)); }
-	
+
+
 template <int size>
 class ObjectIdxBuffer
 {
@@ -52,7 +53,7 @@ public:
 		return ForAny(test);
 	}
 	i32x4 indices[size];
-	int last;
+	uint last;
 };
 
 template <class T>
@@ -88,12 +89,26 @@ public:
 	inline const T &operator[](int n) const { return tab[n]; }
 	inline T &operator[](int n) { return tab[n]; }
 
-private:
-	void Alloc(size_t newS) { Free(); count=newS; tab=count?new T[count]:0; }
-	void Free() { if(tab) delete[] tab; } 
+protected:
+	void Alloc(size_t newS) { Free(); count=newS; tab=count?(T*)_mm_malloc(sizeof(T)*count,64):0; }
+	void Free() { if(tab) _mm_free(tab); } 
 
 	T *tab;
+public:
 	size_t count;
+};
+
+template <class T>
+class TVector: public Vector<T> {
+public:
+	TVector(size_t res) { Vector<T>::Alloc(res); reserve=Vector<T>::count; }
+
+	void push_back(const T &t) { Vector<T>::operator[](Vector<T>::count++)=t; }
+	inline const T &operator[](int n) const { return Vector<T>::tab[n]; }
+	inline T &operator[](int n) { return Vector<T>::tab[n]; }
+
+private:
+	int reserve;
 };
 
 

@@ -1,34 +1,40 @@
 
 	template <class AccStruct> template <class Output,bool sharedOrigin>
 	void BIHTree<AccStruct>:: TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const {
-		floatq maxD[4]={out[0],out[1],out[2],out[3]};
-
 		TreeStats stats;
 		stats.TracingPacket(16);
 
-		Vec3q invDir[4]={
+		const Vec3q invDir[4]={
 			VInv(Vec3q(tDir[0].x+0.000000000001f,tDir[0].y+0.000000000001f,tDir[0].z+0.000000000001f)),
 			VInv(Vec3q(tDir[1].x+0.000000000001f,tDir[1].y+0.000000000001f,tDir[1].z+0.000000000001f)),
 			VInv(Vec3q(tDir[2].x+0.000000000001f,tDir[2].y+0.000000000001f,tDir[2].z+0.000000000001f)),
 			VInv(Vec3q(tDir[3].x+0.000000000001f,tDir[3].y+0.000000000001f,tDir[3].z+0.000000000001f)),
 		};
-		floatq tinv[3][4]={
+		const floatq tinv[3][4]={
 			{invDir[0].x,invDir[1].x,invDir[2].x,invDir[3].x},
 			{invDir[0].y,invDir[1].y,invDir[2].y,invDir[3].y},
 			{invDir[0].z,invDir[1].z,invDir[2].z,invDir[3].z} };
-		floatq torig[3][4]={
-			{rOrigin[0].x,rOrigin[1].x,rOrigin[2].x,rOrigin[3].x},
-			{rOrigin[0].y,rOrigin[1].y,rOrigin[2].y,rOrigin[3].y},
-			{rOrigin[0].z,rOrigin[1].z,rOrigin[2].z,rOrigin[3].z} };
 
-		floatq minRet[4]={maxD[0],maxD[1],maxD[2],maxD[3]};
+		float sharedOrig[3];
+		floatq torig[3][4];
+
+		if(sharedOrigin) {
+			sharedOrig[0]=rOrigin[0].x[0];
+			sharedOrig[1]=rOrigin[0].y[0];
+			sharedOrig[2]=rOrigin[0].z[0];
+		}
+		else {
+			torig[0][0]=rOrigin[0].x; torig[0][1]=rOrigin[1].x; torig[0][2]=rOrigin[2].x; torig[0][3]=rOrigin[3].x;
+			torig[1][0]=rOrigin[0].y; torig[1][1]=rOrigin[1].y; torig[1][2]=rOrigin[2].y; torig[1][3]=rOrigin[3].y;
+			torig[2][0]=rOrigin[0].z; torig[2][1]=rOrigin[1].z; torig[2][2]=rOrigin[2].z; torig[2][3]=rOrigin[3].z;
+		}
 
 		floatq tMin[4],tMax[4];
 		tMin[0]=tMin[1]=tMin[2]=tMin[3]=ConstEpsilon<floatq>();
-		tMax[0]=Min(maxD[0],minRet[0]);
-		tMax[1]=Min(maxD[1],minRet[1]);
-		tMax[2]=Min(maxD[2],minRet[2]);
-		tMax[3]=Min(maxD[3],minRet[3]);
+		tMax[0]=out[0];
+		tMax[1]=out[1];
+		tMax[2]=out[2];
+		tMax[3]=out[3];
 
 		floatq fStackBegin[8*(maxLevel+2)],*fStack=fStackBegin;
 		u32 nStackBegin[maxLevel+2],*nStack=nStackBegin;
@@ -39,37 +45,39 @@
 			if(dirMask&2) Swap(rMin.y,rMax.y);
 			if(dirMask&4) Swap(rMin.z,rMax.z);
 
-			Vec3q ttMin[4]={
-				(Vec3q(rMin)-rOrigin[0])*invDir[0],
-				(Vec3q(rMin)-rOrigin[1])*invDir[1],
-				(Vec3q(rMin)-rOrigin[2])*invDir[2],
-				(Vec3q(rMin)-rOrigin[3])*invDir[3],
-			}; Vec3q ttMax[4]={
-				(Vec3q(rMax)-rOrigin[0])*invDir[0],
-				(Vec3q(rMax)-rOrigin[1])*invDir[1],
-				(Vec3q(rMax)-rOrigin[2])*invDir[2],
-				(Vec3q(rMax)-rOrigin[3])*invDir[3],
-			};
+			Vec3q ttMin[4],ttMax[4];
+			if(sharedOrigin) {
+				Vec3q rrMin=Vec3q(rMin)-rOrigin[0],rrMax=Vec3q(rMax)-rOrigin[0];
 
-			ttMax[0].x=Min(ttMax[0].x,ttMax[0].y);
-			ttMax[1].x=Min(ttMax[1].x,ttMax[1].y);
-			ttMax[2].x=Min(ttMax[2].x,ttMax[2].y);
-			ttMax[3].x=Min(ttMax[3].x,ttMax[3].y);
+				ttMin[0]=rrMin*invDir[0];
+				ttMin[1]=rrMin*invDir[1];
+				ttMin[2]=rrMin*invDir[2];
+				ttMin[3]=rrMin*invDir[3];
+				ttMax[0]=rrMax*invDir[0];
+				ttMax[1]=rrMax*invDir[1];
+				ttMax[2]=rrMax*invDir[2];
+				ttMax[3]=rrMax*invDir[3];
+			}
+			else {
+				ttMin[0]=(Vec3q(rMin)-rOrigin[0])*invDir[0];
+				ttMin[1]=(Vec3q(rMin)-rOrigin[1])*invDir[1];
+				ttMin[2]=(Vec3q(rMin)-rOrigin[2])*invDir[2];
+				ttMin[3]=(Vec3q(rMin)-rOrigin[3])*invDir[3];
+				ttMax[0]=(Vec3q(rMax)-rOrigin[0])*invDir[0];
+				ttMax[1]=(Vec3q(rMax)-rOrigin[1])*invDir[1];
+				ttMax[2]=(Vec3q(rMax)-rOrigin[2])*invDir[2];
+				ttMax[3]=(Vec3q(rMax)-rOrigin[3])*invDir[3];
+			}
 
-			ttMin[0].x=Max(ttMin[0].x,ttMin[0].y);
-			ttMin[1].x=Max(ttMin[1].x,ttMin[1].y);
-			ttMin[2].x=Max(ttMin[2].x,ttMin[2].y);
-			ttMin[3].x=Max(ttMin[3].x,ttMin[3].y);
+			ttMax[0].x=Min(ttMax[0].x,ttMax[0].y); tMax[0]=Min(tMax[0],ttMax[0].z); tMax[0]=Min(tMax[0],ttMax[0].x);
+			ttMax[1].x=Min(ttMax[1].x,ttMax[1].y); tMax[1]=Min(tMax[1],ttMax[1].z); tMax[1]=Min(tMax[1],ttMax[1].x);
+			ttMax[2].x=Min(ttMax[2].x,ttMax[2].y); tMax[2]=Min(tMax[2],ttMax[2].z); tMax[2]=Min(tMax[2],ttMax[2].x);
+			ttMax[3].x=Min(ttMax[3].x,ttMax[3].y); tMax[3]=Min(tMax[3],ttMax[3].z); tMax[3]=Min(tMax[3],ttMax[3].x);
 
-			tMax[0]=Min(tMax[0],ttMax[0].z); tMax[0]=Min(tMax[0],ttMax[0].x);
-			tMax[1]=Min(tMax[1],ttMax[1].z); tMax[1]=Min(tMax[1],ttMax[1].x);
-			tMax[2]=Min(tMax[2],ttMax[2].z); tMax[2]=Min(tMax[2],ttMax[2].x);
-			tMax[3]=Min(tMax[3],ttMax[3].z); tMax[3]=Min(tMax[3],ttMax[3].x);
-			
-			tMin[0]=Max(tMin[0],ttMin[0].z); tMin[0]=Max(tMin[0],ttMin[0].x);
-			tMin[1]=Max(tMin[1],ttMin[1].z); tMin[1]=Max(tMin[1],ttMin[1].x);
-			tMin[2]=Max(tMin[2],ttMin[2].z); tMin[2]=Max(tMin[2],ttMin[2].x);
-			tMin[3]=Max(tMin[3],ttMin[3].z); tMin[3]=Max(tMin[3],ttMin[3].x);
+			ttMin[0].x=Max(ttMin[0].x,ttMin[0].y); tMin[0]=Max(tMin[0],ttMin[0].z); tMin[0]=Max(tMin[0],ttMin[0].x);
+			ttMin[1].x=Max(ttMin[1].x,ttMin[1].y); tMin[1]=Max(tMin[1],ttMin[1].z); tMin[1]=Max(tMin[1],ttMin[1].x);
+			ttMin[2].x=Max(ttMin[2].x,ttMin[2].y); tMin[2]=Max(tMin[2],ttMin[2].z); tMin[2]=Max(tMin[2],ttMin[2].x);
+			ttMin[3].x=Max(ttMin[3].x,ttMin[3].y); tMin[3]=Max(tMin[3],ttMin[3].z); tMin[3]=Max(tMin[3],ttMin[3].x);
 		}
 		ObjectIdxBuffer<4> mailbox;
 
@@ -111,10 +119,10 @@
 							tvec[2]=rOrigin[2]-a;
 							tvec[3]=rOrigin[3]-a;
 						}
-						val[0]=-(tvec[0]|nrm);
-						val[1]=-(tvec[1]|nrm);
-						val[2]=-(tvec[2]|nrm);
-						val[3]=-(tvec[3]|nrm);
+						val[0]=(tvec[0]|-nrm);
+						val[1]=(tvec[1]|-nrm);
+						val[2]=(tvec[2]|-nrm);
+						val[3]=(tvec[3]|-nrm);
 
 						Vec3q ba(obj.ba.x,obj.ba.y,obj.ba.z),ca(obj.ca.x,obj.ca.y,obj.ca.z);
 						u[0]=tDir[0]|(ba^tvec[0]); v[0]=tDir[0]|(tvec[0]^ca);
@@ -124,51 +132,26 @@
 					}
 				
 					floatq nrmLen=floatq( ((float*)&obj.ca)[3] );
-					{
-						floatq det=tDir[0]|nrm;
-						f32x4b mask=Min(u[0],v[0])>=0.0f&&u[0]+v[0]<=det*nrmLen;
-						if(ForAny(mask)) {
-							floatq dist=Condition(mask,val[0]/det,minRet[0]);
-							mask=dist<minRet[0]&&dist>0.0f;
-							minRet[0]=Condition(mask,Output::type==otShadow?0.00001f:dist,minRet[0]);
-							if(Output::objectIndexes)
-								object[0]=Condition(i32x4b(mask),i32x4(idx),object[0]);
-							stats.IntersectPass();
-						} else stats.IntersectFail();
-					} {
-						floatq det=tDir[1]|nrm;
-						f32x4b mask=Min(u[1],v[1])>=0.0f&&u[1]+v[1]<=det*nrmLen;
-						if(ForAny(mask)) {
-							floatq dist=Condition(mask,val[1]/det,minRet[1]);
-							mask=dist<minRet[1]&&dist>0.0f;
-							minRet[1]=Condition(mask,Output::type==otShadow?0.00001f:dist,minRet[1]);
-							if(Output::objectIndexes)
-								object[1]=Condition(i32x4b(mask),i32x4(idx),object[1]);
-							stats.IntersectPass();
-						} else stats.IntersectFail();
-					} {
-						floatq det=tDir[2]|nrm;
-						f32x4b mask=Min(u[2],v[2])>=0.0f&&u[2]+v[2]<=det*nrmLen;
-						if(ForAny(mask)) {
-							floatq dist=Condition(mask,val[2]/det,minRet[2]);
-							mask=dist<minRet[2]&&dist>0.0f;
-							minRet[2]=Condition(mask,Output::type==otShadow?0.00001f:dist,minRet[2]);
-							if(Output::objectIndexes)
-								object[2]=Condition(i32x4b(mask),i32x4(idx),object[2]);
-							stats.IntersectPass();
-						} else stats.IntersectFail();
-					} {
-						floatq det=tDir[3]|nrm;
-						f32x4b mask=Min(u[3],v[3])>=0.0f&&u[3]+v[3]<=det*nrmLen;
-						if(ForAny(mask)) {
-							floatq dist=Condition(mask,val[3]/det,minRet[3]);
-							mask=dist<minRet[3]&&dist>0.0f;
-							minRet[3]=Condition(mask,Output::type==otShadow?0.00001f:dist,minRet[3]);
-							if(Output::objectIndexes)
-								object[3]=Condition(i32x4b(mask),i32x4(idx),object[3]);
-							stats.IntersectPass();
-						} else stats.IntersectFail();
+
+#define COLLIDE(p)  { \
+						floatq det=tDir[p]|nrm;		\
+						f32x4b mask=Min(u[p],v[p])>=0.0f&&u[p]+v[p]<=det*nrmLen;	\
+						if(ForAny(mask)) {		\
+							floatq dist=Condition(mask,val[p]/det,out[p]);	\
+							mask=dist<out[p]&&dist>0.0f;	\
+							out[p]=Condition(mask,Output::type==otShadow?0.00001f:dist,out[p]);	\
+							if(Output::objectIndexes)	\
+								object[p]=Condition(i32x4b(mask),i32x4(idx),object[p]);	\
+							stats.IntersectPass();	\
+						} else stats.IntersectFail();	\
 					}
+
+					COLLIDE(0)
+					COLLIDE(1)
+					COLLIDE(2)
+					COLLIDE(3)
+
+#undef COLLIDE
 				}
 
 			POP_STACK:
@@ -179,33 +162,53 @@
 				tMin[1]=fStack[1];
 				tMin[2]=fStack[2];
 				tMin[3]=fStack[3];
-				tMax[0]=Min(fStack[4],minRet[0]);
-				tMax[1]=Min(fStack[5],minRet[1]);
-				tMax[2]=Min(fStack[6],minRet[2]);
-				tMax[3]=Min(fStack[7],minRet[3]);
+				tMax[0]=Min(fStack[4],out[0]);
+				tMax[1]=Min(fStack[5],out[1]);
+				tMax[2]=Min(fStack[6],out[2]);
+				tMax[3]=Min(fStack[7],out[3]);
 				--nStack;
 				idx=*nStack;
 				continue;
 			}
 
 			const BIHNode *node=node0+(idx&BIHNode::idxMask);
+			pattern.Touch(idx&BIHNode::idxMask,4);
+
 			int axis=node->Axis();
 			int nidx=dirMask&(1<<axis)?1:0;
 
 			floatq near[4],far[4]; {
-				floatq *start=torig[axis],*inv=tinv[axis];
-				float tnear=node->ClipLeft(),tfar=node->ClipRight();
-				if(nidx) Swap(tnear,tfar);
+				const floatq *inv=tinv[axis];
 
-				near[0]=Min( (floatq(tnear)-start[0])*inv[0], tMax[0]);
-				near[1]=Min( (floatq(tnear)-start[1])*inv[1], tMax[1]);
-				near[2]=Min( (floatq(tnear)-start[2])*inv[2], tMax[2]);
-				near[3]=Min( (floatq(tnear)-start[3])*inv[3], tMax[3]);
+				if(sharedOrigin) {
+					float tnear=node->clip[0]-sharedOrig[axis],tfar=node->clip[1]-sharedOrig[axis];
+					if(nidx) Swap(tnear,tfar);
+					
+					near[0]=Min( floatq(tnear)*inv[0], tMax[0]);
+					near[1]=Min( floatq(tnear)*inv[1], tMax[1]);
+					near[2]=Min( floatq(tnear)*inv[2], tMax[2]);
+					near[3]=Min( floatq(tnear)*inv[3], tMax[3]);
 
-				far [0]=Max( (floatq(tfar) -start[0])*inv[0], tMin[0]);
-				far [1]=Max( (floatq(tfar) -start[1])*inv[1], tMin[1]);
-				far [2]=Max( (floatq(tfar) -start[2])*inv[2], tMin[2]);
-				far [3]=Max( (floatq(tfar) -start[3])*inv[3], tMin[3]);
+					far [0]=Max( floatq(tfar)*inv[0], tMin[0]);
+					far [1]=Max( floatq(tfar)*inv[1], tMin[1]);
+					far [2]=Max( floatq(tfar)*inv[2], tMin[2]);
+					far [3]=Max( floatq(tfar)*inv[3], tMin[3]);
+				}
+				else {
+					floatq *start=torig[axis];
+					float tnear=node->clip[0],tfar=node->clip[1];
+					if(nidx) Swap(tnear,tfar);
+
+					near[0]=Min( (floatq(tnear)-start[0])*inv[0], tMax[0]);
+					near[1]=Min( (floatq(tnear)-start[1])*inv[1], tMax[1]);
+					near[2]=Min( (floatq(tnear)-start[2])*inv[2], tMax[2]);
+					near[3]=Min( (floatq(tnear)-start[3])*inv[3], tMax[3]);
+
+					far [0]=Max( (floatq(tfar) -start[0])*inv[0], tMin[0]);
+					far [1]=Max( (floatq(tfar) -start[1])*inv[1], tMin[1]);
+					far [2]=Max( (floatq(tfar) -start[2])*inv[2], tMin[2]);
+					far [3]=Max( (floatq(tfar) -start[3])*inv[3], tMin[3]);
+				}
 			}
 
 			f32x4b test1=tMin[0]>near[0]&&tMin[1]>near[1]&&tMin[2]>near[2]&&tMin[3]>near[3];
@@ -252,9 +255,5 @@
 		}
 
 		if(tstats) tstats->Update(stats);
-		out[0]=minRet[0];
-		out[1]=minRet[1];
-		out[2]=minRet[2];
-		out[3]=minRet[3];
 	}
 

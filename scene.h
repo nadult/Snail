@@ -15,7 +15,7 @@ Vec ExtractNormals(const Container &objects,const integer &objId,const Vec &posi
 	const Object *obj0=&objects[objId[0]];
 	Vec nrm=obj0->Normal(position);
 
-	for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
+	if(ForAny(integer(objId[0])!=objId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
 		const Object *objN=&objects[objId[n]];
 		if(objN!=obj0) {
 			Vec newNrm=objN->Normal(position);
@@ -163,7 +163,7 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector
 
 		c.position[q]=c.RayDir(q)*c.distance[q]+c.RayOrigin(q);
 		c.normal[q]=ExtractNormals(tree.objects,Condition(imask,c.objId[q]),c.position[q]);
-		
+	
 		SimpleLightingShader(c,q);
 	}
 
@@ -183,9 +183,6 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector
 		c.color[q]=Condition(c.selector.Mask(i),c.color[q]);
 	}
 
-//	if(c.options.rdtscShader)
-//		for(int q=0;q<Selector::size;q++)
-//			c.color[q].x=c.color[q].y=0.0f;
 	if(c.options.rdtscShader)
 		for(int q=0;q<Selector::size;q++)
 			StatsShader(c,q);

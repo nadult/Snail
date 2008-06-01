@@ -1,9 +1,9 @@
 import os
 
 includesGlfw = '-D_REENTRANT -I/usr/local/include' #os.popen('pkg-config --cflags libglfw').read() 
-includes = includesGlfw + ' -I /home/someone/veclib -I /home/someone/baselib '
+includes = includesGlfw + ' -I /home/someone/veclib -I /home/someone/baselib -I /usr/local/include/boost-1_35/ '
 
-libsPaths = [ '/usr/local/lib', '/home/someone/baselib/', '/usr/X11R6/lib' ]
+libsPaths = [ '/usr/local/lib', '/home/someone/baselib/', '/root32/usr/X11R6/lib' ]
 libs = [ 'pthread', 'Xrandr', 'GL', 'glfw', 'baselib' ]
 
 release = Environment (

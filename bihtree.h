@@ -26,11 +26,11 @@ public:
 	inline float ClipLeft() const { return clip[0]; }
 	inline float ClipRight() const { return clip[1]; }
 
-	inline bool HasChild1() const { return val[1]&(1<<30); }
-	inline bool HasChild2() const { return val[1]&(1<<31); }
+	inline bool DenseNode() const { return val[1]&(1<<30); }
 
 	float clip[2];
 	u32 val[2];
+	float density;
 };
 
 class BIHIdx {
@@ -46,6 +46,25 @@ public:
 	i32 idx;
 };
 
+struct BIHTravContext {
+	const Vec3q *origin,*dir;
+	floatq *out; i32x4 *object;
+	TreeStats *stats;
+
+	BIHTravContext(const Vec3q *to,const Vec3q *td,floatq *ou,i32x4 *obj,TreeStats *st)
+		:origin(to),dir(td),out(ou),object(obj),stats(st) { }
+	BIHTravContext() { }
+
+};
+
+struct BIHOptData {
+	const Vec3p &orig,*minInv,*maxInv;
+	const ObjectIdxBuffer<4> &mailbox;
+	float min,max; int idx;
+
+	BIHOptData(const Vec3p &o,const Vec3p *mi,const Vec3p *ma,const ObjectIdxBuffer<4> &mb,float tmin,float tmax,int id) 
+		:orig(o),minInv(mi),maxInv(ma),mailbox(mb),min(tmin),max(tmax),idx(id) { }
+};
 
 template <class TObject=BIHTriangle>
 class BIHTree {
@@ -53,7 +72,7 @@ public:
 	typedef TObject Object;
 	enum { maxLevel=60 };
 
-	BIHTree(const vector<Object> &obj);
+	BIHTree(const Vector<Object> &objects);
 
 	void PrintInfo() const;
 	uint FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const;
@@ -66,8 +85,11 @@ public:
 	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask) const;
 	template <class Output,bool shared>
 	void TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const;
+
 	template <class Output>
-	void TraverseQuad4Primary(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const;
+	void TraverseQuad4Primary(const BIHTravContext &context,int dirMask,BIHOptData *data=0) const;
+	template <class Output>
+	void TraverseQuad16Primary(const BIHTravContext &context,int dirMask) const;
 
 	template <class Output,class Group>
 	void TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
@@ -99,6 +121,26 @@ public:
 	template <class Output,class Rays>
 	void TraverseQuadGroup(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out,int dirMask) const {
 		int i=0;
+		if(Output::type==otPrimary) for(;i+15<sel.Num();i+=16) {
+			Vec3q tOrig[16],tDir[16];
+			floatq dist[16]; i32x4 obj[16];
+
+			for(int p=0;p<16;p++) {
+				dist[p]=out.dist[sel[p]];
+				if(Output::objectIndexes)
+					obj[p]=out.object[sel[p]];
+				tOrig[p]=rays.Origin(sel[p]);
+				tDir[p]=rays.Dir(sel[p]);
+			}
+
+			TraverseQuad16Primary<Output>(BIHTravContext(tOrig,tDir,dist,obj,out.stats),dirMask);
+
+			for(int p=0;p<16;p++) {
+				out.dist[sel[p]]=dist[p];
+				if(Output::objectIndexes)
+					out.object[sel[p]]=obj[p];
+			}
+		}
 		for(;i+3<sel.Num();i+=4) {
 			int q[4]={sel[i],sel[i+1],sel[i+2],sel[i+3]};
 			Vec3q tOrig[4],tDir[4];
@@ -115,10 +157,9 @@ public:
 			tDir[0]=rays.Dir(q[0]); tDir[1]=rays.Dir(q[1]);
 			tDir[2]=rays.Dir(q[2]); tDir[3]=rays.Dir(q[3]);
 
-		//	if(Output::type==otPrimary)
-		//		 TraverseQuad4Primary<Output>(tOrig,tDir,dist,obj,out.stats,dirMask);
-		//	else
-				TraverseQuad4<Output,Rays::sharedOrigin>(tOrig,tDir,dist,obj,out.stats,dirMask);
+			if(Output::type==otPrimary)
+				 TraverseQuad4Primary<Output>(BIHTravContext(tOrig,tDir,dist,obj,out.stats),dirMask);
+			else TraverseQuad4<Output,Rays::sharedOrigin>(tOrig,tDir,dist,obj,out.stats,dirMask);
 
 			out.dist[q[0]]=dist[0]; out.dist[q[1]]=dist[1];
 			out.dist[q[2]]=dist[2]; out.dist[q[3]]=dist[3];
@@ -143,19 +184,14 @@ public:
 
 		for(int k=0;k<8;k++) {
 			RaySelector<Rays::size> &sel=selectors[k];
-			if(sel.Num()) {
-				// Ulepszyc, ta czworka moze byc popsuta (wektorki w roznych kierunkach)
-				/*Vec3q dir0=rays.Dir(sel[0]);
 
+			if(sel.Num()) {
 				if(Output::type!=otPrimary) for(int i=1;i<sel.Num();i++) {
 					int q=sel[i];
 
 					int bitMask=sel.BitMask(i);
 					if(CountMaskBits(bitMask)<4) { selectors[8].Add(q,bitMask); sel.Disable(i--); continue; }
-	
-					floatq dot=rays.Dir(q)|dir0;
-					if(ForAny(dot<Const<floatq,500,1000>())) { selectors[8].Add(q); sel.Disable(i--); continue; }
-				}*/
+				}
 				TraverseQuadGroup(rays,sel,out,k);
 			}
 		}
@@ -163,15 +199,21 @@ public:
 			TraverseMonoGroup(rays,selectors[8],out);
 	}
 
+	mutable MemPattern pattern;
+
 	Vec3p pMin,pMax;
 	vector<BIHNode> nodes;
 	Vector<BIHTriangle> objects;
+
+	float maxDensity;
+	bool split;
 };
 
 #include "bihtrav_mono.h"
 #include "bihtrav_quad.h"
 #include "bihtrav_quad4.h"
 #include "bihtrav_quad4p.h"
+#include "bihtrav_quad16p.h"
 #include "bihtree.inl"
 
 #endif

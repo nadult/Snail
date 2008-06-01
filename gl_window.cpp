@@ -41,8 +41,7 @@ namespace
 }
 
 
-	GLWindow::GLWindow(u32 width,u32 height,bool tFullScreen)
-	{
+	GLWindow::GLWindow(u32 width,u32 height,bool tFullScreen) {
 		fullScreen=tFullScreen;
 		if(created) {
 			throw Exception("Trying to create more than one glfw window");
@@ -219,8 +218,8 @@ namespace
 		glEnable(GL_TEXTURE_2D);
 		glTexSubImage2D(GL_TEXTURE_2D,0,0,0,image.width,image.height,GL_RGB,GL_UNSIGNED_BYTE,&image.buffer[0]);
 		
-		float u=float(image.width)/float(texW);
-		float v=float(image.height)/float(texH);
+		float u=float(GetWidth())/float(texW);
+		float v=float(GetHeight())/float(texH);
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glBegin(GL_QUADS);

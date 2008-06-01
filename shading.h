@@ -67,9 +67,11 @@ template <class Context>
 void StatsShader(Context &c,uint i) {
 	typedef typename Context::real real;
 
+//	c.color[i].x*=0.1f;
+//	c.color[i].y*=0.1f;
 	c.color[i].x=float(c.stats.Intersects())*(0.01f/Context::size);
 	c.color[i].y=float(c.stats.LoopIters())*(0.005f/Context::size);
-	c.color[i].z=float(0*c.stats.Skips()*0.1f);
+	c.color[i].z=float(0*c.stats.Skips()*0.8f);
 }
 	
 

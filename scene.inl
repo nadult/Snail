@@ -11,7 +11,7 @@
 
 	template <class AccStruct>
 	TScene<AccStruct>::TScene(const char *modelFile) :tree(vector<Object>()),lightsEnabled(1) {
-		vector<Object> objects;
+		Vector<Object> objects;
 //		objects.push_back(Sphere(Vec3f(-2,0,5)*5.0f,4.04f*5));
 //		objects.push_back(Sphere(Vec3f(3,2,10)*5.0f,3*5));
 //		objects.push_back(Sphere(Vec3f(0,0,-2.0)*5.0f,0.3f*5));
@@ -28,11 +28,9 @@
 //		}
 
 		{
-			vector<Triangle> tris;
-			LoadWavefrontObj(modelFile,tris,20.0f);
-			objects.resize(tris.size());
-			for(uint n=0;n<objects.size();n++)
-				objects[n]=tris[n];
+			TVector<Triangle> tris(2000000);
+			tris.count=LoadWavefrontObj(modelFile,tris,20.0f,2000000);
+			objects=tris;
 		}
 
 	//	AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);

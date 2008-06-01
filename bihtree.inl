@@ -1,4 +1,6 @@
-void GenBIHIndices(const vector<Triangle> &tris,vector<BIHIdx> &out,float maxSize,uint maxSplits);
+#include <set>
+
+void GenBIHIndices(const Vector<Triangle> &tris,vector<BIHIdx> &out,float maxSize,uint maxSplits);
 
 namespace {
 
@@ -12,8 +14,8 @@ namespace {
 
 }
 
-template <class Object>
-BIHTree<Object>::BIHTree(const vector<Object> &obj) :objects(obj) {
+template <class Object> 
+BIHTree<Object>::BIHTree(const Vector<Object> &objs) :objects(objs),split(1),maxDensity(125000000.0f) {
 	if(!objects.size()) return;
 
 	double tPrecomp,tIndices,tBuild;
@@ -38,7 +40,7 @@ BIHTree<Object>::BIHTree(const vector<Object> &obj) :objects(obj) {
 
 	tIndices=GetTime();
 	vector<BIHIdx> indices;
-	GenBIHIndices(obj,indices,avgSize*1.75f,32*objects.size());
+	GenBIHIndices(objs,indices,avgSize*1.75f,32*objects.size());
 //	printf("Indices: %d Avg size: %.2f\n",indices.size(),avgSize);
 	tIndices=GetTime()-tIndices;
 
@@ -54,8 +56,8 @@ template <class Object>
 void BIHTree<Object>::PrintInfo() const {
 	double nodeBytes=nodes.size()*sizeof(BIHNode);
 	double objBytes=objects.size()*sizeof(Object);
-	printf("Objects:%8d * %2d = %6.2fMB\n",objects.size(),sizeof(Object),nodeBytes*0.000001);
-	printf("Nodes:  %8d * %2d = %6.2fMB\n",nodes.size(),sizeof(BIHNode),objBytes*0.000001);
+	printf("Objects:%8d * %2d = %6.2fMB\n",objects.size(),sizeof(Object),objBytes*0.000001);
+	printf("Nodes:  %8d * %2d = %6.2fMB\n",nodes.size(),sizeof(BIHNode),nodeBytes*0.000001);
 	printf("~ %.0f bytes per triangle\n\n",(nodeBytes+objBytes)/double(objects.size()));
 }
 
@@ -73,6 +75,16 @@ uint BIHTree<Object>::FindSimilarParent(vector<u32> &parents,uint nNode,uint axi
 template <class Object>
 void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,int first,int last,Vec3p min,Vec3p max,uint level) {
 	uint axis=MaxAxis(max-min);
+
+	{
+		std::set<int> objs;
+		for(int n=first;n<=last;n++) objs.insert(indices[n].idx);
+
+		float sSize; { Vec3p s=pMax-pMin; sSize=s.x*(s.y+s.z)+s.y*s.z; }
+		Vec3p size=max-min;
+		float density=float(objs.size()) / ((size.x*(size.y+size.z)+size.y*size.z) / sSize);
+		nodes[nNode].density=density;
+	}
 	
 	float split=Lerp((&min.x)[axis],(&max.x)[axis],0.5f);
 	float leftMax=(&pMin.x)[axis],rightMin=(&pMax.x)[axis];
@@ -133,19 +145,18 @@ void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nN
 
 	{
 		BIHNode &node=nodes[nNode];
-		if(numLeft==0) leftMax=(&pMin.x)[axis]-10.0f;
-		if(numRight==0) rightMin=(&pMax.x)[axis]+10.0f;
+		if(numLeft==0) leftMax=-1.0f/0.0f;//(&pMin.x)[axis]-10000.0f;
+		if(numRight==0) rightMin=1.0f/0.0f;//(&pMax.x)[axis]+10000.0f;
 		node.clip[0]=leftMax;
 		node.clip[1]=rightMin;
 		node.val[0]=axis<<30;
-		node.val[1]=0;
+		nodes[nNode].val[1]=0;
 	}
 
 	uint cLeft,cRight;
 	bool leftLeaf=0,rightLeaf=0;
 
 	if(numLeft) {
-		nodes[nNode].val[1]|=(1<<30);
 		cLeft=nodes.size();
 		leftLeaf=numLeft<=1; if(!leftLeaf) {
 			int idx=indices[first].idx; leftLeaf=1;
@@ -159,7 +170,6 @@ void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nN
 		}
 	}
 	if(numRight) {
-		nodes[nNode].val[1]|=(1<<31);
 		cRight=nodes.size();
 		rightLeaf=numRight<=1; if(!rightLeaf) {
 			int idx=indices[right+1].idx; rightLeaf=1;

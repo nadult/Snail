@@ -123,7 +123,7 @@ namespace {
 
 }
 
-void GenBIHIndices(const vector<Triangle> &tris,vector<BIHIdx> &out,float maxSize,uint maxSplits) {
+void GenBIHIndices(const Vector<Triangle> &tris,vector<BIHIdx> &out,float maxSize,uint maxSplits) {
 	std::multiset<BIHIdx,SortBySize> indices;
 
 	for(int n=0;n<tris.size();n++) {

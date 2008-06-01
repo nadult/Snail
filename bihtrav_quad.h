@@ -31,7 +31,7 @@
 			tMin=Max(ttMin.z,tMin);
 		}
 
-		const BIHNode *node0=&nodes[0],*node;
+		const BIHNode *node0=&nodes[0];
 		int idx=0;
 
 		while(true) {
@@ -47,7 +47,7 @@
 					f32x4b mask=ret<minRet&&ret>0.0f;
 
 					if(ForAny(mask)) {
-						minRet=Condition(mask,ret,minRet);
+						minRet=Condition(mask,Output::type==otShadow?0.00001f:ret,minRet);
 						if(Output::objectIndexes)
 							output.object[0]=Condition(i32x4b(mask),i32x4(idx),output.object[0]);
 	
@@ -65,7 +65,9 @@
 				continue;
 			}
 
-			node=node0+(idx&BIHNode::idxMask);
+			const BIHNode *node=node0+(idx&BIHNode::idxMask);
+			pattern.Touch(idx&BIHNode::idxMask,1);
+			
 			int axis=node->Axis();
 			int sign=dirMask&(1<<axis)?1:0;
 			floatq near,far; {

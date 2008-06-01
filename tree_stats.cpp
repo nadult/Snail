@@ -1,6 +1,25 @@
 #include "tree_stats.h"
+#include "image.h"
 
-
+	void MemPattern::Init(int size,int r) {
+		if(enabled) {
+			res=r; mul=double(res)/double(size);
+			data.resize(res);
+			for(int n=0;n<res;n++) data[n]=0;
+		}
+	}
+	void MemPattern::Draw(Image &img) const {
+		if(enabled) {
+			int width=Min(data.size(),img.width);
+			for(int n=0;n<width;n++) {
+				int color=data[n];
+				int r=Clamp(color/255,0,255),g=Clamp(color,0,255),b=0;
+				img.Pixel(n,0,r,g,b);
+				img.Pixel(n,1,r,g,b);
+				img.Pixel(n,2,r,g,b);
+			}
+		}
+	}
 	void TreeStats::PrintInfo(int resx,int resy,double msRenderTime) {
 		double raysPerSec=double(tracedRays)*(1000.0/msRenderTime);
 		double nPixels=double(resx*resy);

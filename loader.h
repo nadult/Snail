@@ -4,8 +4,8 @@
 #include "rtbase.h"
 #include "object.h"
 
-void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale);
-void LoadRaw(const char *fileName,vector<Triangle> &out,float scale);
+uint LoadWavefrontObj(const char *fileName,Vector<Triangle> &out,float scale,uint maxTris);
+uint LoadRaw(const char *fileName,Vector<Triangle> &out,float scale,uint maxTris);
 
 #endif
 

@@ -6,40 +6,17 @@
 using std::cout;
 using std::endl;
 
-enum { maxTris=1000000 };
+uint LoadWavefrontObj(const char *fileName,Vector<Triangle> &out,float scale,uint maxTris) {
 
-namespace {
-
-	void SplitTriangle(const Vec3f &a,const Vec3f &b,const Vec3f &c,vector<Triangle> &out);
-
-	void NewTri(const Vec3f &a,const Vec3f &b,const Vec3f &c,vector<Triangle> &out) {
-	//	const float maxLen=30.0f;
-
-	//	if(Length(b-a)>maxLen||Length(c-b)>maxLen||Length(a-c)>maxLen)
-	//		SplitTriangle(a,b,c,out);
-	//	else
-			if(out.size()<maxTris) out.push_back(Triangle(a,b,c));
-	}
-
-	void SplitTriangle(const Vec3f &a,const Vec3f &b,const Vec3f &c,vector<Triangle> &out) {
-		Vec3f ab=(a+b)*0.5f,bc=(b+c)*0.5f,ac=(a+c)*0.5f;
-		NewTri(a,ab,ac,out);
-		NewTri(b,bc,ab,out);
-		NewTri(c,ac,bc,out);
-		NewTri(ac,ab,bc,out);
-	}
-}
-
-void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale) {
 	std::filebuf fb;
-	if(!fb.open (fileName,std::ios::in))
-		return;
+	if(!fb.open (fileName,std::ios::in)) return 0;
 
 	std::istream is(&fb);
 	vector<Vec3f> verts,normals,tex;
 	bool flipSides=0;
 
 	float sx=scale,sy=scale,sz=scale;
+	int count=0;
 
 	for(;;) {
 		char line[1000],type[100],a[100],b[100],c[100],d[100],e[100],f[100];
@@ -64,8 +41,9 @@ void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale) {
 			buf=strchr(buf ,' ')+1; v[1]=atoi(buf)-1;
 			buf=strchr(buf ,' ')+1; v[2]=atoi(buf)-1;
 
-			if(flipSides) NewTri(verts[v[2]],verts[v[1]],verts[v[0]],out);
-			else NewTri(verts[v[0]],verts[v[1]],verts[v[2]],out);
+			if(flipSides) out[count++]=Triangle(verts[v[2]],verts[v[1]],verts[v[0]]);
+			else out[count++]=Triangle(verts[v[0]],verts[v[1]],verts[v[2]]);
+			if(count==maxTris) break;
 			
 			/*char *buf=strchr(line,' ')+1;
 			while(buf=strchr(buf,' ')) {
@@ -94,11 +72,15 @@ void LoadWavefrontObj(const char *fileName,vector<Triangle> &out,float scale) {
 
 	}
 	fb.close();
-	printf("Done loading %s\n",fileName);
+//	printf("Done loading %s\n",fileName);
+
+	return count;
 }		
 
-void LoadRaw(const char *filename,vector<Triangle> &out,float scale) {
+uint LoadRaw(const char *filename,Vector<Triangle> &out,float scale,uint maxTris) {
 	FILE *f=fopen(filename,"rb");
+
+	int count=0;
 
 	while(1) {
 		float x[3],y[3],z[3];
@@ -110,9 +92,11 @@ void LoadRaw(const char *filename,vector<Triangle> &out,float scale) {
 			z[n]*=-scale;
 		}
 
-		out.push_back(Triangle(Vec3f(x[2],z[2],y[2]),Vec3f(x[1],z[1],y[1]),Vec3f(x[0],z[0],y[0])));
+		out[count++]=Triangle(Vec3f(x[2],z[2],y[2]),Vec3f(x[1],z[1],y[1]),Vec3f(x[0],z[0],y[0]));
+		if(count>maxTris) break;
 	}
 
 	fclose(f);
+	return count;
 }
 

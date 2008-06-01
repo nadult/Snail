@@ -3,6 +3,30 @@
 
 #include "rtbase.h"
 
+class Image;
+
+// Gives information about what memory chunks are needed
+// for given view, lights, etc.
+// It slows down computation up to 20% (or even more) so
+// it should be disabled in release version
+struct MemPattern {
+	enum { enabled=0 };
+
+	void Init(int size,int r=256);
+	inline void Touch(int pos,int count=1) {
+		if(enabled) {
+			int p=float(pos)*mul;
+			if(p>=0&&p<res) data[p]+=count;
+		}
+	}
+	void Draw(Image &img) const;
+
+private:
+	int res; float mul;
+	vector<int> data;
+};
+
+
 class TreeStats
 {
 public:

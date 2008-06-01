@@ -8,7 +8,6 @@
 #include "camera.h"
 
 #include "bihtree.h"
-#include "kdtree.h"
 
 #include "gl_window.h"
 
@@ -23,6 +22,23 @@ struct Options {
 	bool reflections,rdtscShader;
 };
 
+inline i32x4 ConvColor(const Vec3q &rgb) {
+	i32x4 tr=Trunc(Clamp(rgb.x*255.0f,floatq(0.0f),floatq(255.0f)));
+	i32x4 tg=Trunc(Clamp(rgb.y*255.0f,floatq(0.0f),floatq(255.0f)));
+	i32x4 tb=Trunc(Clamp(rgb.z*255.0f,floatq(0.0f),floatq(255.0f)));
+
+	__m128i c1,c2,c3,c4;
+	c1=_mm_packs_epi32(tr.m,tr.m);
+	c2=_mm_packs_epi32(tg.m,tg.m);
+	c3=_mm_packs_epi32(tb.m,tb.m);
+	c1=_mm_packus_epi16(c1,c1);
+	c2=_mm_packus_epi16(c2,c2);
+	c3=_mm_packus_epi16(c3,c3);
+
+	__m128i c12=_mm_unpacklo_epi8(c1,c2);
+	__m128i c33=_mm_unpacklo_epi8(c3,c3);
+	return _mm_unpacklo_epi16(c12,c33);
+}
 
 template <class Scene,int QuadLevels>
 struct GenImageTask {
@@ -55,7 +71,7 @@ struct GenImageTask {
 
 		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
-				Vec3q dir[NQuads],idir[NQuads];
+				Vec3q dir[NQuads];
 				rayGen.Generate(PWidth,PHeight,startX+x,startY+y,dir);
 
 				for(int n=0;n<NQuads;n++) {
@@ -63,7 +79,6 @@ struct GenImageTask {
 					for(int k=0;k<4;k++) tmp[k]=rotMat*tmp[k];
 					Convert(tmp,dir[n]);
 					dir[n]*=RSqrt(dir[n]|dir[n]);
-			//		idir[n]=VInv(dir[n]);
 				}
 
 				TracingContext<Scene,RayGroup<NQuads,1,0>,RaySelector<NQuads> >
@@ -75,30 +90,50 @@ struct GenImageTask {
 				scene->RayTracePrimary(context);
 				outStats->Update(context.stats);
 
-				rayGen.Decompose(rgb,rgb);
-				Vec3f trgb[PWidth*PHeight]; {
-					floatq max=255.0f,zero=0.0f;
-					for(int q=0;q<NQuads;q++) Convert(VClamp(rgb[q]*max,Vec3q(zero),Vec3q(max)),trgb+q*4);
+				if(NQuads==1) {
+					i32x4 col=ConvColor(rgb[0]);
+					u8 *c=(u8*)&col; u32 *ic=(u32*)&col;
+
+					u8 *p1=outPtr+y*pitch+x*3;
+					u8 *p2=p1+pitch;
+
+					*(int*)(p1+0)=col[0];
+					p1[ 3]=c[ 4]; p1[ 4]=c[ 5]; p1[ 5]=c[ 6];
+					*(int*)(p2+0)=col[2];
+					p2[ 3]=c[12]; p2[ 4]=c[13]; p2[ 5]=c[14];
 				}
+				else {
+					rayGen.Decompose(rgb,rgb);
 
-				int tWidth =Min(x+PWidth +startX,out->width )-startX-x;
-				int tHeight=Min(y+PHeight+startY,out->height)-startY-y;
-				for(int ty=0;ty<tHeight;ty++) {
-					u8 *ptr=outPtr+x*3+(ty+y)*pitch;
-					Vec3f *src=trgb+ty*PWidth;
+					Vec3q *src=rgb;
+					u8 *dst=outPtr+x*3+y*pitch;
+					int lineDiff=pitch-PWidth*3+12;
 
-					for(int tx=0;tx<tWidth;tx++) {
-						ptr[0]=src[tx].x;
-						ptr[1]=src[tx].y;
-						ptr[2]=src[tx].z;
-						ptr+=3;
+					for(int ty=0;ty<PHeight;ty++) {
+						for(int tx=0;tx<PWidth-4;tx+=4) {
+							i32x4 col=ConvColor(*src++);
+							u8 *c=(u8*)&col;
+							*(int*)(dst+0)=col[0];
+							*(int*)(dst+3)=col[1];
+							*(int*)(dst+6)=col[2];
+							*(int*)(dst+9)=col[3];
+							dst+=12;
+						}
+						{
+							i32x4 col=ConvColor(*src++);
+							u8 *c=(u8*)&col;
+							*(int*)(dst+0)=col[0];
+							*(int*)(dst+3)=col[1];
+							*(int*)(dst+6)=col[2];
+							dst[ 9]=c[12]; dst[10]=c[13]; dst[11]=c[14];
+							dst+=lineDiff;
+						}
 					}
 				}
 			}
 		}
 	}
 };
-
 
 template <int QuadLevels,class Scene>
 TreeStats GenImage(const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
@@ -123,16 +158,6 @@ TreeStats GenImage(const Scene &scene,const Camera &camera,Image &image,const Op
 	for(uint n=0;n<numTasks;n++)
 		stats.Update(taskStats[n]);
 	return stats;
-}
-
-void PrintBaseSizes() {
-#define PRINT_SIZE(cls)		{printf("sizeof(" #cls "): %d\n",sizeof(cls));}
-	PRINT_SIZE(KDNode)
-	PRINT_SIZE(BIHNode)
-	PRINT_SIZE(Triangle)
-	PRINT_SIZE(Object)
-	PRINT_SIZE(Sphere)
-#undef PRINT_SIZE
 }
 
 Camera GetDefaultCamera(string model) {
@@ -185,10 +210,11 @@ Camera GetDefaultCamera(string model) {
 		Camera box(Vec3f(-12.7319,0.0000,-26.7225),Vec3f(0.3523,0.0000,0.9359),Vec3f(0.9359,0.0000,-0.3523));
 
 		Camera sponzaBug(Vec3f(-281.2263,-104.0000,240.5235),Vec3f(0.8898,0.0000,0.4565),Vec3f(0.4565,0.0000,-0.8898));
-		
+		Camera abrams2(Vec3f(-119.3219,-73.6003,86.1858),Vec3f(0.8808,0.0000,-0.4735),Vec3f(-0.4735,0.0000,-0.8808));
+
 		cams["pompei.obj"]=pompei;
 		cams["sponza.obj"]=sponza;
-		cams["abrams.obj"]=abrams;
+		cams["abrams.obj"]=abrams2;
 		cams["lancia.obj"]=abrams;
 		cams["bunny.obj"]=bunny;
 		cams["feline.obj"]=feline;
@@ -205,8 +231,8 @@ template <class Scene>
 TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	switch(quadLevels) {
 //	case 0: return GenImage<0>(scene,camera,image,options,tasks);
-	case 1: return GenImage<1>(scene,camera,image,options,tasks);
-//	case 2: return GenImage<2>(scene,camera,image,options,tasks);
+//	case 1: return GenImage<1>(scene,camera,image,options,tasks);
+	case 2: return GenImage<2>(scene,camera,image,options,tasks);
 //	case 3: return GenImage<3>(scene,camera,image,options,tasks);
 //	case 4: return GenImage<4>(scene,camera,image,options,tasks);
 	default: throw Exception("Quad level not supported.");
@@ -233,29 +259,21 @@ int main(int argc, char **argv)
 	const string fileName=string("scenes/")+modelFile;
 
 	buildTime=GetTime();
-	TScene<BIHTree<Triangle> >	bihScene (fileName.c_str());
+	TScene<BIHTree<Triangle> >	scene (fileName.c_str());
 	buildTime=GetTime()-buildTime;
 	printf("BIHTree build time: %.2f sec\n",buildTime);
-	bihScene.tree.PrintInfo();
+	scene.tree.PrintInfo();
 
-//	buildTime=GetTime();
-//	TScene<KDTree>				kdScene (fileName.c_str());
-//	buildTime=GetTime()-buildTime;
-//	printf("KDTree build time: %.2f sec\n",buildTime);
-//	kdScene.tree.PrintInfo();
-
-	Image img(resx,resy);
+	Image img(resx,resy,16);
 	Camera cam=GetDefaultCamera(modelFile);;
 	
-	uint quadLevels=1;
+	uint quadLevels=2;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
-//	bool useKdTree=0;
 
 	if(nonInteractive) {
 		for(int n=atoi(argv[3])-1;n>0;n--) {
 			double time=GetTime();
-			/*if(useKdTree) GenImage(quadLevels,kdScene,cam,img,Options(),threads);
-			else*/ GenImage(quadLevels,bihScene,cam,img,Options(),threads);
+			GenImage(quadLevels,scene,cam,img,Options(),threads);
 			time=GetTime()-time;
 			minTime=Min(minTime,time);
 			maxTime=Max(maxTime,time);
@@ -265,7 +283,8 @@ int main(int argc, char **argv)
 	else {
 		GLWindow out(resx,resy,fullscreen);
 		Options options;
-		bihScene.lightsEnabled=0;
+		scene.lightsEnabled=0;
+		scene.tree.maxDensity=520.0f * resx * resy;
 
 		while(out.PollEvents()) {
 			if(out.Key(Key_lctrl)&&out.Key('C')) break;
@@ -280,21 +299,25 @@ int main(int argc, char **argv)
 			if(out.Key('A')) cam.pos-=cam.right*speed;
 			if(out.Key('D')) cam.pos+=cam.right*speed;
 
-			if(out.Key('L')) { printf("Lights %s\n",bihScene.lightsEnabled?"disabled":"enabled"); bihScene.lightsEnabled^=1; }
+			if(out.KeyDown('L')) { printf("Lights %s\n",scene.lightsEnabled?"disabled":"enabled"); scene.lightsEnabled^=1; }
 			if(out.Key('R')) cam.pos-=cam.up*speed;
 			if(out.Key('F')) cam.pos+=cam.up*speed;
 
-		//	if(out.KeyDown('T')) {
-		//		printf("mode: %s\n",useKdTree?"BIH":"KD");
-		//		useKdTree^=1;
-		//	}
-		//	if(out.KeyDown('Y')) {
-		//		printf("splitting %s\n",kdScene.tree.splittingFlag?"off":"on");
-		//		kdScene.tree.splittingFlag^=1;
-		//	}
+		/*	if(out.KeyDown('Y')) {
+				printf("splitting %s\n",scene.tree.split?"off":"on");
+				scene.tree.split^=1;
+			}
+			if(out.KeyDown('[')) {
+				scene.tree.maxDensity/=2.0f;
+				printf("maxdensity: %.0f\n",scene.tree.maxDensity);
+			}
+			if(out.KeyDown(']')) {
+				scene.tree.maxDensity*=2.0f;
+				printf("maxdensity: %.0f\n",scene.tree.maxDensity);
+			} */
 
 		//	if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
-			if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
+		//	if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
 		//	if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
 		//	if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 
@@ -316,20 +339,21 @@ int main(int argc, char **argv)
 			//	}
 			}
 			
+			scene.tree.pattern.Init(scene.tree.nodes.size(),resx);
+
 			TreeStats stats;
 			double time=GetTime();
-			stats=/*useKdTree?	GenImage(quadLevels,kdScene,cam,img,options,threads):*/
-								GenImage(quadLevels,bihScene,cam,img,options,threads);
+			stats=GenImage(quadLevels,scene,cam,img,options,threads);
 
 			time=GetTime()-time; minTime=Min(minTime,time);
 			maxTime=Max(time,maxTime);
 
 			int lastTicks=0;
 			stats.PrintInfo(resx,resy,time*1000.0);
-
-			bihScene.Animate();
+			scene.tree.pattern.Draw(img);
 			out.RenderImage(img);
 			out.SwapBuffers();
+		//	scene.Animate();
 		}
 	}
 
