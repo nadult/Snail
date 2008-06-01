@@ -15,10 +15,9 @@ using std::cout;
 using std::endl;
 
 struct Options {
-	Options(bool pixD,bool refl,bool rdtsc) :pixDoubling(pixD),reflections(refl),rdtscShader(rdtsc) { }
+	Options(bool refl,bool rdtsc) :reflections(refl),rdtscShader(rdtsc) { }
 	Options() { memset(this,0,sizeof(Options)); }
 
-	bool pixDoubling;
 	bool reflections,rdtscShader;
 };
 
@@ -241,6 +240,19 @@ TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image 
 
 int main(int argc, char **argv)
 {
+	if(argc>=2&&string("--help")==argv[1]) {
+		printf("Unnamed raytracer v0.0666 by nadult\n\n");
+		printf("Usage:\n\trtracer resx resy mode threads scene\n\tmode: 0: windowed  1: fullscreen  2: render to output.tga\n");
+		printf("\nExamples:\n\t./rtracer 1280 800 0 2 abrams.obj\n\t./rtracer 800 600 1 2 pompei.obj\n\n");
+		printf("Interactive control:\n\tA,W,S,D R,F - move the camera\n\tN,M - rotate camera\n\t");
+		printf("k - save image to out/output.tga\n\to - toggle reflections\n\tl - toggle lights\n\t");
+		printf("j - toggle lights movement\n\tp - print camera position\n\t");
+	//	printf("i - toggle scene complexity visualization (green: # visited nodes  red: # intersections)\n\t");
+		printf("0,1,2,3 - change tracing mode (on most scenes 0 is slowest,  2,3 is fastest)\n\tctrl+c - exit\n\n");
+
+		return 0;
+	}
+
 	int resx=512,resy=512;
 	float speed=2.0f;
 	
@@ -261,13 +273,13 @@ int main(int argc, char **argv)
 	buildTime=GetTime();
 	TScene<BIHTree<Triangle> >	scene (fileName.c_str());
 	buildTime=GetTime()-buildTime;
-	printf("BIHTree build (faster) time: %.2f sec\n",buildTime);
+	printf("BIHTree build time: %.2f sec\n",buildTime);
 	scene.tree.PrintInfo();
 
 	Image img(resx,resy,16);
 	Camera cam=GetDefaultCamera(modelFile);;
 	
-	uint quadLevels=0;
+	uint quadLevels=2;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 
 	if(nonInteractive) {
@@ -285,40 +297,33 @@ int main(int argc, char **argv)
 		Options options;
 		scene.lightsEnabled=0;
 		scene.tree.maxDensity=520.0f * resx * resy;
+		bool lightsAnim=0;
 
 		while(out.PollEvents()) {
 			if(out.Key(Key_lctrl)&&out.Key('C')) break;
 			if(out.KeyDown('K')) img.SaveToFile("out/output.tga");
-			if(out.KeyDown('P')) options.pixDoubling^=1;
 			if(out.KeyDown('O')) options.reflections^=1;
-			if(out.KeyDown('I')) options.rdtscShader^=1;
+	//		if(out.KeyDown('I')) options.rdtscShader^=1;
+			if(out.KeyDown('P')) cam.Print();
+			if(out.KeyDown('L')) { printf("Lights %s\n",scene.lightsEnabled?"disabled":"enabled"); scene.lightsEnabled^=1; }
+			if(out.KeyDown('J')) { printf("Lights animation %s\n",lightsAnim?"disabled":"enabled"); lightsAnim^=1; }
 
 			if(out.Key('W')) cam.pos+=cam.front*speed;
 			if(out.Key('S')) cam.pos-=cam.front*speed;
-
 			if(out.Key('A')) cam.pos-=cam.right*speed;
 			if(out.Key('D')) cam.pos+=cam.right*speed;
-
-			if(out.KeyDown('L')) {
-				printf("Lights %s\n",scene.lightsEnabled?"disabled":"enabled");
-				scene.lightsEnabled^=1;
-			}
 			if(out.Key('R')) cam.pos-=cam.up*speed;
 			if(out.Key('F')) cam.pos+=cam.up*speed;
 
-		//	if(out.KeyDown('Y')) {
-		//		printf("splitting %s\n",scene.tree.split?"off":"on");
-		//		scene.tree.split^=1;
-		//	}
-			if(out.KeyDown('[')) { scene.tree.maxDensity/=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
-			if(out.KeyDown(']')) { scene.tree.maxDensity*=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
+		//	if(out.KeyDown('Y')) { printf("splitting %s\n",scene.tree.split?"off":"on"); scene.tree.split^=1; }
+		//	if(out.KeyDown('[')) { scene.tree.maxDensity/=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
+		//	if(out.KeyDown(']')) { scene.tree.maxDensity*=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
 
 			if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
 			if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
 			if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
 		//	if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 
-			if(out.KeyDown('P')) cam.Print();
 
 			{
 				int dx=out.KeyDown(Key_space)?out.MouseMove().x:0,dy=0;
@@ -342,15 +347,16 @@ int main(int argc, char **argv)
 			double time=GetTime();
 			stats=GenImage(quadLevels,scene,cam,img,options,threads);
 
+			out.RenderImage(img);
+			out.SwapBuffers();
+
 			time=GetTime()-time; minTime=Min(minTime,time);
 			maxTime=Max(time,maxTime);
 
-			int lastTicks=0;
 			stats.PrintInfo(resx,resy,time*1000.0);
 			scene.tree.pattern.Draw(img);
-			out.RenderImage(img);
-			out.SwapBuffers();
-		//	scene.Animate();
+
+			if(lightsAnim) scene.Animate();
 		}
 	}
 

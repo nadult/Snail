@@ -1,4 +1,3 @@
-#include <set>
 
 void GenBIHIndices(const Vector<Triangle> &tris,vector<BIHIdx> &out,float maxSize,uint maxSplits);
 void SplitIndices(const Vector<Triangle> &tris,vector<BIHIdx> &inds,int axis,float pos,float maxSize);
@@ -35,7 +34,7 @@ BIHTree<Object>::BIHTree(const Vector<Object> &objs) :objects(objs),split(1),max
 	avgSize=sumSize.x+sumSize.y+sumSize.z;
 	avgSize/=3.0*objects.size();
 
-	vector<BIHIdx> indices;
+	vector<BIHIdx> indices; indices.reserve(objects.size()*16);
 	for(int n=0;n<objects.size();n++) {
 		const Object &tri=objects[n];
 		Vec3f p1,p2,p3;	Convert(tri.P1(),p1); Convert(tri.P2(),p2); Convert(tri.P3(),p3);
