@@ -72,11 +72,12 @@ public:
 	typedef TObject Object;
 	enum { maxLevel=60 };
 
-	BIHTree(const Vector<Object> &objects);
+	template <class TriContainer>
+	BIHTree(const TriContainer &objects);
 
 	void PrintInfo() const;
 	uint FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const;
-	void Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,int first,int last,Vec3p min,Vec3p max,uint level);
+	void Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,const Vec3p &min,const Vec3p &max,uint level);
 
 	template <class Output>
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const;
@@ -204,7 +205,7 @@ public:
 	float avgSize;
 	Vec3p pMin,pMax;
 	vector<BIHNode> nodes;
-	Vector<BIHTriangle> objects;
+	TriVector objects;
 
 	float maxDensity;
 	bool split;

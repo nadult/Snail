@@ -104,7 +104,7 @@ namespace {
 
 }
 
-void SplitIndices(const Vector<Triangle> &tris,vector<BIHIdx> &inds,int axis,float pos,float maxSize) {
+void SplitIndices(const TriVector &tris,vector<BIHIdx> &inds,int axis,float pos,float maxSize) {
 	if(inds.size()<=8) return;
 	maxSize*=1.75f;
 

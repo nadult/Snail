@@ -5,20 +5,49 @@
 #include "light.h"
 #include "shading.h"
 #include "context.h"
+#include "loader.h"
 
 
-template <class Container,class integer,class Vec>
-Vec ExtractNormals(const Container &objects,const integer &objId,const Vec &position)  {
+template <class Vec,class Container,class integer>
+Vec FlatNormals(const Container &objects,const integer &objId)  {
 	typedef typename Vec::TScalar real;
 	typedef typename Container::value_type Object;
 
 	const Object *obj0=&objects[objId[0]];
-	Vec nrm=obj0->Normal(position);
+	Vec nrm(obj0->Nrm());
 
 	if(ForAny(integer(objId[0])!=objId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
 		const Object *objN=&objects[objId[n]];
 		if(objN!=obj0) {
-			Vec newNrm=objN->Normal(position);
+			Vec newNrm(objN->Nrm());
+			nrm=Condition(ScalarInfo<real>::ElementMask(n),newNrm,nrm);
+		}
+	}
+
+	return nrm;
+}
+
+
+template <class Container,class integer,class Vec>
+Vec GouraudNormals(const Container &objects,const ShadingDataVec &shadingData,const integer &objId,const Vec &rayOrig,const Vec &rayDir)  {
+	typedef typename Vec::TScalar real;
+	typedef typename Container::value_type Object;
+
+	const Object *obj0=&objects[objId[0]];
+	Vec nrm; {
+		real u,v; obj0->Barycentric(rayOrig,rayDir,u,v);
+		const ShadingData &data=shadingData[objId[0]];
+		nrm=Vec(data.nrm[0])*(real(1.0f)-u-v)+Vec(data.nrm[2])*u+Vec(data.nrm[1])*v;
+	}
+
+	if(ForAny(integer(objId[0])!=objId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
+		const Object *objN=&objects[objId[n]];
+		if(objN!=obj0) {
+			Vec newNrm; {
+				real u,v; objN->Barycentric(rayOrig,rayDir,u,v);
+				const ShadingData &data=shadingData[objId[n]];
+				newNrm=Vec(data.nrm[0])*(real(1.0f)-u-v)+Vec(data.nrm[2])*u+Vec(data.nrm[1])*v;
+			}
 			nrm=Condition(ScalarInfo<real>::ElementMask(n),newNrm,nrm);
 		}
 	}
@@ -105,6 +134,7 @@ public:
 
 	bool lightsEnabled;
 	vector<Light> lights;
+	ShadingDataVec shadingData;
 	AccStruct tree;
 };
 
@@ -162,7 +192,10 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector
 		i32x4b imask(c.selector.Mask(i));
 
 		c.position[q]=c.RayDir(q)*c.distance[q]+c.RayOrigin(q);
-		c.normal[q]=ExtractNormals(tree.objects,Condition(imask,c.objId[q]),c.position[q]);
+		if(c.options.shadingMode==smGouraud)
+			c.normal[q]=GouraudNormals(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
+		else
+			c.normal[q]=FlatNormals<Vec3q>(tree.objects,Condition(imask,c.objId[q]));
 	
 		SimpleLightingShader(c,q);
 	}

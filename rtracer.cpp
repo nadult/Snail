@@ -1,7 +1,4 @@
-#include <map>
 #include <iostream>
-#include <memory.h>
-
 #include "ray_generator.h"
 #include "task_switcher.h"
 #include "scene.h"
@@ -15,9 +12,10 @@ using std::cout;
 using std::endl;
 
 struct Options {
-	Options(bool refl,bool rdtsc) :reflections(refl),rdtscShader(rdtsc) { }
-	Options() { memset(this,0,sizeof(Options)); }
+	Options(ShadingMode sm,bool refl,bool rdtsc) :shading(sm),reflections(refl),rdtscShader(rdtsc) { }
+	Options() { reflections=rdtscShader=0; shading=smFlat; }
 
+	ShadingMode shading;
 	bool reflections,rdtscShader;
 };
 
@@ -84,7 +82,7 @@ struct GenImageTask {
 					context(*scene,RayGroup<NQuads,1,0>(dir,&origin,0));
 				Vec3q *rgb=context.color;
 
-				context.options=TracingOptions(options.reflections?1:0,options.rdtscShader);
+				context.options=TracingOptions(options.reflections?1:0,options.shading,options.rdtscShader);
 				
 				scene->RayTracePrimary(context);
 				outStats->Update(context.stats);
@@ -159,73 +157,6 @@ TreeStats GenImage(const Scene &scene,const Camera &camera,Image &image,const Op
 	return stats;
 }
 
-Camera GetDefaultCamera(string model) {
-	static bool initialized=0;
-	static std::map< string, Camera> cams;
-	if(!initialized) {
-		initialized=1;
-		Camera pompei(
-			Vec3f(52.423584,158.399719,51.276756),
-			Vec3f(0.999916,0.000000,-0.013203),
-			Vec3f(-0.013203,0.000000,-0.999916));
-
-		Camera abrams(
-			Vec3f(-125.014099,-7.600281,115.258301),
-			Vec3f(0.907629,0.000000,-0.419782),
-			Vec3f(-0.419782,0.000000,-0.907629));
-
-		Camera abramsTop( Vec3f(-118.3508,-93.6003,86.6569), Vec3f(0.8508,0.0000,-0.5254), Vec3f(-0.5254,0.0000,-0.8508) );
-		Camera abramsLeak( Vec3f(102.7247,-31.6003,-76.6981), Vec3f(-0.8534,0.0000,-0.5213), Vec3f(-0.5213,0.0000,0.8534) );
-
-		Camera abramsBack(
-			Vec3f(-5.081215,-5.600281,-275.260132),
-			Vec3f(0.023998,0.000000,0.999716),
-			Vec3f(0.999716,0.000000,-0.023998) );
-
-		Camera abramsBadCase(
-				Vec3f(-23.2355,-77.6003,-2.7983),
-				Vec3f(0.6772,0.0000,0.7357),
-				Vec3f(0.7357,0.0000,-0.6772) );
-
-		Camera abramsBackTurned(
-			Vec3f(-14.741514,-3.600281,-217.086441),
-			Vec3f(-0.181398,0.000000,-0.983413),
-			Vec3f(-0.983413,0.000000,0.181398) );
-
-		Camera bunny(
-			Vec3f(7.254675,2.399719,39.409294),
-			Vec3f(-0.240041,0.000000,-0.970767),
-			Vec3f(-0.970767,0.000000,0.240041) );
-
-		Camera room(
-			Vec3f(-58.125217,-205.600281,61.583553),
-			Vec3f(0.713451,0.000000,-0.700709),
-			Vec3f(-0.700709,0.000000,-0.713451) );
-
-		Camera sponza(Vec3f(443.2726,-248.0000,0.8550),Vec3f(-0.9995,0.0000,-0.0324),Vec3f(-0.0324,0.0000,0.9995));
-		Camera sponzaBadCase(Vec3f(-353.3055,-326.0000,147.0938),Vec3f(0.0815,0.0000,-0.9967),Vec3f(-0.9967,0.0000,-0.0815));
-			
-		Camera feline( Vec3f(-3.0111,-5.6003,-2.8642), Vec3f(0.8327,0.0000,0.5537), Vec3f(0.5537,0.0000,-0.8327) );
-		Camera box(Vec3f(-12.7319,0.0000,-26.7225),Vec3f(0.3523,0.0000,0.9359),Vec3f(0.9359,0.0000,-0.3523));
-
-		Camera sponzaBug(Vec3f(-281.2263,-104.0000,240.5235),Vec3f(0.8898,0.0000,0.4565),Vec3f(0.4565,0.0000,-0.8898));
-		Camera abrams2(Vec3f(-119.3219,-73.6003,86.1858),Vec3f(0.8808,0.0000,-0.4735),Vec3f(-0.4735,0.0000,-0.8808));
-
-		cams["pompei.obj"]=pompei;
-		cams["sponza.obj"]=sponza;
-		cams["abrams.obj"]=abrams2;
-		cams["lancia.obj"]=abrams;
-		cams["bunny.obj"]=bunny;
-		cams["feline.obj"]=feline;
-		cams["dragon.obj"]=bunny;
-		cams["room.obj"]=room;
-		cams["box.obj"]=box;
-	}
-
-	std::map<string,Camera>::iterator iter=cams.find(model);
-	return iter==cams.end()?Camera():iter->second;
-}
-
 template <class Scene>
 TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	switch(quadLevels) {
@@ -238,73 +169,98 @@ TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image 
 	}
 }
 
+Vec3f Center(const TriVector &tris) {
+	Vec3f center(0,0,0);
+	for(int n=0;n<tris.size();n++)
+		center+=tris[n].P1()+tris[n].P2()+tris[n].P3();
+	center/=float(tris.size()*3);
+	return center;
+}
+
+void PrintHelp() {
+	printf("Synopsis:    rtracer model_file [options]\nOptions:\n\t-res x y   - set rendering resolution [512 512]\n\t");
+	printf("-fullscreen\n\t-tofile   - renders to file out/output.tga\n\t-threads n   - set threads number to n\n\t");
+	printf("-shading flat|gouraud   - sets shading mode [flat]\n");
+	printf("\nExamples:\n\t./rtracer -res 1280 800 abrams.obj\n\t./rtracer pompei.obj -res 800 600 -fullscreen\n\n");
+	printf("Interactive control:\n\tA,W,S,D R,F - move the camera\n\tN,M - rotate camera\n\t");
+	printf("k - save image to out/output.tga\n\to - toggle reflections\n\tl - toggle lights\n\t");
+	printf("j - toggle lights movement\n\tp - print camera position; save camera configuration\n\t");
+	printf("c - center camera position in the scene\n\t");
+	//	printf("i - toggle scene complexity visualization (green: # visited nodes  red: # intersections)\n\t");
+	printf("0,1,2,3 - change tracing mode (on most scenes 0 is slowest,  2,3 is fastest)\n\tesc - exit\n\n");
+}
+
 int main(int argc, char **argv)
 {
+	printf("Unnamed raytracer v0.0666 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
-		printf("Unnamed raytracer v0.0666 by nadult\n\n");
-		printf("Usage:\n\trtracer resx resy mode threads scene\n\tmode: 0: windowed  1: fullscreen  2: render to output.tga\n");
-		printf("\nExamples:\n\t./rtracer 1280 800 0 2 abrams.obj\n\t./rtracer 800 600 1 2 pompei.obj\n\n");
-		printf("Interactive control:\n\tA,W,S,D R,F - move the camera\n\tN,M - rotate camera\n\t");
-		printf("k - save image to out/output.tga\n\to - toggle reflections\n\tl - toggle lights\n\t");
-		printf("j - toggle lights movement\n\tp - print camera position\n\t");
-	//	printf("i - toggle scene complexity visualization (green: # visited nodes  red: # intersections)\n\t");
-		printf("0,1,2,3 - change tracing mode (on most scenes 0 is slowest,  2,3 is fastest)\n\tctrl+c - exit\n\n");
-
+		PrintHelp();
 		return 0;
 	}
+	else printf("type './rtracer --help' to get some help\n");
+
+	CameraConfigs camConfigs;
+	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
 
 	int resx=512,resy=512;
-	float speed=2.0f;
-	
 	bool fullscreen=0,nonInteractive=0;
 	int threads=GetCoresNum();
 	const char *modelFile="feline.obj";
+	Options options;
 
-	if(argc>2) { resx=atoi(argv[1]); resy=atoi(argv[2]); }
-	if(argc>3) { fullscreen=atoi(argv[3])==1; if(atoi(argv[3])>=2) nonInteractive=1; }
-	if(argc>4) threads=atoi(argv[4]);
-	if(argc>5) modelFile=argv[5];
+	for(int n=1;n<argc;n++) {
+			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
+		else if(string("-threads")==argv[n]&&n<argc-1) { threads=atoi(argv[n+1]); n+=1; }
+		else if(string("-fullscreen")==argv[n]) { fullscreen=1; n+=1; }
+		else if(string("-toFile")==argv[n]) { nonInteractive=1; n+=1; }
+		else if(string("-shading")==argv[n]&&n<argc-1) { options.shading=string("gouraud")==argv[n+1]?smGouraud:smFlat; n+=1; }
+		else modelFile=argv[n];
+	}
 
-	printf("Threads/cores: %d/%d\n",threads,GetCoresNum());
+	printf("Threads/cores: %d/%d\n\n",threads,GetCoresNum());
 
-	double buildTime;
-	const string fileName=string("scenes/")+modelFile;
-
-	buildTime=GetTime();
-	TScene<BIHTree<Triangle> >	scene (fileName.c_str());
+	double buildTime=GetTime();
+	TScene<BIHTree<Triangle> >	scene ((string("scenes/")+modelFile).c_str());
 	buildTime=GetTime()-buildTime;
 	printf("BIHTree build time: %.2f sec\n",buildTime);
 	scene.tree.PrintInfo();
 
 	Image img(resx,resy,16);
-	Camera cam=GetDefaultCamera(modelFile);;
+	Camera cam;
+	if(!camConfigs.GetConfig(string(modelFile),cam))
+		cam.pos=Center(scene.tree.objects);
 	
 	uint quadLevels=2;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 
 	if(nonInteractive) {
-		for(int n=atoi(argv[3])-1;n>0;n--) {
-			double time=GetTime();
-			GenImage(quadLevels,scene,cam,img,Options(),threads);
-			time=GetTime()-time;
-			minTime=Min(minTime,time);
-			maxTime=Max(maxTime,time);
-		}
+		double time=GetTime();
+		GenImage(quadLevels,scene,cam,img,Options(),threads);
+		time=GetTime()-time;
+		minTime=maxTime=time;
 		img.SaveToFile("out/output.tga");
 	}
 	else {
 		GLWindow out(resx,resy,fullscreen);
-		Options options;
 		scene.lightsEnabled=0;
 		scene.tree.maxDensity=520.0f * resx * resy;
 		bool lightsAnim=0;
+		float speed; {
+			Vec3p size=scene.tree.pMax-scene.tree.pMin;
+			speed=(size.x+size.y+size.z)*0.005f;
+		}
 
 		while(out.PollEvents()) {
-			if(out.Key(Key_lctrl)&&out.Key('C')) break;
+			if(out.KeyUp(Key_esc)) break;
 			if(out.KeyDown('K')) img.SaveToFile("out/output.tga");
 			if(out.KeyDown('O')) options.reflections^=1;
-	//		if(out.KeyDown('I')) options.rdtscShader^=1;
-			if(out.KeyDown('P')) cam.Print();
+			if(out.KeyDown('I')) options.rdtscShader^=1;
+			if(out.KeyDown('C')) cam.pos=Center(scene.tree.objects);
+			if(out.KeyDown('P')) {
+				camConfigs.AddConfig(string(modelFile),cam);
+				Saver("scenes/cameras.dat") & camConfigs;
+				cam.Print();
+			}
 			if(out.KeyDown('L')) { printf("Lights %s\n",scene.lightsEnabled?"disabled":"enabled"); scene.lightsEnabled^=1; }
 			if(out.KeyDown('J')) { printf("Lights animation %s\n",lightsAnim?"disabled":"enabled"); lightsAnim^=1; }
 
@@ -326,7 +282,7 @@ int main(int argc, char **argv)
 
 
 			{
-				int dx=out.KeyDown(Key_space)?out.MouseMove().x:0,dy=0;
+				int dx=out.Key(Key_space)?out.MouseMove().x:0,dy=0;
 				if(out.Key('N')) dx-=20;
 				if(out.Key('M')) dx+=20;
 				if(out.Key('V')) dy-=20;

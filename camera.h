@@ -2,6 +2,7 @@
 #define RTRACER_CAMERA_H
 
 #include "rtbase.h"
+#include <map>
 
 
 class Camera
@@ -14,9 +15,21 @@ public:
 		printf("Camera(Vec3f(%.4f,%.4f,%.4f),Vec3f(%.4f,%.4f,%.4f),Vec3f(%.4f,%.4f,%.4f));\n",
 				pos.x,pos.y,pos.z,front.x,front.y,front.z,right.x,right.y,right.z);
 	}
+	void Serialize(Serializer &sr) {
+		sr & pos & right & front & up &plane_dist;
+	}
 
 	Vec3f pos,right,front,up;
 	float plane_dist;
+};
+
+class CameraConfigs {
+public:
+	void AddConfig(const string &fileName,const Camera&);
+	bool GetConfig(const string &fileName,Camera&) const;
+	void Serialize(Serializer&);
+
+	std::map<string,Camera> data;
 };
 
 

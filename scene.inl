@@ -1,6 +1,5 @@
 
 #include "triangle.h"
-#include "loader.h"
 
 	struct SortTris {
 		bool operator()(const Triangle &a,const Triangle &b) const {
@@ -11,32 +10,13 @@
 
 	template <class AccStruct>
 	TScene<AccStruct>::TScene(const char *modelFile) :tree(vector<Object>()),lightsEnabled(1) {
-		Vector<Object> objects;
-//		objects.push_back(Sphere(Vec3f(-2,0,5)*5.0f,4.04f*5));
-//		objects.push_back(Sphere(Vec3f(3,2,10)*5.0f,3*5));
-//		objects.push_back(Sphere(Vec3f(0,0,-2.0)*5.0f,0.3f*5));
-//		objects.push_back(Sphere(Vec3f(4.1,1.5f,5)*5.0f,1*5));
-//		objects.push_back(Sphere(Vec3f(4.1,0.5f,-3.5f)*5.0f,1*5)); 
-
-//		srand(1235);
-//		for(int n=0;n<2000;n++) {
-//			Vec3f pos(FRand()*38.0f-20.0f,FRand()*38.0f-20.0f,FRand()*38.0f-20.0f); pos*=8.0f;
-//			for(int n=0;n<20;n++)
-//			objects.push_back(
-//				Sphere(Vec3f(FRand()*7.80f-4.0f,FRand()*7.80f-4.0f,FRand()*7.80f-4.0f)+pos,
-//							FRand()*1.50f));
-//		}
-
-		{
-			TVector<Triangle> tris(2000000);
-			tris.count=LoadWavefrontObj(modelFile,tris,20.0f,2000000);
-			objects=tris;
-		}
+		vector<Object,AlignedAllocator<Object> > objects;
+		LoadWavefrontObj(modelFile,objects,shadingData,20.0f,2000000);
 
 	//	AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-100,-100,0),Vec3f(0,0,20000),Vec3f(1,1,1),1,1,1);
-		AddSoftLight(Vec3f(100,-180,0),Vec3f(0,20000,5000),Vec3f(1,1,1),1,1,1);
-		AddLight(Vec3f(0,-150,0),Vec3f(15000,20000,0));
+		AddSoftLight(Vec3f(100,-180,0),Vec3f(0,20000,5000),Vec3f(200,200,200),4,4,4);
+		AddSoftLight(Vec3f(0,-150,0),Vec3f(25000,20000,0),Vec3f(200,200,200),4,4,4);
 		
 		tree=AccStruct(objects);
 	}

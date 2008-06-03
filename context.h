@@ -5,12 +5,18 @@
 #include "ray_group.h"
 #include "tree_stats.h"
 
+enum ShadingMode {
+	smFlat,
+	smGouraud,
+};
+
 
 struct TracingOptions {
 	TracingOptions() { }
-	TracingOptions(uint refl,bool rdt) :reflections(refl),rdtscShader(rdt) { }
+	TracingOptions(uint refl,ShadingMode sm,bool rdt) :reflections(refl),shadingMode(sm),rdtscShader(rdt) { }
 
 	uint reflections;
+	ShadingMode shadingMode;
 	bool rdtscShader;
 };
 

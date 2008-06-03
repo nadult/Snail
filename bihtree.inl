@@ -1,6 +1,5 @@
 
-void GenBIHIndices(const Vector<Triangle> &tris,vector<BIHIdx> &out,float maxSize,uint maxSplits);
-void SplitIndices(const Vector<Triangle> &tris,vector<BIHIdx> &inds,int axis,float pos,float maxSize);
+void SplitIndices(const TriVector &tris,vector<BIHIdx> &inds,int axis,float pos,float maxSize);
 
 namespace {
 
@@ -14,9 +13,11 @@ namespace {
 
 }
 
-template <class Object> 
-BIHTree<Object>::BIHTree(const Vector<Object> &objs) :objects(objs),split(1),maxDensity(125000000.0f) {
+template <class Object> template <class TriContainer>
+BIHTree<Object>::BIHTree(const TriContainer &objs) :split(1),maxDensity(125000000.0f) {
+	objects.resize(objs.size());
 	if(!objects.size()) return;
+	std::copy(objs.begin(),objs.end(),objects.begin());
 
 	pMin=objects[0].BoundMin();
 	pMax=objects[0].BoundMax();
@@ -42,7 +43,7 @@ BIHTree<Object>::BIHTree(const Vector<Object> &objs) :objects(objs),split(1),max
 	}
 
 	vector<u32> parents; parents.push_back(0);
-	Build(indices,parents,0,0,indices.size()-1,pMin,pMax,0);
+	Build(indices,parents,0,pMin,pMax,0);
 }
 
 template <class Object>
@@ -62,13 +63,12 @@ uint BIHTree<Object>::FindSimilarParent(vector<u32> &parents,uint nNode,uint axi
 	if(node.ClipLeft()>(&pMin.x)[node.Axis()]-5.0f&&node.ClipRight()<(&pMax.x)[node.Axis()]+5.0f) return ~0;
 	if(axis==node.Axis()) return nNode;
 	if(nNode==0) return ~0;
-	FindSimilarParent(parents,parents[nNode],axis);
+	return FindSimilarParent(parents,parents[nNode],axis);
 }
 
 template <class Object>
-void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,int first,int last,Vec3p min,Vec3p max,uint level) {
+void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,const Vec3p &min,const Vec3p &max,uint level) {
 	uint axis=MaxAxis(max-min);
-
 	{
 		float sSize; { Vec3p s=pMax-pMin; sSize=s.x*(s.y+s.z)+s.y*s.z; }
 		Vec3p size=max-min;
@@ -81,21 +81,20 @@ void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nN
 	float leftMax=(&pMin.x)[axis],rightMin=(&pMax.x)[axis];
 
 	SplitIndices(objects,indices,axis,split,avgSize);
-	first=0; last=indices.size()-1;
-	int right=last;
 
 	if(level>=maxLevel) { // Od teraz dzielimy obiekty rowno po polowie
 		double sum=0;
-		for(int n=first;n<=last;n++) {
+		for(int n=0;n<indices.size();n++) {
 			float min=(&indices[n].min.x)[axis];
 			float max=(&indices[n].max.x)[axis];
 			sum+=Lerp(min,max,0.5f);
 		}
-		sum/=double(last-first+1);
+		sum/=double(indices.size());
 		split=sum;
 	}
 
-	for(int n=first;n<=right;n++) {
+	int right=indices.size()-1;
+	for(int n=0;n<=right;n++) {
 		float pos,min,max; {
 			min=(&indices[n].min.x)[axis];
 			max=(&indices[n].max.x)[axis];
@@ -111,10 +110,10 @@ void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nN
 	}
 
 	if(level>=maxLevel) {
-		right=first+(last-first+1)/2-1;
+		right=indices.size()/2-1;
 		leftMax=(&pMin.x)[axis];
 		rightMin=(&pMax.x)[axis];
-		for(int n=first;n<=last;n++) {
+		for(int n=0;n<indices.size();n++) {
 			float min=(&indices[n].min.x)[axis];
 			float max=(&indices[n].max.x)[axis];
 			if(n<=right) rightMin=Min(rightMin,min);
@@ -122,8 +121,8 @@ void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nN
 		}
 	}
 
-	int numLeft=right-first+1;	
-	int numRight=last-right;
+	int numLeft=right+1;
+	int numRight=indices.size()-numLeft;
 
 	Vec3p maxL=max; (&maxL.x)[axis]=split;
 	Vec3p minR=min; (&minR.x)[axis]=split;
@@ -131,8 +130,8 @@ void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nN
 	if((numLeft==0||numRight==0)) {
 		uint sameAxisParent=FindSimilarParent(parents,parents[nNode],axis);
 		if(sameAxisParent!=~0) {
-			if(numLeft==0) Build(indices,parents,nNode,first,last,minR,max,level+1);
-			if(numRight==0) Build(indices,parents,nNode,first,last,min,maxL,level+1);
+			if(numLeft==0) Build(indices,parents,nNode,minR,max,level+1);
+			if(numRight==0) Build(indices,parents,nNode,min,maxL,level+1);
 			return;
 		}
 	}
@@ -147,46 +146,42 @@ void BIHTree<Object>::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nN
 		nodes[nNode].val[1]=0;
 	}
 
-	uint cLeft,cRight;
-	bool leftLeaf=0,rightLeaf=0;
-
 	if(numLeft) {
-		cLeft=nodes.size();
-		leftLeaf=numLeft<=1; if(!leftLeaf) {
-			int idx=indices[first].idx; leftLeaf=1;
-			for(int n=first+1;n<=right;n++) if(indices[n].idx!=idx) { leftLeaf=0; break; }
+		bool leftLeaf=numLeft<=1; if(!leftLeaf) {
+			int idx=indices[0].idx; leftLeaf=1;
+			for(int n=1;n<=right;n++) if(indices[n].idx!=idx) { leftLeaf=0; break; }
 		}
-		if(leftLeaf) nodes[nNode].val[0]|=indices[first].idx|BIHNode::leafMask;
+		if(leftLeaf) nodes[nNode].val[0]|=indices[0].idx|BIHNode::leafMask;
 		else {
-			nodes[nNode].val[0]|=nodes.size();
+			uint leftIdx=nodes.size();
+			nodes[nNode].val[0]|=leftIdx;
 			parents.push_back(nNode);
 			nodes.push_back(BIHNode());
+			if(numRight) {
+				vector<BIHIdx> inds(numLeft);
+				std::copy(indices.begin(),indices.begin()+numLeft,inds.begin());
+		   		Build(inds,parents,leftIdx,min,maxL,level+1);
+			}
+			else Build(indices,parents,leftIdx,min,maxL,level+1);
 		}
 	}
 	if(numRight) {
-		cRight=nodes.size();
-		rightLeaf=numRight<=1; if(!rightLeaf) {
+		bool rightLeaf=numRight<=1; if(!rightLeaf) {
 			int idx=indices[right+1].idx; rightLeaf=1;
-			for(int n=right+2;n<=last;n++) if(indices[n].idx!=idx) { rightLeaf=0; break; }
+			for(int n=right+2;n<indices.size();n++) if(indices[n].idx!=idx) { rightLeaf=0; break; }
 		}
 		if(rightLeaf) nodes[nNode].val[1]|=indices[right+1].idx|BIHNode::leafMask;
 		else {
-			nodes[nNode].val[1]|=nodes.size();
+			uint rightIdx=nodes.size();
+			nodes[nNode].val[1]|=rightIdx;
 			parents.push_back(nNode);
 			nodes.push_back(BIHNode());
+			if(numLeft) {
+				std::copy(indices.begin()+numLeft,indices.end(),indices.begin());
+				indices.resize(numRight);
+			}
+			Build(indices,parents,rightIdx,minR,max,level+1);
 		}
 	}
-
-	if(!leftLeaf&&numLeft) {
-		vector<BIHIdx> inds(right-first+1);
-		for(int n=0;n<inds.size();n++) inds[n]=indices[n];
-	   	Build(inds,parents,cLeft,first,right,min,maxL,level+1);
-	}
-	if(!rightLeaf&&numRight) {
-		vector<BIHIdx> inds(last-right);
-		for(int n=0;n<inds.size();n++) inds[n]=indices[right+1+n];
-		Build(inds,parents,cRight,right+1,last,minR,max,level+1);
-	}
 }
-
 

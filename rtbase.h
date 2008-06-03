@@ -1,8 +1,13 @@
 #ifndef RTBASE_H
 #define RTBASE_H
 
+#ifdef _WIN32
+	#define VECLIB_SSE_VER 0x20
+#endif
+
 #include <baselib.h>
 #include <veclib.h>
+#include "allocator.h"
 
 
 using namespace baselib;
@@ -55,62 +60,6 @@ public:
 	i32x4 indices[size];
 	uint last;
 };
-
-template <class T>
-class Vector
-{
-public:
-	typedef T value_type;
-
-	Vector() :tab(0),count(0) { }
-
-	template <class Container>
-	Vector(const Container &obj) :tab(0) {
-		Alloc(obj.size());
-		for(int n=0;n<count;n++) tab[n]=obj[n];
-	}
-	Vector(const Vector &obj) :tab(0) {
-		Alloc(obj.size());
-		for(int n=0;n<count;n++) tab[n]=obj[n];
-	}
-	const Vector &operator=(const Vector &obj) {
-		if(&obj==this) return *this;
-		return operator=<Vector>(obj);
-	}
-	template <class Container>
-	const Vector &operator=(const Container &obj) {
-		Alloc(obj.size());
-		for(int n=0;n<count;n++) tab[n]=obj[n];
-		return *this;
-	}
-	~Vector() { Free(); }
-
-	inline size_t size() const { return count; }
-	inline const T &operator[](int n) const { return tab[n]; }
-	inline T &operator[](int n) { return tab[n]; }
-
-protected:
-	void Alloc(size_t newS) { Free(); count=newS; tab=count?(T*)_mm_malloc(sizeof(T)*count,64):0; }
-	void Free() { if(tab) _mm_free(tab); } 
-
-	T *tab;
-public:
-	size_t count;
-};
-
-template <class T>
-class TVector: public Vector<T> {
-public:
-	TVector(size_t res) { Vector<T>::Alloc(res); reserve=Vector<T>::count; }
-
-	void push_back(const T &t) { Vector<T>::operator[](Vector<T>::count++)=t; }
-	inline const T &operator[](int n) const { return Vector<T>::tab[n]; }
-	inline T &operator[](int n) { return Vector<T>::tab[n]; }
-
-private:
-	int reserve;
-};
-
 
 #endif
 

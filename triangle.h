@@ -87,7 +87,7 @@ public:
 	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
 
 	template <class Vec0,class Vec,class real>
-	typename Vec::TScalar Barycentric(const Vec0 &rOrig,const Vec &rDir,real &u,real &v) const;
+	void Barycentric(const Vec0 &rOrig,const Vec &rDir,real &u,real &v) const;
 
 	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *outCollisionPos=0) const NOINLINE;
 
@@ -135,7 +135,7 @@ typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) 
 }
 
 template <template <class> class EN> template <class VecO,class Vec,class real>
-typename Vec::TScalar TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,real &u,real &v) const {
+void TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,real &u,real &v) const {
 	typedef typename Vec::TBool Bool;
 
 	real det = (rDir|Nrm())*((float*)&ca)[3];
@@ -175,6 +175,8 @@ int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,flo
 }
 
 typedef TTriangle<SlowEdgeNormals> Triangle;
+
+typedef vector<Triangle,AlignedAllocator<Triangle> > TriVector;
 
 template <class Triangle>
 class IndexedTriangle {

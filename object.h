@@ -5,6 +5,7 @@
 #include "sphere.h"
 #include "triangle.h"
 
+/*
 class Object
 {
 public:
@@ -96,6 +97,7 @@ public:
 		return out;
 	}
 };
+*/
 
 #endif
 
