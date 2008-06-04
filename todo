@@ -2,10 +2,12 @@ BIH:
 - przyspieszyc budowe; optymalizacje boxow otaczajacych robic na krawedziach a nie trojkatach
 - uzyc RayGroup::IDir
 - poprawic bug na sponzie
+- uwzglednic w SAH to ze niektore trojkaty moga wystepowac kilka razy przez co jest wieksza szansa
+  ze beda kilka razy sprawdzane, z pelnym kosztem tylko za pierwszym razem
 
 - Zapamietac: Bindy sie hujowo rozwijaja :(((
 - Zapamietac: JEBANE GCC AKCEPTUJE FUNKCJE ZWRACAJACE COS, NIE ZAWIERAJACE RETURNA
-
+- GCC ma jakis problem z boolami 
 
 Kdtree: ( olac :) )
 - Poprawnie wyliczyc epsilon w Triangle::BeamCollide

@@ -5,8 +5,9 @@
 #include "camera.h"
 
 #include "bihtree.h"
-
 #include "gl_window.h"
+
+int gVals[16]={0,};
 
 using std::cout;
 using std::endl;
@@ -211,8 +212,8 @@ int main(int argc, char **argv)
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
 		else if(string("-threads")==argv[n]&&n<argc-1) { threads=atoi(argv[n+1]); n+=1; }
-		else if(string("-fullscreen")==argv[n]) { fullscreen=1; n+=1; }
-		else if(string("-toFile")==argv[n]) { nonInteractive=1; n+=1; }
+		else if(string("-fullscreen")==argv[n]) { fullscreen=1; }
+		else if(string("-toFile")==argv[n]) { nonInteractive=1; }
 		else if(string("-shading")==argv[n]&&n<argc-1) { options.shading=string("gouraud")==argv[n+1]?smGouraud:smFlat; n+=1; }
 		else modelFile=argv[n];
 	}
@@ -220,7 +221,7 @@ int main(int argc, char **argv)
 	printf("Threads/cores: %d/%d\n\n",threads,GetCoresNum());
 
 	double buildTime=GetTime();
-	TScene<BIHTree<Triangle> >	scene ((string("scenes/")+modelFile).c_str());
+	TScene<BIHTree>	scene ((string("scenes/")+modelFile).c_str());
 	buildTime=GetTime()-buildTime;
 	printf("BIHTree build time: %.2f sec\n",buildTime);
 	scene.tree.PrintInfo();
@@ -229,13 +230,13 @@ int main(int argc, char **argv)
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
 		cam.pos=Center(scene.tree.objects);
-	
+
 	uint quadLevels=2;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 
 	if(nonInteractive) {
 		double time=GetTime();
-		GenImage(quadLevels,scene,cam,img,Options(),threads);
+		GenImage(quadLevels,scene,cam,img,options,threads);
 		time=GetTime()-time;
 		minTime=maxTime=time;
 		img.SaveToFile("out/output.tga");
@@ -247,7 +248,7 @@ int main(int argc, char **argv)
 		bool lightsAnim=0;
 		float speed; {
 			Vec3p size=scene.tree.pMax-scene.tree.pMin;
-			speed=(size.x+size.y+size.z)*0.005f;
+			speed=(size.x+size.y+size.z)*0.0025f;
 		}
 
 		while(out.PollEvents()) {
@@ -280,6 +281,7 @@ int main(int argc, char **argv)
 			if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
 		//	if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 
+			if(out.KeyDown(Key_f1)) gVals[0]^=1;
 
 			{
 				int dx=out.Key(Key_space)?out.MouseMove().x:0,dy=0;

@@ -99,14 +99,53 @@ namespace {
 		return out>=min&&out<=max?out:1.0f;
 	}
 
+	template <class Container>
+	void Split(const Triangle &tri,const BIHIdx &idx,Container &out) {
+		Vec3f size=idx.max-idx.min;
+		int axis=size.x>size.y?(size.z>size.x?2:0):(size.z>size.y?2:1);
+
+		Vec3f min1=idx.min,min2=idx.min,max1=idx.max,max2=idx.max;
+		Vec3f p1,p2,p3;	Convert(tri.P1(),p1); Convert(tri.P2(),p2); Convert(tri.P3(),p3);
+		float split=Lerp((&idx.min.x)[axis],(&idx.max.x)[axis],0.5f);
+		(&max1.x)[axis]=(&min2.x)[axis]=split;
+
+		float mult=GetTriMultiplier(tri);
+
+		bool add1=MinimizeTriBound(p1,p2,p3,min1,max1);
+		bool add2=MinimizeTriBound(p1,p2,p3,min2,max2);
+		
+		if(add1) out.insert(BIHIdx(idx.idx,min1,max1,mult));
+		if(add2) out.insert(BIHIdx(idx.idx,min2,max2,mult));
+	}
+
 	struct SortByIdx { bool operator()(const BIHIdx &a,const BIHIdx &b) const { return a.idx<b.idx; } };
 	struct SortBySize { bool operator()(const BIHIdx &a,const BIHIdx &b) const { return a.size>b.size; } };
 
 }
 
+void GenBIHIndices(const TriVector &tris,vector<BIHIdx> &out,float maxSize,uint maxSplits) {
+	std::multiset<BIHIdx,SortBySize> indices;
+ 
+	for(int n=0;n<tris.size();n++) {
+		Vec3p min=tris[n].BoundMin(),max=tris[n].BoundMax();
+		indices.insert(BIHIdx(n,Vec3f(min.x,min.y,min.z),Vec3f(max.x,max.y,max.z),GetTriMultiplier(tris[n])));
+	}
+	for(int s=0;s<maxSplits;s++) {
+		BIHIdx idx=*indices.begin();
+		if(idx.size<maxSize) break;
+		indices.erase(indices.begin());
+		Split(tris[idx.idx],idx,indices);
+	}
+	std::set<BIHIdx,SortBySize>::iterator it=indices.begin();
+	out.reserve(indices.size());
+ 
+	while(it!=indices.end()) out.push_back(*it++);
+	std::sort(out.begin(),out.end(),SortByIdx());
+ }
+ 
 void SplitIndices(const TriVector &tris,vector<BIHIdx> &inds,int axis,float pos,float maxSize) {
 	if(inds.size()<=8) return;
-	maxSize*=1.75f;
+	maxSize*=2.5f;
 
 	for(int n=0,end=inds.size();n<end;n++) {
 		BIHIdx &idx=inds[n];
@@ -132,3 +171,25 @@ void SplitIndices(const TriVector &tris,vector<BIHIdx> &inds,int axis,float pos,
 	}
 }
 
+void OptimizeIndices(vector<BIHIdx> &indices) {
+	if(indices.size()>128) return;
+
+	std::set<int> inds;
+	for(int n=0;n<indices.size();n++) inds.insert(indices[n].idx);
+
+	if(inds.size()<=8) {
+		vector<BIHIdx> newInds;
+		for(int n=0;n<indices.size();n++) {
+			BIHIdx &idx=indices[n];
+
+			int k=0;
+			for(k;k<newInds.size();k++) if(newInds[k].idx==idx.idx) {
+				newInds[k].min=VMin(newInds[k].min,idx.min);
+				newInds[k].max=VMax(newInds[k].max,idx.max);
+			}
+			if(k==newInds.size()) newInds.push_back(idx);
+		}
+		indices=newInds;
+	}
+}
+	

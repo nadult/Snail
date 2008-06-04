@@ -2,8 +2,8 @@
 
 	// Its fast when hitting big triangles (relatively)
 	// When you have a lot of small triangles, TraverseQuad4 will be faster
-	template <class AccStruct> template <class Output>
-	void BIHTree<AccStruct>:: TraverseQuad4Primary(const BIHTravContext &c,int dirMask,BIHOptData *data) const {
+	template <class Output>
+	void BIHTree::TraverseQuad4Primary(const BIHTravContext &c,int dirMask,BIHOptData *data) const {
 		TreeStats stats;
 		stats.TracingPacket(data?0:16);
 
@@ -67,7 +67,7 @@
 					mailbox.Insert(idx);
 					stats.Intersection(4);
 
-					const Object &obj=objects[idx];
+					const BIHTriangle &obj=objects[idx];
 
 					Vec3p nrm=obj.Nrm();
 					floatq u[4],v[4],val; {

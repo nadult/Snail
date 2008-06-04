@@ -1,6 +1,6 @@
 
-template <class AccStruct> template <class Output>
-	void BIHTree<AccStruct>::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const {
+	template <class Output>
+	void BIHTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const {
 		float maxD=output.dist[0];
 
 		TreeStats stats;
@@ -40,7 +40,7 @@ template <class AccStruct> template <class Output>
 				idx&=BIHNode::idxMask;
 				{
 					stats.Intersection();
-					const Object &obj=objects[idx];
+					const BIHTriangle &obj=objects[idx];
 					float ret=obj.Collide(rOrigin,tDir);
 					if(ret<minRet&&ret>0) {
 						minRet=ret;
@@ -59,7 +59,8 @@ POP_STACK:
 				continue;
 			}
 
-			node=node0+(idx&BIHNode::idxMask);
+			idx&=BIHNode::idxMask;
+			node=node0+idx;
 			int axis=node->Axis();
 			int nidx=dirMask&(1<<axis)?1:0,fidx=nidx^1;
 

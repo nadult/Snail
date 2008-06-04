@@ -36,6 +36,7 @@ inline float Minimize(const floatq &t) { return Min(Min(t[0],t[1]),Min(t[2],t[3]
 inline Vec3p Maximize(const Vec3q &v) { return Vec3p(Maximize(v.x),Maximize(v.y),Maximize(v.z)); }
 inline Vec3p Minimize(const Vec3q &v) { return Vec3p(Minimize(v.x),Minimize(v.y),Minimize(v.z)); }
 
+extern int gVals[16];
 
 template <int size>
 class ObjectIdxBuffer

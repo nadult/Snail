@@ -1,6 +1,6 @@
 
-	template <class AccStruct> template <class Output,bool sharedOrigin>
-	void BIHTree<AccStruct>:: TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const {
+	template <class Output,bool sharedOrigin>
+	void BIHTree:: TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const {
 		TreeStats stats;
 		stats.TracingPacket(16);
 
@@ -94,7 +94,7 @@
 					mailbox.Insert(idx);
 					stats.Intersection(4);
 
-					const Object &obj=objects[idx];
+					const BIHTriangle &obj=objects[idx];
 
 					Vec3p nrm=obj.Nrm();
 					floatq u[4],v[4],val[4];

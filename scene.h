@@ -24,7 +24,7 @@ Vec FlatNormals(const Container &objects,const integer &objId)  {
 		}
 	}
 
-	return nrm;
+	return nrm*RSqrt(nrm|nrm);
 }
 
 

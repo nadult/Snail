@@ -6,7 +6,7 @@
 #include "tree_stats.h"
 #include "context.h"
 
-typedef TTriangle<SlowEdgeNormals> BIHTriangle;
+typedef TTriangle<FastEdgeNormals> BIHTriangle;
 
 // Liscie nie sa przechowywane w drzewie
 // Zamiast odnosnika do liscia jest od razu odnosnik do obiektu
@@ -66,18 +66,23 @@ struct BIHOptData {
 		:orig(o),minInv(mi),maxInv(ma),mailbox(mb),min(tmin),max(tmax),idx(id) { }
 };
 
-template <class TObject=BIHTriangle>
+void GenBIHIndices(const TriVector &tris,vector<BIHIdx> &out,float maxSize,uint maxSplits);
+void SplitIndices(const TriVector &tris,vector<BIHIdx> &inds,int axis,float pos,float maxSize);
+void OptimizeIndices(vector<BIHIdx> &indices);
+
 class BIHTree {
 public:
-	typedef TObject Object;
+	typedef BIHTriangle Object;
 	enum { maxLevel=60 };
 
-	template <class TriContainer>
-	BIHTree(const TriContainer &objects);
+	BIHTree(const TriVector &objects);
 
 	void PrintInfo() const;
 	uint FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const;
-	void Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,const Vec3p &min,const Vec3p &max,uint level);
+	void Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,const Vec3p &min,const Vec3p &max,uint level,bool);
+
+	void BIHSplit(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit);
+	bool SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit);
 
 	template <class Output>
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const;
@@ -174,12 +179,8 @@ public:
 			TraverseQuad(rays.Origin(q),rays.Dir(q),Output(out.dist+q,out.object+q,out.stats),dirMask);
 		}
 	}
-
-
 	template <class Output,class Rays>
 	void TraverseOptimized(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out) const {
-		if(!sel.Num()) return;
-
 		RaySelector<Rays::size> selectors[9];
 		rays.GenSelectors(sel,selectors);
 
@@ -216,7 +217,6 @@ public:
 #include "bihtrav_quad4.h"
 #include "bihtrav_quad4p.h"
 #include "bihtrav_quad16p.h"
-#include "bihtree.inl"
 
 #endif
 

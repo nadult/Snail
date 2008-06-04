@@ -1,6 +1,6 @@
 
-	template <class AccStruct> template <class Output>
-	void BIHTree<AccStruct>::TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask) const {
+	template <class Output>
+	void BIHTree::TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask) const {
 		floatq maxD=output.dist[0];
 
 		TreeStats stats;
@@ -41,8 +41,11 @@
 				idx&=BIHNode::idxMask;
 
 				{
+					const BIHTriangle &obj=objects[idx];
+				//	if(gVals[0]&&ForAll((tDir|Vec3q(obj.Nrm()))<0.0f)) { stats.Skip(); goto POP_STACK; }
+
 					stats.Intersection();
-					const Object &obj=objects[idx];
+
 					floatq ret=obj.Collide(rOrigin,tDir);
 					f32x4b mask=ret<minRet&&ret>0.0f;
 
@@ -65,7 +68,9 @@
 				continue;
 			}
 
-			const BIHNode *node=node0+(idx&BIHNode::idxMask);
+			idx&=BIHNode::idxMask;
+			const BIHNode *node=node0+idx;
+
 			pattern.Touch(idx&BIHNode::idxMask,1);
 			
 			int axis=node->Axis();
