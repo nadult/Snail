@@ -6,7 +6,7 @@
 #include "tree_stats.h"
 #include "context.h"
 
-typedef TTriangle<FastEdgeNormals> BIHTriangle;
+typedef Triangle BIHTriangle;
 
 // Liscie nie sa przechowywane w drzewie
 // Zamiast odnosnika do liscia jest od razu odnosnik do obiektu

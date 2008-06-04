@@ -106,16 +106,12 @@ private:
 		plane=Vec4p(nrm.x,nrm.y,nrm.z,nrm|a);
 
 		EdgeNormals::ComputeEdgeNormals(this);
-		val1=ba|Edge2Normal();
-		val2=ca|Edge3Normal();
 	}
 
 // BUT DONT EVEN THINK ABOUT MODIFYING IT :)
 public:
 	Vec3p a,ba,ca;
 	Vec4p plane;
-	float val1,val2;
-	int dummy[2];
 };
 
 template <template <class> class EN> template <class VecO,class Vec>
@@ -151,58 +147,8 @@ void TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,real &u,real &
 }
 
 template <template <class> class EN>
-int TTriangle<EN>::PrimaryBeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const {
-	float dot=dir.x*plane.x+dir.y*plane.y+dir.z*plane.z;
-	Vec3f torig(orig.x-a.x,orig.y-a.y,orig.z-a.z);
-	float t=torig.x*plane.x+torig.y*plane.y+torig.z*plane.z;
-
-	if(dot<=0.0001f||t>=0.9999f) return 1;
-
-	float idot=1.0f/dot;
-
-	t=-t*idot;
-	Vec3f col(torig.x+dir.x*t,torig.y+dir.y*t,torig.z+dir.z*t);
-
-	const Vec3p e1=Edge1Normal(),e2=Edge2Normal(),e3=Edge3Normal();
-
-	float distA=col.x*e1.x+col.y*e1.y+col.z*e1.z;
-	float distB=col.x*e2.x+col.y*e2.y+col.z*e2.z-val1;
-	float distC=col.x*e3.x+col.y*e3.y+col.z*e3.z-val2;
-	float min=Min(distA,Min(distB,distC));
-	float epsilon=epsL*t*idot;
-
-	return min<-epsilon?0:(min>epsilon?2:1);
-}
-
-/*
-template <template <class> class EN>
-int TTriangle<EN>::PrimaryBeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const {
-	float dot=Abs(dir|Nrm());
-
-	if(ForAny(dot<=Const<float,1,10000>()))
-		return 1;
-
-	float idot=Inv(dot);
-	Vec3p torig=orig-a;
-
-	float t=-(torig|Nrm())*idot;
-	Vec3p col=torig+dir*t;
-
-	if(t<-idot) return 0;
-
-	float epsilon=(epsL*t)*idot;
-
-	float distA=col|Edge1Normal();
-	float distB=(col-ba)|Edge2Normal();
-	float distC=(col-ca)|Edge3Normal();
-	float min=Min(distA,Min(distB,distC));
-
-	return min<-epsilon?0:(min>epsilon?2:1);
-}*/
-
-template <template <class> class EN>
 int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *colPos) const {
-	float dot=Abs(dir|Nrm());
+	float dot=dir|Nrm();
 
 //	if(ForAny(dot<=Const<float,1,100000>()))
 //		return 1;
@@ -227,7 +173,7 @@ int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,flo
 
 typedef TTriangle<SlowEdgeNormals> Triangle;
 
-typedef vector<TTriangle<FastEdgeNormals>,AlignedAllocator<TTriangle<FastEdgeNormals> > > TriVector;
+typedef vector<Triangle,AlignedAllocator<Triangle> > TriVector;
 
 #endif
 
