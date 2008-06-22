@@ -4,7 +4,7 @@
 #include "scene.h"
 #include "camera.h"
 
-#include "bihtree.h"
+#include "kdtree.h"
 #include "gl_window.h"
 
 int gVals[16]={0,};
@@ -221,9 +221,9 @@ int main(int argc, char **argv)
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
 	double buildTime=GetTime();
-	TScene<BIHTree>	scene ((string("scenes/")+modelFile).c_str());
+	TScene<KDTree>	scene ((string("scenes/")+modelFile).c_str());
 	buildTime=GetTime()-buildTime;
-	printf("BIHTree build time: %.2f sec\n",buildTime);
+	printf("KDTree build time: %.2f sec\n",buildTime);
 	scene.tree.PrintInfo();
 
 	Image img(resx,resy,16);
@@ -244,7 +244,7 @@ int main(int argc, char **argv)
 	else {
 		GLWindow out(resx,resy,fullscreen);
 		scene.lightsEnabled=0;
-		scene.tree.maxDensity=520.0f * resx * resy;
+//		scene.tree.maxDensity=520.0f * resx * resy;
 		bool lightsAnim=0;
 		float speed; {
 			Vec3p size=scene.tree.pMax-scene.tree.pMin;
@@ -299,7 +299,7 @@ int main(int argc, char **argv)
 			//	}
 			}
 			
-			scene.tree.pattern.Init(scene.tree.nodes.size(),resx);
+		//	scene.tree.pattern.Init(scene.tree.nodes.size(),resx);
 
 			TreeStats stats;
 			double time=GetTime();
@@ -312,7 +312,7 @@ int main(int argc, char **argv)
 			maxTime=Max(time,maxTime);
 
 			stats.PrintInfo(resx,resy,time*1000.0);
-			scene.tree.pattern.Draw(img);
+		//	scene.tree.pattern.Draw(img);
 
 			if(lightsAnim) scene.Animate();
 		}

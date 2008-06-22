@@ -26,7 +26,7 @@ static bool Covered(bool space[res][res][res],int sx,int sy,int sz) {
 }
 */
 
-SlowKDTree::SlowKDTree(const vector<Object> &objs)
+SlowKDTree::SlowKDTree(const TriVector &objs)
 :objects(objs)
 {
 	if(objs.size()==0) {
@@ -315,7 +315,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 	}
 }
 
-KDTree::KDTree(const vector<Object> &objects):splittingFlag(1) {
+KDTree::KDTree(const TriVector &objects):splittingFlag(1) {
 	SlowKDTree slowkd(objects);
 	Build(slowkd);
 }

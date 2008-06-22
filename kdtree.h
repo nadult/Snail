@@ -20,7 +20,7 @@ public:
 	vector<u32> objects;
 };
 
-typedef TTriangle<FastEdgeNormals> KDTriangle;
+typedef TTriangle<SlowEdgeNormals> KDTriangle;
 
 class SlowKDTree
 {
@@ -28,7 +28,7 @@ public:
 	enum { MaxLevel=50 };
 	typedef KDTriangle Object;
 
-	SlowKDTree(const vector<Object> &objects);
+	SlowKDTree(const TriVector &objects);
 	//void Draw(Image&,Vec3<float>,Vec3<float>,const Camera &cam,u32 node=0) const;
 
 private:
@@ -38,7 +38,7 @@ private:
 
 	Vec3p pMin,pMax;
 	vector<SlowKDNode> nodes;
-	vector<Object> objects;
+	TriVector objects;
 };
 
 class KDNode
@@ -73,7 +73,7 @@ public:
 	// Flag1:  1337: object is a blocker (there will be no split going through it) 0: normal
 	// Flag2: object is full in node
 
-	KDTree(const vector<Object>&) NOINLINE;
+	KDTree(const TriVector&) NOINLINE;
 	KDTree(const SlowKDTree&);
 	~KDTree();
 
@@ -101,7 +101,7 @@ public:
 	bool Test() const;
 
 	Vec3p pMin,pMax;
-	vector<Object> objects;
+	TriVector objects;
 	bool splittingFlag;
 
 	vector<KDNode> nodes;

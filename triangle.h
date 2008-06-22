@@ -156,8 +156,8 @@ int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,flo
 	float idot=Inv(dot);
 
 	float t=-((orig-a)|Nrm())*idot;
-	Vec3f col=orig+dir*t;
-	if(colPos) *colPos=col;
+	Vec3p col=orig+dir*t;
+	if(colPos) Convert(col,*colPos);
 
 	if(t<-epsC*idot) return 0;
 

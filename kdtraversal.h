@@ -114,8 +114,8 @@ INLINE void ComputeMinMaxOrigin(const Rays &rays,const Selector &sel,Vec3p &min,
 	}
 	else {
 		float fmax=1.0f/0.0f,fmin=-1.0f/0.0f;
-		Vec3q tMin=Vec3p(fmax,fmax,fmax);
-		Vec3q tMax=Vec3p(fmin,fmin,fmin);
+		Vec3q tMin=(Vec3q)Vec3p(fmax,fmax,fmax);
+		Vec3q tMax=(Vec3q)Vec3p(fmin,fmin,fmin);
 
 		for(int i=0;i<sel.Num();i++) {
 			int q=sel[i];
