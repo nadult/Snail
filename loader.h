@@ -12,6 +12,8 @@ typedef vector<ShadingData,AlignedAllocator<ShadingData> > ShadingDataVec;
 
 void LoadWavefrontObj(const char *fileName,TriVector &out,ShadingDataVec &shadingData,float scale,uint maxTris);
 void LoadRaw(const char *fileName,TriVector &out,float scale,uint maxTris);
+void LoadV3O(string fileName,TriVector &out,ShadingDataVec &shadingData,float scale,uint maxTris);
+void LoadModel(const string &fileName,TriVector &out,ShadingDataVec &shadingData,float scale,uint maxTris);
 
 #endif
 

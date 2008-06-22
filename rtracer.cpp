@@ -145,7 +145,7 @@ TreeStats GenImage(const Scene &scene,const Camera &camera,Image &image,const Op
 	uint num=0;
 	for(uint y=0;y<image.height;y+=taskSize) for(uint x=0;x<image.width;x+=taskSize) {
 		switcher.AddTask(GenImageTask<Scene,QuadLevels> (&scene,camera,&image,options,x,y,
-					Min(taskSize,image.width-x),Min(taskSize,image.height-y),
+					Min((int)taskSize,int(image.width-x)),Min((int)taskSize,int(image.height-y)),
 					&taskStats[num]) );
 		num++;
 	}

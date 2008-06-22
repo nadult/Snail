@@ -11,12 +11,12 @@
 	template <class AccStruct>
 	TScene<AccStruct>::TScene(const char *modelFile) :tree(TriVector()),lightsEnabled(1) {
 		vector<Object,AlignedAllocator<Object> > objects;
-		LoadWavefrontObj(modelFile,objects,shadingData,20.0f,2000000);
+		LoadModel(string(modelFile),objects,shadingData,20.0f,10000000);
 
 	//	AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-100,-100,0),Vec3f(0,0,20000),Vec3f(1,1,1),1,1,1);
-		AddSoftLight(Vec3f(100,-250,0),Vec3f(0,20000,45000),Vec3f(30,30,30),1,1,1);
-		AddSoftLight(Vec3f(-100,-250,0),Vec3f(40000,30000,0),Vec3f(30,30,30),1,1,1);
+		AddSoftLight(Vec3f(-4000,-3550,-4000),Vec3f(50.0f,50.0f,10.0f)*1000000.0f,Vec3f(30,30,30),1,1,1);
+	//	AddSoftLight(Vec3f(-100,-250,0),Vec3f(400000,300000,0),Vec3f(30,30,30),1,1,1);
 		
 		tree=AccStruct(objects);
 	}
