@@ -179,7 +179,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 		float iNodeSize=1.0/(nodeSize[0]*nodeSize[1]+nodeSize[0]*nodeSize[2]+nodeSize[1]*nodeSize[2]);
 		float longestSeg[3]={0,},longestSegP[3];
 
-#ifdef NDEBUG
+#if defined(NDEBUG) && defined(_OPENMP)
 		int maxThr=omp_get_max_threads();
 		omp_set_num_threads(objs.size()>100?3:1);
 
@@ -243,7 +243,7 @@ void SlowKDTree::Build(u32 idx,u32 level,Vec3f tMin,Vec3f tMax)
 			}
 		}
 
-#ifdef NDEBUG
+#if defined(NDEBUG) && defined(_OPENMP)
 		omp_set_num_threads(maxThr);
 #endif
 

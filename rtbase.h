@@ -8,6 +8,7 @@
 #include <baselib.h>
 #include <veclib.h>
 #include "allocator.h"
+#include <cassert>
 
 
 using namespace baselib;

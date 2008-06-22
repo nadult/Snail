@@ -1,6 +1,6 @@
 #include <iostream>
+#include <baselib_threads.h>
 #include "ray_generator.h"
-#include "task_switcher.h"
 #include "scene.h"
 #include "camera.h"
 
@@ -205,7 +205,7 @@ int main(int argc, char **argv)
 
 	int resx=512,resy=512;
 	bool fullscreen=0,nonInteractive=0;
-	int threads=GetCoresNum();
+	int threads=4;
 	const char *modelFile="feline.obj";
 	Options options;
 
@@ -218,7 +218,7 @@ int main(int argc, char **argv)
 		else modelFile=argv[n];
 	}
 
-	printf("Threads/cores: %d/%d\n\n",threads,GetCoresNum());
+	printf("Threads/cores: %d/%d\n\n",threads,4);
 
 	double buildTime=GetTime();
 	TScene<BIHTree>	scene ((string("scenes/")+modelFile).c_str());

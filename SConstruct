@@ -1,36 +1,42 @@
 import os
 
-includesGlfw = '-D_REENTRANT -I/usr/local/include' #os.popen('pkg-config --cflags libglfw').read() 
-includes = includesGlfw + ' -I /home/someone/veclib -I /home/someone/baselib -I /usr/local/include/boost-1_35/ '
 
-libsPaths = [ '/usr/local/lib', '/home/someone/baselib/', '/root32/usr/X11R6/lib' ]
-libs = [ 'pthread', 'Xrandr', 'GL', 'glfw', 'baselib' ]
+libs = [ 'pthread', 'baselib', 'glfw' ]
+libsLinux = [ 'GL', 'Xrandr' ]
+libsWin32 = [ 'opengl32' ]
 
-release = Environment (
-		CXX = '/usr/local/gcc-4.3/bin/g++ -fopenmp',
-		CXXFLAGS = includes + '-O3 -msse3 -ffast-math -mfpmath=sse -funroll-loops -fno-rtti -DNDEBUG -g',
-		CPPPATH = '.',
-		LIBPATH = libsPaths
-	)
-debug = Environment (
-		CXX= '/usr/local/gcc-4.3/bin/g++',
-		CXXFLAGS = includes + '-O0 -g',
-		CPPPATH = '.',
-		LIBPATH = libsPaths
+if Environment()["PLATFORM"] == 'posix': libs += libsLinux
+else: libs += libsWin32
+
+default = Environment (
+		ENV = os.environ,
+		PLATFORM = 'posix',
+		CXX = 'ccache g++',
+		CPPPATH = '.'		
 	)
 
-env=release
-if int(ARGUMENTS.get('debug',0)):
-	env=debug
+if int(ARGUMENTS.get('32bit',0)):
+	default=default.Clone( CXX='g++ -m32')
 
-def BuildObject(file,dir):
-	return env.Object('build/'+dir+file[0:-4] , dir+file)
+release = default.Clone(
+	CXXFLAGS='-O3 -mssse3 -ffast-math -mfpmath=sse -funroll-loops -DNDEBUG -g',
+	BUILDDIR='build/release/'
+)
+debug = default.Clone(
+	CXXFLAGS='-O0 -msse2 -g',
+	BUILDDIR='build/debug/'
+)
 
-def BuildObjects(files,dir):
+
+def BuildObject(env,file,dir):
+	buildDir = env['BUILDDIR']
+	return env.Object(buildDir+dir+file[0:-4] , dir+file)
+
+def BuildObjects(env,files,dir):
 	fileList = Split(files)
 	outList = []
 	for file in fileList:
-		obj = BuildObject(file,dir)
+		obj = BuildObject(env,file,dir)
 		outList.append(obj)
 	return outList
 
@@ -49,6 +55,10 @@ def ExcludeFromList(tList,tObj):
 			outList.append(obj)
 	return outList
 
-baseObjects = BuildObjects( ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
+def Build( env, progName ):
+	baseObjects = BuildObjects( env, ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
+	env.Program(progName, baseObjects, LIBS=libs )
 
-env.Program('rtracer', baseObjects, LIBS=libs )
+Build( release, 'rtracer' )
+Build( debug, 'rtracerd' )
+
