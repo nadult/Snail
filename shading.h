@@ -15,6 +15,8 @@ void InitializationShader(Context &c,uint i,const typename Context::real &maxDis
 template <class Context>
 void SimpleLightingShader(Context &c,uint i) {
 	c.color[i]=c.RayDir(i)|c.normal[i];
+//	c.color[i]*=c.color[i];
+//	c.color[i]*=c.color[i];
 }
 
 template <class Context>
@@ -55,10 +57,10 @@ template <class Vec,class real>
 Vec ShadeLight(const Vec &lightColor,const real &dot,const real &lightDist) {
 	Vec out;
 	real mul=Inv(lightDist*lightDist);
-	real spec=dot*dot; spec=spec*spec;
+	real spec=dot*dot; spec=spec*spec; //spec*=spec; spec*=spec;
 	out = ( 
 			 lightColor*dot
-			+Vec3q(lightColor.x,Const<real,0>(),Const<real,0>())*spec
+			+Vec3q(lightColor.x,0.0f,0.0f)*spec
 			)*mul;
 	return out;
 }
@@ -69,8 +71,8 @@ void StatsShader(Context &c,uint i) {
 
 //	c.color[i].x*=0.1f;
 //	c.color[i].y*=0.1f;
-	c.color[i].x=float(c.stats.Intersects())*(0.01f/Context::size);
-	c.color[i].y=float(c.stats.LoopIters())*(0.005f/Context::size);
+	c.color[i].x=float(c.stats.Intersects())*(0.05f/Context::size);
+	c.color[i].y=float(c.stats.LoopIters())*(0.01f/Context::size);
 	c.color[i].z=float(c.stats.Skips()*0.25f);
 }
 	

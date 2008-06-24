@@ -169,8 +169,7 @@ namespace
 	Vec3f GLWindow::MousePos() const			{ return Vec3f(f32(activeInput.MousePosX),f32(activeInput.MousePosY),f32(activeInput.WheelPos)); }
 	Vec3f GLWindow::MouseMove() const			{ return Vec3f(f32(mouseDX),f32(mouseDY),f32(activeInput.WheelPos-lastInput.WheelPos)); }
 
-	bool GLWindow::PollEvents()
-	{
+	bool GLWindow::PollEvents() {
 		for(;;) {
 			glfwPollEvents();
 			// Aplikacja jest zminimalizowana -> uspij na 50msec

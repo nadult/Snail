@@ -40,6 +40,7 @@ public:
 		Vec3f vsize=max-min;
 		size=Max(vsize.x,Max(vsize.y,vsize.z))*mul;
 	}
+	bool operator<(const BIHIdx &i) const { return idx<i.idx; }
 
 	Vec3f min,max;
 	float size;
@@ -47,8 +48,8 @@ public:
 };
 
 struct BIHTravContext {
-	const Vec3q *origin,*dir;
-	floatq *out; i32x4 *object;
+	const Vec3q * __restrict__ origin,* __restrict__ dir;
+	floatq * __restrict__ out; i32x4 * __restrict__ object;
 	TreeStats *stats;
 
 	BIHTravContext(const Vec3q *to,const Vec3q *td,floatq *ou,i32x4 *obj,TreeStats *st)
@@ -81,8 +82,8 @@ public:
 	uint FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const;
 	void Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,const Vec3p &min,const Vec3p &max,uint level,bool);
 
-	void BIHSplit(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit);
-	bool SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit);
+	void BIHSplit(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit) const;
+	bool SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit) const;
 
 	template <class Output>
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const;
@@ -181,6 +182,9 @@ public:
 	}
 	template <class Output,class Rays>
 	void TraverseOptimized(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out) const {
+//		TraverseMonoGroup(rays,sel,out);
+//		return;
+
 		RaySelector<Rays::size> selectors[9];
 		rays.GenSelectors(sel,selectors);
 

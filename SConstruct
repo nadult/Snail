@@ -1,7 +1,7 @@
 import os
 
 
-libs = [ 'pthread', 'baselib', 'glfw' ]
+libs = [ 'pthread', 'baselib', 'glfw', 'GLU' ]
 libsLinux = [ 'GL', 'Xrandr' ]
 libsWin32 = [ 'opengl32' ]
 
@@ -19,7 +19,7 @@ if int(ARGUMENTS.get('32bit',0)):
 	default=default.Clone( CXX='g++ -m32')
 
 release = default.Clone(
-	CXXFLAGS='-O3 -mssse3 -ffast-math -mfpmath=sse -funroll-loops -DNDEBUG -g',
+	CXXFLAGS='-O3 -mssse3 -ffast-math -mfpmath=sse -funroll-all-loops -fpeel-loops -g -DNDEBUG',
 	BUILDDIR='build/release/'
 )
 debug = default.Clone(

@@ -112,7 +112,8 @@ class TScene
 public:
 	typedef typename AccStruct::Object Object;
 
-	TScene(const char *modelFile);
+	TScene() :tree(TriVector()) { }
+	TScene(const TriVector &trivec,const ShadingDataVec &shd);
 
 	void Animate();
 	void AddLight(Vec3f pos,Vec3f col);

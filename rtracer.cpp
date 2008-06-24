@@ -4,8 +4,11 @@
 #include "scene.h"
 #include "camera.h"
 
-#include "kdtree.h"
+#include "bihtree.h"
 #include "gl_window.h"
+#include "loader.h"
+
+int TreeVisMain(TriVector &tris);
 
 int gVals[16]={0,};
 
@@ -180,7 +183,7 @@ Vec3f Center(const TriVector &tris) {
 
 void PrintHelp() {
 	printf("Synopsis:    rtracer model_file [options]\nOptions:\n\t-res x y   - set rendering resolution [512 512]\n\t");
-	printf("-fullscreen\n\t-tofile   - renders to file out/output.tga\n\t-threads n   - set threads number to n\n\t");
+	printf("-fullscreen\n\t-toFile   - renders to file out/output.tga\n\t-threads n   - set threads number to n\n\t");
 	printf("-shading flat|gouraud   - sets shading mode [flat]\n");
 	printf("\nExamples:\n\t./rtracer -res 1280 800 abrams.obj\n\t./rtracer pompei.obj -res 800 600 -fullscreen\n\n");
 	printf("Interactive control:\n\tA,W,S,D R,F - move the camera\n\tN,M - rotate camera\n\t");
@@ -191,9 +194,19 @@ void PrintHelp() {
 	printf("0,1,2,3 - change tracing mode (on most scenes 0 is slowest,  2,3 is fastest)\n\tesc - exit\n\n");
 }
 
-int main(int argc, char **argv)
-{
-	printf("Unnamed raytracer v0.0666 by nadult\n");
+template <class Scene>
+void Build(const TriVector &tris,const ShadingDataVec &shd,Scene &out) {
+	double buildTime=GetTime();
+	out=Scene(tris,shd);
+	buildTime=GetTime()-buildTime;
+	printf("Tree build time: %.2f sec\n",buildTime);
+	out.tree.PrintInfo();
+}
+
+Vec3f RotateVecY(const Vec3f& v,float angle);
+
+int main(int argc, char **argv) {
+	printf("Unnamed raytracer v0.07 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
 		PrintHelp();
 		return 0;
@@ -208,6 +221,7 @@ int main(int argc, char **argv)
 	int threads=4;
 	const char *modelFile="feline.obj";
 	Options options;
+	bool treeVisMode=0;
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
@@ -215,27 +229,34 @@ int main(int argc, char **argv)
 		else if(string("-fullscreen")==argv[n]) { fullscreen=1; }
 		else if(string("-toFile")==argv[n]) { nonInteractive=1; }
 		else if(string("-shading")==argv[n]&&n<argc-1) { options.shading=string("gouraud")==argv[n+1]?smGouraud:smFlat; n+=1; }
+		else if(string("-treevis")==argv[n]) treeVisMode=1;
 		else modelFile=argv[n];
 	}
 
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
-	double buildTime=GetTime();
-	TScene<KDTree>	scene ((string("scenes/")+modelFile).c_str());
-	buildTime=GetTime()-buildTime;
-	printf("KDTree build time: %.2f sec\n",buildTime);
-	scene.tree.PrintInfo();
+	TriVector tris; ShadingDataVec shadingData;
+	LoadModel(string("scenes/")+modelFile,tris,shadingData,20.0f,10000000);
+
+	if(treeVisMode) { TreeVisMain(tris); return 0; }
+
+	TScene<BIHTree>	scene;
+	Build(tris,shadingData,scene);
 
 	Image img(resx,resy,16);
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
-		cam.pos=Center(scene.tree.objects);
+		cam.pos=Center(tris);
 
 	uint quadLevels=2;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 
+	for(int n=0;n<4;n++)
+		gVals[n]=1;
+
 	if(nonInteractive) {
 		double time=GetTime();
+		scene.lightsEnabled=1;
 		GenImage(quadLevels,scene,cam,img,options,threads);
 		time=GetTime()-time;
 		minTime=maxTime=time;
@@ -243,8 +264,7 @@ int main(int argc, char **argv)
 	}
 	else {
 		GLWindow out(resx,resy,fullscreen);
-		scene.lightsEnabled=0;
-//		scene.tree.maxDensity=520.0f * resx * resy;
+		scene.tree.maxDensity=520.0f * resx * resy;
 		bool lightsAnim=0;
 		float speed; {
 			Vec3p size=scene.tree.pMax-scene.tree.pMin;
@@ -256,7 +276,7 @@ int main(int argc, char **argv)
 			if(out.KeyDown('K')) img.SaveToFile("out/output.tga");
 			if(out.KeyDown('O')) options.reflections^=1;
 			if(out.KeyDown('I')) options.rdtscShader^=1;
-			if(out.KeyDown('C')) cam.pos=Center(scene.tree.objects);
+			if(out.KeyDown('C')) cam.pos=Center(tris);
 			if(out.KeyDown('P')) {
 				camConfigs.AddConfig(string(modelFile),cam);
 				Saver("scenes/cameras.dat") & camConfigs;
@@ -272,6 +292,24 @@ int main(int argc, char **argv)
 			if(out.Key('R')) cam.pos-=cam.up*speed;
 			if(out.Key('F')) cam.pos+=cam.up*speed;
 
+			if(out.KeyDown('[')||out.KeyDown(']')) {
+				float angle=out.KeyDown('[')?0.05:-0.05;
+
+				Vec3f center=Center(tris);
+				cam.pos=RotateVecY(cam.pos-center,angle)+center;
+				cam.right=RotateVecY(cam.right,angle);
+				cam.front=RotateVecY(cam.front,angle);
+
+				for(int n=0;n<tris.size();n++) {
+					Triangle &tri=tris[n];
+					Vec3f p1=RotateVecY(tri.P1()-center,angle)+center;
+					Vec3f p2=RotateVecY(tri.P2()-center,angle)+center;
+					Vec3f p3=RotateVecY(tri.P3()-center,angle)+center;
+					tri=Triangle(p1,p2,p3);
+				}
+				Build(tris,shadingData,scene);
+			}
+
 		//	if(out.KeyDown('Y')) { printf("splitting %s\n",scene.tree.split?"off":"on"); scene.tree.split^=1; }
 		//	if(out.KeyDown('[')) { scene.tree.maxDensity/=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
 		//	if(out.KeyDown(']')) { scene.tree.maxDensity*=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
@@ -281,7 +319,10 @@ int main(int argc, char **argv)
 			if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
 		//	if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 
-			if(out.KeyDown(Key_f1)) gVals[0]^=1;
+			if(out.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 1 %s\n",gVals[0]?"on":"off"); }
+			if(out.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
+			if(out.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
+			if(out.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
 
 			{
 				int dx=out.Key(Key_space)?out.MouseMove().x:0,dy=0;
@@ -299,11 +340,12 @@ int main(int argc, char **argv)
 			//	}
 			}
 			
-		//	scene.tree.pattern.Init(scene.tree.nodes.size(),resx);
+			scene.tree.pattern.Init(scene.tree.nodes.size(),resx);
 
 			TreeStats stats;
 			double time=GetTime();
 			stats=GenImage(quadLevels,scene,cam,img,options,threads);
+			scene.tree.pattern.Draw(img);
 
 			out.RenderImage(img);
 			out.SwapBuffers();
@@ -312,7 +354,6 @@ int main(int argc, char **argv)
 			maxTime=Max(time,maxTime);
 
 			stats.PrintInfo(resx,resy,time*1000.0);
-		//	scene.tree.pattern.Draw(img);
 
 			if(lightsAnim) scene.Animate();
 		}

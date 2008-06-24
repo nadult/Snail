@@ -52,6 +52,8 @@ namespace {
 		return nOut;
 	}
 
+}
+
 	bool MinimizeTriBound(const Vec3f &p1,const Vec3f &p2,const Vec3f &p3,Vec3f &min,Vec3f &max) {
 		Vec3f buf1[3*32],buf2[3*32]; Vec3f *src=buf1,*dst=buf2;
 		int count;
@@ -90,9 +92,11 @@ namespace {
 		return count>0;
 	}
 
+namespace {
+
 	// The closer to the worse case, the bigger value
 	float GetTriMultiplier(const Triangle &tri) {
-		const float min=1.0f,max=4.0f;
+		const float min=1.0f,max=16.0f;
 
 		Vec3p worse(0.577350269,0.577350269,0.577350269);
 		float out=Lerp(min,max,VAbs(tri.Nrm())|worse);
@@ -144,8 +148,9 @@ void GenBIHIndices(const TriVector &tris,vector<BIHIdx> &out,float maxSize,uint 
  }
  
 void SplitIndices(const TriVector &tris,vector<BIHIdx> &inds,int axis,float pos,float maxSize) {
-	if(inds.size()<=8) return;
-	maxSize*=2.5f;
+//	if(inds.size()<=(maxSize>0.0f?16:64)) return;
+	if(inds.size()<=12) return;
+	maxSize*=2.25f;
 
 	for(int n=0,end=inds.size();n<end;n++) {
 		BIHIdx &idx=inds[n];

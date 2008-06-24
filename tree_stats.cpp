@@ -29,9 +29,9 @@
 			return;
 		}
 		printf("isct,iter:%5.2f %5.2f  MSec/frame:%6.2f  MRays/sec:%5.2f  "
-				"Coherency:%.2f%% br:%.2f%% fa:%.2f%% %.0f R:%d\n",
+				/*"Coh:%.2f%% "*/"br:%.2f%% fa:%.2f%% %.0f R:%d\n",
 				double(intersects)/nPixels,double(iters)/nPixels,
-				msRenderTime,raysPerSec*0.000001,Coherent()*100.0f,
+				msRenderTime,raysPerSec*0.000001/*,Coherent()*100.0f*/,
 				TBreaking()*100.0f,TIntersectFail()*100.0f,double(skips),tracedRays);
 	}
 

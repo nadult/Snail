@@ -24,6 +24,7 @@ protected:
 	}
 
 	Vec3p e1n,e2n,e3n;
+	Vec3p dummy;
 };
 
 template <class Triangle>
@@ -90,7 +91,7 @@ public:
 	void Barycentric(const Vec0 &rOrig,const Vec &rDir,real &u,real &v) const;
 
 	int PrimaryBeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const;
-	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *outCollisionPos=0) const NOINLINE;
+	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const;
 
 	void SetFlag1(uint value) { ((uint*)&a)[3]=value; }
 	void SetFlag2(uint value) { ((uint*)&ba)[3]=value; }
@@ -147,21 +148,17 @@ void TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,real &u,real &
 }
 
 template <template <class> class EN>
-int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC,Vec3p *colPos) const {
+int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const {
 	float dot=dir|Nrm();
 
-//	if(ForAny(dot<=Const<float,1,100000>()))
-//		return 1;
+	float t=((orig-a)|Nrm());
+	if(t>0.0f||dot<0.0f) return 0;
 
 	float idot=Inv(dot);
+	t=-t*idot;
 
-	float t=-((orig-a)|Nrm())*idot;
 	Vec3p col=orig+dir*t;
-	if(colPos) Convert(col,*colPos);
-
-	if(t<-epsC*idot) return 0;
-
-	float epsilon=(epsL*t+epsC)*idot;
+	float epsilon=(epsL*t)*idot;
 
 	float distA=(col-P1())|Edge1Normal();
 	float distB=(col-P2())|Edge2Normal();
@@ -171,7 +168,7 @@ int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,flo
 	return min<-epsilon?0:(min>epsilon?2:1);
 }
 
-typedef TTriangle<SlowEdgeNormals> Triangle;
+typedef TTriangle<FastEdgeNormals> Triangle;
 
 typedef vector<Triangle,AlignedAllocator<Triangle> > TriVector;
 

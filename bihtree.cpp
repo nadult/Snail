@@ -56,9 +56,7 @@ BIHTree::BIHTree(const TriVector &objs) :split(1),maxDensity(125000000.0f) {
 
 	vector<u32> parents; parents.push_back(0);
 
-	gVals[1]=0;
 	Build(indices,parents,0,pMin,pMax,0,1);
-//	printf("shits: %d\n",gVals[1]);
 }
 
 void BIHTree::PrintInfo() const {
@@ -79,7 +77,7 @@ uint BIHTree::FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const
 	return FindSimilarParent(parents,parents[nNode],axis);
 }
 
-void BIHTree::BIHSplit(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit) {
+void BIHTree::BIHSplit(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit) const {
 	int axis=MaxAxis(max-min);
 	float cmin=(&min.x)[axis],cmax=(&max.x)[axis];
 	float split=Lerp(cmin,cmax,0.5f);
@@ -90,7 +88,7 @@ void BIHTree::BIHSplit(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3
 class PSplit
 {
 public:
-	PSplit() { }
+	INLINE PSplit() { }
 	PSplit(float ta,float tb,bool s) :a(ta),b(tb),start(s) { pos=start?a:b; }
 	bool operator<(const PSplit& s) const { return pos==s.pos?a==s.a?b<s.b:a<s.a:pos<s.pos; }
 
@@ -98,9 +96,10 @@ public:
 	int start;
 };
 
-bool BIHTree::SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit) {
-	enum { pickLongestAxis=0 };
+bool MinimizeTriBound(const Vec3f &p1,const Vec3f &p2,const Vec3f &p3,Vec3f &min,Vec3f &max);
 
+bool BIHTree::SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit) const {
+	enum { pickLongestAxis=0 };
 	int axis=MaxAxis(max-min);
 
 	const float travCost=0.1;
@@ -113,10 +112,9 @@ bool BIHTree::SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &ma
 	const float nodeSize[3]={max.x-min.x,max.y-min.y,max.z-min.z};
 	const float iNodeSize=1.0/(nodeSize[0]*nodeSize[1]+nodeSize[0]*nodeSize[2]+nodeSize[1]*nodeSize[2]);
 
-	int startS=pickLongestAxis?axis:0,endS=pickLongestAxis?axis+1:3;
-	{
-		static vector<PSplit> splits;
-		splits.resize(indices.size()*2);
+	int startS=pickLongestAxis?axis:0,endS=pickLongestAxis?axis+1:3; {
+		int nSplits=indices.size()*2;
+		vector<PSplit> splits(nSplits);
 
 		for(int s=startS;s<endS;s++) {
 			for(int n=0;n<indices.size();n++) {
@@ -125,16 +123,16 @@ bool BIHTree::SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &ma
 				splits[n*2+1]=PSplit((&min.x)[s],(&max.x)[s],1);
 			}
 
-			std::sort(splits.begin(),splits.end());
+			std::sort(&splits[0],&splits[nSplits]);
 			minCost[s]=1.0f/0.0f;
 
 			float tNodeSize[3]={nodeSize[0],nodeSize[1],nodeSize[2]};
-			int voxelsLeft=0,voxelsRight=indices.size();
-		
-			for(int ks=0;ks<splits.size();ks++) {
+			int left=0,right=indices.size();
+
+			for(int ks=0;ks<nSplits;ks++) {
 				float pos=splits[ks].pos;
 
-				if(!splits[ks].start) voxelsRight--;
+				if(!splits[ks].start) right--;
 				float posInNode=(pos-sub[s])*mul[s];
 
 				if(posInNode>0.0&&posInNode<1.0) {
@@ -143,17 +141,16 @@ bool BIHTree::SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &ma
 					tNodeSize[s]=nodeSize[s]*(1.0-posInNode);
 					float rightSize=(tNodeSize[0]*(tNodeSize[1]+tNodeSize[2])+tNodeSize[1]*tNodeSize[2]);
 
-					float splitCost=leftSize*float(voxelsLeft)+rightSize*float(voxelsRight);
+					float splitCost=leftSize*float(left)+rightSize*float(right);
 
 					if(splitCost<minCost[s]) {
 						minCost[s]=splitCost;
 						dividers[s]=pos;
 					}
 				}
-				if(splits[ks].start) voxelsLeft++;
+				if(splits[ks].start) left++;
 			}
 		}
-		splits.clear();
 	}
 
 	for(int k=startS;k<endS;k++)
@@ -173,29 +170,37 @@ bool BIHTree::SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &ma
 void BIHTree::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,
 							const Vec3p &min,const Vec3p &max,uint level,bool sah) {
 
+	/* { // eliminating duplicates
+RESORT:
+		std::sort(indices.begin(),indices.end());
+		for(int n=1;n<indices.size();n++) {
+			if(indices[n].idx==indices[n-1].idx) {
+				indices[n-1].min=VMin(indices[n-1].min,indices[n].min);
+				indices[n-1].max=VMax(indices[n-1].max,indices[n].max);
+				indices[n]=indices.back(); indices.pop_back();
+				goto RESORT;
+			}
+		}
+	} */
+
 	{
 		float sSize; { Vec3p s=pMax-pMin; sSize=s.x*(s.y+s.z)+s.y*s.z; }
 		Vec3p size=max-min;
 		float nodeSize=((size.x*(size.y+size.z)+size.y*size.z) / sSize);
 		float density=float(indices.size())/nodeSize;
-		nodes[nNode].density=density;
+		nodes[nNode].density=density*0.5f;
 	}
-	if(level>45) sah=0;
-	sah=0;
-//	printf("%d %d %d\n",indices.size(),level,sah);
+	if(level>50) sah=0;
 
 	float split; int axis;
 	BIHSplit(indices,min,max,axis,split);
 	if(sah) if(!SAH(indices,min,max,axis,split)) sah=0;
-//	printf("done sah\n");
 
 	float leftMax=-1.0f/0.0f,rightMin=1.0f/0.0f;
 	SplitIndices(objects,indices,axis,split,sah?0.0f:avgSize);
-//	printf("done splitting..\n");
 
 	int right=indices.size()-1;
 	if(level>=maxLevel) {
-		gVals[1]++;
 		double sum=0;
 		for(int n=0;n<indices.size();n++) {
 			float min=(&indices[n].min.x)[axis];

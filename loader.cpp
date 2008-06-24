@@ -141,10 +141,12 @@ void LoadV3O(string fileName,TriVector &out,ShadingDataVec &shadingData,float sc
 	scale *= 0.001f;
 
 	int idxAdd=0;
+	vector<u16> hmap;
+	int hmapW=0,hmapH=0;
 
 	for(;;) {
-		char line[16*1024];
-		if(!is.getline(line,16*1024)) break;
+		char line[64*1024];
+		if(!is.getline(line,64*1024)) break;
 
 		if(line[0]=='/'&&line[1]=='/') continue;
 
@@ -156,17 +158,17 @@ void LoadV3O(string fileName,TriVector &out,ShadingDataVec &shadingData,float sc
 		}
 		if(tokens.size()<1) continue;
 
-		if(tokens[0]=="SRF") {
-			if(tokens.size()<12) continue;
-			mats.push_back(Mat(tokens[1],tokens[5],atoi(tokens[11])));
-		}
 		if(tokens[0]=="D") {
 			enum { A=0, B=2, C=1 };
 			if(tokens.size()<13) continue;
 			verts.push_back(Vec3f(atof(tokens[1+A]),-atof(tokens[1+B]),atof(tokens[1+C])));
 			verts.back().v *= scale;
 		}
-		if(tokens[0]=="P") {
+		else if(tokens[0]=="SRF") {
+			if(tokens.size()<12) continue;
+			mats.push_back(Mat(tokens[1],tokens[5],atoi(tokens[11])));
+		}
+		else if(tokens[0]=="P") {
 			if(tokens.size()<5) continue;
 			if(atoi(tokens[1])!=3) continue;
 			int v[3]={ atoi(tokens[2])-1+idxAdd, atoi(tokens[3])-1+idxAdd, atoi(tokens[4])-1+idxAdd };
@@ -176,7 +178,7 @@ void LoadV3O(string fileName,TriVector &out,ShadingDataVec &shadingData,float sc
 			tris.push_back(Tri(v[0],v[1],v[2],verts,0,1));
 			if(mat.twoSided) tris.push_back(Tri(v[1],v[0],v[2],verts,0,1));
 		}
-		if(tokens[0]=="TLS") {
+		else if(tokens[0]=="TLS") {
 			int count=atoi(tokens[1])/3;
 
 			for(int n=0;n<count;n++) {
@@ -184,9 +186,50 @@ void LoadV3O(string fileName,TriVector &out,ShadingDataVec &shadingData,float sc
 				tris.push_back(Tri(v[0]+idxAdd,v[1]+idxAdd,v[2]+idxAdd,verts,0,1));
 			}
 		}
-		if(tokens[0]=="HMAP") {
-			continue;
+		else if(tokens[0]=="HF"&&hmap.size()) {
+			int x1,y1,x2,y2;
+			x1=atoi(tokens[10]);
+			y1=atoi(tokens[11]);
+			x2=atoi(tokens[12]);
+			y2=atoi(tokens[13]);
+			int p[4]={ atoi(tokens[1])-1,atoi(tokens[2])-1,atoi(tokens[3])-1,atoi(tokens[4])-1 };
+			float hscale=atof(tokens[5])*255.0f/float(32767);
 
+			{
+				float h[4]; float shift=512.0f;
+				h[0]=-float(hmap[x1+y1*hmapW])*hscale+shift;
+				h[1]=-float(hmap[x1+y2*hmapW])*hscale+shift;
+				h[2]=-float(hmap[x2+y2*hmapW])*hscale+shift;
+				h[3]=-float(hmap[x2+y1*hmapW])*hscale+shift;
+
+				idxAdd=verts.size();
+				verts.push_back(verts[p[0]].v+Vec3f(0,h[0],0));
+				verts.push_back(verts[p[1]].v+Vec3f(0,h[1],0));
+				verts.push_back(verts[p[2]].v+Vec3f(0,h[2],0));
+				verts.push_back(verts[p[3]].v+Vec3f(0,h[3],0));
+
+				tris.push_back(Tri(idxAdd+0,idxAdd+1,idxAdd+2,verts,0,1));
+				tris.push_back(Tri(idxAdd+0,idxAdd+2,idxAdd+3,verts,0,1));
+				continue;
+			}
+
+			Vec3f pos=verts[p[0]].v,ey=verts[p[1]].v-pos,ex=verts[p[2]].v-pos;
+			ey *= 1.0f/float(y2-y1);
+			ex *= 1.0f/float(x2-x1);
+			idxAdd=verts.size();	
+
+			for(int y=y1;y<y2;y++) for(int x=x1;x<x2;x++)
+				verts.push_back(pos+ex*float(x)+ey*float(y)+Vec3f(0,float(-hmap[x+y*hmapW])*hscale,0));
+
+			for(int y=y1;y<y2;y++) for(int x=x1;x<x2;x++) {
+				int tx=x-x1,ty=y-y1,w=x2-x1;
+
+				tris.push_back(Tri(tx+ty*w+idxAdd,tx+1+ty*w+idxAdd,tx+(ty+1)*w+idxAdd,verts,0,1));
+				tris.push_back(Tri(tx+(ty+1)*w+idxAdd,tx+1+ty*w+idxAdd,tx+1+(ty+1)*w+idxAdd,verts,0,1));
+			}
+			idxAdd=verts.size();
+		}
+		else if(tokens[0]=="HMAP") {
 			string hmapFile=string("scenes/desperados/")+tokens[1];
 			for(int n=0;n<hmapFile.length();n++)
 				if(hmapFile[n]=='\\') hmapFile[n]='/';
@@ -199,25 +242,11 @@ void LoadV3O(string fileName,TriVector &out,ShadingDataVec &shadingData,float sc
 
 				idxAdd=verts.size();
 
-				vector<i16> hmap2(width*height);
-				vector<i16> hmap(width*height/4);
-				ldr.Data(&hmap2[0],width*height*2);
-				width/=2; height/=2;
-
-				for(int y=0;y<height;y++) for(int x=0;x<width;x++) hmap[x+y*width]=hmap2[x*2+y*width*4];
-
-				Vec3f hscale=Vec3f(1.0f/float(width),0.25f/65535.0f,1.0f/float(height))*1000000.0f*scale;
-				for(int y=0;y<height;y++) for(int x=0;x<width;x++)
-					verts.push_back(hscale*Vec3f(x-width/2,-hmap[x+y*width],y-height/2));
-
-				for(int y=0;y<height-1;y++) for(int x=0;x<width-1;x++) {
-					tris.push_back(Tri(x+y*width+idxAdd,x+1+y*width+idxAdd,x+(y+1)*width+idxAdd,verts,0,1));
-					tris.push_back(Tri(x+(y+1)*width+idxAdd,x+1+y*width+idxAdd,x+1+(y+1)*width+idxAdd,verts,0,1));
-				}
-				idxAdd=verts.size();
-
+				hmap.resize(width*height);
+				ldr.Data(&hmap[0],width*height*2);
+				hmapW=width; hmapH=height;
 			} catch(const Exception &ex) {
-				cout << ex.what() << '\n';
+				cout << ex.what() << "!!!\n";
 				continue;
 			}
 		}
