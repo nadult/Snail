@@ -71,7 +71,7 @@ void StatsShader(Context &c,uint i) {
 
 //	c.color[i].x*=0.1f;
 //	c.color[i].y*=0.1f;
-	c.color[i].x=float(c.stats.Intersects())*(0.05f/Context::size);
+	c.color[i].x=float(c.stats.Intersects())*(0.025f/Context::size);
 	c.color[i].y=float(c.stats.LoopIters())*(0.01f/Context::size);
 	c.color[i].z=float(c.stats.Skips()*0.25f);
 }

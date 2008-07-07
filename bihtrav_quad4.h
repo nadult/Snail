@@ -1,8 +1,36 @@
 
 	template <class Output,bool sharedOrigin>
-	void BIHTree:: TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const {
+	int BIHTree:: TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,
+								int dirMask,int lastShadowTri) const {
 		TreeStats stats;
 		stats.TracingPacket(16);
+
+		if(Output::type==otShadow) if(lastShadowTri!=-1&&gVals[0]) {
+			floatq ret[4];
+			const BIHTriangle &obj=objects[lastShadowTri];
+
+			ret[0]=obj.Collide(rOrigin[0],tDir[0]);
+			ret[1]=obj.Collide(rOrigin[1],tDir[1]);
+			ret[2]=obj.Collide(rOrigin[2],tDir[2]);
+			ret[3]=obj.Collide(rOrigin[3],tDir[3]);
+			f32x4b mask[4];
+			mask[0]=ret[0]>0.0f&&ret[0]<out[0];
+			mask[1]=ret[1]>0.0f&&ret[1]<out[1];
+			mask[2]=ret[2]>0.0f&&ret[2]<out[2];
+			mask[3]=ret[3]>0.0f&&ret[3]<out[3];
+
+			out[0]=Condition(mask[0],0.0001f,out[0]);
+			out[1]=Condition(mask[1],0.0001f,out[1]);
+			out[2]=Condition(mask[2],0.0001f,out[2]);
+			out[3]=Condition(mask[3],0.0001f,out[3]);
+
+			if(ForAll(mask[0]&&mask[1]&&mask[2]&&mask[3])) {
+				stats.Skip();
+				if(tstats) tstats->Update(stats);
+				return lastShadowTri;
+			}
+			lastShadowTri=-1;
+		}
 
 		const Vec3q invDir[4]={
 			VInv(Vec3q(tDir[0].x+0.000000000001f,tDir[0].y+0.000000000001f,tDir[0].z+0.000000000001f)),
@@ -133,15 +161,18 @@
 				
 					floatq nrmLen=floatq( ((float*)&obj.ca)[3] );
 
+					stats.Intersection(4);
+					int passMask=0;
 #define COLLIDE(p)  { \
 						floatq det=tDir[p]|nrm;		\
 						f32x4b mask=Min(u[p],v[p])>=0.0f&&u[p]+v[p]<=det*nrmLen;	\
 						if(ForAny(mask)) {		\
 							floatq dist=Condition(mask,val[p]/det,out[p]);	\
 							mask=dist<out[p]&&dist>0.0f;	\
-							out[p]=Condition(mask,Output::type==otShadow?0.00001f:dist,out[p]);	\
+							out[p]=Condition(mask,Output::type==otShadow?0.0001f:dist,out[p]);	\
 							if(Output::objectIndexes)	\
 								object[p]=Condition(i32x4b(mask),i32x4(idx),object[p]);	\
+							passMask += ForWhich(mask); \
 							stats.IntersectPass();	\
 						} else stats.IntersectFail();	\
 					}
@@ -151,6 +182,7 @@
 					COLLIDE(2)
 					COLLIDE(3)
 
+					if(Output::type==otShadow&&passMask==15*4) lastShadowTri=idx;
 #undef COLLIDE
 				}
 
@@ -255,5 +287,6 @@
 		}
 
 		if(tstats) tstats->Update(stats);
+		return lastShadowTri;
 	}
 

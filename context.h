@@ -20,6 +20,16 @@ struct TracingOptions {
 	bool rdtscShader;
 };
 
+struct ShadowCache {
+	enum { size=4 };
+	ShadowCache() { for(int n=0;n<size;n++) lastTri[n]=-1; }
+	int &operator[](int n) { return lastTri[n]; }
+	int operator[](int n) const { return lastTri[n]; }
+
+private:
+	int lastTri[size];
+};
+
 template <class Scene,class Rays,class Selector>
 class TracingContext {
 public:
@@ -60,6 +70,8 @@ public:
 
 	TreeStats stats;
 	float density;
+
+	ShadowCache shadowCache;
 };
 
 enum OutputType {

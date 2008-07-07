@@ -144,7 +144,7 @@
 					}	
 			
 					if(lastDensity*(tMin+tMax)>maxDensity) {
-						stats.Skip(16);
+					//	stats.Skip(16);
 						if(fStack==fStackBegin) { allTMin=tMin; allTMax=tMax; allIdx=idx|BIHNode::leafMask; }
 
 						BIHOptData data(orig,tMinInv+0,tMaxInv+0,mailbox,allTMin,allTMax,allIdx);

@@ -69,7 +69,11 @@ struct GenImageTask {
 
 		uint pitch=out->width*3;
 		u8 *outPtr=(u8*)&out->buffer[startY*pitch+startX*3];
+		ShadowCache shadowCache;
 
+//		for(int ky=0;ky<height;ky+=PHeight*2) for(int kx=0;kx<width;kx+=PWidth*2)
+//			for(int y=ky;y<=ky+PHeight;y+=PHeight) { for(int x=kx;x<=kx+PWidth;x+=PWidth) {
+				
 		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
 				Vec3q dir[NQuads];
@@ -88,7 +92,10 @@ struct GenImageTask {
 
 				context.options=TracingOptions(options.reflections?1:0,options.shading,options.rdtscShader);
 				
+				context.shadowCache=shadowCache;
 				scene->RayTracePrimary(context);
+				shadowCache=context.shadowCache;
+
 				outStats->Update(context.stats);
 
 				if(NQuads==1) {
@@ -191,7 +198,9 @@ void PrintHelp() {
 	printf("j - toggle lights movement\n\tp - print camera position; save camera configuration\n\t");
 	printf("c - center camera position in the scene\n\t");
 	//	printf("i - toggle scene complexity visualization (green: # visited nodes  red: # intersections)\n\t");
-	printf("0,1,2,3 - change tracing mode (on most scenes 0 is slowest,  2,3 is fastest)\n\tesc - exit\n\n");
+	printf("0,1,2,3 - change tracing mode (on most scenes 0 is slowest,  2,3 is fastest)\n\t");
+	printf("F1 - toggle shadow caching\n\t");
+	printf("esc - exit\n\n");
 }
 
 template <class Scene>
@@ -238,6 +247,10 @@ int main(int argc, char **argv) {
 	TriVector tris; ShadingDataVec shadingData;
 	LoadModel(string("scenes/")+modelFile,tris,shadingData,20.0f,10000000);
 
+	tris.push_back(Triangle(Vec3f(1000,65,-1000),Vec3f(-1000,65,-1000),Vec3f(1000,65,1000)));
+	tris.push_back(Triangle(Vec3f(1000,65,1000),Vec3f(-1000,65,-1000),Vec3f(-1000,65,1000)));
+	for(int n=0;n<2;n++) shadingData.push_back(ShadingData(Vec3p(0,1,0),Vec3p(0,1,0),Vec3p(0,1,0)));
+
 	if(treeVisMode) { TreeVisMain(tris); return 0; }
 
 	TScene<BIHTree>	scene;
@@ -265,6 +278,7 @@ int main(int argc, char **argv) {
 	else {
 		GLWindow out(resx,resy,fullscreen);
 		scene.tree.maxDensity=520.0f * resx * resy;
+		scene.lightsEnabled=1;
 		bool lightsAnim=0;
 		float speed; {
 			Vec3p size=scene.tree.pMax-scene.tree.pMin;

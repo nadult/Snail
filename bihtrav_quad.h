@@ -1,10 +1,26 @@
 
 	template <class Output>
-	void BIHTree::TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask) const {
+	int BIHTree::TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask,
+								int lastShadowTri) const {
 		floatq maxD=output.dist[0];
 
 		TreeStats stats;
 		stats.TracingRay(4);
+
+		if(Output::type==otShadow) if(lastShadowTri!=-1&&gVals[0]) {
+			floatq ret=objects[lastShadowTri].Collide(rOrigin,tDir);
+			f32x4b mask=ret>0.0f&&ret<maxD;
+			maxD=Condition(mask,0.0001f,maxD);
+			stats.Intersection();
+
+			if(ForAll(mask)) {
+				stats.Skip();
+				if(output.stats) output.stats->Update(stats);
+				output.dist[0]=maxD;
+				return lastShadowTri;
+			}
+			lastShadowTri=-1;
+		}
 
 		Vec3q invDir=VInv(Vec3q(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f));
 		floatq tinv[3]={invDir.x,invDir.y,invDir.z};
@@ -31,6 +47,7 @@
 			tMin=Max(ttMin.z,tMin);
 		}
 
+
 		const BIHNode *node0=&nodes[0];
 		int idx=0;
 
@@ -42,7 +59,6 @@
 
 				{
 					const BIHTriangle &obj=objects[idx];
-				//	if(gVals[0]&&ForAll((tDir|Vec3q(obj.Nrm()))<0.0f)) { stats.Skip(); goto POP_STACK; }
 
 					stats.Intersection();
 
@@ -50,9 +66,11 @@
 					f32x4b mask=ret<minRet&&ret>0.0f;
 
 					if(ForAny(mask)) {
-						minRet=Condition(mask,Output::type==otShadow?0.00001f:ret,minRet);
+						minRet=Condition(mask,Output::type==otShadow?0.0001f:ret,minRet);
 						if(Output::objectIndexes)
 							output.object[0]=Condition(i32x4b(mask),i32x4(idx),output.object[0]);
+
+						if(Output::type==otShadow) if(ForAll(mask)) lastShadowTri=idx;
 	
 						tMax=Min(tMax,minRet);
 					}
@@ -107,8 +125,9 @@
 			idx=node->val[sign];
 		}
 
-		output.stats->Update(stats);
+		if(output.stats) output.stats->Update(stats);
 		output.dist[0]=minRet;
+		return lastShadowTri;
 	}
 
 

@@ -56,7 +56,7 @@ Vec GouraudNormals(const Container &objects,const ShadingDataVec &shadingData,co
 }
 
 template <class Scene,class Group,class Selector>
-void TraceLight(TracingContext<Scene,Group,Selector> &c,const Light &light) {
+void TraceLight(TracingContext<Scene,Group,Selector> &c,const Light &light,int idx) {
 	typedef typename Vec3q::TScalar real;
 	typedef typename Vec3q::TBool boolean;
 
@@ -95,7 +95,8 @@ void TraceLight(TracingContext<Scene,Group,Selector> &c,const Light &light) {
 			tDst[q]=lightDist[q]*0.99999f;
 		}
 
-		c.scene.Traverse(tGroup,lsel,Output<otShadow,floatq,i32x4>(tDst,0,&c.stats));
+		c.shadowCache[idx]=
+			c.scene.Traverse(tGroup,lsel,Output<otShadow,floatq,i32x4>(tDst,0,&c.stats),c.shadowCache[idx]);
 	}
 
 	Vec3q lightColor(light.color);
@@ -120,9 +121,8 @@ public:
 	void AddSoftLight(Vec3f pos,Vec3f col,Vec3f dens,int dx,int dy,int dz);
 
 	template <class Output,class Group,class Selector>
-	void Traverse(Group &group,const Selector &sel,const Output &out) const {
-		//tree.TraverseMonoGroup(group,sel,out);
-		tree.TraverseOptimized(group,sel,out);
+	int Traverse(Group &group,const Selector &sel,const Output &out,int lastShadowTri=-1) const {
+		return tree.TraverseOptimized(group,sel,out,lastShadowTri);
 	}
 
 	template <class Group,class Selector,bool primary>
@@ -201,8 +201,11 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector
 		SimpleLightingShader(c,q);
 	}
 
-	if(lightsEnabled) for(int n=0;n<lights.size();n++)
-		TraceLight(c,lights[n]);
+	if(lightsEnabled) {
+		assert(ShadowCache::size>=lights.size());
+		for(int n=0;n<lights.size();n++)
+			TraceLight(c,lights[n],n);
+	}
 
 	if(c.options.reflections>0&&c.selector.Num())
 		TraceReflection(c);

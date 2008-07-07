@@ -89,9 +89,10 @@ public:
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const;
 
 	template <class Output>
-	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask) const;
+	int TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask,int lastShadowTri=-1) const;
 	template <class Output,bool shared>
-	void TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask) const;
+	int TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask,
+						int lastShadowTri=-1) const;
 
 	template <class Output>
 	void TraverseQuad4Primary(const BIHTravContext &context,int dirMask,BIHOptData *data=0) const;
@@ -126,8 +127,10 @@ public:
 	}
 
 	template <class Output,class Rays>
-	void TraverseQuadGroup(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out,int dirMask) const {
+	int TraverseQuadGroup(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out,int dirMask,
+							int lastShadowTri=-1) const {
 		int i=0;
+
 		if(Output::type==otPrimary) for(;i+15<sel.Num();i+=16) {
 			Vec3q tOrig[16],tDir[16];
 			floatq dist[16]; i32x4 obj[16];
@@ -166,7 +169,7 @@ public:
 
 			if(Output::type==otPrimary)
 				 TraverseQuad4Primary<Output>(BIHTravContext(tOrig,tDir,dist,obj,out.stats),dirMask);
-			else TraverseQuad4<Output,Rays::sharedOrigin>(tOrig,tDir,dist,obj,out.stats,dirMask);
+			else lastShadowTri=TraverseQuad4<Output,Rays::sharedOrigin>(tOrig,tDir,dist,obj,out.stats,dirMask,lastShadowTri);
 
 			out.dist[q[0]]=dist[0]; out.dist[q[1]]=dist[1];
 			out.dist[q[2]]=dist[2]; out.dist[q[3]]=dist[3];
@@ -177,14 +180,13 @@ public:
 		}
 		for(;i<sel.Num();i++) {
 			int q=sel[i];
-			TraverseQuad(rays.Origin(q),rays.Dir(q),Output(out.dist+q,out.object+q,out.stats),dirMask);
+			lastShadowTri=TraverseQuad(rays.Origin(q),rays.Dir(q),Output(out.dist+q,out.object+q,out.stats),dirMask,lastShadowTri);
 		}
+
+		return lastShadowTri;
 	}
 	template <class Output,class Rays>
-	void TraverseOptimized(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out) const {
-//		TraverseMonoGroup(rays,sel,out);
-//		return;
-
+	int TraverseOptimized(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out,int lastShadowTri) const {
 		RaySelector<Rays::size> selectors[9];
 		rays.GenSelectors(sel,selectors);
 
@@ -198,11 +200,13 @@ public:
 					int bitMask=sel.BitMask(i);
 					if(CountMaskBits(bitMask)<4) { selectors[8].Add(q,bitMask); sel.Disable(i--); continue; }
 				}
-				TraverseQuadGroup(rays,sel,out,k);
+				lastShadowTri=TraverseQuadGroup(rays,sel,out,k,lastShadowTri);
 			}
 		}
 		if(selectors[8].Num())
 			TraverseMonoGroup(rays,selectors[8],out);
+
+		return lastShadowTri;
 	}
 
 	mutable MemPattern pattern;

@@ -5,6 +5,8 @@
 #include "object.h"
 
 struct ShadingData {
+	ShadingData() { }
+	ShadingData(const Vec3p &a,const Vec3p &b,const Vec3p &c) { nrm[0]=a; nrm[1]=b; nrm[2]=c; }
 	Vec3p nrm[3]; // for every vertex
 };
 
