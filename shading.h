@@ -12,6 +12,8 @@ void InitializationShader(Context &c,uint i,const typename Context::real &maxDis
 	c.light[i]=ambient;
 }
 
+
+
 template <class Context>
 void SimpleLightingShader(Context &c,uint i) {
 	c.color[i]=c.RayDir(i)|c.normal[i];

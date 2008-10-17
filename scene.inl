@@ -13,9 +13,11 @@
 		lightsEnabled(0) {
 	//	AddSoftLight(Vec3f(-2,8.0f,0.9f),Vec3f(800,805,805),Vec3f(40,40,40),1,1,1);
 	//	AddSoftLight(Vec3f(-100,-100,0),Vec3f(0,0,20000),Vec3f(1,1,1),1,1,1);
-		AddSoftLight(Vec3f(-4000,-3550,-4000),Vec3f(50.0f,30.0f,10.0f)*1000000.0f,Vec3f(100,100,100),1,1,1);
-		AddSoftLight(Vec3f(2000,-2050,4000),Vec3f(0,0.0f,50.0f)*1000000.0f,Vec3f(100,100,100),1,1,1);
-		AddSoftLight(Vec3f(-6000,-3050,1000),Vec3f(0,30.0f,50.0f)*1000000.0f,Vec3f(100,1000,100),1,1,1);
+		AddSoftLight(Vec3f(-4000,-3550,-4000),Vec3f(50.0f,30.0f,10.0f)*50.0f,Vec3f(100,100,100),1,1,1);
+		AddSoftLight(Vec3f(2000,-2050,4000),Vec3f(0,50.0f,10.0f)*50.0f,Vec3f(100,100,100),1,1,1);
+	//	AddSoftLight(Vec3f(-6000,-3050,1000),Vec3f(0,30.0f,50.0f)*1000000.0f,Vec3f(100,1000,100),1,1,1);
+
+	//	Loader("data/tex1.png") & tex;
 	}
 
 	template <class AccStruct>

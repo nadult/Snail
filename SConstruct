@@ -1,7 +1,7 @@
 import os
 
 
-libs = [ 'pthread', 'baselib', 'glfw', 'GLU' ]
+libs = [ 'gfxlib', 'baselib', 'glfw', 'GLU', 'png', 'pthread' ]
 libsLinux = [ 'GL', 'Xrandr' ]
 libsWin32 = [ 'opengl32' ]
 
@@ -15,7 +15,7 @@ default = Environment (
 		CPPPATH = '.'		
 	)
 
-if int(ARGUMENTS.get('32bit',0)):
+if int(ARGUMENTS.get('-m32',0)):
 	default=default.Clone( CXX='g++ -m32')
 
 release = default.Clone(

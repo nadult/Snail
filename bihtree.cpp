@@ -169,7 +169,6 @@ bool BIHTree::SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &ma
 
 void BIHTree::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,
 							const Vec3p &min,const Vec3p &max,uint level,bool sah) {
-
 	/* { // eliminating duplicates
 RESORT:
 		std::sort(indices.begin(),indices.end());
@@ -183,6 +182,7 @@ RESORT:
 		}
 	} */
 
+	sah=0;
 	{
 		float sSize; { Vec3p s=pMax-pMin; sSize=s.x*(s.y+s.z)+s.y*s.z; }
 		Vec3p size=max-min;

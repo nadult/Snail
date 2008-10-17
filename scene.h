@@ -6,6 +6,7 @@
 #include "shading.h"
 #include "context.h"
 #include "loader.h"
+#include "gfxlib_texture.h"
 
 
 template <class Vec,class Container,class integer>
@@ -54,6 +55,35 @@ Vec GouraudNormals(const Container &objects,const ShadingDataVec &shadingData,co
 
 	return nrm;
 }
+
+template <class Container>
+Vec2q GouraudTexCoords(const Container &objects,const ShadingDataVec &shadingData,const i32x4 &objId,
+						const Vec3q &rayOrig,const Vec3q &rayDir)  {
+	typedef typename Vec3q::TScalar real;
+	typedef typename Container::value_type Object;
+
+	const Object *obj0=&objects[objId[0]];
+	Vec2q nrm; {
+		real u,v; obj0->Barycentric(rayOrig,rayDir,u,v);
+		const ShadingData &data=shadingData[objId[0]];
+		nrm=Vec2q(data.uv[0])*(real(1.0f)-u-v)+Vec2q(data.uv[2])*u+Vec2q(data.uv[1])*v;
+	}
+
+	if(ForAny(i32x4(objId[0])!=objId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
+		const Object *objN=&objects[objId[n]];
+		if(objN!=obj0) {
+			Vec2q newNrm; {
+				real u,v; objN->Barycentric(rayOrig,rayDir,u,v);
+				const ShadingData &data=shadingData[objId[n]];
+				newNrm=Vec2q(data.uv[0])*(real(1.0f)-u-v)+Vec2q(data.uv[2])*u+Vec2q(data.uv[1])*v;
+			}
+			nrm=Condition(ScalarInfo<real>::ElementMask(n),newNrm,nrm);
+		}
+	}
+
+	return nrm;
+}
+
 
 template <class Scene,class Group,class Selector>
 void TraceLight(TracingContext<Scene,Group,Selector> &c,const Light &light,int idx) {
@@ -133,6 +163,7 @@ public:
 	template <class Group,class Selector>
 	void RayTraceSecondary(TracingContext<TScene<AccStruct>,Group,Selector> &c) const { RayTrace<Group,Selector,0>(c); }
 
+	gfxlib::Texture tex;
 	bool lightsEnabled;
 	vector<Light> lights;
 	ShadingDataVec shadingData;
@@ -167,6 +198,32 @@ void TraceReflection(TracingContext<Scene,Group,Selector> &c) {
 	}
 }
 
+Vec3q Sample(const gfxlib::Texture &tex,const Vec2q &uv) {
+	Vec2q pos=uv*Vec2q(float(tex.Width()),float(tex.Height()));
+	i32x4 x(pos.x),y(pos.y);
+
+	assert(tex.GetFormat().GetIdent()==gfxlib::TI_R8G8B8);
+	u8 *data=(u8*)tex.DataPointer();
+	int pitch=tex.Pitch();
+
+	for(int n=0;n<4;n++) {
+		x[n]=x[n]%tex.Width();
+		y[n]=y[n]%tex.Height();
+	}
+//	x%=i32x4(tex.Width()); y%=i32x4(tex.Height());
+	i32x4 offset=x+x+x+y*i32x4(pitch);
+
+	u8 *pix[4]={data+offset[0],data+offset[1],data+offset[2],data+offset[3]};
+
+	Vec3q out;
+	out.x[0]=pix[0][0]; out.y[0]=pix[0][1]; out.z[0]=pix[0][2];
+	out.x[1]=pix[1][0]; out.y[1]=pix[1][1]; out.z[1]=pix[1][2];
+	out.x[2]=pix[2][0]; out.y[2]=pix[2][1]; out.z[2]=pix[2][2];
+	out.x[3]=pix[3][0]; out.y[3]=pix[3][1]; out.z[3]=pix[3][2];
+
+	return out*f32x4(1.0f/255.0f);
+}
+
 template <class AccStruct> template <class Group,class Selector,bool primary>
 void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector> &c) const {
 	typedef typename Vec3q::TScalar real;
@@ -199,6 +256,8 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector
 			c.normal[q]=FlatNormals<Vec3q>(tree.objects,Condition(imask,c.objId[q]));
 	
 		SimpleLightingShader(c,q);
+	//	Vec2q texCoord=GouraudTexCoords(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
+	//	c.color[q]*=Sample(tex,texCoord);
 	}
 
 	if(lightsEnabled) {

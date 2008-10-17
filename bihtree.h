@@ -187,6 +187,9 @@ public:
 	}
 	template <class Output,class Rays>
 	int TraverseOptimized(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out,int lastShadowTri) const {
+	//	TraverseMonoGroup(rays,sel,out);
+	//	return lastShadowTri;
+		
 		RaySelector<Rays::size> selectors[9];
 		rays.GenSelectors(sel,selectors);
 

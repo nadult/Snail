@@ -8,6 +8,73 @@
 #include "gl_window.h"
 #include "loader.h"
 
+
+Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
+	Matrix<Vec4f> mOut;
+	
+	const float *M=&mat.x.x;
+	float *out=&mOut.x.x;
+	
+	float t[12],m[16];
+	for(int n=0;n<4;n++) {
+      m[n+ 0]=M[n*4+0]; m[n+ 4]=M[n*4+1];
+      m[n+ 8]=M[n*4+2]; m[n+12]=M[n*4+3];
+   }
+	t[0 ]=m[10]*m[15]; t[1 ]=m[11]*m[14];
+	t[2 ]=m[9 ]*m[15]; t[3 ]=m[11]*m[13];
+	t[4 ]=m[9 ]*m[14]; t[5 ]=m[10]*m[13];
+	t[6 ]=m[8 ]*m[15]; t[7 ]=m[11]*m[12];
+	t[8 ]=m[8 ]*m[14]; t[9 ]=m[10]*m[12];
+	t[10]=m[8 ]*m[13]; t[11]=m[9 ]*m[12];
+
+	out[0 ] = t[0 ]*m[5 ]+t[3 ]*m[6 ]+t[4 ]*m[7 ];
+	out[0 ]-= t[1 ]*m[5 ]+t[2 ]*m[6 ]+t[5 ]*m[7 ];
+	out[1 ] = t[1 ]*m[4 ]+t[6 ]*m[6 ]+t[9 ]*m[7 ];
+	out[1 ]-= t[0 ]*m[4 ]+t[7 ]*m[6 ]+t[8 ]*m[7 ];
+	out[2 ] = t[2 ]*m[4 ]+t[7 ]*m[5 ]+t[10]*m[7 ];
+	out[2 ]-= t[3 ]*m[4 ]+t[6 ]*m[5 ]+t[11]*m[7 ];
+	out[3 ] = t[5 ]*m[4 ]+t[8 ]*m[5 ]+t[11]*m[6 ];
+	out[3 ]-= t[4 ]*m[4 ]+t[9 ]*m[5 ]+t[10]*m[6 ];
+	out[4 ] = t[1 ]*m[1 ]+t[2 ]*m[2 ]+t[5 ]*m[3 ];
+	out[4 ]-= t[0 ]*m[1 ]+t[3 ]*m[2 ]+t[4 ]*m[3 ];
+	out[5 ] = t[0 ]*m[0 ]+t[7 ]*m[2 ]+t[8 ]*m[3 ];
+	out[5 ]-= t[1 ]*m[0 ]+t[6 ]*m[2 ]+t[9 ]*m[3 ];
+	out[6 ] = t[3 ]*m[0 ]+t[6 ]*m[1 ]+t[11]*m[3 ];
+	out[6 ]-= t[2 ]*m[0 ]+t[7 ]*m[1 ]+t[10]*m[3 ];
+	out[7 ] = t[4 ]*m[0 ]+t[9 ]*m[1 ]+t[10]*m[2 ];
+	out[7 ]-= t[5 ]*m[0 ]+t[8 ]*m[1 ]+t[11]*m[2 ];
+
+	t[0 ]=m[2 ]*m[7 ]; t[1 ]=m[3 ]*m[6 ];
+	t[2 ]=m[1 ]*m[7 ]; t[3 ]=m[3 ]*m[5 ];
+	t[4 ]=m[1 ]*m[6 ]; t[5 ]=m[2 ]*m[5 ];
+	t[6 ]=m[0 ]*m[7 ]; t[7 ]=m[3 ]*m[4 ];
+	t[8 ]=m[0 ]*m[6 ]; t[9 ]=m[2 ]*m[4 ];
+	t[10]=m[0 ]*m[5 ]; t[11]=m[1 ]*m[4 ];
+
+	out[8 ] = t[0 ]*m[13]+t[3 ]*m[14]+t[4 ]*m[15];
+	out[8 ]-= t[1 ]*m[13]+t[2 ]*m[14]+t[5 ]*m[15];
+	out[9 ] = t[1 ]*m[12]+t[6 ]*m[14]+t[9 ]*m[15];
+	out[9 ]-= t[0 ]*m[12]+t[7 ]*m[14]+t[8 ]*m[15];
+	out[10] = t[2 ]*m[12]+t[7 ]*m[13]+t[10]*m[15];
+	out[10]-= t[3 ]*m[12]+t[6 ]*m[13]+t[11]*m[15];
+	out[11] = t[5 ]*m[12]+t[8 ]*m[13]+t[11]*m[14];
+	out[11]-= t[4 ]*m[12]+t[9 ]*m[13]+t[10]*m[14];
+	out[12] = t[2 ]*m[10]+t[5 ]*m[11]+t[1 ]*m[9 ];
+	out[12]-= t[4 ]*m[11]+t[0 ]*m[9 ]+t[3 ]*m[10];
+	out[13] = t[8 ]*m[11]+t[0 ]*m[8 ]+t[7 ]*m[10];
+	out[13]-= t[6 ]*m[10]+t[9 ]*m[11]+t[1 ]*m[8 ];
+	out[14] = t[6 ]*m[9 ]+t[11]*m[11]+t[3 ]*m[8 ];
+	out[14]-= t[10]*m[11]+t[2 ]*m[8 ]+t[7 ]*m[9 ];
+	out[15] = t[10]*m[10]+t[4 ]*m[8 ]+t[9 ]*m[9 ];
+	out[15]-= t[8 ]*m[9 ]+t[11]*m[10]+t[5 ]*m[8 ];
+
+	float det=1.0f/(m[0]*out[0]+m[1]*out[1]+m[2]*out[2]+m[3]*out[3]);
+	for(int n=0;n<16;n++) out[n]*=det;
+   
+	return mOut;   
+}
+
+
 int TreeVisMain(TriVector &tris);
 
 int gVals[16]={0,};
@@ -172,8 +239,8 @@ template <class Scene>
 TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	switch(quadLevels) {
 	case 0: return GenImage<0>(scene,camera,image,options,tasks);
-	case 1: return GenImage<1>(scene,camera,image,options,tasks);
-	case 2: return GenImage<2>(scene,camera,image,options,tasks);
+//	case 1: return GenImage<1>(scene,camera,image,options,tasks);
+//	case 2: return GenImage<2>(scene,camera,image,options,tasks);
 //	case 3: return GenImage<3>(scene,camera,image,options,tasks);
 //	case 4: return GenImage<4>(scene,camera,image,options,tasks);
 	default: throw Exception("Quad level not supported.");
@@ -247,9 +314,9 @@ int main(int argc, char **argv) {
 	TriVector tris; ShadingDataVec shadingData;
 	LoadModel(string("scenes/")+modelFile,tris,shadingData,20.0f,10000000);
 
-	tris.push_back(Triangle(Vec3f(1000,65,-1000),Vec3f(-1000,65,-1000),Vec3f(1000,65,1000)));
-	tris.push_back(Triangle(Vec3f(1000,65,1000),Vec3f(-1000,65,-1000),Vec3f(-1000,65,1000)));
-	for(int n=0;n<2;n++) shadingData.push_back(ShadingData(Vec3p(0,1,0),Vec3p(0,1,0),Vec3p(0,1,0)));
+//	tris.push_back(Triangle(Vec3f(1000,65,-1000),Vec3f(-1000,65,-1000),Vec3f(1000,65,1000)));
+//	tris.push_back(Triangle(Vec3f(1000,65,1000),Vec3f(-1000,65,-1000),Vec3f(-1000,65,1000)));
+//	for(int n=0;n<2;n++) shadingData.push_back(ShadingData(Vec3p(0,1,0),Vec3p(0,1,0),Vec3p(0,1,0)));
 
 	if(treeVisMode) { TreeVisMain(tris); return 0; }
 
@@ -261,7 +328,7 @@ int main(int argc, char **argv) {
 	if(!camConfigs.GetConfig(string(modelFile),cam))
 		cam.pos=Center(tris);
 
-	uint quadLevels=2;
+	uint quadLevels=0;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 
 	for(int n=0;n<4;n++)
@@ -278,11 +345,11 @@ int main(int argc, char **argv) {
 	else {
 		GLWindow out(resx,resy,fullscreen);
 		scene.tree.maxDensity=520.0f * resx * resy;
-		scene.lightsEnabled=1;
+		scene.lightsEnabled=0;
 		bool lightsAnim=0;
 		float speed; {
 			Vec3p size=scene.tree.pMax-scene.tree.pMin;
-			speed=(size.x+size.y+size.z)*0.0025f;
+			speed=(size.x+size.y+size.z)*0.001f;
 		}
 
 		while(out.PollEvents()) {
@@ -299,12 +366,15 @@ int main(int argc, char **argv) {
 			if(out.KeyDown('L')) { printf("Lights %s\n",scene.lightsEnabled?"disabled":"enabled"); scene.lightsEnabled^=1; }
 			if(out.KeyDown('J')) { printf("Lights animation %s\n",lightsAnim?"disabled":"enabled"); lightsAnim^=1; }
 
-			if(out.Key('W')) cam.pos+=cam.front*speed;
-			if(out.Key('S')) cam.pos-=cam.front*speed;
-			if(out.Key('A')) cam.pos-=cam.right*speed;
-			if(out.Key('D')) cam.pos+=cam.right*speed;
-			if(out.Key('R')) cam.pos-=cam.up*speed;
-			if(out.Key('F')) cam.pos+=cam.up*speed;
+			{
+				float tspeed=speed*(out.Key(Key_lshift)?3.0f:1.0f);
+				if(out.Key('W')) cam.pos+=cam.front*tspeed;
+				if(out.Key('S')) cam.pos-=cam.front*tspeed;
+				if(out.Key('A')) cam.pos-=cam.right*tspeed;
+				if(out.Key('D')) cam.pos+=cam.right*tspeed;
+				if(out.Key('R')) cam.pos-=cam.up*tspeed;
+				if(out.Key('F')) cam.pos+=cam.up*tspeed;
+			}
 
 			if(out.KeyDown('[')||out.KeyDown(']')) {
 				float angle=out.KeyDown('[')?0.05:-0.05;
@@ -328,15 +398,23 @@ int main(int argc, char **argv) {
 		//	if(out.KeyDown('[')) { scene.tree.maxDensity/=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
 		//	if(out.KeyDown(']')) { scene.tree.maxDensity*=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
 
-			if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
-			if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
-			if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
-		//	if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
+			if(out.Key(Key_lctrl)) {
+				if(out.KeyDown('1')&&scene.lights.size()>=1) scene.lights[0].pos=cam.pos;
+				if(out.KeyDown('2')&&scene.lights.size()>=2) scene.lights[1].pos=cam.pos;
+				if(out.KeyDown('3')&&scene.lights.size()>=3) scene.lights[2].pos=cam.pos;
+			}
+			else {
+				if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
+			//	if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
+			//	if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
+			//	if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
+			}
 
 			if(out.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 1 %s\n",gVals[0]?"on":"off"); }
 			if(out.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
 			if(out.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
 			if(out.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
+
 
 			{
 				int dx=out.Key(Key_space)?out.MouseMove().x:0,dy=0;

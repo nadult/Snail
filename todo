@@ -1,3 +1,9 @@
+- Zrobic hierarchie zorientowanych obiektow (bez cieniowania)
+
+
+
+
+
 BIH:
 - przyspieszyc budowe; optymalizacje boxow otaczajacych robic na krawedziach a nie trojkatach
 - uzyc RayGroup::IDir

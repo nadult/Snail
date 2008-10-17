@@ -63,5 +63,8 @@ public:
 	uint last;
 };
 
+Matrix<Vec4f> Inverse(const Matrix<Vec4f>&);
+
+
 #endif
 
