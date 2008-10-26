@@ -5,6 +5,7 @@
 #include "gl_window.h"
 #include <algorithm>
 #include <set>
+#include <stdio.h>
 
 
 class Eigen

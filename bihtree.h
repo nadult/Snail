@@ -49,11 +49,11 @@ public:
 
 struct BIHTravContext {
 	const Vec3q * __restrict__ origin,* __restrict__ dir;
-	floatq * __restrict__ out; i32x4 * __restrict__ object;
+	floatq * __restrict__ out; i32x4 * __restrict__ object; i32x4 * __restrict__ element;
 	TreeStats *stats;
 
-	BIHTravContext(const Vec3q *to,const Vec3q *td,floatq *ou,i32x4 *obj,TreeStats *st)
-		:origin(to),dir(td),out(ou),object(obj),stats(st) { }
+	BIHTravContext(const Vec3q *to,const Vec3q *td,floatq *ou,i32x4 *obj,i32x4 *elem,TreeStats *st)
+		:origin(to),dir(td),out(ou),object(obj),element(elem),stats(st) { }
 	BIHTravContext() { }
 
 };
@@ -71,11 +71,17 @@ void GenBIHIndices(const TriVector &tris,vector<BIHIdx> &out,float maxSize,uint 
 void SplitIndices(const TriVector &tris,vector<BIHIdx> &inds,int axis,float pos,float maxSize);
 void OptimizeIndices(vector<BIHIdx> &indices);
 
-class BIHTree {
+class BIHTree: public Object {
 public:
-	typedef BIHTriangle Object;
+	typedef BIHTriangle Element;
 	enum { maxLevel=60 };
 
+	BBox GetBBox() const {
+		return BBox(pMin,pMax);
+	}
+
+	Vec3f FlatNormals(u32 id) { return TFlatNormals<BIHTree>(id); }
+	
 	BIHTree(const TriVector &objects);
 
 	void PrintInfo() const;
@@ -87,12 +93,21 @@ public:
 
 	template <class Output>
 	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const;
+	
+	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output<otNormal,float,u32> output) const {
+		TraverseMono<Output<otNormal,float,u32> >(rOrigin,tDir,output);
+	}
 
 	template <class Output>
 	int TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask,int lastShadowTri=-1) const;
+	
+	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output<otNormal,f32x4,i32x4> output) const {
+		TraverseQuad(rOrigin,tDir,output,GetVecSign(tDir),-1);
+	}
+	
 	template <class Output,bool shared>
-	int TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,int dirMask,
-						int lastShadowTri=-1) const;
+	int TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,i32x4 *element,TreeStats *tstats,
+						int dirMask,int lastShadowTri=-1) const;
 
 	template <class Output>
 	void TraverseQuad4Primary(const BIHTravContext &context,int dirMask,BIHOptData *data=0) const;
@@ -118,11 +133,12 @@ public:
 
 			float *dist=(float*)(out.dist+q);
 			u32 *objId=Output::objectIndexes?(u32*)(out.object+q):tmp;
+			u32 *elemId=Output::objectIndexes?(u32*)(out.element+q):tmp;
 
-			if(bmask&1) TraverseMono(orig[0],dir[0],::Output<otNormal,float,u32>(dist+0,objId+0,out.stats));
-			if(bmask&2) TraverseMono(orig[1],dir[1],::Output<otNormal,float,u32>(dist+1,objId+1,out.stats));
-			if(bmask&4) TraverseMono(orig[2],dir[2],::Output<otNormal,float,u32>(dist+2,objId+2,out.stats));
-			if(bmask&8) TraverseMono(orig[3],dir[3],::Output<otNormal,float,u32>(dist+3,objId+3,out.stats));
+			if(bmask&1) TraverseMono(orig[0],dir[0],::Output<otNormal,float,u32>(dist+0,objId+0,elemId+0,out.stats));
+			if(bmask&2) TraverseMono(orig[1],dir[1],::Output<otNormal,float,u32>(dist+1,objId+1,elemId+1,out.stats));
+			if(bmask&4) TraverseMono(orig[2],dir[2],::Output<otNormal,float,u32>(dist+2,objId+2,elemId+2,out.stats));
+			if(bmask&8) TraverseMono(orig[3],dir[3],::Output<otNormal,float,u32>(dist+3,objId+3,elemId+3,out.stats));
 		}
 	}
 
@@ -133,12 +149,14 @@ public:
 
 		if(Output::type==otPrimary) for(;i+15<sel.Num();i+=16) {
 			Vec3q tOrig[16],tDir[16];
-			floatq dist[16]; i32x4 obj[16];
+			floatq dist[16]; i32x4 obj[16],elem[16];
 
 			for(int p=0;p<16;p++) {
 				dist[p]=out.dist[sel[p]];
-				if(Output::objectIndexes)
+				if(Output::objectIndexes) {
 					obj[p]=out.object[sel[p]];
+					elem[p]=out.element[sel[p]];
+				}
 				tOrig[p]=rays.Origin(sel[p]);
 				tDir[p]=rays.Dir(sel[p]);
 			}
@@ -147,20 +165,24 @@ public:
 
 			for(int p=0;p<16;p++) {
 				out.dist[sel[p]]=dist[p];
-				if(Output::objectIndexes)
+				if(Output::objectIndexes) {
 					out.object[sel[p]]=obj[p];
+					out.element[sel[p]]=elem[p];
+				}
 			}
 		}
 		for(;i+3<sel.Num();i+=4) {
 			int q[4]={sel[i],sel[i+1],sel[i+2],sel[i+3]};
 			Vec3q tOrig[4],tDir[4];
-			floatq dist[4]; i32x4 obj[4];
+			floatq dist[4]; i32x4 obj[4],elem[4];
 
 			dist[0]=out.dist[q[0]]; dist[1]=out.dist[q[1]];
 			dist[2]=out.dist[q[2]]; dist[3]=out.dist[q[3]];
 			if(Output::objectIndexes) {
 				obj[0]=out.object[q[0]]; obj[1]=out.object[q[1]];
 				obj[2]=out.object[q[2]]; obj[3]=out.object[q[3]];
+				elem[0]=out.element[q[0]]; elem[1]=out.element[q[1]];
+				elem[2]=out.element[q[2]]; elem[1]=out.element[q[3]];
 			}
 			tOrig[0]=rays.Origin(q[0]); tOrig[1]=rays.Origin(q[1]);
 			tOrig[2]=rays.Origin(q[2]); tOrig[3]=rays.Origin(q[3]);
@@ -176,11 +198,13 @@ public:
 			if(Output::objectIndexes) {
 				out.object[q[0]]=obj[0]; out.object[q[1]]=obj[1];
 				out.object[q[2]]=obj[2]; out.object[q[3]]=obj[3];
+				out.element[q[0]]=elem[0]; out.element[q[1]]=elem[1];
+				out.element[q[2]]=elem[2]; out.element[q[3]]=elem[3];
 			}
 		}
 		for(;i<sel.Num();i++) {
 			int q=sel[i];
-			lastShadowTri=TraverseQuad(rays.Origin(q),rays.Dir(q),Output(out.dist+q,out.object+q,out.stats),dirMask,lastShadowTri);
+			lastShadowTri=TraverseQuad(rays.Origin(q),rays.Dir(q),Output(out.dist+q,out.object+q,out.element+q,out.stats),dirMask,lastShadowTri);
 		}
 
 		return lastShadowTri;
@@ -219,6 +243,7 @@ public:
 	vector<BIHNode> nodes;
 	TriVector objects;
 
+	int objectId;
 	float maxDensity;
 	bool split;
 };

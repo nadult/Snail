@@ -168,7 +168,7 @@ int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) co
 	return min<-epsilon?0:(min>epsilon?2:1);
 }
 
-typedef TTriangle<FastEdgeNormals> Triangle;
+typedef TTriangle<SlowEdgeNormals> Triangle;
 
 typedef vector<Triangle,AlignedAllocator<Triangle> > TriVector;
 

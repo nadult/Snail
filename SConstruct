@@ -11,7 +11,7 @@ else: libs += libsWin32
 default = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
-		CXX = 'ccache g++',
+		CXX = 'g++',
 		CPPPATH = '.'		
 	)
 

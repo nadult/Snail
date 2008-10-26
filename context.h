@@ -30,14 +30,14 @@ private:
 	int lastTri[size];
 };
 
-template <class Scene,class Rays,class Selector>
+template <class Rays,class Selector>
 class TracingContext {
 public:
-	TracingContext(const Scene &scn,const Rays &tRays) :scene(scn),rays(tRays) {
+	TracingContext(const Rays &tRays) :rays(tRays) {
 		selector.SelectAll();
 	}
-	TracingContext(const Scene &scn,const Rays &tRays,const Selector &sel)
-		:scene(scn),rays(tRays),selector(sel) {
+	TracingContext(const Rays &tRays,const Selector &sel)
+		:rays(tRays),selector(sel) {
 	}
 
 	Vec3q &RayDir(int n)				{ return rays.Dir(n); }
@@ -51,13 +51,11 @@ public:
 	typedef Vec3q Vec;
 	typedef typename Vec::TScalar real;
 	typedef typename Vec::TBool boolean;
-	typedef typename Scene::Object Object;
 	typedef i32x4 integer;
 
 	enum { size=Rays::size };
 
 	TracingOptions options;
-	const Scene &scene;
 
 	Rays rays;
 	Selector selector;
@@ -66,7 +64,7 @@ public:
 	Vec reflectionDir[size];
 
 	real distance[size];
-	integer objId[size];
+	integer objId[size],elementId[size];
 
 	TreeStats stats;
 	float density;
@@ -89,7 +87,7 @@ inline bool operator!=(int a,const OutputType &b) { return a!=int(b); }
 
 //
 // Output classes hold pointers, so you can
-// still modify the data when referencing to class
+// still modify the data when referencing to it
 // with a const reference
 
 template <OutputType type_,class real,class integer>
@@ -97,15 +95,15 @@ struct Output
 {
 	enum { objectIndexes=type_!=otShadow, type=type_ };
 
-	Output(real *d,integer *i,TreeStats *st) :dist(d),object(i),stats(st),density(0) { }
+	Output(real *d,integer *i,integer *e,TreeStats *st) :dist(d),object(i),element(e),stats(st),density(0) { }
 
-	template <class Scene,class Group,class Selector>
-	Output(TracingContext<Scene,Group,Selector> &c) :dist(c.distance),object(c.objId),stats(&c.stats),density(&c.density) { }
-	Output(const Output &all,int n) :dist(all.dist+n),object(all.object+n),stats(all.stats),density(0) { }
-
+	template <class Group,class Selector>
+	Output(TracingContext<Group,Selector> &c) :dist(c.distance),object(c.objId),element(c.elementId),stats(&c.stats),density(&c.density) { }
+	Output(const Output &all,int n) :dist(all.dist+n),object(all.object+n),element(all.element+n),stats(all.stats),density(0) { }
+	
 	float *density;
 	real *dist;
-	integer *object;
+	integer *object,*element;
 	TreeStats *stats;
 };
 

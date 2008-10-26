@@ -44,8 +44,10 @@
 					float ret=obj.Collide(rOrigin,tDir);
 					if(ret<minRet&&ret>0) {
 						minRet=ret;
-						if(Output::objectIndexes)
-							output.object[0]=idx;
+						if(Output::objectIndexes) {
+							output.object[0]=objectId;
+							output.element[0]=idx;
+						}
 
 						tMax=Min(tMax,minRet);
 					}	

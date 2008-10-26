@@ -123,8 +123,10 @@
 								floatq dist=val/det; \
 								f32x4b mask=dist<c.out[p]; \
 								c.out[p]=Condition(mask,Output::type==otShadow?0.00001f:dist,c.out[p]); \
-								if(Output::objectIndexes) \
-									c.object[p]=Condition(i32x4b(mask),i32x4(idx),c.object[p]); \
+								if(Output::objectIndexes) { \
+									c.element[p]=Condition(i32x4b(mask),i32x4(idx),c.element[p]); \
+									c.object[p]=Condition(i32x4b(mask),i32x4(objectId),c.object[p]); \
+								} \
 							}
 							
 							floatq ttMax[4];
@@ -148,7 +150,7 @@
 						if(fStack==fStackBegin) { allTMin=tMin; allTMax=tMax; allIdx=idx|BIHNode::leafMask; }
 
 						BIHOptData data(orig,tMinInv+0,tMaxInv+0,mailbox,allTMin,allTMax,allIdx);
-						BIHTravContext cn(c.origin,c.dir,c.out,c.object,c.stats);
+						BIHTravContext cn(c.origin,c.dir,c.out,c.object,c.element,c.stats);
 						TraverseQuad4Primary<Output>(cn,dirMask,&data);
 
 						cn.origin+=4; cn.dir+=4; cn.out+=4; cn.object+=4; data.minInv++; data.maxInv++;
@@ -199,8 +201,10 @@
 							floatq dist=Condition(mask,val/det,c.out[p]); \
 							mask=dist<c.out[p]&&dist>0.0f; \
 							c.out[p]=Condition(mask,Output::type==otShadow?0.00001f:dist,c.out[p]); \
-							if(Output::objectIndexes) \
-								c.object[p]=Condition(i32x4b(mask),i32x4(idx),c.object[p]); \
+							if(Output::objectIndexes) { \
+								c.element[p]=Condition(i32x4b(mask),i32x4(idx),c.element[p]); \
+								c.object[p]=Condition(i32x4b(mask),i32x4(objectId),c.object[p]); \
+							} \
 							stats.IntersectPass(); \
 						} else stats.IntersectFail(); \
 					}

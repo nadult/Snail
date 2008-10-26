@@ -1,6 +1,6 @@
 
 	template <class Output,bool sharedOrigin>
-	int BIHTree:: TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,TreeStats *tstats,
+	int BIHTree:: TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,i32x4 *element,TreeStats *tstats,
 								int dirMask,int lastShadowTri) const {
 		TreeStats stats;
 		stats.TracingPacket(16);
@@ -170,8 +170,10 @@
 							floatq dist=Condition(mask,val[p]/det,out[p]);	\
 							mask=dist<out[p]&&dist>0.0f;	\
 							out[p]=Condition(mask,Output::type==otShadow?0.0001f:dist,out[p]);	\
-							if(Output::objectIndexes)	\
-								object[p]=Condition(i32x4b(mask),i32x4(idx),object[p]);	\
+							if(Output::objectIndexes) {	\
+								element[p]=Condition(i32x4b(mask),i32x4(idx),element[p]); \
+								object[p]=Condition(i32x4b(mask),i32x4(objectId),object[p]); \
+							} \
 							passMask += ForWhich(mask); \
 							stats.IntersectPass();	\
 						} else stats.IntersectFail();	\

@@ -12,13 +12,13 @@
 template <class Vec,class Container,class integer>
 Vec FlatNormals(const Container &objects,const integer &objId)  {
 	typedef typename Vec::TScalar real;
-	typedef typename Container::value_type Object;
+	typedef typename Container::value_type Element;
 
-	const Object *obj0=&objects[objId[0]];
+	const Element *obj0=&objects[objId[0]];
 	Vec nrm(obj0->Nrm());
 
 	if(ForAny(integer(objId[0])!=objId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
-		const Object *objN=&objects[objId[n]];
+		const Element *objN=&objects[objId[n]];
 		if(objN!=obj0) {
 			Vec newNrm(objN->Nrm());
 			nrm=Condition(ScalarInfo<real>::ElementMask(n),newNrm,nrm);
@@ -32,9 +32,9 @@ Vec FlatNormals(const Container &objects,const integer &objId)  {
 template <class Container,class integer,class Vec>
 Vec GouraudNormals(const Container &objects,const ShadingDataVec &shadingData,const integer &objId,const Vec &rayOrig,const Vec &rayDir)  {
 	typedef typename Vec::TScalar real;
-	typedef typename Container::value_type Object;
+	typedef typename Container::value_type Element;
 
-	const Object *obj0=&objects[objId[0]];
+	const Element *obj0=&objects[objId[0]];
 	Vec nrm; {
 		real u,v; obj0->Barycentric(rayOrig,rayDir,u,v);
 		const ShadingData &data=shadingData[objId[0]];
@@ -42,7 +42,7 @@ Vec GouraudNormals(const Container &objects,const ShadingDataVec &shadingData,co
 	}
 
 	if(ForAny(integer(objId[0])!=objId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
-		const Object *objN=&objects[objId[n]];
+		const Element *objN=&objects[objId[n]];
 		if(objN!=obj0) {
 			Vec newNrm; {
 				real u,v; objN->Barycentric(rayOrig,rayDir,u,v);
@@ -60,9 +60,9 @@ template <class Container>
 Vec2q GouraudTexCoords(const Container &objects,const ShadingDataVec &shadingData,const i32x4 &objId,
 						const Vec3q &rayOrig,const Vec3q &rayDir)  {
 	typedef typename Vec3q::TScalar real;
-	typedef typename Container::value_type Object;
+	typedef typename Container::value_type Element;
 
-	const Object *obj0=&objects[objId[0]];
+	const Element *obj0=&objects[objId[0]];
 	Vec2q nrm; {
 		real u,v; obj0->Barycentric(rayOrig,rayDir,u,v);
 		const ShadingData &data=shadingData[objId[0]];
@@ -70,7 +70,7 @@ Vec2q GouraudTexCoords(const Container &objects,const ShadingDataVec &shadingDat
 	}
 
 	if(ForAny(i32x4(objId[0])!=objId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
-		const Object *objN=&objects[objId[n]];
+		const Element *objN=&objects[objId[n]];
 		if(objN!=obj0) {
 			Vec2q newNrm; {
 				real u,v; objN->Barycentric(rayOrig,rayDir,u,v);
@@ -86,7 +86,7 @@ Vec2q GouraudTexCoords(const Container &objects,const ShadingDataVec &shadingDat
 
 
 template <class Scene,class Group,class Selector>
-void TraceLight(TracingContext<Scene,Group,Selector> &c,const Light &light,int idx) {
+void TraceLight(TracingContext<Group,Selector> &c,const Light &light,int idx) {
 	typedef typename Vec3q::TScalar real;
 	typedef typename Vec3q::TBool boolean;
 
@@ -141,10 +141,11 @@ template <class AccStruct>
 class TScene
 {
 public:
-	typedef typename AccStruct::Object Object;
+	typedef typename AccStruct::Element Element;
 
 	TScene() :tree(TriVector()) { }
 	TScene(const TriVector &trivec,const ShadingDataVec &shd);
+/*	TScene(const AccStruct &struct);*/
 
 	void Animate();
 	void AddLight(Vec3f pos,Vec3f col);
@@ -156,12 +157,12 @@ public:
 	}
 
 	template <class Group,class Selector,bool primary>
-	void RayTrace(TracingContext<TScene<AccStruct>,Group,Selector> &c) const NOINLINE;
+	void RayTrace(TracingContext<Group,Selector> &c) const NOINLINE;
 
 	template <class Group,class Selector>
-	void RayTracePrimary(TracingContext<TScene<AccStruct>,Group,Selector> &c) const { RayTrace<Group,Selector,1>(c); }
+	void RayTracePrimary(TracingContext<Group,Selector> &c) const { RayTrace<Group,Selector,1>(c); }
 	template <class Group,class Selector>
-	void RayTraceSecondary(TracingContext<TScene<AccStruct>,Group,Selector> &c) const { RayTrace<Group,Selector,0>(c); }
+	void RayTraceSecondary(TracingContext<Group,Selector> &c) const { RayTrace<Group,Selector,0>(c); }
 
 	gfxlib::Texture tex;
 	bool lightsEnabled;
@@ -171,7 +172,7 @@ public:
 };
 
 template <class Scene,class Group,class Selector>
-void TraceReflection(TracingContext<Scene,Group,Selector> &c) {
+void TraceReflection(TracingContext<Group,Selector> &c) {
 	typedef typename Vec3q::TScalar real;
 	typedef typename Vec3q::TBool boolean;
 
@@ -183,7 +184,7 @@ void TraceReflection(TracingContext<Scene,Group,Selector> &c) {
 	}
 
 	typedef RayGroup<Group::size> TGroup;
-	TracingContext<Scene,TGroup,Selector> rc(c.scene,TGroup(reflDir,c.position),c.selector);
+	TracingContext<TGroup,Selector> rc(c.scene,TGroup(reflDir,c.position),c.selector);
 	rc.options=c.options;
 	rc.options.reflections--;
 
@@ -225,7 +226,7 @@ Vec3q Sample(const gfxlib::Texture &tex,const Vec2q &uv) {
 }
 
 template <class AccStruct> template <class Group,class Selector,bool primary>
-void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector> &c) const {
+void TScene<AccStruct>::RayTrace(TracingContext<Group,Selector> &c) const {
 	typedef typename Vec3q::TScalar real;
 	typedef typename Vec3q::TBool boolean;
 	const floatq maxDist=100000.0f;
@@ -240,7 +241,7 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector
 
 	for(int i=0;i<c.selector.Num();i++) {
 		int q=c.selector.Idx(i);
-		const Object *obj=&tree.objects[0];
+		const Element *obj=&tree.objects[0];
 
 		if(c.selector.DisableWithMask(i,c.distance[q]>=maxDist)) {
 			c.color[q]=Vec3q(Const<real,0>());
@@ -250,12 +251,13 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector
 		i32x4b imask(c.selector.Mask(i));
 
 		c.position[q]=c.RayDir(q)*c.distance[q]+c.RayOrigin(q);
-		if(c.options.shadingMode==smGouraud)
+	/*	if(c.options.shadingMode==smGouraud)
 			c.normal[q]=GouraudNormals(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
 		else
-			c.normal[q]=FlatNormals<Vec3q>(tree.objects,Condition(imask,c.objId[q]));
+			c.normal[q]=FlatNormals<Vec3q>(tree.objects,Condition(imask,c.objId[q]));*/
 	
-		SimpleLightingShader(c,q);
+		DistanceShader(c,q);
+	//	SimpleLightingShader(c,q);
 	//	Vec2q texCoord=GouraudTexCoords(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
 	//	c.color[q]*=Sample(tex,texCoord);
 	}
@@ -279,6 +281,70 @@ void TScene<AccStruct>::RayTrace(TracingContext<TScene<AccStruct>,Group,Selector
 		c.color[q]=Condition(c.selector.Mask(i),c.color[q]);
 	}
 
+	if(c.options.rdtscShader)
+		for(int q=0;q<Selector::size;q++)
+			StatsShader(c,q);
+}
+
+template <class AccStruct,class Group,class Selector>
+void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
+	enum { primary=0 };
+	
+	typedef typename Vec3q::TScalar real;
+	typedef typename Vec3q::TBool boolean;
+	const floatq maxDist=100000.0f;
+
+	for(int i=0;i<c.selector.Num();i++) {
+		int q=c.selector.Idx(i);
+		InitializationShader(c,q,maxDist);
+	}
+
+	c.density=0.5f;
+	tree.TraverseQuadGroup(c.rays,c.selector,Output<primary?otPrimary:otNormal,f32x4,i32x4>(c));
+
+	for(int i=0;i<c.selector.Num();i++) {
+		int q=c.selector.Idx(i);
+//		const Element *obj=&tree.objects[0];
+
+		if(c.selector.DisableWithMask(i,c.distance[q]>=maxDist)) {
+			c.color[q]=Vec3q(Const<real,0>());
+			i--; continue;
+		}
+
+		i32x4b imask(c.selector.Mask(i));
+
+		c.position[q]=c.RayDir(q)*c.distance[q]+c.RayOrigin(q);
+		
+		{
+			
+			Vec3f normals[4];
+			for(int k=0;k<4;k++) {
+				if(!((i32x4)imask)[k]) continue;
+				normals[k]=gObjects[c.objId[q][k]]->FlatNormals(c.elementId[q][k]);
+			}
+			for(int k=0;k<4;k++) {
+				c.normal[q].x[k]=normals[k].x;
+				c.normal[q].y[k]=normals[k].y;
+				c.normal[q].z[k]=normals[k].z;
+			}
+		}
+				
+		
+	/*	if(c.options.shadingMode==smGouraud)
+			c.normal[q]=GouraudNormals(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
+		else
+			c.normal[q]=FlatNormals<Vec3q>(tree.objects,Condition(imask,c.objId[q]));*/
+	
+	//	DistanceShader(c,q);
+		SimpleLightingShader(c,q);
+	//	Vec2q texCoord=GouraudTexCoords(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
+	//	c.color[q]*=Sample(tex,texCoord);
+	}
+
+	for(int i=0;i<c.selector.Num();i++) {
+		int q=c.selector[i];
+		c.color[q]=Condition(c.selector.Mask(i),c.color[q]);
+	}
 	if(c.options.rdtscShader)
 		for(int q=0;q<Selector::size;q++)
 			StatsShader(c,q);

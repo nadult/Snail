@@ -1,5 +1,6 @@
 #include "tree_stats.h"
 #include "image.h"
+#include <stdio.h>
 
 	void MemPattern::Init(int size,int r) {
 		if(enabled) {

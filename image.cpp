@@ -1,4 +1,5 @@
 #include "image.h"
+#include <stdio.h>
 
 
 Image::Image() :width(0),height(0) {

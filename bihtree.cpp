@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <stdio.h>
 #include "bihtree.h"
 
 namespace {

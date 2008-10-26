@@ -3,6 +3,7 @@
 
 #include "rtbase.h"
 #include <map>
+#include <stdio.h>
 
 
 class Camera

@@ -7,6 +7,7 @@
 #include "bihtree.h"
 #include "gl_window.h"
 #include "loader.h"
+#include "object.h"
 
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
@@ -78,6 +79,7 @@ Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 int TreeVisMain(TriVector &tris);
 
 int gVals[16]={0,};
+BVH *bvhTree;
 
 using std::cout;
 using std::endl;
@@ -138,7 +140,7 @@ struct GenImageTask {
 		u8 *outPtr=(u8*)&out->buffer[startY*pitch+startX*3];
 		ShadowCache shadowCache;
 
-//		for(int ky=0;ky<height;ky+=PHeight*2) for(int kx=0;kx<width;kx+=PWidth*2)
+	//	for(int ky=0;ky<height;ky+=PHeight*2) for(int kx=0;kx<width;kx+=PWidth*2)
 //			for(int y=ky;y<=ky+PHeight;y+=PHeight) { for(int x=kx;x<=kx+PWidth;x+=PWidth) {
 				
 		for(int y=0;y<height;y+=PHeight) {
@@ -153,14 +155,13 @@ struct GenImageTask {
 					dir[n]*=RSqrt(dir[n]|dir[n]);
 				}
 
-				TracingContext<Scene,RayGroup<NQuads,1,0>,RaySelector<NQuads> >
-					context(*scene,RayGroup<NQuads,1,0>(dir,&origin,0));
+				TracingContext<RayGroup<NQuads,1,0>,RaySelector<NQuads> > context(RayGroup<NQuads,1,0>(dir,&origin,0));
 				Vec3q *rgb=context.color;
 
 				context.options=TracingOptions(options.reflections?1:0,options.shading,options.rdtscShader);
 				
 				context.shadowCache=shadowCache;
-				scene->RayTracePrimary(context);
+				RayTrace(*bvhTree,context);
 				shadowCache=context.shadowCache;
 
 				outStats->Update(context.stats);
@@ -277,6 +278,10 @@ void Build(const TriVector &tris,const ShadingDataVec &shd,Scene &out) {
 	buildTime=GetTime()-buildTime;
 	printf("Tree build time: %.2f sec\n",buildTime);
 	out.tree.PrintInfo();
+	
+	if(gObjects.size()<1) gObjects.push_back(0);
+	gObjects[0]=&out.tree;
+	out.tree.objectId=0;
 }
 
 Vec3f RotateVecY(const Vec3f& v,float angle);
@@ -330,7 +335,7 @@ int main(int argc, char **argv) {
 
 	uint quadLevels=0;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
-
+	
 	for(int n=0;n<4;n++)
 		gVals[n]=1;
 
@@ -405,9 +410,9 @@ int main(int argc, char **argv) {
 			}
 			else {
 				if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
-			//	if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
-			//	if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
-			//	if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
+	//			if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
+	//			if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
+	//			if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 			}
 
 			if(out.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 1 %s\n",gVals[0]?"on":"off"); }
@@ -433,6 +438,22 @@ int main(int argc, char **argv) {
 			}
 			
 			scene.tree.pattern.Init(scene.tree.nodes.size(),resx);
+
+			BVH bvh; {
+				float dist=Max(scene.tree.GetBBox().Size().x,scene.tree.GetBBox().Size().z);
+				static float ang=0.0f; ang+=0.01f;
+				Matrix<Vec4f> mat; mat=Identity<void>();
+				bvh.nodes.push_back(BVH::Node(mat,1,4));
+				
+				mat=RotateY(ang); mat.w.x=-dist; mat.w.y=0; mat.w.z=0;			bvh.nodes.push_back(BVH::Node(mat,0,0));
+				mat=RotateY(-ang*0.5f); mat.w.x=dist; mat.w.y=0; mat.w.z=0;		bvh.nodes.push_back(BVH::Node(mat,0,0));
+				mat=RotateY(ang*0.5f); mat.w.x=0; mat.w.y=0; mat.w.z=dist;		bvh.nodes.push_back(BVH::Node(mat,0,0));
+				mat=RotateY(-ang); mat.w.x=0; mat.w.y=0; mat.w.z=-dist;			bvh.nodes.push_back(BVH::Node(mat,0,0));
+				
+				bvh.UpdateBox();
+				bvhTree=&bvh;
+			}
+
 
 			TreeStats stats;
 			double time=GetTime();

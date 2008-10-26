@@ -4,6 +4,8 @@
 #include "rtbase.h"
 #include "sphere.h"
 #include "triangle.h"
+#include "context.h"
+#include "ray_group.h"
 
 class BIHTree;
 
@@ -38,132 +40,113 @@ public:
 			
 		return *this;
 	}
+	const BBox &operator+=(const BBox &other) {
+		min=VMin(min,other.min);
+		max=VMax(max,other.max);
+	}
+	Vec3f Size() const { return max-min; }
 	
 	Vec3f min,max;
 };
 
+inline BBox operator+(const BBox &a,const BBox &b) { BBox out(a); out+=b; return out; }
+inline BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out*=mat; return out; }
 
 class Object {
 public:
-	Object(const BIHTree*,const Matrix<Vec4f>&);
+	virtual ~Object() { }
+	virtual void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,Output<otNormal,float,u32> output) const=0;
+	virtual void TraverseQuad(const Vec3q &rOrigin,const Vec3q &rDir,Output<otNormal,f32x4,i32x4> output) const=0;
+	virtual BBox GetBBox() const=0;
+
+	template <class Rays>
+	void TraverseMonoGroup(Rays &group,const RaySelector<Rays::size> &sel,const Output<otNormal,f32x4,i32x4> &out) const {
+		Vec3p orig[4],dir[4];
+		u32 tmp[4];
+
+		if(Rays::sharedOrigin)
+			Convert(group.Origin(sel[0]),orig);
+		
+		for(int i=0;i<sel.Num();i++) {
+			int q=sel[i];
+			Vec3p dir[4];
+			int bmask=sel.BitMask(i);
+
+			if(!Rays::sharedOrigin)
+				Convert(group.Origin(q),orig);
+			Convert(group.Dir(q),dir);
+
+			float *dist=(float*)(out.dist+q);
+			u32 *objId =Output<otNormal,f32x4,i32x4>::objectIndexes?(u32*)(out.object+q):tmp;
+			u32 *elemId=Output<otNormal,f32x4,i32x4>::objectIndexes?(u32*)(out.element+q):tmp;
+
+			if(bmask&1) TraverseMono(orig[0],dir[0],::Output<otNormal,float,u32>(dist+0,objId+0,elemId+0,out.stats));
+			if(bmask&2) TraverseMono(orig[1],dir[1],::Output<otNormal,float,u32>(dist+1,objId+1,elemId+1,out.stats));
+			if(bmask&4) TraverseMono(orig[2],dir[2],::Output<otNormal,float,u32>(dist+2,objId+2,elemId+2,out.stats));
+			if(bmask&8) TraverseMono(orig[3],dir[3],::Output<otNormal,float,u32>(dist+3,objId+3,elemId+3,out.stats));
+		}
+	}
 	
-	const BIHTree *object;
-	Matrix<Vec4f> trans,invTrans;
-	BBox box;
+	template <class Rays>
+	void TraverseQuadGroup(Rays &rays,const RaySelector<Rays::size> &sel,const Output<otNormal,f32x4,i32x4> &out) const {
+		for(int i=0;i<sel.Num();i++) {
+			int q=sel[i];
+			TraverseQuad(rays.Origin(q),rays.Dir(q),Output<otNormal,f32x4,i32x4>(out.dist+q,out.object+q,out.element+q,out.stats));
+		}
+	}
+	
+	template <class Derived>
+	Vec3f TFlatNormals(u32 elementId)  {
+		typedef typename Derived::Element Element;
+		const Derived &derived=*(Derived*)this;
+
+		// transform by matrix ?
+		return derived.objects[elementId].Nrm();
+		
+/*		Vec nrm(e0->Nrm());
+
+		if(ForAny(integer(elementId[0])!=elementId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
+			const Element *eN=&derived.objects[elementId[n]];
+			if(eN!=e0) {
+				Vec newNrm(eN->Nrm());
+				nrm=Condition(ScalarInfo<real>::ElementMask(n),newNrm,nrm);
+			}
+		}
+
+		return nrm*RSqrt(nrm|nrm);*/
+	}
+	
+	virtual Vec3f FlatNormals(u32) { return Vec3f(0,1,0); }
 };
 
-/*
- 
- 
-	Triangle
-		TracingData = Position*3, Normal*3
-		ShadingData = Normal*3, Color*3
-	
-	Sphere
-		TracingData = 
-	
-	Nurbsy
-	
-	BIHTree
-	
-	BVHTree
-	
-  	
-  
- */
+extern vector<Object*> gObjects;
 
-/*
-class Object
-{
+
+class BVH: public Object {
 public:
-	enum { MaxObjs=10000 };
-
-	static Triangle tris[MaxObjs] __attribute__ ((aligned(16)));
-	static Sphere spheres[MaxObjs] __attribute__ ((aligned(16)));
-	static int nObjs;
-
-public:
-	Object(const Sphere &sp) :type(T_SPHERE) {
-		if(nObjs==MaxObjs)
-			throw Exception("Object buffer overflow");
-
-		id=nObjs; nObjs++;
-		spheres[id]=sp;
-	}
-	Object(const Triangle &tr) :type(T_TRIANGLE) {
-		if(nObjs==MaxObjs)
-			throw Exception("Object buffer overflow");
-
-		id=nObjs; nObjs++;
-		tris[id]=tr;
-	}
-	Object() { }
-	~Object() {
-	}
-
-	u32 id;
-	enum Type { T_SPHERE=1, T_TRIANGLE=2, };
-	char type;
-
-	// Object is complete within the node
-//	bool fullInNode;
-//	bool FullInNode() const { return 0; }
-//	void SetFullInNode(bool full) { }
-
-	template <class VecO,class Vec>
-	INLINE typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const {
-		switch(type) {
-		case T_SPHERE:
-			return spheres[id].Collide(rOrig,rDir);
-		case T_TRIANGLE:
-			return tris[id].Collide(rOrig,rDir);
+	BBox GetBBox() const;
+	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,Output<otNormal,float,u32> output,int node) const;
+	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,Output<otNormal,float,u32> output) const {
+		TraverseMono(rOrigin,rDir,output,0);
 		}
+		
+	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &rDir,Output<otNormal,f32x4,i32x4> output,int node) const;
+	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &rDir,Output<otNormal,f32x4,i32x4> output) const {
+		TraverseQuad(rOrigin,rDir,output,0);
 	}
-
-	// return 2 if every ray in beam collides with the object
-	INLINE int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL,float epsC) const {
-		switch(type) {
-		case T_TRIANGLE:
-			return tris[id].BeamCollide(orig,dir,epsL,epsC);
-		default:
-			return 1;
-		}
-	}
-
-	template <class Vec>
-	INLINE Vec Normal(const Vec &colPos) const {
-		Vec out;
-		switch(type) {
-		case T_SPHERE: {
-			Vec sPos(spheres[id].pos);
-			Vec surfNormal=colPos-sPos;
-			surfNormal*=RSqrt(surfNormal|surfNormal);
-			out=surfNormal;
-			break; }
-		case T_TRIANGLE:
-			out=Vec(tris[id].Nrm());
-			break;
-		}
-		return out;
-	}
-
-	Vec3p BoundMin() const {
-		Vec3p out;
-		switch(type) {
-		case T_SPHERE: out=spheres[id].BoundMin(); break;
-		case T_TRIANGLE: out=spheres[id].BoundMin(); break;
-		}
-		return out;
-	}
-	Vec3p BoundMax() const {
-		Vec3p out;
-		switch(type) {
-		case T_SPHERE: out=spheres[id].BoundMax(); break;
-		case T_TRIANGLE: out=spheres[id].BoundMax(); break;
-		}
-		return out;
-	}
+			
+	void UpdateBox(int node=0);
+	
+	struct Node {
+		Node(const Matrix<Vec4f> &m,int s,int c) :trans(m),invTrans(Inverse(m)),subNode(s),count(c) { }
+		Node() { }
+		
+		Matrix<Vec4f> trans,invTrans;
+		BBox box;
+		int subNode,count;
+	};
+	
+	vector<Node> nodes;
 };
-*/
 
 #endif
