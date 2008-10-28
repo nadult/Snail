@@ -1,7 +1,7 @@
 
 	template <class Output>
-	int BIHTree::TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask,
-								int lastShadowTri) const {
+	int BIHTree::TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int instanceId,
+								int dirMask,int lastShadowTri) const {
 		floatq maxD=output.dist[0];
 
 		TreeStats stats;
@@ -69,7 +69,7 @@
 						minRet=Condition(mask,Output::type==otShadow?0.0001f:ret,minRet);
 						if(Output::objectIndexes) {
 							output.element[0]=Condition(i32x4b(mask),i32x4(idx),output.element[0]);
-							output.object[0]=Condition(i32x4b(mask),i32x4(objectId),output.object[0]);
+							output.object[0]=Condition(i32x4b(mask),i32x4(instanceId),output.object[0]);
 						}
 
 						if(Output::type==otShadow) if(ForAll(mask)) lastShadowTri=idx;

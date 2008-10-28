@@ -36,7 +36,7 @@ public:
 class BIHIdx {
 public:
 	BIHIdx() { }
-	BIHIdx(int i,const Vec3f &mi,const Vec3f &ma,float mul) :idx(i),min(mi),max(ma) {
+	BIHIdx(int i,const Vec3f &mi,const Vec3f &ma,float mul) :min(mi),max(ma),idx(i) {
 		Vec3f vsize=max-min;
 		size=Max(vsize.x,Max(vsize.y,vsize.z))*mul;
 	}
@@ -92,17 +92,17 @@ public:
 	bool SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &max,int &outAxis,float &outSplit) const;
 
 	template <class Output>
-	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const;
+	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output,int instanceId) const;
 	
-	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output<otNormal,float,u32> output) const {
-		TraverseMono<Output<otNormal,float,u32> >(rOrigin,tDir,output);
+	void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output<otNormal,float,u32> output,int instanceId) const {
+		TraverseMono<Output<otNormal,float,u32> >(rOrigin,tDir,output,instanceId);
 	}
 
 	template <class Output>
-	int TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int dirMask,int lastShadowTri=-1) const;
+	int TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int instanceId,int dirMask,int lastShadowTri=-1) const;
 	
-	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output<otNormal,f32x4,i32x4> output) const {
-		TraverseQuad(rOrigin,tDir,output,GetVecSign(tDir),-1);
+	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output<otNormal,f32x4,i32x4> output,int instanceId) const {
+		TraverseQuad(rOrigin,tDir,output,instanceId,GetVecSign(tDir),-1);
 	}
 	
 	template <class Output,bool shared>
@@ -114,7 +114,7 @@ public:
 	template <class Output>
 	void TraverseQuad16Primary(const BIHTravContext &context,int dirMask) const;
 
-	template <class Output,class Group>
+/*	template <class Output,class Group>
 	void TraverseMonoGroup(Group &group,const RaySelector<Group::size> &sel,const Output &out) const {
 		Vec3p orig[4],dir[4];
 		u32 tmp[4];
@@ -140,7 +140,7 @@ public:
 			if(bmask&4) TraverseMono(orig[2],dir[2],::Output<otNormal,float,u32>(dist+2,objId+2,elemId+2,out.stats));
 			if(bmask&8) TraverseMono(orig[3],dir[3],::Output<otNormal,float,u32>(dist+3,objId+3,elemId+3,out.stats));
 		}
-	}
+	} */
 
 	template <class Output,class Rays>
 	int TraverseQuadGroup(Rays &rays,const RaySelector<Rays::size> &sel,const Output &out,int dirMask,

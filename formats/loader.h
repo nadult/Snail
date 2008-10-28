@@ -4,6 +4,7 @@
 #include "rtbase.h"
 #include "object.h"
 
+
 struct ShadingData {
 	ShadingData() { }
 	ShadingData(const Vec3p &a,const Vec3p &b,const Vec3p &c) {

@@ -55,9 +55,42 @@ inline BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out
 class Object {
 public:
 	virtual ~Object() { }
-	virtual void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,Output<otNormal,float,u32> output) const=0;
-	virtual void TraverseQuad(const Vec3q &rOrigin,const Vec3q &rDir,Output<otNormal,f32x4,i32x4> output) const=0;
+	virtual void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,Output<otNormal,float,u32> output,int) const=0;
+	virtual void TraverseQuad(const Vec3q &rOrigin,const Vec3q &rDir,Output<otNormal,f32x4,i32x4> output,int) const=0;
 	virtual BBox GetBBox() const=0;
+
+	template <class Derived>
+	Vec3f TFlatNormals(u32 elementId)  {
+		typedef typename Derived::Element Element;
+		const Derived &derived=*(Derived*)this;
+
+		// transform by matrix ?
+		return derived.objects[elementId].Nrm();
+		
+/*		Vec nrm(e0->Nrm());
+
+		if(ForAny(integer(elementId[0])!=elementId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
+			const Element *eN=&derived.objects[elementId[n]];
+			if(eN!=e0) {
+				Vec newNrm(eN->Nrm());
+				nrm=Condition(ScalarInfo<real>::ElementMask(n),newNrm,nrm);
+			}
+		}
+
+		return nrm*RSqrt(nrm|nrm);*/
+	}
+	
+	virtual Vec3f FlatNormals(u32) { return Vec3f(0,1,0); }
+};
+
+extern vector<Object*> gObjects;
+
+
+class BVH {
+public:
+	BBox GetBBox() const;
+	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,Output<otNormal,float,u32> output,int node=0) const;
+	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &rDir,Output<otNormal,f32x4,i32x4> output,int node=0) const;
 
 	template <class Rays>
 	void TraverseMonoGroup(Rays &group,const RaySelector<Rays::size> &sel,const Output<otNormal,f32x4,i32x4> &out) const {
@@ -94,59 +127,27 @@ public:
 			TraverseQuad(rays.Origin(q),rays.Dir(q),Output<otNormal,f32x4,i32x4>(out.dist+q,out.object+q,out.element+q,out.stats));
 		}
 	}
-	
-	template <class Derived>
-	Vec3f TFlatNormals(u32 elementId)  {
-		typedef typename Derived::Element Element;
-		const Derived &derived=*(Derived*)this;
-
-		// transform by matrix ?
-		return derived.objects[elementId].Nrm();
-		
-/*		Vec nrm(e0->Nrm());
-
-		if(ForAny(integer(elementId[0])!=elementId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
-			const Element *eN=&derived.objects[elementId[n]];
-			if(eN!=e0) {
-				Vec newNrm(eN->Nrm());
-				nrm=Condition(ScalarInfo<real>::ElementMask(n),newNrm,nrm);
-			}
-		}
-
-		return nrm*RSqrt(nrm|nrm);*/
-	}
-	
-	virtual Vec3f FlatNormals(u32) { return Vec3f(0,1,0); }
-};
-
-extern vector<Object*> gObjects;
-
-
-class BVH: public Object {
-public:
-	BBox GetBBox() const;
-	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,Output<otNormal,float,u32> output,int node) const;
-	void TraverseMono(const Vec3p &rOrigin,const Vec3p &rDir,Output<otNormal,float,u32> output) const {
-		TraverseMono(rOrigin,rDir,output,0);
-		}
-		
-	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &rDir,Output<otNormal,f32x4,i32x4> output,int node) const;
-	void TraverseQuad(const Vec3q &rOrigin,const Vec3q &rDir,Output<otNormal,f32x4,i32x4> output) const {
-		TraverseQuad(rOrigin,rDir,output,0);
-	}
 			
 	void UpdateBox(int node=0);
+	void UpdateGlobalTrans(int node=0,Matrix<Vec4f> *parentMat=0);
+	
+	int AddNode(const Matrix<Vec4f> &m,int sub,int count);
 	
 	struct Node {
-		Node(const Matrix<Vec4f> &m,int s,int c) :trans(m),invTrans(Inverse(m)),subNode(s),count(c) { }
-		Node() { }
-		
 		Matrix<Vec4f> trans,invTrans;
+		Matrix<Vec4f> globalTrans;
+
 		BBox box;
-		int subNode,count;
+	
+		Vec3f obbAxis[3],obbCenter;
+		float obbExtent[3],sRadius;
+		
+		int subNode,count,id;
 	};
 	
-	vector<Node> nodes;
+	vector<Node,AlignedAllocator<Node> > nodes;
 };
+
+extern BVH *gBVH;
 
 #endif

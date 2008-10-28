@@ -1,6 +1,6 @@
 
 	template <class Output>
-	void BIHTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output) const {
+	void BIHTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output,int instanceId) const {
 		float maxD=output.dist[0];
 
 		TreeStats stats;
@@ -45,7 +45,7 @@
 					if(ret<minRet&&ret>0) {
 						minRet=ret;
 						if(Output::objectIndexes) {
-							output.object[0]=objectId;
+							output.object[0]=instanceId;
 							output.element[0]=idx;
 						}
 

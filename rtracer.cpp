@@ -6,7 +6,7 @@
 
 #include "bihtree.h"
 #include "gl_window.h"
-#include "loader.h"
+#include "formats/loader.h"
 #include "object.h"
 
 
@@ -79,7 +79,6 @@ Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 int TreeVisMain(TriVector &tris);
 
 int gVals[16]={0,};
-BVH *bvhTree;
 
 using std::cout;
 using std::endl;
@@ -161,7 +160,7 @@ struct GenImageTask {
 				context.options=TracingOptions(options.reflections?1:0,options.shading,options.rdtscShader);
 				
 				context.shadowCache=shadowCache;
-				RayTrace(*bvhTree,context);
+				RayTrace(*gBVH,context);
 				shadowCache=context.shadowCache;
 
 				outStats->Update(context.stats);
@@ -354,7 +353,7 @@ int main(int argc, char **argv) {
 		bool lightsAnim=0;
 		float speed; {
 			Vec3p size=scene.tree.pMax-scene.tree.pMin;
-			speed=(size.x+size.y+size.z)*0.001f;
+			speed=(size.x+size.y+size.z)*0.005f;
 		}
 
 		while(out.PollEvents()) {
@@ -441,17 +440,18 @@ int main(int argc, char **argv) {
 
 			BVH bvh; {
 				float dist=Max(scene.tree.GetBBox().Size().x,scene.tree.GetBBox().Size().z);
-				static float ang=0.0f; ang+=0.01f;
+				static float ang=0.0f; //if(!out.Key(Key_space)) ang+=0.01f;
 				Matrix<Vec4f> mat; mat=Identity<void>();
-				bvh.nodes.push_back(BVH::Node(mat,1,4));
+				bvh.AddNode(mat,1,4);
 				
-				mat=RotateY(ang); mat.w.x=-dist; mat.w.y=0; mat.w.z=0;			bvh.nodes.push_back(BVH::Node(mat,0,0));
-				mat=RotateY(-ang*0.5f); mat.w.x=dist; mat.w.y=0; mat.w.z=0;		bvh.nodes.push_back(BVH::Node(mat,0,0));
-				mat=RotateY(ang*0.5f); mat.w.x=0; mat.w.y=0; mat.w.z=dist;		bvh.nodes.push_back(BVH::Node(mat,0,0));
-				mat=RotateY(-ang); mat.w.x=0; mat.w.y=0; mat.w.z=-dist;			bvh.nodes.push_back(BVH::Node(mat,0,0));
+				mat=RotateY(ang); mat.w.x=-dist; mat.w.y=0; mat.w.z=0;			bvh.AddNode(mat,0,0);
+				mat=RotateY(-ang*0.5f); mat.w.x=dist; mat.w.y=0; mat.w.z=0;		bvh.AddNode(mat,0,0);
+				mat=RotateY(ang*0.5f); mat.w.x=0; mat.w.y=0; mat.w.z=dist;		bvh.AddNode(mat,0,0);
+				mat=RotateY(-ang); mat.w.x=0; mat.w.y=0; mat.w.z=-dist;			bvh.AddNode(mat,0,0);
 				
 				bvh.UpdateBox();
-				bvhTree=&bvh;
+				bvh.UpdateGlobalTrans();
+				gBVH=&bvh;
 			}
 
 

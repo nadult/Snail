@@ -5,7 +5,7 @@
 #include "light.h"
 #include "shading.h"
 #include "context.h"
-#include "loader.h"
+#include "formats/loader.h"
 #include "gfxlib_texture.h"
 
 
@@ -315,20 +315,19 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 
 		c.position[q]=c.RayDir(q)*c.distance[q]+c.RayOrigin(q);
 		
-		{
-			
-			Vec3f normals[4];
-			for(int k=0;k<4;k++) {
-				if(!((i32x4)imask)[k]) continue;
-				normals[k]=gObjects[c.objId[q][k]]->FlatNormals(c.elementId[q][k]);
-			}
-			for(int k=0;k<4;k++) {
-				c.normal[q].x[k]=normals[k].x;
-				c.normal[q].y[k]=normals[k].y;
-				c.normal[q].z[k]=normals[k].z;
-			}
+		Vec3f normals[4];
+		for(int k=0;k<4;k++) {
+			if(!((i32x4)imask)[k]) continue;
+		
+			const BVH::Node &bvhNode=gBVH->nodes[c.objId[q][k]];
+			const Matrix<Vec4f> &m=bvhNode.globalTrans;
+			Vec3f d=gObjects[bvhNode.subNode]->FlatNormals(c.elementId[q][k]);
+		
+			normals[k].x = d.x*m.x.x+d.y*m.y.x+d.z*m.z.x;
+			normals[k].y = d.x*m.x.y+d.y*m.y.y+d.z*m.z.y;
+			normals[k].z = d.x*m.x.z+d.y*m.y.z+d.z*m.z.z;
 		}
-				
+		Convert(normals,c.normal[q]);
 		
 	/*	if(c.options.shadingMode==smGouraud)
 			c.normal[q]=GouraudNormals(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));

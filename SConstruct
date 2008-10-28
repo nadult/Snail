@@ -57,7 +57,8 @@ def ExcludeFromList(tList,tObj):
 
 def Build( env, progName ):
 	baseObjects = BuildObjects( env, ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
-	env.Program(progName, baseObjects, LIBS=libs )
+	formatsObjects = BuildObjects( env, ListCppFiles('formats/'), 'formats/')
+	env.Program(progName, baseObjects+formatsObjects, LIBS=libs )
 
 Build( release, 'rtracer' )
 Build( debug, 'rtracerd' )

@@ -775,7 +775,7 @@ struct Camera {
 		gluLookAt(a.x,a.y,a.z,b.x,b.y,b.z,up.x,up.y,up.z);
 	}
 	void React(GLWindow &input) {
-		float speed=25.0f;
+		float speed=10.0f;
 
 		Vec3f right=RotateVecY(front,ConstPI<float>()*0.5f);
 		if(input.Key('A')) pos-=right*speed;
@@ -788,7 +788,7 @@ struct Camera {
 		if(input.MouseKey(2)) {
 			Vec3f mv=input.MouseMove();
 			if(Abs(mv.x)>0.5f) {
-				front=RotateVecY(front,mv.x*0.05f);
+				front=RotateVecY(front,mv.x*0.025f);
 				front*=RSqrt(front|front);
 			}
 		}
@@ -1202,8 +1202,10 @@ int TreeVisMain(TriVector &tris) {
 				box=Box(&points[0],points.size());
 			}
 
+			static int eId=0; if(window.KeyDown('N')) eId++;
 			if(window.Key('E')) {
-				FILE *out=fopen("scenes/temp.obj","wb");
+				char name[270]; sprintf(name,"scenes/%d.obj",eId);
+				FILE *out=fopen(name,"wb");
 				Mat align((Vec4f)box.axis[0],(Vec4f)box.axis[1],(Vec4f)box.axis[2],Vec4f(0,0,0,1));
 
 				int idx=0,count=0;
