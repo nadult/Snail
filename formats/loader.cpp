@@ -61,7 +61,7 @@ namespace {
 
 }
 
-void LoadModel(const string &fileName,TriVector &out,ShadingDataVec &shadingData,float scale,uint maxTris) {
+/*void LoadModel(const string &fileName,TriVector &out,ShadingDataVec &shadingData,float scale,uint maxTris) {
 	string ext; {
 		ext=fileName.substr(Max(0,int(fileName.length())-4));
 		for(int n=0,end=ext.length();n<end;n++) ext[n]=tolower(ext[n]);
@@ -71,5 +71,5 @@ void LoadModel(const string &fileName,TriVector &out,ShadingDataVec &shadingData
 	else if(ext==".v3o"||ext==".v3d") LoadV3O(fileName.c_str(),out,shadingData,scale,maxTris);
 	else if(ext=="proc") LoadProc(fileName.c_str(),out,shadingData,scale,maxTris);
 	else throw Exception(string("Format ")+ext+" not supported");
-}
+}*/
 

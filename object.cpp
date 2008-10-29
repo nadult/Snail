@@ -70,6 +70,30 @@ namespace {
 	}
 
 	template <class real,class Vec>
+	bool IntersectAABB(const Vec &rDir,const Vec &rOrig,const float bExtent[3],const Vec3f &bCenter,real max) {
+		Vec sDir=rDir*real(max*0.5f);
+		Vec kDiff=rOrig+sDir-Vec(bCenter);
+
+		if (ForAll( Abs(kDiff.x) > Abs(sDir.x)+bExtent[0]||
+					Abs(kDiff.y) > Abs(sDir.y)+bExtent[1]||
+					Abs(kDiff.z) > Abs(sDir.z)+bExtent[2]  ) )
+			return 0;
+
+		real fAWdU[3];
+		fAWdU[0] = Abs(sDir.x);
+		fAWdU[1] = Abs(sDir.y);
+		fAWdU[2] = Abs(sDir.z);
+		Vec kWxD=sDir^kDiff;
+		
+		typename ScalarInfo<real>::TBool test[3];
+		test[0]=Abs(kWxD.x)<=fAWdU[2]*bExtent[1]+fAWdU[1]*bExtent[2];
+		test[1]=Abs(kWxD.y)<=fAWdU[2]*bExtent[0]+fAWdU[0]*bExtent[2];
+		test[2]=Abs(kWxD.z)<=fAWdU[1]*bExtent[0]+fAWdU[0]*bExtent[1];
+
+		return ForAny(test[0]&&test[1]&&test[2]);
+	}
+
+	template <class real,class Vec>
 	bool IntersectBBox(const BBox &box,const Vec &orig,const Vec &dir,real tMax=-1.0f) {
 		real l1,l2,idir[3]={Inv(dir.x),Inv(dir.y),Inv(dir.z)};
 		
@@ -93,10 +117,16 @@ namespace {
 
 	template <class real,class Vec>
 	bool IntersectSphere(const Vec &rDir,const Vec &rOrig,const Vec3f &sCenter,const float sRadiusSq) {
-		Vec dst=rOrig-sCenter;
+	    Vec kDiff=Vec(sCenter)-rOrig;
+	    real fSqrLen=rDir|rDir;
+	    real fT=(kDiff|rDir)/fSqrLen;
+	    kDiff -=rDir*fT;
+
+	    return ForAny((kDiff|kDiff) <= real(sRadiusSq));
+/*		Vec dst=rOrig-sCenter;
 		real B=dst|rDir;
 		
-		return ForAny(B*B>(dst|dst)-sRadiusSq);
+		return ForAny(B*B>(dst|dst)-sRadiusSq);*/
 	}
 }
 
@@ -163,19 +193,24 @@ void TransRay(const Vec3q &o,const Vec3q &d,const Matrix<Vec4f> &m,Vec3q &tOrig,
 void BVH::TraverseQuad(const Vec3q &o,const Vec3q &d,Output<otNormal,f32x4,i32x4> output,int nNode) const {
 	const Node &node=nodes[nNode];
 
-	if(!IntersectSphere<f32x4,Vec3q>(d,o,node.obbCenter,node.sRadius)) return;
-	output.stats->Skip();
+//	if(!IntersectSphere<f32x4,Vec3q>(d,o,node.obbCenter,node.sRadius)) return;
+//	output.stats->Skip();
 
 	Vec3q tOrig,tDir;
-	TransRay(o,d,node.invTrans,tOrig,tDir);
+	if(node.count) {
+		tOrig.x=o.x+node.invTrans.w.x;
+		tOrig.y=o.y+node.invTrans.w.y;
+		tOrig.z=o.z+node.invTrans.w.z;
+		tDir=d;
+	}
+	else TransRay(o,d,node.invTrans,tOrig,tDir);
 	
-//	if(!IntersectBBox(node.box,tOrig,tDir,output.dist[0])) return;
-	Vec3f obbCenter=(node.box.max+node.box.min)*0.5f;
-	if(!IntersectAABB<f32x4,Vec3q>(tDir,tOrig,node.obbExtent,obbCenter)) return;
-
-	output.stats->Skip();
+	if(!IntersectBBox(node.box,tOrig,tDir,output.dist[0])) return;
+//	Vec3f obbCenter=(node.box.max+node.box.min)*0.5f;
+//	if(!IntersectAABB<f32x4,Vec3q>(tDir,tOrig,node.obbExtent,obbCenter,output.dist[0])) return;
 
 	if(!node.count) {
+		output.stats->Skip();
 		gObjects[node.subNode]->TraverseQuad(tOrig,tDir,output,node.id);
 		return;
 	}

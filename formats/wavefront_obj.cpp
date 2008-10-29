@@ -1,4 +1,4 @@
-#include "loader.h"
+#include "base_scene.h"
 #include <iostream>
 #include <fstream>
 #include <string.h>
@@ -8,6 +8,7 @@ using std::endl;
 
 namespace {
 
+	/*
 	struct Vert {
 		Vert(const Vec3f &tv) :v(tv),nrm(0,0,0) { }
 
@@ -39,6 +40,7 @@ namespace {
 		string name,texture;
 	};
 
+
 	void GenShadingData(vector<Vert> &verts,vector<Vec2f> &coords,vector<Tri> &tris,
 						ShadingDataVec &shadingData,bool generate) {
 		shadingData.resize(tris.size());
@@ -54,25 +56,25 @@ namespace {
 				shadingData[n].uv[k]=coords.size()>tri.t[k]?coords[tri.t[k]]:Vec2f(0.0f,0.0f);
 			}
 		}
-	}
+	}*/
 
 	int atoi(const string &str) { return ::atoi(str.c_str()); }
 	float atof(const string &str) { return ::atof(str.c_str()); }
 
 }
 
-void LoadWavefrontObj(const char *fileName,TriVector &out,ShadingDataVec &shadingData,float scale,uint maxTris) {
+void BaseScene::LoadWavefrontObj(const string &fileName) {
+	objects.clear();
+	
 	std::filebuf fb;
-	if(!fb.open (fileName,std::ios::in)) return;
+	if(!fb.open (fileName.c_str(),std::ios::in)) return;
 
 	std::istream is(&fb);
-	bool flipSides=0,swap=0;
-
-	float sx=scale,sy=scale,sz=scale;
-
-	vector<Vert> verts;
-	vector<Vec2f> coords;
-	vector<Tri> tris;
+	
+	vector<Vec3f> verts;
+	vector<Vec2f> uvs;
+	vector<Vec3f> normals;
+	vector<BaseScene::IndexedTri> tris;
 
 	for(;;) {
 		char line[4000],type[100],a[100],b[100],c[100],d[100],e[100],f[100];
@@ -81,67 +83,89 @@ void LoadWavefrontObj(const char *fileName,TriVector &out,ShadingDataVec &shadin
 
 		sscanf(line,"%s",type);
 
-		if(strcmp(type,"v")==0) {
+		if(strcmp(type,"o")==0) {
+			if(tris.size()>0) {
+				objects.push_back(BaseScene::Object(verts,uvs,normals,tris));
+				objects.back().name=strchr(line,' ')+1;
+				tris.clear();
+			}
+		}
+		else if(strcmp(type,"v")==0) {
 			Vec3f vert;
-			sscanf(line,"%s %s %s %s",type,a,b,c);
-			vert.x=atof(a)*sx;
-			vert.y=-atof(b)*sy;
-			vert.z=atof(c)*sz;
-			if(swap) Swap(vert.y,vert.z);
-			verts.push_back(Vert(vert));
+			sscanf(line,"%s %f %f %f",type,&vert.x,&vert.y,&vert.z);
+			vert.y*=-1.0f;
+			verts.push_back(vert);
 		}
 		else if(strcmp(type,"vt")==0) {
-			Vec2f uv;
-			sscanf(line,"%s %s %s",type,a,b);
-			uv.x=atof(a);
-			uv.y=atof(b);
-			coords.push_back(uv);
+			Vec2f uv; float w;
+			sscanf(line,"%s %f %f %f",type,&uv.x,&uv.y,&w);
+			uvs.push_back(uv);
+		}
+		else if(strcmp(type,"vn")==0) {
+			Vec3f nrm;
+			sscanf(line,"%s %f %f %f",type,&nrm.x,&nrm.y,&nrm.z);
+			normals.push_back(nrm);
 		}
 		else if(strcmp(type,"f")==0) {
-			int v[3]={verts.size(),verts.size(),verts.size()};
-			int vt[3]={0,0,0};
+			char *p[3];
+			p[0]=strchr(line,' ')+1;
+			p[1]=strchr(p[0],' ')+1; p[1][-1]=0;
+			p[2]=strchr(p[1],' ')+1; p[2][-1]=0;
 
-			char *buf;
-			buf=strchr(line,' ')+1; if(buf-1) { v[0]=atoi(buf)-1;
-			buf=strchr(buf ,' ')+1; if(buf-1) { v[1]=atoi(buf)-1;
-			buf=strchr(buf ,' ')+1; if(buf-1) { v[2]=atoi(buf)-1;
-			buf=strchr(line,'/')+1; if(buf-1) { vt[0]=atoi(buf)-1; buf=strchr(buf,' ');
-			buf=strchr(buf ,'/')+1; if(buf-1) { vt[1]=atoi(buf)-1; buf=strchr(buf,' ');
-			buf=strchr(buf ,'/')+1; if(buf-1) vt[2]=atoi(buf)-1; } } } } }
-
-			for(int n=0;n<3;n++) {
-				if(v[n]<0) v[n]=verts.size()+v[n];
-				if(vt[n]<0) vt[n]=coords.size()+vt[n];
+			BaseScene::IndexedTri tri;
+			for(int k=0;k<3;k++) {
+				tri.v[k] = atoi(p[k]);
+				if(tri.v[k]<0) tri.v[k]=verts.size()+tri.v[k];
+				tri.vt[k]=tri.vn[k]=0;
+				
+				char *puv=strchr(p[k],'/');
+				
+				if(puv) {
+					char *pnrm=strchr(puv+1,'/');
+					if(pnrm!=puv+1) {
+						tri.vt[k]=atoi(puv+1);
+						if(tri.vt[k]<0) tri.vt[k]=uvs.size()+tri.vt[k];
+					}
+					if(pnrm[1]) {
+						tri.vn[k]=atoi(pnrm+1);
+						if(tri.vn[k]<0) tri.vn[k]=normals.size()+tri.vn[k];
+					}
+				}
+				
+				tri.v[k]--;
+				tri.vt[k]--;
+				tri.vn[k]--;
+				
+				if(tri.v[k]>=int(verts.size()))
+					ThrowException("Wrong vertex index: ",tri.v[k],"/",int(verts.size()));
+				if(tri.vt[k]>=int(uvs.size()))
+					ThrowException("Wrong tex-coord index: ",tri.vt[k],"/",int(uvs.size()));
+				if(tri.vn[k]>=int(normals.size()))
+					ThrowException("Wrong normal index",tri.vn[k],"/",int(normals.size()));
 			}
-
-			if(flipSides) tris.push_back( Tri(v[2],v[1],v[0],vt[2],vt[1],vt[0],verts,1) );
-			else tris.push_back( Tri(v[0],v[1],v[2],vt[0],vt[1],vt[2],verts,1) );
-			if(tris.size()==maxTris) break;
 			
-			/*char *buf=strchr(line,' ')+1;
-			while(buf=strchr(buf,' ')) {
-				buf++;
-				v[1]=v[2];
-				v[2]=atoi(buf)-1;
-			}*/
+			tris.push_back(tri);
 		}
-		else if(strcmp(type,"swap")==0) swap=1;
+
+/*		else if(strcmp(type,"swap")==0) swap=1;
 		else if(strcmp(type,"flip")==0) flipSides=1;
 		else if(strcmp(type,"scale")==0) {
 			sscanf(line,"%s %s %s %s",type,a,b,c);
 			sx=sx*atof(a);
 			sy=sy*atof(b);
 			sz=sz*atof(c);
-		}
+		}*/
 
 	}
+	
 	fb.close();
+	if(tris.size())
+		objects.push_back(BaseScene::Object(verts,uvs,normals,tris));
 
-	out.resize(tris.size());
+/*	out.resize(tris.size());
 	for(int n=0;n<tris.size();n++) {
 		Tri &tri=tris[n];
 		out[n]=Triangle(verts[tri.i[0]].v,verts[tri.i[1]].v,verts[tri.i[2]].v);
 	}
-	GenShadingData(verts,coords,tris,shadingData,1);
-
-}		
+	GenShadingData(verts,coords,tris,shadingData,1); */
+}

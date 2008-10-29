@@ -8,6 +8,8 @@
 #include "gl_window.h"
 #include "formats/loader.h"
 #include "object.h"
+#include "base_scene.h"
+#include <algorithm>
 
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
@@ -130,7 +132,6 @@ struct GenImageTask {
 		enum { NQuads=1<<(QuadLevels*2), PWidth=2<<QuadLevels, PHeight=2<<QuadLevels };
 
 		Matrix<Vec4f> rotMat(Vec4f(camera.right),Vec4f(camera.up),Vec4f(camera.front),Vec4f(0,0,0,1));
-		rotMat=Transpose(rotMat);
 
 		Vec3q origin; Broadcast(camera.pos,origin);
 		RayGenerator rayGen(QuadLevels,out->width,out->height,camera.plane_dist);
@@ -269,7 +270,7 @@ void PrintHelp() {
 	printf("F1 - toggle shadow caching\n\t");
 	printf("esc - exit\n\n");
 }
-
+/*
 template <class Scene>
 void Build(const TriVector &tris,const ShadingDataVec &shd,Scene &out) {
 	double buildTime=GetTime();
@@ -281,9 +282,74 @@ void Build(const TriVector &tris,const ShadingDataVec &shd,Scene &out) {
 	if(gObjects.size()<1) gObjects.push_back(0);
 	gObjects[0]=&out.tree;
 	out.tree.objectId=0;
-}
+}*/
 
 Vec3f RotateVecY(const Vec3f& v,float angle);
+
+struct SortObjects {
+	SortObjects(const BaseScene &scn,int ax) :scene(scn),axis(ax) { }
+	
+	bool operator()(int a,int b) const {
+		const BBox &ba=scene.objects[a].GetBBox(),&bb=scene.objects[b].GetBBox();
+		return (&ba.Center().x)[axis]<(&bb.Center().x)[axis];
+	}
+	
+	int axis;
+	const BaseScene &scene;
+};
+
+void FindSplit(BVH &bvh,int nNode,const BaseScene &scene,vector<int> indices) {
+	Matrix<Vec4f> mat=Identity<void>();
+	
+	if(indices.size()<=2) {
+		bvh.nodes[nNode].count=indices.size();
+		bvh.nodes[nNode].subNode=bvh.nodes.size();
+		
+		for(int n=0;n<indices.size();n++)
+			bvh.AddNode(scene.objects[indices[n]].trans,indices[n],0);
+	}
+	else {
+		int axis; {
+			BBox box=scene.objects[indices[0]].GetBBox()*scene.objects[indices[0]].trans;
+			for(int n=1;n<indices.size();n++) 
+				box+=scene.objects[indices[n]].GetBBox()*scene.objects[indices[n]].trans;
+				
+			Vec3f bSize=box.Size();
+			axis=bSize.x>bSize.y?0:1;
+			if(bSize.z>(&bSize.x)[axis]) axis=2;
+		}
+		
+		std::sort(indices.begin(),indices.end(),SortObjects(scene,axis));
+		bvh.nodes[nNode].count=2;
+		bvh.nodes[nNode].subNode=bvh.nodes.size();
+		
+		vector<int> left,right;
+		for(int n=0;n<indices.size();n++)
+			(n<indices.size()/2?left:right).push_back(indices[n]);
+			
+		int leftId =bvh.nodes.size(); bvh.AddNode(mat,-1,left.size());
+		int rightId=bvh.nodes.size(); bvh.AddNode(mat,-1,right.size());
+		
+		FindSplit(bvh,leftId,scene,left);
+		FindSplit(bvh,rightId,scene,right);
+	}
+	
+	
+}
+
+void BuildBVH(BVH &bvh,BaseScene &scene) {
+	Matrix<Vec4f> mat; mat=Identity<void>();
+	
+	vector<int> indices;
+	for(int n=0;n<scene.objects.size();n++) indices.push_back(n);
+	
+	bvh.AddNode(mat,1,indices.size());
+	FindSplit(bvh,0,scene,indices);
+	
+	bvh.UpdateBox();
+	bvh.UpdateGlobalTrans();
+	gBVH=&bvh;
+}
 
 int main(int argc, char **argv) {
 	printf("Unnamed raytracer v0.07 by nadult\n");
@@ -315,8 +381,15 @@ int main(int argc, char **argv) {
 
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
-	TriVector tris; ShadingDataVec shadingData;
-	LoadModel(string("scenes/")+modelFile,tris,shadingData,20.0f,10000000);
+	TriVector tris;
+	ShadingDataVec shadingData;
+	BaseScene baseScene; {
+		baseScene.LoadWavefrontObj(string("scenes/")+modelFile);
+		tris=baseScene.ToTriVector();
+		
+		for(int n=0;n<baseScene.objects.size();n++)
+			gObjects.push_back(new BIHTree(baseScene.objects[n].ToTriVector()));
+	}
 
 //	tris.push_back(Triangle(Vec3f(1000,65,-1000),Vec3f(-1000,65,-1000),Vec3f(1000,65,1000)));
 //	tris.push_back(Triangle(Vec3f(1000,65,1000),Vec3f(-1000,65,-1000),Vec3f(-1000,65,1000)));
@@ -325,7 +398,9 @@ int main(int argc, char **argv) {
 	if(treeVisMode) { TreeVisMain(tris); return 0; }
 
 	TScene<BIHTree>	scene;
-	Build(tris,shadingData,scene);
+//	Build(tris,shadingData,scene,sceneObjects);
+	BVH bvh;
+	BuildBVH(bvh,baseScene);
 
 	Image img(resx,resy,16);
 	Camera cam;
@@ -352,7 +427,7 @@ int main(int argc, char **argv) {
 		scene.lightsEnabled=0;
 		bool lightsAnim=0;
 		float speed; {
-			Vec3p size=scene.tree.pMax-scene.tree.pMin;
+			Vec3p size=baseScene.GetBBox().Size();
 			speed=(size.x+size.y+size.z)*0.005f;
 		}
 
@@ -380,7 +455,7 @@ int main(int argc, char **argv) {
 				if(out.Key('F')) cam.pos+=cam.up*tspeed;
 			}
 
-			if(out.KeyDown('[')||out.KeyDown(']')) {
+			/*if(out.KeyDown('[')||out.KeyDown(']')) {
 				float angle=out.KeyDown('[')?0.05:-0.05;
 
 				Vec3f center=Center(tris);
@@ -396,7 +471,7 @@ int main(int argc, char **argv) {
 					tri=Triangle(p1,p2,p3);
 				}
 				Build(tris,shadingData,scene);
-			}
+			}*/
 
 		//	if(out.KeyDown('Y')) { printf("splitting %s\n",scene.tree.split?"off":"on"); scene.tree.split^=1; }
 		//	if(out.KeyDown('[')) { scene.tree.maxDensity/=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
@@ -427,7 +502,7 @@ int main(int argc, char **argv) {
 				if(out.Key('V')) dy-=20;
 				if(out.Key('B')) dy+=20;
 				if(dx) {
-					Matrix<Vec4f> rotMat=RotateY(dx*0.003f);
+					Matrix<Vec4f> rotMat=RotateY(-dx*0.003f);
 					cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
 				}
 			//	if(dy) {
@@ -437,23 +512,6 @@ int main(int argc, char **argv) {
 			}
 			
 			scene.tree.pattern.Init(scene.tree.nodes.size(),resx);
-
-			BVH bvh; {
-				float dist=Max(scene.tree.GetBBox().Size().x,scene.tree.GetBBox().Size().z);
-				static float ang=0.0f; //if(!out.Key(Key_space)) ang+=0.01f;
-				Matrix<Vec4f> mat; mat=Identity<void>();
-				bvh.AddNode(mat,1,4);
-				
-				mat=RotateY(ang); mat.w.x=-dist; mat.w.y=0; mat.w.z=0;			bvh.AddNode(mat,0,0);
-				mat=RotateY(-ang*0.5f); mat.w.x=dist; mat.w.y=0; mat.w.z=0;		bvh.AddNode(mat,0,0);
-				mat=RotateY(ang*0.5f); mat.w.x=0; mat.w.y=0; mat.w.z=dist;		bvh.AddNode(mat,0,0);
-				mat=RotateY(-ang); mat.w.x=0; mat.w.y=0; mat.w.z=-dist;			bvh.AddNode(mat,0,0);
-				
-				bvh.UpdateBox();
-				bvh.UpdateGlobalTrans();
-				gBVH=&bvh;
-			}
-
 
 			TreeStats stats;
 			double time=GetTime();
