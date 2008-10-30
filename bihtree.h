@@ -1,7 +1,7 @@
 #ifndef RTRACER_BIHTREE_H
 #define RTRACER_BIHTREE_H
 
-#include "object.h"
+#include "bvh.h"
 #include "ray_group.h"
 #include "tree_stats.h"
 #include "context.h"
@@ -30,7 +30,6 @@ public:
 
 	float clip[2];
 	u32 val[2];
-	float density;
 };
 
 class BIHIdx {
@@ -80,7 +79,7 @@ public:
 		return BBox(pMin,pMax);
 	}
 
-	Vec3f FlatNormals(u32 id) { return TFlatNormals<BIHTree>(id); }
+	Vec3f FlatNormals(u32 id) const { return TFlatNormals<BIHTree>(id); }
 	
 	BIHTree(const TriVector &objects);
 
@@ -107,7 +106,15 @@ public:
 	
 	template <class Output,bool shared>
 	int TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,floatq *out,i32x4 *object,i32x4 *element,TreeStats *tstats,
-						int dirMask,int lastShadowTri=-1) const;
+						int instanceId,int dirMask,int lastShadowTri=-1) const;
+
+	void TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,Output<otNormal,f32x4,i32x4> output,int instanceId) const {
+		int mask[4]={GetVecSign(tDir[0]),GetVecSign(tDir[1]),GetVecSign(tDir[2]),GetVecSign(tDir[3])};
+		if(mask[1]!=mask[0]||mask[2]!=mask[0]||mask[3]!=mask[0]) mask[0]=8;
+		TraverseQuad4<Output<otNormal,f32x4,i32x4>,0>(rOrigin,tDir,output.dist,output.object,output.element,
+												output.stats,instanceId,mask[0],-1);
+	}
+
 
 	template <class Output>
 	void TraverseQuad4Primary(const BIHTravContext &context,int dirMask,BIHOptData *data=0) const;

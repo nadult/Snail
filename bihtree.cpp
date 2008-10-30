@@ -14,7 +14,7 @@ namespace {
 
 }
 
-BIHTree::BIHTree(const TriVector &objs) :split(1),maxDensity(125000000.0f) {
+BIHTree::BIHTree(const TriVector &objs) :split(1) {
 	objects.resize(objs.size());
 	if(!objects.size()) {
 		nodes.push_back(BIHNode());
@@ -46,7 +46,7 @@ BIHTree::BIHTree(const TriVector &objs) :split(1),maxDensity(125000000.0f) {
 	avgSize=sumSize.x+sumSize.y+sumSize.z;
 	avgSize/=3.0*objects.size();
 
-	printf("building\n");
+	printf("."); fflush(stdout);
 	vector<BIHIdx> indices; indices.reserve(objects.size()*16);
 
 	for(int n=0;n<objects.size();n++) {
@@ -170,7 +170,7 @@ bool BIHTree::SAH(const vector<BIHIdx> &indices,const Vec3p &min,const Vec3p &ma
 
 void BIHTree::Build(vector<BIHIdx> &indices,vector<u32> &parents,uint nNode,
 							const Vec3p &min,const Vec3p &max,uint level,bool sah) {
-	/* { // eliminating duplicates
+	/*{ // eliminating duplicates
 RESORT:
 		std::sort(indices.begin(),indices.end());
 		for(int n=1;n<indices.size();n++) {
@@ -178,19 +178,20 @@ RESORT:
 				indices[n-1].min=VMin(indices[n-1].min,indices[n].min);
 				indices[n-1].max=VMax(indices[n-1].max,indices[n].max);
 				indices[n]=indices.back(); indices.pop_back();
+				printf("x"); fflush(stdout);
 				goto RESORT;
 			}
 		}
-	} */
+	}*/
 
 	//sah=0;
-	{
+	/*{
 		float sSize; { Vec3p s=pMax-pMin; sSize=s.x*(s.y+s.z)+s.y*s.z; }
 		Vec3p size=max-min;
 		float nodeSize=((size.x*(size.y+size.z)+size.y*size.z) / sSize);
 		float density=float(indices.size())/nodeSize;
 		nodes[nNode].density=density*0.5f;
-	}
+	}*/
 	if(level>50) sah=0;
 
 	float split; int axis;

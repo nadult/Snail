@@ -62,7 +62,7 @@ public:
 	uint LoopIters() const { return enabled?iters:0; }
 	uint Skips() const { return enabled?skips:0; }
 
-	void PrintInfo(int resx,int resy,double msRenderTime);
+	void PrintInfo(int resx,int resy,double msRenderTime,double msBuildTime);
 
 	inline void Breaking(uint val=1) { if(enabled) breaking+=val; }
 	inline void NotBreaking(uint val=1) { if(enabled) notBreaking+=val; }

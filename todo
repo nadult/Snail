@@ -5,6 +5,8 @@
 
 
 BIH:
+- problem w kolejnosci mnozenia macierzy
+- przyspieszyc budowe eliminujac zbedne wywolania rekurencyjne
 - przyspieszyc budowe; optymalizacje boxow otaczajacych robic na krawedziach a nie trojkatach
 - uzyc RayGroup::IDir
 - poprawic bug na sponzie

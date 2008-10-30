@@ -26,6 +26,15 @@ BBox BaseScene::GetBBox() const {
 	return out;
 }
 
+void BaseScene::Transform(const Matrix<Vec4f> &mat) {
+	for(int n=0;n<objects.size();n++)
+		objects[n].Transform(mat);
+}
+void BaseScene::Optimize() {
+	for(int n=0;n<objects.size();n++)
+		objects[n].Optimize();
+}
+
 BaseScene::Object::Object(const vector<Vec3f> &tverts,const vector<Vec2f> &tuvs,const vector<Vec3f> &tnormals,
 							const vector<BaseScene::IndexedTri> &ttris) {
 								
@@ -70,12 +79,28 @@ BaseScene::Object::Object(const vector<Vec3f> &tverts,const vector<Vec2f> &tuvs,
 	}
 	
 	trans=Identity<>();
-	FindOptimalTrans();
-	
-	UpdateBox();
+	bbox=BBox(&verts[0],verts.size());
+	optBBox=OptBBox(bbox,Identity<>());
 }
 
+void BaseScene::Object::TransformData(const Matrix<Vec4f> &mat) {
+	for(int n=0;n<verts.size();n++) verts[n]=mat*verts[n];
+	for(int n=0;n<normals.size();n++) normals[n]=mat&normals[n];
+	bbox=BBox(&verts[0],verts.size(),trans);
+	optBBox=OptBBox(bbox,Inverse(trans));
+}
 
+void BaseScene::Object::Transform(const Matrix<Vec4f> &mat) {
+	trans=mat*trans;
+	bbox=BBox(&verts[0],verts.size());
+	optBBox=OptBBox(bbox,Inverse(trans));
+}
+
+void BaseScene::Object::Optimize() {
+	FindOptimalTrans();
+	optBBox=OptBBox(&verts[0],verts.size());
+	bbox=BBox(&verts[0],verts.size(),trans);
+}
 
 BaseScene::Triangle BaseScene::Object::GetTriangle(uint n) const {
 	Triangle out;
@@ -102,32 +127,27 @@ TriVector BaseScene::Object::ToTriVector() const {
 	return out;
 }
 
-void BaseScene::Object::UpdateBox() {
-	if(verts.size()==0) {
-		bbox=BBox(Vec3f(0,0,0),Vec3f(0,0,0));
-		return;
-	}
-	
-	bbox.min=bbox.max=verts[0];
-	for(int n=1;n<verts.size();n++) {
-		Vec3f vert=verts[n];
-		bbox.min=VMin(bbox.min,vert);
-		bbox.max=VMax(bbox.max,vert);
-	}
-}
-
 void BaseScene::Object::FindOptimalTrans() {
 	{
 		Matrix<Vec4f> min;
 		float minSum=1.0f/0.0f;
 		
-		for(int n=0;n<32;n++) {
-			float ang=ConstPI<float>()*0.5f*float(n)/31.0f;
-			trans=RotateY(ang);
+		enum { dx=8,dy=8,dz=8 };
+		
+		for(int x=0;x<dx;x++) for(int y=0;y<dy;y++) for(int z=0;z<dz;z++) {
+			float ax=dx==1?0.0f:ConstPI<float>()*0.5f*float(x)/float(dx-1);
+			float ay=dy==1?0.0f:ConstPI<float>()*0.5f*float(y)/float(dy-1);
+			float az=dz==1?0.0f:ConstPI<float>()*0.5f*float(z)/float(dz-1);
+			
+			trans=Rotate(ax,ay,az);
 			
 			Vec3f planes[6];
-			for(int k=0;k<4;k++) planes[k]=RotateY(ang+k*ConstPI<float>()*0.5f)*Vec3f(1,0,0);
-			planes[4]=Vec3f(0,1,0); planes[5]=Vec3f(0,-1,0);
+			planes[0]=Vec3f(trans.x.x,trans.x.y,trans.x.z);
+			planes[1]=Vec3f(trans.y.x,trans.y.y,trans.y.z);
+			planes[2]=Vec3f(trans.z.x,trans.z.y,trans.z.z);
+			planes[3]=-planes[0];
+			planes[4]=-planes[1];
+			planes[5]=-planes[2];
 			
 			float sum=0.0f;
 			for(int n=0;n<tris.size();n++) {
@@ -140,10 +160,9 @@ void BaseScene::Object::FindOptimalTrans() {
 		}
 		trans=min;
 	}
-	
+
 	Matrix<Vec4f> inv=Inverse(trans);
-	for(int n=0;n<verts.size();n++) {
-		verts[n]=inv*verts[n];
-		//TODO przeksztalcic normalne
-	}
+	for(int n=0;n<verts.size();n++) verts[n]=inv*verts[n];
+	for(int n=0;n<normals.size();n++) normals[n]=inv&normals[n];
 }
+

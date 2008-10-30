@@ -137,6 +137,8 @@ void TraceLight(TracingContext<Group,Selector> &c,const Light &light,int idx) {
 		c.light[q]+=Condition(lsel.Mask(i),ShadeLight(lightColor,dot[q],lightDist[q]));
 	}
 }
+
+/*
 template <class AccStruct>
 class TScene
 {
@@ -145,7 +147,6 @@ public:
 
 	TScene() :tree(TriVector()) { }
 	TScene(const TriVector &trivec,const ShadingDataVec &shd);
-/*	TScene(const AccStruct &struct);*/
 
 	void Animate();
 	void AddLight(Vec3f pos,Vec3f col);
@@ -169,35 +170,7 @@ public:
 	vector<Light> lights;
 	ShadingDataVec shadingData;
 	AccStruct tree;
-};
-
-template <class Scene,class Group,class Selector>
-void TraceReflection(TracingContext<Group,Selector> &c) {
-	typedef typename Vec3q::TScalar real;
-	typedef typename Vec3q::TBool boolean;
-
-	Vec3q reflDir[Selector::size];
-
-	for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector.Idx(i);
-		reflDir[q]=Reflect(c.RayDir(q),c.normal[q]);
-	}
-
-	typedef RayGroup<Group::size> TGroup;
-	TracingContext<TGroup,Selector> rc(c.scene,TGroup(reflDir,c.position),c.selector);
-	rc.options=c.options;
-	rc.options.reflections--;
-
-	c.scene.RayTraceSecondary(rc);
-	c.stats.Update(rc.stats);
-
-	for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector.Idx(i);
-		c.color[q]=Condition(c.selector.Mask(i),
-						c.color[q]*Const<real,8,10>()+rc.color[q]*Const<real,2,10>(),
-						c.color[q]);
-	}
-}
+};*/
 
 Vec3q Sample(const gfxlib::Texture &tex,const Vec2q &uv) {
 	Vec2q pos=uv*Vec2q(float(tex.Width()),float(tex.Height()));
@@ -225,66 +198,8 @@ Vec3q Sample(const gfxlib::Texture &tex,const Vec2q &uv) {
 	return out*f32x4(1.0f/255.0f);
 }
 
-template <class AccStruct> template <class Group,class Selector,bool primary>
-void TScene<AccStruct>::RayTrace(TracingContext<Group,Selector> &c) const {
-	typedef typename Vec3q::TScalar real;
-	typedef typename Vec3q::TBool boolean;
-	const floatq maxDist=100000.0f;
-
-	for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector.Idx(i);
-		InitializationShader(c,q,maxDist);
-	}
-
-	c.density=0.5f;
-	Traverse(c.rays,c.selector,Output<primary?otPrimary:otNormal,floatq,i32x4>(c));
-
-	for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector.Idx(i);
-		const Element *obj=&tree.objects[0];
-
-		if(c.selector.DisableWithMask(i,c.distance[q]>=maxDist)) {
-			c.color[q]=Vec3q(Const<real,0>());
-			i--; continue;
-		}
-
-		i32x4b imask(c.selector.Mask(i));
-
-		c.position[q]=c.RayDir(q)*c.distance[q]+c.RayOrigin(q);
-	/*	if(c.options.shadingMode==smGouraud)
-			c.normal[q]=GouraudNormals(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
-		else
-			c.normal[q]=FlatNormals<Vec3q>(tree.objects,Condition(imask,c.objId[q]));*/
-	
-		DistanceShader(c,q);
-	//	SimpleLightingShader(c,q);
-	//	Vec2q texCoord=GouraudTexCoords(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
-	//	c.color[q]*=Sample(tex,texCoord);
-	}
-
-	if(lightsEnabled) {
-		assert(ShadowCache::size>=lights.size());
-		for(int n=0;n<lights.size();n++)
-			TraceLight(c,lights[n],n);
-	}
-
-	if(c.options.reflections>0&&c.selector.Num())
-		TraceReflection(c);
-
-	if(lights.size()&&lightsEnabled)
-		for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector[i];
-		c.color[q]=Condition(c.selector.Mask(i),c.color[q]*c.light[q]);
-	}
-	else for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector[i];
-		c.color[q]=Condition(c.selector.Mask(i),c.color[q]);
-	}
-
-	if(c.options.rdtscShader)
-		for(int q=0;q<Selector::size;q++)
-			StatsShader(c,q);
-}
+template <class AccStruct,class Group,class Selector>
+void TraceReflection(const AccStruct &tree,TracingContext<Group,Selector> &c);
 
 template <class AccStruct,class Group,class Selector>
 void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
@@ -299,8 +214,8 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 		InitializationShader(c,q,maxDist);
 	}
 
-	c.density=0.5f;
-	tree.TraverseQuadGroup(c.rays,c.selector,Output<primary?otPrimary:otNormal,f32x4,i32x4>(c));
+	tree.Traverse(c.rays,c.selector,Output<primary?otPrimary:otNormal,f32x4,i32x4>(c));
+	const vector<PObject> &objects = tree.objects;
 
 	for(int i=0;i<c.selector.Num();i++) {
 		int q=c.selector.Idx(i);
@@ -319,9 +234,9 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 		for(int k=0;k<4;k++) {
 			if(!((i32x4)imask)[k]) continue;
 		
-			const BVH::Node &bvhNode=gBVH->nodes[c.objId[q][k]];
+			const BVH::Node &bvhNode=tree.nodes[c.objId[q][k]];
 			const Matrix<Vec4f> &m=bvhNode.globalTrans;
-			Vec3f d=gObjects[bvhNode.subNode]->FlatNormals(c.elementId[q][k]);
+			Vec3f d=objects[bvhNode.subNode]->FlatNormals(c.elementId[q][k]);
 		
 			normals[k].x = d.x*m.x.x+d.y*m.y.x+d.z*m.z.x;
 			normals[k].y = d.x*m.x.y+d.y*m.y.y+d.z*m.z.y;
@@ -340,13 +255,55 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 	//	c.color[q]*=Sample(tex,texCoord);
 	}
 
-	for(int i=0;i<c.selector.Num();i++) {
+	/*if(lightsEnabled) {
+		assert(ShadowCache::size>=lights.size());
+		for(int n=0;n<lights.size();n++)
+			TraceLight(c,lights[n],n);
+	}
+
+	if(c.options.reflections>0&&c.selector.Num())
+		TraceReflection(c);
+
+	if(lights.size()&&lightsEnabled)
+		for(int i=0;i<c.selector.Num();i++) {
+		int q=c.selector[i];
+		c.color[q]=Condition(c.selector.Mask(i),c.color[q]*c.light[q]);
+	}
+	else*/ for(int i=0;i<c.selector.Num();i++) {
 		int q=c.selector[i];
 		c.color[q]=Condition(c.selector.Mask(i),c.color[q]);
 	}
 	if(c.options.rdtscShader)
 		for(int q=0;q<Selector::size;q++)
 			StatsShader(c,q);
+}
+
+template <class AccStruct,class Group,class Selector>
+void TraceReflection(const AccStruct &tree,TracingContext<Group,Selector> &c) {
+	typedef typename Vec3q::TScalar real;
+	typedef typename Vec3q::TBool boolean;
+
+	Vec3q reflDir[Selector::size];
+
+	for(int i=0;i<c.selector.Num();i++) {
+		int q=c.selector.Idx(i);
+		reflDir[q]=Reflect(c.RayDir(q),c.normal[q]);
+	}
+
+	typedef RayGroup<Group::size> TGroup;
+	TracingContext<TGroup,Selector> rc(TGroup(reflDir,c.position),c.selector);
+	rc.options=c.options;
+	rc.options.reflections--;
+
+	RayTrace(tree,rc);
+	c.stats.Update(rc.stats);
+
+	for(int i=0;i<c.selector.Num();i++) {
+		int q=c.selector.Idx(i);
+		c.color[q]=Condition(c.selector.Mask(i),
+						c.color[q]*Const<real,8,10>()+rc.color[q]*Const<real,2,10>(),
+						c.color[q]);
+	}
 }
 
 

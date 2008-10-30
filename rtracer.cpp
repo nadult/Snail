@@ -7,9 +7,8 @@
 #include "bihtree.h"
 #include "gl_window.h"
 #include "formats/loader.h"
-#include "object.h"
+#include "bvh.h"
 #include "base_scene.h"
-#include <algorithm>
 
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
@@ -111,17 +110,17 @@ inline i32x4 ConvColor(const Vec3q &rgb) {
 	return _mm_unpacklo_epi16(c12,c33);
 }
 
-template <class Scene,int QuadLevels>
+template <class AccStruct,int QuadLevels>
 struct GenImageTask {
-	GenImageTask(const Scene *scn,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,uint tw,uint th,TreeStats *outSt)
-		:scene(scn),camera(cam),out(tOut),options(opt),startX(tx),startY(ty),width(tw),height(th),outStats(outSt) {
+	GenImageTask(const AccStruct *tr,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,uint tw,uint th,TreeStats *outSt)
+		:tree(tr),camera(cam),out(tOut),options(opt),startX(tx),startY(ty),width(tw),height(th),outStats(outSt) {
 		}
 
 	uint startX,startY;
 	uint width,height;
 
 	TreeStats *outStats;
-	const Scene *scene;
+	const AccStruct *tree;
 	Camera camera;
 	Image *out;
 	Options options;
@@ -161,7 +160,7 @@ struct GenImageTask {
 				context.options=TracingOptions(options.reflections?1:0,options.shading,options.rdtscShader);
 				
 				context.shadowCache=shadowCache;
-				RayTrace(*gBVH,context);
+				RayTrace(*tree,context);
 				shadowCache=context.shadowCache;
 
 				outStats->Update(context.stats);
@@ -211,18 +210,18 @@ struct GenImageTask {
 	}
 };
 
-template <int QuadLevels,class Scene>
-TreeStats GenImage(const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
+template <int QuadLevels,class AccStruct>
+TreeStats GenImage(const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
 	enum { taskSize=64 };
 
 	uint numTasks=(image.width+taskSize-1)*(image.height+taskSize-1)/(taskSize*taskSize);
 
 	vector<TreeStats> taskStats(numTasks);
 
-	TaskSwitcher<GenImageTask<Scene,QuadLevels> > switcher(numTasks);
+	TaskSwitcher<GenImageTask<AccStruct,QuadLevels> > switcher(numTasks);
 	uint num=0;
 	for(uint y=0;y<image.height;y+=taskSize) for(uint x=0;x<image.width;x+=taskSize) {
-		switcher.AddTask(GenImageTask<Scene,QuadLevels> (&scene,camera,&image,options,x,y,
+		switcher.AddTask(GenImageTask<AccStruct,QuadLevels> (&tree,camera,&image,options,x,y,
 					Min((int)taskSize,int(image.width-x)),Min((int)taskSize,int(image.height-y)),
 					&taskStats[num]) );
 		num++;
@@ -236,14 +235,14 @@ TreeStats GenImage(const Scene &scene,const Camera &camera,Image &image,const Op
 	return stats;
 }
 
-template <class Scene>
-TreeStats GenImage(int quadLevels,const Scene &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
+template <class AccStruct>
+TreeStats GenImage(int quadLevels,const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
 	switch(quadLevels) {
-	case 0: return GenImage<0>(scene,camera,image,options,tasks);
-//	case 1: return GenImage<1>(scene,camera,image,options,tasks);
-//	case 2: return GenImage<2>(scene,camera,image,options,tasks);
-//	case 3: return GenImage<3>(scene,camera,image,options,tasks);
-//	case 4: return GenImage<4>(scene,camera,image,options,tasks);
+	case 0: return GenImage<0>(tree,camera,image,options,tasks);
+	case 1: return GenImage<1>(tree,camera,image,options,tasks);
+	case 2: return GenImage<2>(tree,camera,image,options,tasks);
+//	case 3: return GenImage<3>(tree,camera,image,options,tasks);
+//	case 4: return GenImage<4>(tree,camera,image,options,tasks);
 	default: throw Exception("Quad level not supported.");
 	}
 }
@@ -270,85 +269,25 @@ void PrintHelp() {
 	printf("F1 - toggle shadow caching\n\t");
 	printf("esc - exit\n\n");
 }
-/*
-template <class Scene>
-void Build(const TriVector &tris,const ShadingDataVec &shd,Scene &out) {
-	double buildTime=GetTime();
-	out=Scene(tris,shd);
-	buildTime=GetTime()-buildTime;
-	printf("Tree build time: %.2f sec\n",buildTime);
-	out.tree.PrintInfo();
-	
-	if(gObjects.size()<1) gObjects.push_back(0);
-	gObjects[0]=&out.tree;
-	out.tree.objectId=0;
-}*/
 
 Vec3f RotateVecY(const Vec3f& v,float angle);
 
-struct SortObjects {
-	SortObjects(const BaseScene &scn,int ax) :scene(scn),axis(ax) { }
+void BuildBVH(BVH &bvh,BVHBuilder &bvhBuilder) {
+	static float pos=1.0f; pos+=0.02f;
+	bvhBuilder.instances.clear();
+	Matrix<Vec4f> ident=Identity<>();
 	
-	bool operator()(int a,int b) const {
-		const BBox &ba=scene.objects[a].GetBBox(),&bb=scene.objects[b].GetBBox();
-		return (&ba.Center().x)[axis]<(&bb.Center().x)[axis];
+	Vec3f rotCenter(0,0,0);
+	Matrix<Vec4f> rot=Translate(-rotCenter)*RotateY(pos)*Translate(rotCenter);
+	
+	for(int n=0;n<bvhBuilder.objects.size();n++) {
+	//	bvhBuilder.AddInstance(n,Identity<>());
+		bvhBuilder.AddInstance(n,bvhBuilder.objects[n].bBox.Center().y<-0.1423f?rot:ident);
+		
+		//bvhBuilder.AddInstance(n,RotateY(pos*log(0.1f+float(n))));
+		//bvhBuilder.AddInstance(n,Translate(Vec3f(0,cos(pos+n*0.5f)*0.02f,0)));
 	}
-	
-	int axis;
-	const BaseScene &scene;
-};
-
-void FindSplit(BVH &bvh,int nNode,const BaseScene &scene,vector<int> indices) {
-	Matrix<Vec4f> mat=Identity<void>();
-	
-	if(indices.size()<=2) {
-		bvh.nodes[nNode].count=indices.size();
-		bvh.nodes[nNode].subNode=bvh.nodes.size();
-		
-		for(int n=0;n<indices.size();n++)
-			bvh.AddNode(scene.objects[indices[n]].trans,indices[n],0);
-	}
-	else {
-		int axis; {
-			BBox box=scene.objects[indices[0]].GetBBox()*scene.objects[indices[0]].trans;
-			for(int n=1;n<indices.size();n++) 
-				box+=scene.objects[indices[n]].GetBBox()*scene.objects[indices[n]].trans;
-				
-			Vec3f bSize=box.Size();
-			axis=bSize.x>bSize.y?0:1;
-			if(bSize.z>(&bSize.x)[axis]) axis=2;
-		}
-		
-		std::sort(indices.begin(),indices.end(),SortObjects(scene,axis));
-		bvh.nodes[nNode].count=2;
-		bvh.nodes[nNode].subNode=bvh.nodes.size();
-		
-		vector<int> left,right;
-		for(int n=0;n<indices.size();n++)
-			(n<indices.size()/2?left:right).push_back(indices[n]);
-			
-		int leftId =bvh.nodes.size(); bvh.AddNode(mat,-1,left.size());
-		int rightId=bvh.nodes.size(); bvh.AddNode(mat,-1,right.size());
-		
-		FindSplit(bvh,leftId,scene,left);
-		FindSplit(bvh,rightId,scene,right);
-	}
-	
-	
-}
-
-void BuildBVH(BVH &bvh,BaseScene &scene) {
-	Matrix<Vec4f> mat; mat=Identity<void>();
-	
-	vector<int> indices;
-	for(int n=0;n<scene.objects.size();n++) indices.push_back(n);
-	
-	bvh.AddNode(mat,1,indices.size());
-	FindSplit(bvh,0,scene,indices);
-	
-	bvh.UpdateBox();
-	bvh.UpdateGlobalTrans();
-	gBVH=&bvh;
+	bvh.Build(bvhBuilder);
 }
 
 int main(int argc, char **argv) {
@@ -362,10 +301,10 @@ int main(int argc, char **argv) {
 	CameraConfigs camConfigs;
 	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
 
-	int resx=512,resy=512;
+	int resx=800,resy=600;
 	bool fullscreen=0,nonInteractive=0;
 	int threads=4;
-	const char *modelFile="feline.obj";
+	const char *modelFile="abrams_opt.obj";
 	Options options;
 	bool treeVisMode=0;
 
@@ -386,9 +325,7 @@ int main(int argc, char **argv) {
 	BaseScene baseScene; {
 		baseScene.LoadWavefrontObj(string("scenes/")+modelFile);
 		tris=baseScene.ToTriVector();
-		
-		for(int n=0;n<baseScene.objects.size();n++)
-			gObjects.push_back(new BIHTree(baseScene.objects[n].ToTriVector()));
+		baseScene.Optimize();
 	}
 
 //	tris.push_back(Triangle(Vec3f(1000,65,-1000),Vec3f(-1000,65,-1000),Vec3f(1000,65,1000)));
@@ -397,17 +334,18 @@ int main(int argc, char **argv) {
 
 	if(treeVisMode) { TreeVisMain(tris); return 0; }
 
-	TScene<BIHTree>	scene;
-//	Build(tris,shadingData,scene,sceneObjects);
-	BVH bvh;
-	BuildBVH(bvh,baseScene);
+	BVHBuilder bvhBuilder;
+	for(int n=0;n<baseScene.objects.size();n++) {
+		const BaseScene::Object &obj=baseScene.objects[n];
+		bvhBuilder.AddObject(new BIHTree(obj.ToTriVector()),obj.GetTrans(),obj.GetBBox(),obj.GetOptBBox());
+	}
 
 	Image img(resx,resy,16);
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
 		cam.pos=Center(tris);
 
-	uint quadLevels=0;
+	uint quadLevels=2;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
 	for(int n=0;n<4;n++)
@@ -415,16 +353,15 @@ int main(int argc, char **argv) {
 
 	if(nonInteractive) {
 		double time=GetTime();
-		scene.lightsEnabled=1;
-		GenImage(quadLevels,scene,cam,img,options,threads);
+		BVH bvh;
+		BuildBVH(bvh,bvhBuilder);
+		GenImage(quadLevels,bvh,cam,img,options,threads);
 		time=GetTime()-time;
 		minTime=maxTime=time;
 		img.SaveToFile("out/output.tga");
 	}
 	else {
 		GLWindow out(resx,resy,fullscreen);
-		scene.tree.maxDensity=520.0f * resx * resy;
-		scene.lightsEnabled=0;
 		bool lightsAnim=0;
 		float speed; {
 			Vec3p size=baseScene.GetBBox().Size();
@@ -442,7 +379,7 @@ int main(int argc, char **argv) {
 				Saver("scenes/cameras.dat") & camConfigs;
 				cam.Print();
 			}
-			if(out.KeyDown('L')) { printf("Lights %s\n",scene.lightsEnabled?"disabled":"enabled"); scene.lightsEnabled^=1; }
+		//	if(out.KeyDown('L')) { printf("Lights %s\n",scene.lightsEnabled?"disabled":"enabled"); scene.lightsEnabled^=1; }
 			if(out.KeyDown('J')) { printf("Lights animation %s\n",lightsAnim?"disabled":"enabled"); lightsAnim^=1; }
 
 			{
@@ -455,37 +392,17 @@ int main(int argc, char **argv) {
 				if(out.Key('F')) cam.pos+=cam.up*tspeed;
 			}
 
-			/*if(out.KeyDown('[')||out.KeyDown(']')) {
-				float angle=out.KeyDown('[')?0.05:-0.05;
-
-				Vec3f center=Center(tris);
-				cam.pos=RotateVecY(cam.pos-center,angle)+center;
-				cam.right=RotateVecY(cam.right,angle);
-				cam.front=RotateVecY(cam.front,angle);
-
-				for(int n=0;n<tris.size();n++) {
-					Triangle &tri=tris[n];
-					Vec3f p1=RotateVecY(tri.P1()-center,angle)+center;
-					Vec3f p2=RotateVecY(tri.P2()-center,angle)+center;
-					Vec3f p3=RotateVecY(tri.P3()-center,angle)+center;
-					tri=Triangle(p1,p2,p3);
-				}
-				Build(tris,shadingData,scene);
-			}*/
-
 		//	if(out.KeyDown('Y')) { printf("splitting %s\n",scene.tree.split?"off":"on"); scene.tree.split^=1; }
-		//	if(out.KeyDown('[')) { scene.tree.maxDensity/=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
-		//	if(out.KeyDown(']')) { scene.tree.maxDensity*=2.0f; printf("maxdensity: %.0f\n",scene.tree.maxDensity); }
 
 			if(out.Key(Key_lctrl)) {
-				if(out.KeyDown('1')&&scene.lights.size()>=1) scene.lights[0].pos=cam.pos;
-				if(out.KeyDown('2')&&scene.lights.size()>=2) scene.lights[1].pos=cam.pos;
-				if(out.KeyDown('3')&&scene.lights.size()>=3) scene.lights[2].pos=cam.pos;
+		//		if(out.KeyDown('1')&&scene.lights.size()>=1) scene.lights[0].pos=cam.pos;
+		//		if(out.KeyDown('2')&&scene.lights.size()>=2) scene.lights[1].pos=cam.pos;
+		//		if(out.KeyDown('3')&&scene.lights.size()>=3) scene.lights[2].pos=cam.pos;
 			}
 			else {
 				if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
-	//			if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
-	//			if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
+				if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
+				if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
 	//			if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 			}
 
@@ -510,13 +427,15 @@ int main(int argc, char **argv) {
 			//		cam.up=rotMat*cam.up; cam.front=rotMat*cam.front;
 			//	}
 			}
+	
+			BVH bvh;
+			double buildTime=GetTime();
+			BuildBVH(bvh,bvhBuilder);
+			buildTime=GetTime()-buildTime;
 			
-			scene.tree.pattern.Init(scene.tree.nodes.size(),resx);
-
 			TreeStats stats;
 			double time=GetTime();
-			stats=GenImage(quadLevels,scene,cam,img,options,threads);
-			scene.tree.pattern.Draw(img);
+			stats=GenImage(quadLevels,bvh,cam,img,options,threads);
 
 			out.RenderImage(img);
 			out.SwapBuffers();
@@ -524,9 +443,9 @@ int main(int argc, char **argv) {
 			time=GetTime()-time; minTime=Min(minTime,time);
 			maxTime=Max(time,maxTime);
 
-			stats.PrintInfo(resx,resy,time*1000.0);
+			stats.PrintInfo(resx,resy,time*1000.0,buildTime*1000.0);
 
-			if(lightsAnim) scene.Animate();
+		//	if(lightsAnim) scene.Animate();
 		}
 	}
 

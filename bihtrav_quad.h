@@ -2,7 +2,22 @@
 	template <class Output>
 	int BIHTree::TraverseQuad(const Vec3q &rOrigin,const Vec3q &tDir,Output output,int instanceId,
 								int dirMask,int lastShadowTri) const {
+
+		if(dirMask==8) {
+			::Output<otNormal,float,u32> out((float*)output.dist,(u32*)output.object,(u32*)output.element,output.stats);
+			
+			TraverseMono(Vec3p(rOrigin.x[0],rOrigin.y[0],rOrigin.z[0]),Vec3p(tDir.x[0],tDir.y[0],tDir.z[0]),out,instanceId);
+			out.dist++; out.object++; out.element++;
+			TraverseMono(Vec3p(rOrigin.x[1],rOrigin.y[1],rOrigin.z[1]),Vec3p(tDir.x[1],tDir.y[1],tDir.z[1]),out,instanceId);
+			out.dist++; out.object++; out.element++;
+			TraverseMono(Vec3p(rOrigin.x[2],rOrigin.y[2],rOrigin.z[2]),Vec3p(tDir.x[2],tDir.y[2],tDir.z[2]),out,instanceId);
+			out.dist++; out.object++; out.element++;
+			TraverseMono(Vec3p(rOrigin.x[3],rOrigin.y[3],rOrigin.z[3]),Vec3p(tDir.x[3],tDir.y[3],tDir.z[3]),out,instanceId);
+			return lastShadowTri;
+		}
+
 		floatq maxD=output.dist[0];
+	
 
 		TreeStats stats;
 		stats.TracingRay(4);

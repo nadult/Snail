@@ -12,7 +12,7 @@ default = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
 		CXX = 'g++',
-		CPPPATH = '.'		
+		CPPPATH = '.'
 	)
 
 if int(ARGUMENTS.get('-m32',0)):

@@ -83,7 +83,7 @@
 		float allTMin=tMin,allTMax=tMax;
 		int allIdx=idx;
 		float lastDensity=0;
-
+//
 		while(true) {
 			stats.LoopIteration();
 			if(idx&BIHNode::leafMask) {
@@ -145,7 +145,7 @@
 						}
 					}	
 			
-					if(lastDensity*(tMin+tMax)>maxDensity) {
+			/*		if(lastDensity*(tMin+tMax)>maxDensity) {
 					//	stats.Skip(16);
 						if(fStack==fStackBegin) { allTMin=tMin; allTMax=tMax; allIdx=idx|BIHNode::leafMask; }
 
@@ -163,7 +163,7 @@
 						TraverseQuad4Primary<Output>(cn,dirMask,&data);
 
 						break;
-					}
+					} */
 
 					mailbox.Insert(idx);
 
@@ -239,7 +239,7 @@
 			idx&=BIHNode::idxMask;
 			const BIHNode *node=node0+idx;
 			pattern.Touch(idx&BIHNode::idxMask,16);
-			lastDensity=node->density;
+	//		lastDensity=node->density;
 
 			int axis=node->Axis();
 			int nidx=dirMask&(1<<axis)?1:0;

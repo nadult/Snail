@@ -2,7 +2,7 @@
 #define RTRACER_LOADER_H
 
 #include "rtbase.h"
-#include "object.h"
+#include "bvh.h"
 
 
 struct ShadingData {

@@ -67,7 +67,6 @@ public:
 	integer objId[size],elementId[size];
 
 	TreeStats stats;
-	float density;
 
 	ShadowCache shadowCache;
 };
@@ -95,13 +94,12 @@ struct Output
 {
 	enum { objectIndexes=type_!=otShadow, type=type_ };
 
-	Output(real *d,integer *i,integer *e,TreeStats *st) :dist(d),object(i),element(e),stats(st),density(0) { }
+	Output(real *d,integer *i,integer *e,TreeStats *st) :dist(d),object(i),element(e),stats(st) { }
 
 	template <class Group,class Selector>
-	Output(TracingContext<Group,Selector> &c) :dist(c.distance),object(c.objId),element(c.elementId),stats(&c.stats),density(&c.density) { }
-	Output(const Output &all,int n) :dist(all.dist+n),object(all.object+n),element(all.element+n),stats(all.stats),density(0) { }
+	Output(TracingContext<Group,Selector> &c) :dist(c.distance),object(c.objId),element(c.elementId),stats(&c.stats) { }
+	Output(const Output &all,int n) :dist(all.dist+n),object(all.object+n),element(all.element+n),stats(all.stats) { }
 	
-	float *density;
 	real *dist;
 	integer *object,*element;
 	TreeStats *stats;

@@ -4,11 +4,15 @@
 #include "rtbase.h"
 #include "triangle.h"
 
+
 class BaseScene {
 public:
 	void LoadWavefrontObj(const string &fileName);
 	TriVector ToTriVector() const;
 	BBox GetBBox() const;
+	
+	void Transform(const Matrix<Vec4f> &mat);
+	void Optimize();
 
 	class Triangle {
 	public:
@@ -29,24 +33,34 @@ public:
 		Object() { }
 		
 		Triangle GetTriangle(uint n) const;
-		
 		TriVector ToTriVector() const;
-		void FindOptimalTrans();
 		
+		void TransformData(const Matrix<Vec4f> &mat);
+		void Transform(const Matrix<Vec4f> &mat);
+		void Optimize();
+		
+		// transform included
 		inline BBox GetBBox() const { return bbox; }
+		
+		// transform not included
+		inline OptBBox GetOptBBox() const { return optBBox; }
+
 		inline Matrix<Vec4f> GetTrans() const { return trans; }
 		
-		string name;
-		Matrix<Vec4f> trans;
+		const string &GetName() const { return name; }
 		
 	protected:
 		vector<IndexedTri> tris;
 		vector<Vec3f> verts;
 		vector<Vec2f> uvs;
 		vector<Vec3f> normals;
-		BBox bbox;
 		
-		void UpdateBox();
+		BBox bbox;
+		string name;
+		OptBBox optBBox;
+		Matrix<Vec4f> trans;
+		
+		void FindOptimalTrans();
 		
 		friend class BaseScene;
 	};

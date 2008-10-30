@@ -1,6 +1,7 @@
 
 #include "triangle.h"
 
+/*
 	struct SortTris {
 		bool operator()(const Triangle &a,const Triangle &b) const {
 			Vec3p min1=a.BoundMin(),min2=b.BoundMin();
@@ -44,3 +45,4 @@
 			lights.push_back(Light(pos+dens*Vec3f(x/float(dx)-0.5f,y/float(dy)-0.5f,z/float(dz)-0.5f),col));
 	}
 
+*/
