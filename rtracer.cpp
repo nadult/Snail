@@ -304,7 +304,7 @@ int main(int argc, char **argv) {
 	int resx=800,resy=600;
 	bool fullscreen=0,nonInteractive=0;
 	int threads=4;
-	const char *modelFile="abrams_opt.obj";
+	const char *modelFile="abrams.obj";
 	Options options;
 	bool treeVisMode=0;
 
@@ -322,6 +322,7 @@ int main(int argc, char **argv) {
 
 	TriVector tris;
 	ShadingDataVec shadingData;
+	printf("Loading...\n");
 	BaseScene baseScene; {
 		baseScene.LoadWavefrontObj(string("scenes/")+modelFile);
 		tris=baseScene.ToTriVector();
@@ -334,6 +335,7 @@ int main(int argc, char **argv) {
 
 	if(treeVisMode) { TreeVisMain(tris); return 0; }
 
+	printf("Building..\n");
 	BVHBuilder bvhBuilder;
 	for(int n=0;n<baseScene.objects.size();n++) {
 		const BaseScene::Object &obj=baseScene.objects[n];

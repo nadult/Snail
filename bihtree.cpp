@@ -15,6 +15,7 @@ namespace {
 }
 
 BIHTree::BIHTree(const TriVector &objs) :split(1) {
+
 	objects.resize(objs.size());
 	if(!objects.size()) {
 		nodes.push_back(BIHNode());
@@ -35,7 +36,8 @@ BIHTree::BIHTree(const TriVector &objs) :split(1) {
 
 	Vec3p sumSize(0,0,0);
 	for(uint n=1;n<objects.size();n++) {
-		Vec3p min=objects[n].BoundMin(),max=objects[n].BoundMax();
+		Triangle t=objects[n];
+		Vec3p min=t.BoundMin(),max=t.BoundMax();
 		sumSize+=max-min;
 
 		pMin=VMin(pMin,min);

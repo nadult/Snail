@@ -1,9 +1,9 @@
 import os
 
 
-libs = [ 'gfxlib', 'baselib', 'glfw', 'GLU', 'png', 'pthread' ]
-libsLinux = [ 'GL', 'Xrandr' ]
-libsWin32 = [ 'opengl32' ]
+libs = [ 'gfxlib', 'baselib', 'glfw', 'png', 'pthread' ]
+libsLinux = [ 'GL', 'GLU', 'Xrandr' ]
+libsWin32 = [ 'opengl32', 'glu32' ]
 
 if Environment()["PLATFORM"] == 'posix': libs += libsLinux
 else: libs += libsWin32

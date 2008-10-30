@@ -246,7 +246,7 @@ public:
 	mutable MemPattern pattern;
 
 	float avgSize;
-	Vec3p pMin,pMax;
+	Vec3f pMin,pMax;
 	vector<BIHNode> nodes;
 	TriVector objects;
 
