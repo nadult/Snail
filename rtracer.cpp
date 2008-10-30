@@ -304,7 +304,7 @@ int main(int argc, char **argv) {
 	int resx=800,resy=600;
 	bool fullscreen=0,nonInteractive=0;
 	int threads=4;
-	const char *modelFile="abrams.obj";
+	const char *modelFile="abrams_opt.obj";
 	Options options;
 	bool treeVisMode=0;
 
