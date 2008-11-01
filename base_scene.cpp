@@ -1,5 +1,6 @@
 #include "base_scene.h"
 #include <iostream>
+#include <algorithm>
 
 
 TriVector BaseScene::ToTriVector() const {
@@ -94,6 +95,122 @@ void BaseScene::Object::Transform(const Matrix<Vec4f> &mat) {
 	trans=mat*trans;
 	bbox=BBox(&verts[0],verts.size());
 	optBBox=OptBBox(bbox,Inverse(trans));
+}
+
+namespace {
+	
+	struct Tri {
+		Tri() { }
+		Tri(int a,int b,int c,int src) :used(0),srcIdx(src) {
+			if(b<a) Swap(b,a); if(c<a) Swap(c,a); if(c<b) Swap(c,b);
+			v[0]=a; v[1]=b; v[2]=c;
+		}
+		bool operator<(const Tri &rhs) const {
+			return v[0]==rhs.v[0]?v[1]==rhs.v[1]?v[2]<rhs.v[2]:v[1]<rhs.v[1]:v[0]<rhs.v[0];
+		}
+		
+		bool used;
+		int v[3],srcIdx;
+	};
+	
+	bool Same(float a,float b) { return Abs(a-b)<Abs(a)/1000000.0f; }
+	
+	struct Vert {
+		Vert() { }
+		Vert(float xx,float yy,float zz,int idx) :srcIdx(idx),x(xx),y(yy),z(zz) { }
+		bool operator<(const Vert &rhs) const {
+			return Same(x,rhs.x)?Same(y,rhs.y)?Same(z,rhs.z)?srcIdx<rhs.srcIdx:z<rhs.z:y<rhs.y:x<rhs.x;
+		}
+		bool operator==(const Vert &rhs) const {
+			return Same(x,rhs.x)&&Same(y,rhs.y)&&Same(z,rhs.z);
+		}
+		
+		float x,y,z;
+		int srcIdx,first;
+	};
+	
+}
+
+void BaseScene::Object::BreakToElements(vector<Object> &out) {
+	vector<Vert> tVerts(verts.size());
+	for(int n=0;n<verts.size();n++)
+		tVerts[n]=Vert(verts[n].x,verts[n].y,verts[n].z,n);
+	std::sort(tVerts.begin(),tVerts.end());
+	
+	tVerts[0].first=0;
+	for(int n=1;n<tVerts.size();n++)
+		tVerts[n].first=tVerts[n]==tVerts[n-1]?tVerts[n-1].first:n;
+	
+	vector<int> optVerts(verts.size());
+	for(int n=0;n<tVerts.size();n++)
+		optVerts[tVerts[n].srcIdx]=tVerts[n].first;
+		
+	vector<int> uses(tVerts.size(),0);
+	int allUses=0;
+	
+	for(int n=0;n<tris.size();n++) {
+		const IndexedTri &tri=tris[n];
+		for(int v=0;v<3;v++) uses[optVerts[tri.v[v]]]++;
+		allUses+=3;
+	}
+	
+	vector<Tri> tTris(tris.size());
+	for(int n=0;n<tris.size();n++) {
+		const IndexedTri &tr=tris[n];
+		tTris[n]=Tri(optVerts[tr.v[0]],optVerts[tr.v[1]],optVerts[tr.v[2]],n);
+	}
+	
+	std::sort(tTris.begin(),tTris.end());
+	
+	{ // setting pointers for array vert->tri
+		int temp=uses[0]; uses[0]=0;
+		for(int n=1;n<uses.size();n++) {
+			int tt=uses[n];
+			uses[n]=uses[n-1]+temp;
+			temp=tt;
+		}
+	}
+	
+	vector<int> vertToTri(allUses);
+	for(int n=0;n<tTris.size();n++) {
+		const Tri &tri=tTris[n];
+		vertToTri[uses[tri.v[0]]++]=n;
+		vertToTri[uses[tri.v[1]]++]=n;
+		vertToTri[uses[tri.v[2]]++]=n;
+	}
+	
+	vector<int> stack(verts.size());
+	int stackPos=0;
+	
+	for(int t=0;t<tTris.size();t++) {
+		Tri &tri=tTris[t];
+		if(tri.used) continue;
+		tri.used=1;
+		
+		vector<IndexedTri> extraction;
+		for(int v=0;v<3;v++) stack[stackPos++]=tri.v[v];
+		extraction.push_back(tris[tri.srcIdx]);
+		
+		while(stackPos) {
+			int v=stack[--stackPos];
+			int *triIdx=&vertToTri[v==0?0:uses[v-1]];
+			int count=uses[v]-uses[v-1];
+			
+			for(int k=0;k<count;k++) {
+				Tri &tri=tTris[triIdx[k]];
+				if(tri.used) continue;
+				tri.used=1;
+				
+				extraction.push_back(tris[tri.srcIdx]);
+				for(int v=0;v<3;v++) stack[stackPos++]=tri.v[v];
+			}
+		}
+		
+//		static int c=0; c++;
+		printf(","); fflush(stdout);
+		out.push_back(Object(verts,uvs,normals,extraction));
+		extraction.clear();
+	}
 }
 
 void BaseScene::Object::Optimize() {

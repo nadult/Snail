@@ -235,7 +235,7 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 			if(!((i32x4)imask)[k]) continue;
 		
 			const BVH::Node &bvhNode=tree.nodes[c.objId[q][k]];
-			const Matrix<Vec4f> &m=bvhNode.globalTrans;
+			const Matrix<Vec4f> &m=bvhNode.trans;
 			Vec3f d=objects[bvhNode.subNode]->FlatNormals(c.elementId[q][k]);
 		
 			normals[k].x = d.x*m.x.x+d.y*m.y.x+d.z*m.z.x;

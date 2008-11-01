@@ -80,6 +80,7 @@ public:
 	}
 
 	Vec3f FlatNormals(u32 id) const { return TFlatNormals<BIHTree>(id); }
+	int Complexity() const { return objects.size(); }
 	
 	BIHTree(const TriVector &objects);
 
@@ -111,7 +112,7 @@ public:
 	void TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,Output<otNormal,f32x4,i32x4> output,int instanceId) const {
 		int mask[4]={GetVecSign(tDir[0]),GetVecSign(tDir[1]),GetVecSign(tDir[2]),GetVecSign(tDir[3])};
 		if(mask[1]!=mask[0]||mask[2]!=mask[0]||mask[3]!=mask[0]) mask[0]=8;
-		TraverseQuad4<Output<otNormal,f32x4,i32x4>,0>(rOrigin,tDir,output.dist,output.object,output.element,
+		TraverseQuad4<Output<otNormal,f32x4,i32x4>,1>(rOrigin,tDir,output.dist,output.object,output.element,
 												output.stats,instanceId,mask[0],-1);
 	}
 

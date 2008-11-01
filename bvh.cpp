@@ -28,34 +28,55 @@ int BVHBuilder::AddInstance(int objId,const Matrix<Vec4f> &trans) {
 namespace {
 	
 	struct SortObjects {
-		SortObjects(const BVHBuilder &b,int ax) :builder(b),axis(ax) { }
+		SortObjects(const vector<float> &vals) :values(vals) { }
 		
-		bool operator()(int a,int b) const {
-			const BBox &ba=builder.objects[builder.instances[a].objId].bBox*builder.instances[a].trans;
-			const BBox &bb=builder.objects[builder.instances[b].objId].bBox*builder.instances[b].trans;
-			return (&ba.Center().x)[axis]<(&bb.Center().x)[axis];
-		}
+		bool operator()(int a,int b) const { return values[a]<values[b]; }
 		
-		int axis;
-		const BVHBuilder &builder;
+		const vector<float> &values;
 	};
+	
+	/*
+	float BoxPointDistanceSq(const BBox &box,const Vec3f &point) const {
+		Vec3f center=box.Center(),size=box.Size()*0.5f;
+		float diff[3]={point.x-center.x,point.y-center.y,point.z-center.z};
+		float length[3]={size.x,size.y,size.z};
+		float p[3]={point.x,point.y,point.z};
+
+		float distance = 0.0;
+		float delta;
+
+		for( int i=0; i<3; i++ )
+			if ( diff[i]<-length[i] ) {
+				delta=diff[i]+length[i];
+				distance+=delta*delta;
+				diff[i]=-length[i];
+			}
+			else if (diff[i]>length[i] ) {
+				delta=diff[i]-length[i];
+				distance+=delta*delta;
+				diff[i]=length[i];
+			}
+
+		return distance;
+	} */
 	
 };
 
-void BVH::FindSplit(int nNode,const BVHBuilder &builder,vector<int> &indices) {
-	if(indices.size()<=2) {
-		nodes[nNode].count=indices.size();
+void BVH::FindSplit(int nNode,BBox sceneBox,const BVHBuilder &builder,vector<int> &indices,int first,int count,
+					const vector<BBox> &instBBoxes,const vector<float> centers[3],int depth) {
+	if(count<=2) {
+		nodes[nNode].count=count;
 		nodes[nNode].subNode=nodes.size();
 		
-		for(int n=0;n<indices.size();n++) {
-			const BVHBuilder::Instance &inst=builder.instances[indices[n]];
+		for(int n=0;n<count;n++) {
+			const BVHBuilder::Instance &inst=builder.instances[indices[first+n]];
 			const BVHBuilder::Obj &obj=builder.objects[inst.objId];
 			
 			Node newNode;
 			newNode.bBox=obj.bBox*inst.trans;
 			newNode.trans=obj.preTrans*inst.trans;
 			newNode.invTrans=Inverse(newNode.trans);
-			newNode.optBBox=obj.optBBox;
+			newNode.optBBox=OptBBox(obj.optBBox.GetBBox(),obj.optBBox.GetTrans()*newNode.trans);
 
 			newNode.subNode=inst.objId;
 			newNode.count=0;
@@ -64,45 +85,85 @@ void BVH::FindSplit(int nNode,const BVHBuilder &builder,vector<int> &indices) {
 		}
 	}
 	else {
-		int axis; {
-			BBox box=(builder.objects[builder.instances[indices[0]].objId].bBox)*builder.instances[indices[0]].trans;
-			for(int n=1;n<indices.size();n++) 
-				box+=(builder.objects[builder.instances[indices[n]].objId].bBox)*builder.instances[indices[n]].trans;
-				
-			Vec3f bSize=box.Size();
+		int axis; {		
+			Vec3f bSize=sceneBox.Size();
 			axis=bSize.x>bSize.y?0:1;
 			if(bSize.z>(&bSize.x)[axis]) axis=2;
 		}
+		BBox leftBox=sceneBox,rightBox=sceneBox;
+		float split=(&sceneBox.Center().x)[axis];
+		(&leftBox .max.x)[axis]=split;
+		(&rightBox.min.x)[axis]=split;
 		
-		std::sort(indices.begin(),indices.end(),SortObjects(builder,axis));
-		nodes[nNode].count=2;
-		nodes[nNode].subNode=nodes.size();
-		
-		vector<int> left,right;
-		for(int n=0;n<indices.size();n++)
-			(n<indices.size()/2?left:right).push_back(indices[n]);
+		std::sort(&indices[first],&indices[first+count],SortObjects(centers[axis]));
 			
-		int leftId =AddNode(-1,left.size());
-		int rightId=AddNode(-1,right.size());
-		
-		FindSplit(leftId,builder,left);
-		FindSplit(rightId,builder,right);
+		int lCount; {
+			int l=first,r=first+count-1;
+			while(l<r) {
+				int m=(l+r)/2;
+				if((&instBBoxes[indices[m]].Center().x)[axis]<split) l=m+1;
+				else r=m;
+			}
+			int rStart=(&instBBoxes[indices[r]].Center().x)[axis]<split?r+1:r;
+			
+			lCount=rStart-first;
+		}
+		int rCount=count-lCount;
+
+		if(lCount&&rCount) {
+			nodes[nNode].count=2;
+			nodes[nNode].subNode=nodes.size();
+			nodes[nNode].divAxis=axis;
+			
+			int leftId =AddNode(-1,lCount);
+			int rightId=AddNode(-1,count-lCount);
+			
+			FindSplit(leftId,leftBox,builder,indices,first,lCount,instBBoxes,centers,depth+1);
+			FindSplit(rightId,rightBox,builder,indices,first+lCount,count-lCount,instBBoxes,centers,depth+1);
+		}
+		else {
+			if(lCount) FindSplit(nNode,leftBox,builder,indices,first,count,instBBoxes,centers,depth+1);
+			if(rCount) FindSplit(nNode,rightBox,builder,indices,first,count,instBBoxes,centers,depth+1);
+		}
 	}
+	
+	maxDepth=Max(maxDepth,depth);
 }
 
 void BVH::Build(const BVHBuilder &builder) {
+	nodes.reserve(builder.objects.size()*2);
 	nodes.clear();
-	objects.clear();
 	
+	objects.resize(builder.objects.size());
 	for(int n=0;n<builder.objects.size();n++)
-		objects.push_back(builder.objects[n].object);
+		objects[n]=builder.objects[n].object;
 	
-	vector<int> indices;
-	for(int n=0;n<builder.instances.size();n++)
-		indices.push_back(n);
+	vector<BBox> instBBoxes(builder.instances.size());
+	vector<int> indices(builder.instances.size());
 	
+	
+	for(int n=0;n<builder.instances.size();n++) indices[n]=n;
+	for(int n=0;n<instBBoxes.size();n++) {
+		const BVHBuilder::Instance &inst=builder.instances[n];
+		instBBoxes[n]=(builder.objects[inst.objId].bBox)*inst.trans;
+	}
+
+	BBox sceneBox=instBBoxes[0];
+	for(int n=1;n<instBBoxes.size();n++) sceneBox+=instBBoxes[n];
+	
+	vector<float> centers[3];
+	for(int k=0;k<3;k++) centers[k].resize(instBBoxes.size());
+	for(int n=0;n<instBBoxes.size();n++) {
+		Vec3f center=instBBoxes[n].Center();
+		centers[0][n]=center.x;
+		centers[1][n]=center.y;
+		centers[2][n]=center.z;
+	}
+	
+	maxDepth=0;
+		
 	AddNode(1,indices.size());
-	FindSplit(0,builder,indices);
+	FindSplit(0,sceneBox,builder,indices,0,indices.size(),instBBoxes,centers,0);
 	
 	Update();
 }
@@ -141,7 +202,6 @@ float BoxPointDistanceSq(const BBox &box,const Vec3f &point,const Vec3f &dir) {
 
 void BVH::Update() {
 	UpdateBU(0,~0);
-	UpdateTD(0,~0);
 }
 
 void BVH::UpdateBU(int nNode,int nParent) {
@@ -174,13 +234,6 @@ void BVH::UpdateBU(int nNode,int nParent) {
 		 	node.sRadius=obbExtent[0]*obbExtent[0]+obbExtent[1]*obbExtent[1];
 		else  node.sRadius=obbExtent[0]*obbExtent[0]+obbExtent[2]*obbExtent[2];
 	}*/
-}
-
-void BVH::UpdateTD(int nNode,int nParent) {
-	Node &node=nodes[nNode];
-	node.globalTrans=nParent!=~0?node.trans*nodes[nParent].trans:node.trans;
-	for(int n=0;n<node.count;n++)
-		UpdateTD(node.subNode+n,nNode);
 }
 
 BBox BVH::GetBBox() const {

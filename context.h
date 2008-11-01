@@ -84,6 +84,7 @@ inline bool operator==(int a,const OutputType &b) { return a==int(b); }
 inline bool operator!=(const OutputType &a,int b) { return int(a)!=b; }
 inline bool operator!=(int a,const OutputType &b) { return a!=int(b); }
 
+
 //
 // Output classes hold pointers, so you can
 // still modify the data when referencing to it

@@ -241,7 +241,7 @@ TreeStats GenImage(int quadLevels,const AccStruct &tree,const Camera &camera,Ima
 	case 0: return GenImage<0>(tree,camera,image,options,tasks);
 	case 1: return GenImage<1>(tree,camera,image,options,tasks);
 	case 2: return GenImage<2>(tree,camera,image,options,tasks);
-//	case 3: return GenImage<3>(tree,camera,image,options,tasks);
+	case 3: return GenImage<3>(tree,camera,image,options,tasks);
 //	case 4: return GenImage<4>(tree,camera,image,options,tasks);
 	default: throw Exception("Quad level not supported.");
 	}
@@ -277,18 +277,22 @@ void BuildBVH(BVH &bvh,BVHBuilder &bvhBuilder) {
 	bvhBuilder.instances.clear();
 	Matrix<Vec4f> ident=Identity<>();
 	
-	Vec3f rotCenter(0,0,0);
-	Matrix<Vec4f> rot=Translate(-rotCenter)*RotateY(pos)*Translate(rotCenter);
-	
 	for(int n=0;n<bvhBuilder.objects.size();n++) {
-	//	bvhBuilder.AddInstance(n,Identity<>());
-		bvhBuilder.AddInstance(n,bvhBuilder.objects[n].bBox.Center().y<-0.1423f?rot:ident);
-		
+		//bvhBuilder.AddInstance(n,Identity<>());
 		//bvhBuilder.AddInstance(n,RotateY(pos*log(0.1f+float(n))));
-		//bvhBuilder.AddInstance(n,Translate(Vec3f(0,cos(pos+n*0.5f)*0.02f,0)));
+		bvhBuilder.AddInstance(n,Translate(Vec3f(0,cos(pos+n*0.5f)*0.02f,0)));
 	}
 	bvh.Build(bvhBuilder);
 }
+
+#include <gfxlib_font.h>
+
+
+class Font {
+	Font() :font("data/fonts/font1.fnt") { }
+	
+	gfxlib::Font font;
+};
 
 int main(int argc, char **argv) {
 	printf("Unnamed raytracer v0.07 by nadult\n");
@@ -304,7 +308,7 @@ int main(int argc, char **argv) {
 	int resx=800,resy=600;
 	bool fullscreen=0,nonInteractive=0;
 	int threads=4;
-	const char *modelFile="abrams_opt.obj";
+	const char *modelFile="abrams.obj";
 	Options options;
 	bool treeVisMode=0;
 
@@ -326,6 +330,16 @@ int main(int argc, char **argv) {
 	BaseScene baseScene; {
 		baseScene.LoadWavefrontObj(string("scenes/")+modelFile);
 		tris=baseScene.ToTriVector();
+		for(int n=0;n<baseScene.objects.size();n++) {
+			if(baseScene.objects.size()==1)/*if(baseScene.objects[n].GetName()=="Splitme_None_None")*/ {
+				BaseScene::Object obj=baseScene.objects[n];
+				baseScene.objects[n]=baseScene.objects.back();
+				baseScene.objects.pop_back();
+				
+				cout << "Splitting..." << '\n';
+				obj.BreakToElements(baseScene.objects);
+			}
+		}
 		baseScene.Optimize();
 	}
 
@@ -405,7 +419,7 @@ int main(int argc, char **argv) {
 				if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
 				if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
 				if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
-	//			if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
+				if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 			}
 
 			if(out.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 1 %s\n",gVals[0]?"on":"off"); }
@@ -430,13 +444,14 @@ int main(int argc, char **argv) {
 			//	}
 			}
 	
+			double time=GetTime();
+			
 			BVH bvh;
 			double buildTime=GetTime();
 			BuildBVH(bvh,bvhBuilder);
 			buildTime=GetTime()-buildTime;
 			
 			TreeStats stats;
-			double time=GetTime();
 			stats=GenImage(quadLevels,bvh,cam,img,options,threads);
 
 			out.RenderImage(img);

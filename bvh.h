@@ -18,6 +18,9 @@ public:
 	virtual void TraverseQuad4(const Vec3q *rOrigin,const Vec3q *tDir,Output<otNormal,f32x4,i32x4> output,int) const=0;
 	virtual BBox GetBBox() const=0;
 
+	// number of triangles for example
+	virtual int Complexity() const = 0;
+
 	template <class Derived>
 	Vec3f TFlatNormals(u32 elementId) const {
 		typedef typename Derived::Element Element;
@@ -73,166 +76,118 @@ public:
 	BBox GetBBox() const;
 
 protected:	
-	float BoxPointDistanceSq(const BBox &box,const Vec3f &point) const {
-		Vec3f center=box.Center(),size=box.Size()*0.5f;
-		float diff[3]={point.x-center.x,point.y-center.y,point.z-center.z};
-		float length[3]={size.x,size.y,size.z};
-		float p[3]={point.x,point.y,point.z};
-
-		float distance = 0.0;
-		float delta;
-
-		for( int i=0; i<3; i++ )
-			if ( diff[i]<-length[i] ) {
-				delta=diff[i]+length[i];
-				distance+=delta*delta;
-				diff[i]=-length[i];
-			}
-			else if (diff[i]>length[i] ) {
-				delta=diff[i]-length[i];
-				distance+=delta*delta;
-				diff[i]=length[i];
-			}
-
-		//if(where) *where=diff;
-		return distance;
+	template <class Rays,bool shared>
+	static void TransformRays(const Rays &rays,Vec3q * __restrict__ orig,Vec3q *__restrict__ dir,const Matrix<Vec4f> &mat) {
+		if(shared) orig[0]=mat*rays.Origin(0);
+		
+		for(int n=0;n<Rays::size;n++) {
+			if(!shared) orig[n]=mat*rays.Origin(n);
+			dir[n]=mat&rays.Dir(n);
+		}
 	}
-	
+
 public:
+
 	template <class Rays>
 	void Traverse(const Rays &rays,const RaySelector<Rays::size> &sel,Output<otNormal,f32x4,i32x4> output,int nNode=0) const {
 		const Node &node=nodes[nNode];
 		output.stats->Skip();
 		
-		if(node.count) {
-			if(node.count==2&&gVals[0]) {
-				const Node &a=nodes[node.subNode+0],&b=nodes[node.subNode+1];
-			
-				Vec3q orig0[Rays::size],orig1[Rays::size];
-				Vec3q dir0 [Rays::size],dir1 [Rays::size];
-				
-				for(int n=0;n<Rays::size;n++) {
-					orig0[n]=a.invTrans&rays.Origin(n);
-					dir0[n]=a.invTrans&rays.Dir(n);
-				}
-				for(int n=0;n<Rays::size;n++) {
-					orig1[n]=b.invTrans&rays.Origin(n);
-					dir1[n]=b.invTrans&rays.Dir(n);
-				}
+		enum { shared=1 };
 		
+		if(node.count) {
+			if(node.count==2) {
+				const Node &a=nodes[node.subNode+0],&b=nodes[node.subNode+1];
 				bool left=0,right=0;
-				for(int n=0;n<Rays::size;n++)
-					left|=a.Test(orig0[n],dir0[n],output.dist[n]);
-				for(int n=0;n<Rays::size;n++)
-					right|=b.Test(orig1[n],dir1[n],output.dist[n]);
+
+				for(int r=0;r<Rays::size&&!left;r++)
+					left|=a.bBox.Test(rays.Origin(shared?0:r),rays.Dir(r),output.dist[r]);
+				for(int r=0;r<Rays::size&&!right;r++)
+					right|=b.bBox.Test(rays.Origin(shared?0:r),rays.Dir(r),output.dist[r]);
 				
 				if(left&&right) {
-					Vec3f size0=a.bBox.Size(),size1=b.bBox.Size();
-					//Vec3f tDir(dir0[0].x[0],dir0[0].y[0],dir0[0].z[0]);
-					
-					float surf0=size0.x*(size0.y+size0.z)+size0.y*size0.z;
-					float surf1=size1.x*(size1.y+size1.z)+size1.y*size1.z;
-					
-					
-					if(gVals[2]) {
-						if(gVals[1]) {
-							surf0*=FastRSqrt(BoxPointDistanceSq(a.bBox,Vec3f(orig0[0].x[0],orig0[0].y[0],orig0[0].z[0])));
-							surf1*=FastRSqrt(BoxPointDistanceSq(b.bBox,Vec3f(orig1[0].x[0],orig1[0].y[0],orig1[0].z[0])));
-						} else {
-							surf0*=FastRSqrt(LengthSq(a.bBox.Center()-Vec3f(orig0[0].x[0],orig0[0].y[0],orig0[0].z[0])));
-							surf1*=FastRSqrt(LengthSq(b.bBox.Center()-Vec3f(orig1[0].x[0],orig1[0].y[0],orig1[0].z[0])));
-						}
+					Vec3f dir; {
+						Vec3q dirq=rays.Dir(0);
+						dir=Vec3f(dirq.x[0],dirq.y[0],dirq.z[0]);
 					}
-					bool first0=surf0>surf1;
 					
-					/*int min[3],max[3];
-					min[0]=b.bBox.min.x<a.bBox.min.x;
-					min[1]=b.bBox.min.y<a.bBox.min.y;
-					min[2]=b.bBox.min.z<a.bBox.min.z;
-					max[0]=b.bBox.max.x>a.bBox.max.x;
-					max[1]=b.bBox.max.y>a.bBox.max.y;
-					max[2]=b.bBox.max.z>a.bBox.max.z;
-					
-					int maxAxis=Abs(tDir.x)>Abs(tDir.y)?0:1;
-					if(Abs(tDir.z)>Abs((&tDir.x)[maxAxis])) maxAxis=2;
-					bool first0=((&tDir.x)[maxAxis]<0?max:min)[maxAxis]==0; */
-				
-				/*	float left=
-						Abs(tDir.x)*((tDir.x<0.0f?max:min)[0]==0)+
-						Abs(tDir.y)*((tDir.y<0.0f?max:min)[1]==0)+
-						Abs(tDir.z)*((tDir.z<0.0f?max:min)[2]==0);
-					float right=
-						Abs(tDir.x)*((tDir.x<0.0f?max:min)[0])+
-						Abs(tDir.y)*((tDir.y<0.0f?max:min)[1])+
-						Abs(tDir.z)*((tDir.z<0.0f?max:min)[2]);
-					bool first0=left<right;*/
-					
-					if(first0) {
-						Traverse(Rays(dir0,orig0),sel,output,node.subNode+0);
-						Traverse(Rays(dir1,orig1),sel,output,node.subNode+1);
+					if((&dir.x)[node.divAxis]>0) {
+						Traverse(rays,sel,output,node.subNode+0);
+						Traverse(rays,sel,output,node.subNode+1);
 					}
 					else {
-						Traverse(Rays(dir1,orig1),sel,output,node.subNode+1);
-						Traverse(Rays(dir0,orig0),sel,output,node.subNode+0);
+						Traverse(rays,sel,output,node.subNode+1);
+						Traverse(rays,sel,output,node.subNode+0);
 					}
 				}
 				else {
-					if(left) Traverse(Rays(dir0,orig0),sel,output,node.subNode+0);
-					if(right) Traverse(Rays(dir1,orig1),sel,output,node.subNode+1);
+					if(left) Traverse(rays,sel,output,node.subNode+0);
+					if(right) Traverse(rays,sel,output,node.subNode+1);
 				}
 			}
 			else for(int n=0;n<node.count;n++) {
 				const Node &tNode=nodes[node.subNode+n];
 				
-				Vec3q orig[Rays::size],dir[Rays::size];
-				for(int r=0;r<Rays::size;r++) {
-					orig[r]=tNode.invTrans&rays.Origin(r);
-					dir[r]=tNode.invTrans&rays.Dir(r);
-				}
-				
 				bool test=0;
-				for(int r=0;r<Rays::size;r++)
-					test|=tNode.Test(orig[r],dir[r],output.dist[r]);
+				for(int r=0;r<Rays::size&&!test;r++)
+					test|=tNode.bBox.Test(rays.Origin(shared?0:r),rays.Dir(r),output.dist[r]);
 					
-				if(test) Traverse(Rays(dir,orig),sel,output,node.subNode+n);
+				if(test) Traverse(rays,sel,output,node.subNode+n);
 			}
 		}
 		else {
-			int n=0;
-			for(;n<Rays::size-3;n+=4)
-				objects[node.subNode]->TraverseQuad4(&rays.Origin(n),&rays.Dir(n),Output<otNormal,f32x4,i32x4>(output,n),node.id);
-			for(;n<Rays::size;n++)
-				objects[node.subNode]->TraverseQuad(rays.Origin(n),rays.Dir(n),Output<otNormal,f32x4,i32x4>(output,n),node.id);
+			
+			bool test=1;
+			
+			/*if(gVals[3]) {
+				test=0; for(int r=0;r<Rays::size&&!test;r++)
+					test|=node.optBBox.Test(rays.Origin(shared?0:r),rays.Dir(r),output.dist[r]);
+			} else test=1;*/
+				
+			if(test) {
+				Vec3q orig[Rays::size],dir[Rays::size];
+				TransformRays<Rays,shared>(rays,orig,dir,node.invTrans);
+			
+				int n=0;
+				for(;n<Rays::size-3;n+=4)
+					objects[node.subNode]->TraverseQuad4(orig+(shared?0:n),dir+n,Output<otNormal,f32x4,i32x4>(output,n),node.id);
+				for(;n<Rays::size;n++)
+					objects[node.subNode]->TraverseQuad(orig[shared?0:n],dir[n],Output<otNormal,f32x4,i32x4>(output,n),node.id);
+			}
 		}
 	}
+
 		
 protected:
-	void FindSplit(int nNode,const BVHBuilder&,vector<int> &indices);
+	void FindSplit(int nNode,BBox sceneBox,const BVHBuilder&,vector<int> &indices,int first,int count,const vector<BBox> &instBBoxes,
+					const vector<float> centers[3],int depth);
 	
 	void Update();
 	void UpdateBU(int node,int nParent);
-	void UpdateTD(int node,int nParent);
 	
 	int AddNode(int sub,int count);
+	int maxDepth;
 	
 public:
 	struct Node {
+		Node() { divAxis=0; }
 		template <class Real,class Vec>
-		INLINE bool Test(Vec &rOrig,Vec &rDir,const Real &maxDist=Real(1.0f/0.0f)) const {
-			return count ? bBox.Test(rOrig,rDir,maxDist) : optBBox.Test(rOrig,rDir,maxDist);
-		}
+		bool Test(Vec &rOrig,Vec &rDir,const Real &maxDist=Real(1.0f/0.0f)) const NOINLINE;
+		
+		INLINE bool IsLeaf() const { return count==0; }
 
+		// used only in leafs
 		Matrix<Vec4f> trans,invTrans;
-		Matrix<Vec4f> globalTrans;
 
 		BBox bBox;
 		OptBBox optBBox;
 		
-		int subNode,count,id;
+		int subNode,count,id,divAxis;
 	};
 	
 	vector<PObject> objects;
 	vector<Node,AlignedAllocator<Node> > nodes;
 };
+
 
 #endif

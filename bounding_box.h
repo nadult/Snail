@@ -17,7 +17,7 @@ public:
 	inline Vec3f Center() const { return (max+min)*0.5f; }
 	
 	template <class Real,class Vec>
-	inline bool Test(const Vec &orig,const Vec &dir,const Real &maxDist=Real(1.0f/0.0f)) const {
+	INLINE bool Test(const Vec &orig,const Vec &dir,const Real &maxDist=Real(1.0f/0.0f)) const {
 		Real l1,l2,idir[3]={Inv(dir.x),Inv(dir.y),Inv(dir.z)};
 		
 		l1=idir[0]*(Real(min.x)-orig.x);
@@ -41,8 +41,8 @@ public:
 	Vec3f min,max;
 };
 
-inline BBox operator+(const BBox &a,const BBox &b) { BBox out(a); out+=b; return out; }
-inline BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out*=mat; return out; }
+INLINE BBox operator+(const BBox &a,const BBox &b) { BBox out(a); out+=b; return out; }
+INLINE BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out*=mat; return out; }
 
 class OptBBox {
 public:
@@ -56,7 +56,7 @@ public:
 	inline const BBox &GetBBox() const { return box; }
 	
 	template <class Real,class Vec>
-	inline bool Test(const Vec &rayOrig,const Vec &rayDir,const Real &maxDist=Real(1.0f/0.0f)) const {
+	INLINE bool Test(const Vec &rayOrig,const Vec &rayDir,const Real &maxDist=Real(1.0f/0.0f)) const {
 		return box.Test(invTrans*rayOrig,invTrans&rayDir,maxDist);
 	}
 	

@@ -69,7 +69,7 @@ public:
 
 	inline void LoopIteration(uint val=1) { if(enabled) iters+=val; }
 	inline void Intersection(uint val=1) { if(enabled) intersects+=val; }
-	inline void Skip(uint val=1) { if(enabled) skips++; }
+	inline void Skip(uint val=1) { if(enabled) skips+=val; }
 
 	inline void IntersectFail(uint val=1) { if(enabled) intersectFail+=val; }
 	inline void IntersectPass(uint val=1) { if(enabled) intersectPass+=val; }

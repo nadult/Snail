@@ -94,7 +94,7 @@ POP_STACK:
 			idx=node->val[nidx];
 		}
 
-		output.stats->Update(stats);
+		if(output.stats) output.stats->Update(stats);
 		output.dist[0]=minRet;
 	}
 

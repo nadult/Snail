@@ -37,6 +37,7 @@ public:
 		
 		void TransformData(const Matrix<Vec4f> &mat);
 		void Transform(const Matrix<Vec4f> &mat);
+		void BreakToElements(vector<Object> &output);
 		void Optimize();
 		
 		// transform included
