@@ -152,6 +152,9 @@ struct GenImageTask {
 					for(int k=0;k<4;k++) tmp[k]=rotMat*tmp[k];
 					Convert(tmp,dir[n]);
 					dir[n]*=RSqrt(dir[n]|dir[n]);
+					dir[n].x+=floatq(0.000000000001f);
+					dir[n].y+=floatq(0.000000000001f);
+					dir[n].z+=floatq(0.000000000001f);
 				}
 
 				TracingContext<RayGroup<NQuads,1,0>,RaySelector<NQuads> > context(RayGroup<NQuads,1,0>(dir,&origin,0));
@@ -167,14 +170,14 @@ struct GenImageTask {
 
 				if(NQuads==1) {
 					i32x4 col=ConvColor(rgb[0]);
-					u8 *c=(u8*)&col; u32 *ic=(u32*)&col;
+					const u8 *c=(u8*)&col;
 
 					u8 *p1=outPtr+y*pitch+x*3;
 					u8 *p2=p1+pitch;
 
-					*(int*)(p1+0)=col[0];
+					p1[ 0]=c[ 0]; p1[ 1]=c[ 1]; p1[ 2]=c[ 2];
 					p1[ 3]=c[ 4]; p1[ 4]=c[ 5]; p1[ 5]=c[ 6];
-					*(int*)(p2+0)=col[2];
+					p2[ 0]=c[ 8]; p2[ 1]=c[ 9]; p2[ 2]=c[10];
 					p2[ 3]=c[12]; p2[ 4]=c[13]; p2[ 5]=c[14];
 				}
 				else {
@@ -278,15 +281,14 @@ void BuildBVH(BVH &bvh,BVHBuilder &bvhBuilder) {
 	Matrix<Vec4f> ident=Identity<>();
 	
 	for(int n=0;n<bvhBuilder.objects.size();n++) {
-		//bvhBuilder.AddInstance(n,Identity<>());
-		//bvhBuilder.AddInstance(n,RotateY(pos*log(0.1f+float(n))));
-		bvhBuilder.AddInstance(n,Translate(Vec3f(0,cos(pos+n*0.5f)*0.02f,0)));
+		bvhBuilder.AddInstance(n,Identity<>());
+	//	bvhBuilder.AddInstance(n,RotateY(pos*log(0.1f+float(n))));
+	//	bvhBuilder.AddInstance(n,Translate(Vec3f(0,cos(pos+n*0.5f)*0.02f,0)));
 	}
 	bvh.Build(bvhBuilder);
 }
 
 #include <gfxlib_font.h>
-
 
 class Font {
 	Font() :font("data/fonts/font1.fnt") { }
@@ -340,12 +342,9 @@ int main(int argc, char **argv) {
 				obj.BreakToElements(baseScene.objects);
 			}
 		}
+		baseScene.SaveWavefrontObj("out/splitted.obj");
 		baseScene.Optimize();
 	}
-
-//	tris.push_back(Triangle(Vec3f(1000,65,-1000),Vec3f(-1000,65,-1000),Vec3f(1000,65,1000)));
-//	tris.push_back(Triangle(Vec3f(1000,65,1000),Vec3f(-1000,65,-1000),Vec3f(-1000,65,1000)));
-//	for(int n=0;n<2;n++) shadingData.push_back(ShadingData(Vec3p(0,1,0),Vec3p(0,1,0),Vec3p(0,1,0)));
 
 	if(treeVisMode) { TreeVisMain(tris); return 0; }
 

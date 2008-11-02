@@ -47,7 +47,7 @@ public:
 };
 
 struct BIHTravContext {
-	const Vec3q * __restrict__ origin,* __restrict__ dir;
+	const Vec3q *origin,*dir;
 	floatq * __restrict__ out; i32x4 * __restrict__ object; i32x4 * __restrict__ element;
 	TreeStats *stats;
 

@@ -186,7 +186,7 @@ RESORT:
 		}
 	}*/
 
-	//sah=0;
+//	sah=0;
 	/*{
 		float sSize; { Vec3p s=pMax-pMin; sSize=s.x*(s.y+s.z)+s.y*s.z; }
 		Vec3p size=max-min;

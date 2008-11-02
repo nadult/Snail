@@ -93,17 +93,17 @@ public:
 	int PrimaryBeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const;
 	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const;
 
-	void SetFlag1(uint value) { ((uint*)&a)[3]=value; }
-	void SetFlag2(uint value) { ((uint*)&ba)[3]=value; }
-	uint GetFlag1() const { return ((uint*)&a)[3]; }
-	uint GetFlag2() const { return ((uint*)&ba)[3]; }
+	void SetFlag1(uint value) { a.t0=UValue(value).f; }
+	void SetFlag2(uint value) { ba.t0=UValue(value).f; }
+	uint GetFlag1() const { return UValue(a.t0).i; }
+	uint GetFlag2() const { return UValue(ba.t0).i; }
 
 private:
 	void ComputeData() {
 		Vec3p nrm=(ba)^(ca);
 		float e1ce2Len=Length(nrm);
 		nrm/=e1ce2Len;
-		((float*)&ca)[3]=e1ce2Len;
+		ca.t0=e1ce2Len;
 		plane=Vec4p(nrm.x,nrm.y,nrm.z,nrm|a);
 
 		EdgeNormals::ComputeEdgeNormals(this);
@@ -126,7 +126,7 @@ typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) 
 	VecO tvec = rOrig-VecO(a);
 	real u = rDir|(VecO(ba)^tvec);
 	real v = rDir|(tvec^VecO(ca));
-	Bool test=Min(u,v)>=0.0f&&u+v<=det*real(((float*)&ca)[3]);
+	Bool test=Min(u,v)>=0.0f&&u+v<=det*real(ca.t0);
 
 	if (ForAny(test)) {
 		real dist=-(tvec|Nrm())/det;

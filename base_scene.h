@@ -3,11 +3,14 @@
 
 #include "rtbase.h"
 #include "triangle.h"
+#include <stdio.h>
 
 
 class BaseScene {
 public:
 	void LoadWavefrontObj(const string &fileName);
+	void SaveWavefrontObj(const string &fileName) const;
+	
 	TriVector ToTriVector() const;
 	BBox GetBBox() const;
 	

@@ -91,7 +91,7 @@ public:
 	template <class Rays>
 	void Traverse(const Rays &rays,const RaySelector<Rays::size> &sel,Output<otNormal,f32x4,i32x4> output,int nNode=0) const {
 		const Node &node=nodes[nNode];
-		output.stats->Skip();
+		//output.stats->Skip();
 		
 		enum { shared=1 };
 		
@@ -139,12 +139,14 @@ public:
 			
 			bool test=1;
 			
-			/*if(gVals[3]) {
+			if(gVals[0]) {
 				test=0; for(int r=0;r<Rays::size&&!test;r++)
 					test|=node.optBBox.Test(rays.Origin(shared?0:r),rays.Dir(r),output.dist[r]);
-			} else test=1;*/
-				
+			} else test=1;
+			
 			if(test) {
+				output.stats->Skip();
+				
 				Vec3q orig[Rays::size],dir[Rays::size];
 				TransformRays<Rays,shared>(rays,orig,dir,node.invTrans);
 			

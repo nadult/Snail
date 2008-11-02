@@ -1,7 +1,7 @@
 import os
 
 
-libs = [ 'gfxlib', 'baselib', 'glfw', 'png', 'pthread' ]
+libs = [ 'baselib', 'glfw', 'pthread', 'png', 'gfxlib' ] 
 libsLinux = [ 'GL', 'GLU', 'Xrandr' ]
 libsWin32 = [ 'opengl32', 'glu32' ]
 
@@ -11,7 +11,7 @@ else: libs += libsWin32
 default = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
-		CXX = 'g++',
+		CXX = '/usr/local/gcc-4.3.2/bin/g++',
 		CPPPATH = '.'
 	)
 
@@ -19,7 +19,8 @@ if int(ARGUMENTS.get('-m32',0)):
 	default=default.Clone( CXX='g++ -m32')
 
 release = default.Clone(
-	CXXFLAGS='-O3 -mssse3 -ffast-math -mfpmath=sse -funroll-all-loops -fpeel-loops -fstrict-aliasing -g -DNDEBUG',
+	CXXFLAGS='-O3 -mssse3 -ffast-math -mfpmath=sse -fvariable-expansion-in-unroller  -fprefetch-loop-arrays -funroll-all-loops \
+				-fpeel-loops -g -DNDEBUG -Wstrict-aliasing=2',
 	BUILDDIR='build/release/'
 )
 debug = default.Clone(

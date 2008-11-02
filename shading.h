@@ -10,6 +10,7 @@ void InitializationShader(Context &c,uint i,const typename Context::real &maxDis
 	c.distance[i]=maxDist;
 	c.color[i]=Const<f32x4,0>();
 	c.light[i]=ambient;
+	c.objId[i]=c.elementId[i]=i32x4(0);
 }
 
 
@@ -75,7 +76,7 @@ void StatsShader(Context &c,uint i) {
 //	c.color[i].y*=0.1f;
 	c.color[i].x=float(c.stats.Intersects())*(0.005f/Context::size);
 	c.color[i].y=0.0f;//float(c.stats.LoopIters())*(0.001f/Context::size);
-	c.color[i].z=float(c.stats.Skips()*0.005f);
+	c.color[i].z=float(c.stats.Skips()*0.025f);
 }
 	
 

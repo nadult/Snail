@@ -175,7 +175,7 @@
 						u[3]=tDir[3]|(ba^tvec[3]); v[3]=tDir[3]|(tvec[3]^ca);
 					}
 				
-					floatq nrmLen=floatq( ((float*)&obj.ca)[3] );
+					floatq nrmLen=floatq(obj.ca.t0);
 
 					stats.Intersection(4);
 					int passMask=0;

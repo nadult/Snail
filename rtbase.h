@@ -11,6 +11,7 @@
 #include <cassert>
 
 
+
 using namespace baselib;
 using namespace veclib;
 
@@ -49,7 +50,7 @@ public:
 		last=0;
 	}
 	void Insert(u32 idx) {
-		((u32*)indices)[last]=idx;
+		indices[0].i[last]=idx;
 		last=(last+1)%(size*4);
 	}
 	bool Find(u32 idx) {

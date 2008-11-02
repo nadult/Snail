@@ -172,6 +172,7 @@ public:
 	AccStruct tree;
 };*/
 
+/*
 Vec3q Sample(const gfxlib::Texture &tex,const Vec2q &uv) {
 	Vec2q pos=uv*Vec2q(float(tex.Width()),float(tex.Height()));
 	i32x4 x(pos.x),y(pos.y);
@@ -196,7 +197,7 @@ Vec3q Sample(const gfxlib::Texture &tex,const Vec2q &uv) {
 	out.x[3]=pix[3][0]; out.y[3]=pix[3][1]; out.z[3]=pix[3][2];
 
 	return out*f32x4(1.0f/255.0f);
-}
+}*/
 
 template <class AccStruct,class Group,class Selector>
 void TraceReflection(const AccStruct &tree,TracingContext<Group,Selector> &c);
@@ -269,7 +270,8 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 		int q=c.selector[i];
 		c.color[q]=Condition(c.selector.Mask(i),c.color[q]*c.light[q]);
 	}
-	else*/ for(int i=0;i<c.selector.Num();i++) {
+	else*/
+	for(int i=0;i<c.selector.Num();i++) {
 		int q=c.selector[i];
 		c.color[q]=Condition(c.selector.Mask(i),c.color[q]);
 	}

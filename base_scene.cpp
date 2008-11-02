@@ -72,6 +72,7 @@ BaseScene::Object::Object(const vector<Vec3f> &tverts,const vector<Vec2f> &tuvs,
 	for(int n=0;n<tris.size();n++) {
 		const BaseScene::IndexedTri &src=ttris[n];
 		BaseScene::IndexedTri &dst=tris[n];
+			
 		for(int k=0;k<3;k++) {
 			dst.v[k]=vIMap[src.v[k]];
 			dst.vt[k]=src.vt[k]>=0?uvIMap[src.vt[k]]:-1;

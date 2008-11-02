@@ -169,3 +169,28 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 	}
 	GenShadingData(verts,coords,tris,shadingData,1); */
 }
+
+void BaseScene::SaveWavefrontObj(const string &fileName) const {
+	std::filebuf fb;
+	if(!fb.open (fileName.c_str(),std::ios::out)) return;
+
+	std::ostream os(&fb);
+	
+	for(int n=0;n<objects.size();n++) {
+		const Object &obj=objects[n];
+		os << "o " << (obj.name==""?Stringize("object_",n):obj.name) << '\n';
+		
+		for(int f=0;f<obj.tris.size();f++) {
+			const IndexedTri &tri=obj.tris[f];
+			Vec3f vert=obj.trans * obj.verts[tri.v[0]];
+			os << "v " << vert.x << ' ' << -vert.y << ' ' << vert.z << '\n';
+			vert=obj.trans * obj.verts[tri.v[1]];
+			os << "v " << vert.x << ' ' << -vert.y << ' ' << vert.z << '\n';
+			vert=obj.trans * obj.verts[tri.v[2]];
+			os << "v " << vert.x << ' ' << -vert.y << ' ' << vert.z << '\n';
+			os << "f -3 -2 -1\n";
+		}
+	}
+	
+	fb.close();
+}
