@@ -4,7 +4,7 @@
 #include "scene.h"
 #include "camera.h"
 
-#include "bihtree.h"
+#include "bih/tree.h"
 #include "gl_window.h"
 #include "formats/loader.h"
 #include "bvh.h"
@@ -110,6 +110,86 @@ inline i32x4 ConvColor(const Vec3q &rgb) {
 	return _mm_unpacklo_epi16(c12,c33);
 }
 
+template <class Group,class Selector>
+void RayTrace(const bih::Tree<bih::BIHBox<bih::Tree<Triangle> > > &tree,TracingContext<Group,Selector> &c) {
+	enum { primary=0 };
+	
+	typedef typename Vec3q::TScalar real;
+	typedef typename Vec3q::TBool boolean;
+	const floatq maxDist=100000.0f;
+
+	for(int i=0;i<c.selector.Num();i++) {
+		int q=c.selector.Idx(i);
+		InitializationShader(c,q,maxDist);
+	}
+
+	tree.TraversePacketF0(c.rays,c.selector,Output<primary?otPrimary:otNormal,f32x4,i32x4>(c),0);
+//	const vector<PObject> &objects = tree.objects;
+
+	for(int i=0;i<c.selector.Num();i++) {
+		int q=c.selector.Idx(i);
+//		const Element *obj=&tree.objects[0];
+
+		if(c.selector.DisableWithMask(i,c.distance[q]>=maxDist)) {
+			c.color[q]=Vec3q(Const<real,0>());
+			i--; continue;
+		}
+
+		i32x4b imask(c.selector.Mask(i));
+
+		c.position[q]=c.RayDir(q)*c.distance[q]+c.RayOrigin(q);
+		
+		Vec3f normals[4];
+		for(int k=0;k<4;k++) {
+			if(!((i32x4)imask)[k]) continue;
+	
+			normals[k]=Vec3f(0.0f,1.0f,0.0f);	
+	//		const AccStruct::Node &bvhNode=tree.nodes[c.objId[q][k]];
+	//		const Matrix<Vec4f> &m=bvhNode.trans;
+			normals[k]=tree.FlatNormals(c.objId[q][k],c.elementId[q][k]);
+		
+	//		normals[k].x = d.x*m.x.x+d.y*m.y.x+d.z*m.z.x;
+	//		normals[k].y = d.x*m.x.y+d.y*m.y.y+d.z*m.z.y;
+	//		normals[k].z = d.x*m.x.z+d.y*m.y.z+d.z*m.z.z;
+		}
+		Convert(normals,c.normal[q]);
+		
+	/*	if(c.options.shadingMode==smGouraud)
+			c.normal[q]=GouraudNormals(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
+		else
+			c.normal[q]=FlatNormals<Vec3q>(tree.objects,Condition(imask,c.objId[q]));*/
+	
+	//	DistanceShader(c,q);
+		SimpleLightingShader(c,q);
+	//	Vec2q texCoord=GouraudTexCoords(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
+	//	c.color[q]*=Sample(tex,texCoord);
+	}
+
+	/*if(lightsEnabled) {
+		assert(ShadowCache::size>=lights.size());
+		for(int n=0;n<lights.size();n++)
+			TraceLight(c,lights[n],n);
+	}
+
+	if(c.options.reflections>0&&c.selector.Num())
+		TraceReflection(c);
+
+	if(lights.size()&&lightsEnabled)
+		for(int i=0;i<c.selector.Num();i++) {
+		int q=c.selector[i];
+		c.color[q]=Condition(c.selector.Mask(i),c.color[q]*c.light[q]);
+	}
+	else*/
+	for(int i=0;i<c.selector.Num();i++) {
+		int q=c.selector[i];
+		c.color[q]=Condition(c.selector.Mask(i),c.color[q]);
+	}
+	if(c.options.rdtscShader)
+		for(int q=0;q<Selector::size;q++)
+			StatsShader(c,q);
+}
+
+
 template <class AccStruct,int QuadLevels>
 struct GenImageTask {
 	GenImageTask(const AccStruct *tr,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,uint tw,uint th,TreeStats *outSt)
@@ -144,7 +224,7 @@ struct GenImageTask {
 				
 		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
-				Vec3q dir[NQuads];
+				Vec3q dir[NQuads],idir[NQuads];
 				rayGen.Generate(PWidth,PHeight,startX+x,startY+y,dir);
 
 				for(int n=0;n<NQuads;n++) {
@@ -155,9 +235,10 @@ struct GenImageTask {
 					dir[n].x+=floatq(0.000000000001f);
 					dir[n].y+=floatq(0.000000000001f);
 					dir[n].z+=floatq(0.000000000001f);
+					idir[n]=VInv(dir[n]);
 				}
 
-				TracingContext<RayGroup<NQuads,1,0>,RaySelector<NQuads> > context(RayGroup<NQuads,1,0>(dir,&origin,0));
+				TracingContext<RayGroup<NQuads,1,1>,RaySelector<NQuads> > context(RayGroup<NQuads,1,1>(&origin,dir,idir));
 				Vec3q *rgb=context.color;
 
 				context.options=TracingOptions(options.reflections?1:0,options.shading,options.rdtscShader);
@@ -332,35 +413,37 @@ int main(int argc, char **argv) {
 	BaseScene baseScene; {
 		baseScene.LoadWavefrontObj(string("scenes/")+modelFile);
 		tris=baseScene.ToTriVector();
-		for(int n=0;n<baseScene.objects.size();n++) {
-			if(baseScene.objects.size()==1)/*if(baseScene.objects[n].GetName()=="Splitme_None_None")*/ {
-				BaseScene::Object obj=baseScene.objects[n];
-				baseScene.objects[n]=baseScene.objects.back();
-				baseScene.objects.pop_back();
+	/*	if(baseScene.objects.size()==1) {
+			BaseScene::Object obj=baseScene.objects[0];
+			baseScene.objects[0]=baseScene.objects.back();
+			baseScene.objects.pop_back();
 				
-				cout << "Splitting..." << '\n';
-				obj.BreakToElements(baseScene.objects);
-			}
-		}
-		baseScene.SaveWavefrontObj("out/splitted.obj");
+			cout << "Splitting..." << '\n';
+			obj.BreakToElements(baseScene.objects);
+		} */
+	//	baseScene.SaveWavefrontObj("out/splitted.obj");
 		baseScene.Optimize();
 	}
 
 	if(treeVisMode) { TreeVisMain(tris); return 0; }
 
+	typedef bih::Tree<Triangle> BIH;
+
 	printf("Building..\n");
 	BVHBuilder bvhBuilder;
 	for(int n=0;n<baseScene.objects.size();n++) {
 		const BaseScene::Object &obj=baseScene.objects[n];
-		bvhBuilder.AddObject(new BIHTree(obj.ToTriVector()),obj.GetTrans(),obj.GetBBox(),obj.GetOptBBox());
+		bvhBuilder.AddObject(new BIH(obj.ToTriVector()),obj.GetTrans(),obj.GetBBox(),obj.GetOptBBox());
 	}
+//	bvhBuilder.AddObject(new BIH(tris),Identity<>(),baseScene.GetBBox(),OptBBox());
+	printf("Done building\n");
 
 	Image img(resx,resy,16);
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
 		cam.pos=Center(tris);
 
-	uint quadLevels=2;
+	uint quadLevels=1;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
 	for(int n=0;n<4;n++)
@@ -444,14 +527,24 @@ int main(int argc, char **argv) {
 			}
 	
 			double time=GetTime();
-			
-			BVH bvh;
+		
 			double buildTime=GetTime();
-			BuildBVH(bvh,bvhBuilder);
+
+			typedef bih::BIHBox<bih::Tree<Triangle> > Elem;
+			vector<Elem,AlignedAllocator<Elem> > elems;
+			if(!gVals[0]) for(int n=0;n<bvhBuilder.instances.size();n++) {
+				const BVHBuilder::Instance &inst=bvhBuilder.instances[n];
+				const BVHBuilder::Obj &obj=bvhBuilder.objects[inst.objId];
+				elems.push_back(Elem((bih::Tree<Triangle>*)&*obj.object,obj.preTrans*inst.trans,obj.bBox));
+			}
+			bih::Tree<Elem> root(elems);
+			BVH bvh; if(gVals[0]) BuildBVH(bvh,bvhBuilder);
+
 			buildTime=GetTime()-buildTime;
 			
 			TreeStats stats;
-			stats=GenImage(quadLevels,bvh,cam,img,options,threads);
+			if(gVals[0]) stats=GenImage(quadLevels,bvh,cam,img,options,threads);
+			else stats=GenImage(quadLevels,root,cam,img,options,threads);
 
 			out.RenderImage(img);
 			out.SwapBuffers();

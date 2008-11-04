@@ -20,3 +20,14 @@ BIH:
 Kdtree: ( olac :) )
 - Poprawnie wyliczyc epsilon w Triangle::BeamCollide
 - Obsluzyc beamCollision == 2
+
+
+
+
+
+
+------------
+- specjalizacja RaySelector<1>
+- zrobic procedurke RepairRays ktora zabezpiecza przed dzieleniem przed zero dodajac 0.00000001 
+   (a moze zrobic tak jak w travmono ? )
+

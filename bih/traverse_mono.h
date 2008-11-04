@@ -1,6 +1,8 @@
 
-	template <class Output>
-	void BIHTree::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output,int instanceId) const {
+namespace bih {
+
+	template <class Element> template <class Output>
+	void Tree<Element>::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output,int instanceId) const {
 		float maxD=output.dist[0];
 
 		TreeStats stats;
@@ -13,7 +15,7 @@
 		float minRet=maxD,tMin=ConstEpsilon<float>(),tMax=maxD;
 
 		struct Locals { float tMin,tMax; u32 idx; } stackBegin[maxLevel+2],*stack=stackBegin;
-		const BIHNode *node,*node0=&nodes[0];
+		const Node *node,*node0=&nodes[0];
 		int idx=0;
 
 		tMax=Min(tMax,minRet);
@@ -36,12 +38,12 @@
 			stats.LoopIteration();
 			if(tMin>tMax) goto POP_STACK;
 		
-			if(idx&BIHNode::leafMask) {
-				idx&=BIHNode::idxMask;
+			if(idx&Node::leafMask) {
+				idx&=Node::idxMask;
 				{
 					stats.Intersection();
-					const BIHTriangle &obj=objects[idx];
-					float ret=obj.Collide(rOrigin,tDir);
+					const Element &element=elements[idx];
+					float ret=element.Collide(rOrigin,tDir);
 					if(ret<minRet&&ret>0) {
 						minRet=ret;
 						if(Output::objectIndexes) {
@@ -61,7 +63,7 @@ POP_STACK:
 				continue;
 			}
 
-			idx&=BIHNode::idxMask;
+			idx&=Node::idxMask;
 			node=node0+idx;
 			int axis=node->Axis();
 			int nidx=dirMask&(1<<axis)?1:0,fidx=nidx^1;
@@ -97,5 +99,7 @@ POP_STACK:
 		if(output.stats) output.stats->Update(stats);
 		output.dist[0]=minRet;
 	}
+
+}
 
 

@@ -19,7 +19,7 @@ if int(ARGUMENTS.get('-m32',0)):
 	default=default.Clone( CXX='g++ -m32')
 
 release = default.Clone(
-	CXXFLAGS='-O3 -mssse3 -ffast-math -mfpmath=sse -fvariable-expansion-in-unroller  -fprefetch-loop-arrays -funroll-all-loops \
+	CXXFLAGS='-O3 -mssse3 -mfpmath=sse -fvariable-expansion-in-unroller -fprefetch-loop-arrays -funroll-all-loops \
 				-fpeel-loops -g -DNDEBUG -Wstrict-aliasing=2',
 	BUILDDIR='build/release/'
 )
@@ -59,7 +59,8 @@ def ExcludeFromList(tList,tObj):
 def Build( env, progName ):
 	baseObjects = BuildObjects( env, ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
 	formatsObjects = BuildObjects( env, ListCppFiles('formats/'), 'formats/')
-	env.Program(progName, baseObjects+formatsObjects, LIBS=libs )
+	bihObjects = BuildObjects( env, ListCppFiles('bih/'), 'bih/')
+	env.Program(progName, baseObjects+formatsObjects+bihObjects, LIBS=libs )
 
 Build( release, 'rtracer' )
 Build( debug, 'rtracerd' )

@@ -7,7 +7,7 @@
 #	-rm callgrind.out* cachegrind.out*
 #	alleyop ./rtracer -res 800 600 eagles_nest2.obj
 
-profile:
-	gprof|less
+prof:
+	gprof rtracer|less -S
 
 .PHONY: profile profilec

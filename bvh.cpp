@@ -1,5 +1,4 @@
 #include "bvh.h"
-#include "bihtree.h"
 #include <algorithm>
 
 
@@ -76,7 +75,6 @@ void BVH::FindSplit(int nNode,BBox sceneBox,const BVHBuilder &builder,vector<int
 			newNode.bBox=obj.bBox*inst.trans;
 			newNode.trans=obj.preTrans*inst.trans;
 			newNode.invTrans=Inverse(newNode.trans);
-			newNode.optBBox=OptBBox(obj.optBBox.GetBBox(),obj.optBBox.GetTrans()*newNode.trans);
 
 			newNode.subNode=inst.objId;
 			newNode.count=0;
@@ -94,7 +92,7 @@ void BVH::FindSplit(int nNode,BBox sceneBox,const BVHBuilder &builder,vector<int
 		float split=(&sceneBox.Center().x)[axis];
 		(&leftBox .max.x)[axis]=split;
 		(&rightBox.min.x)[axis]=split;
-		
+
 		std::sort(&indices[first],&indices[first+count],SortObjects(centers[axis]));
 			
 		int lCount; {
@@ -140,7 +138,6 @@ void BVH::Build(const BVHBuilder &builder) {
 	
 	vector<BBox> instBBoxes(builder.instances.size());
 	vector<int> indices(builder.instances.size());
-	
 	
 	for(int n=0;n<builder.instances.size();n++) indices[n]=n;
 	for(int n=0;n<instBBoxes.size();n++) {

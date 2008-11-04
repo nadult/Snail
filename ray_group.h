@@ -34,9 +34,12 @@ class RaySelector {
 public:
 	enum { size=size_ };
 private:
-	u8 idx[size];
-	char bits[size];
 	int num;
+	u8 idx[size];
+	union {
+		char bits[size];
+		int bits4[size/4];
+	};
 public:
 	INLINE RaySelector() :num(0) { }
 
@@ -44,6 +47,18 @@ public:
 	INLINE RayIndex Last() const			{ return idx[num-1]; }
 	INLINE RayIndex Idx(int n) const		{ return idx[n]; }
 	INLINE RayIndex operator[](int n) const { return idx[n]; }
+	
+	INLINE void SplitTo4(RaySelector<size/4> part[4]) const {
+		part[0].Clear();
+		part[1].Clear();
+		part[2].Clear();
+		part[3].Clear();
+		
+		for(int n=0;n<Num();n++) {
+			int idx=Idx(n);
+			part[idx/(size/4)].Add(idx&(size/4-1),BitMask(n));
+		}
+	}
 
 	// Moves last index to n,
 	// decreases number of selected rays
@@ -70,16 +85,91 @@ public:
 	template <class Selector>
 	INLINE void Add(const Selector &other,int n)	{ Add(other[n],other.BitMask(n)); }
 
+	INLINE int	BitMask4(int n) const			{ return bits4[n]; }
 	INLINE int  BitMask(int n) const			{ return bits[n]; }
 	INLINE f32x4b Mask(int n) const				{ return GetSSEMaskFromBits(bits[n]); }
 	INLINE void SetBitMask(int n,int m)			{ bits[n]=m; }
-	INLINE void SetMask(int n,const f32x4b &m)	{ return bits[n]=_mm_movemask_ps(m.m); }
+	INLINE void SetMask(int n,const f32x4b &m)	{ bits[n]=_mm_movemask_ps(m.m); }
 
 	INLINE void Clear() { num=0; }
 	INLINE void SelectAll() {
 		num=size;
 		for(int n=0;n<size;n++) { idx[n]=n; bits[n]=15; }
 	}
+};
+
+template <>
+class RaySelector<1> {
+public:
+	enum { size=1 };
+private:
+	char bits;
+public:
+	INLINE RaySelector() :bits(0) { }
+
+	INLINE int Num() const					{ return bits?1:0; }
+	INLINE RayIndex Last() const			{ return 0; }
+	INLINE RayIndex Idx(int n) const		{ return 0; }
+	INLINE RayIndex operator[](int n) const { return 0; }
+	
+	// Moves last index to n,
+	// decreases number of selected rays
+	INLINE void Disable(int n) {
+		assert(n==0);
+		bits=0;
+	}
+	INLINE bool DisableWithMask(int n,const f32x4b &m) {
+		assert(n==0); 
+		int newMask=_mm_movemask_ps(m.m);
+		bits&=~newMask;
+		return !bits;
+	}
+	INLINE bool DisableWithBitMask(int n,int newMask) {
+		assert(n==0);
+		bits&=~newMask;
+		return !bits;
+	}
+
+	INLINE void Add(RayIndex i,int bitMask=15) {
+		assert(bits==0);
+		bits=bitMask;
+	}
+	template <class Selector>
+	INLINE void Add(const Selector &other,int n)	{ Add(other[n],other.BitMask(n)); }
+
+	INLINE int	BitMask4(int n) const			{ return bits; }
+	INLINE int  BitMask(int n) const			{ return bits; }
+	INLINE f32x4b Mask(int n) const				{ return GetSSEMaskFromBits(bits); }
+	INLINE void SetBitMask(int n,int m)			{ bits=m; }
+	INLINE void SetMask(int n,const f32x4b &m)	{ bits=_mm_movemask_ps(m.m); }
+
+	INLINE void Clear() { bits=0; }
+	INLINE void SelectAll() { bits=0xf; }
+};
+
+
+template <int size_>
+class FullSelector {
+public:
+	enum { size=size_ };
+
+	operator RaySelector<size>() const {
+		RaySelector<size> sel;
+		sel.SelectAll();
+		return sel;
+	}
+
+	INLINE int Num() const					{ return size; }
+	INLINE RayIndex Last() const			{ return size-1; }
+	INLINE RayIndex Idx(int n) const		{ return n; }
+	INLINE RayIndex operator[](int n) const { return n; }
+	
+	INLINE void SplitTo4(FullSelector<size/4> part[4]) const { }
+
+	INLINE int	BitMask4(int n) const			{ return 0x0f0f0f0f; }
+	INLINE int  BitMask(int n) const			{ return 0xf; }
+	INLINE f32x4b Mask(int n) const				{ return GetSSEMaskFromBits(0xf); }
+
 };
 
 // returns 8 for mixed rays
@@ -114,13 +204,13 @@ public:
 		SplitSelectorsBySign(oldSelector,sel,&Dir(0));
 	}
 
-	INLINE RayGroup(Vec3q *d,Vec3q *o,Vec3q *i=0) :dir(d),origin(o),idir(i) { assert(!precomputedInverses||idir); }
+	INLINE RayGroup(Vec3q *o,Vec3q *d,Vec3q *i=0) :dir(d),origin(o),idir(i) { assert(!precomputedInverses||idir); }
 
 	template <int tSize,bool tPrecomputed>
-	INLINE RayGroup(RayGroup<tSize,sharedOrigin,tPrecomputed> &other,int shift)
+	INLINE RayGroup(const RayGroup<tSize,sharedOrigin,tPrecomputed> &other,int shift)
 		:dir(other.dir+shift)
 		,origin(sharedOrigin?other.origin:other.origin+shift)
-		,idir(precomputedInverses?tPrecomputed?other.idir+shift:0:0) { }
+		,idir(precomputedInverses&&tPrecomputed?other.idir+shift:0) { }
 
 	INLINE Vec3q &Dir(int n)				{ return dir[n]; }
 	INLINE const Vec3q &Dir(int n) const	{ return dir[n]; }
@@ -134,7 +224,7 @@ public:
 	INLINE Vec3q *OriginPtr()	{ return origin; }
 	INLINE Vec3q *IDirPtr()		{ return precomputedInverses?idir:0; }
 
-private:
+//private:
 	Vec3q *dir,*idir,*origin;
 };
 

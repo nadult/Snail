@@ -2,6 +2,8 @@
 #define RTRACER_TRIANGLE_H
 
 #include "rtbase.h"
+#include "ray_group.h"
+#include "context.h"
 
 
 template <class Triangle>
@@ -38,7 +40,6 @@ public:
 protected:
 	void ComputeEdgeNormals(Triangle *base) { }
 };
-
 
 template <template <class> class TEdgeNormals>
 class TTriangle: public TEdgeNormals < TTriangle <TEdgeNormals> >
@@ -77,6 +78,7 @@ public:
 	inline Vec3p Edge3Normal() const { return EdgeNormals::Edge3Normal(this); }
 
 	inline Vec3p Nrm() const { return Vec3p(plane); }
+	INLINE Vec3p Nrm(int) const { return Nrm(); }
 
 	inline Vec3p BoundMin() const { return VMin(P1(),VMin(P2(),P3())); }
 	inline Vec3p BoundMax() const { return VMax(P1(),VMax(P2(),P3())); }
@@ -86,6 +88,10 @@ public:
 
 	template <class VecO,class Vec>
 	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
+
+	template <int packetSize,bool sharedOrigin,OutputType outputType,bool precompInv>
+	void Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,
+					Output<outputType,f32x4,i32x4> output,int objId,int elemId) const NOINLINE;
 
 	template <class Vec0,class Vec,class real>
 	void Barycentric(const Vec0 &rOrig,const Vec &rDir,real &u,real &v) const;
@@ -134,6 +140,36 @@ typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) 
 	}
 
 	return out;
+}
+
+template<template<class> class EN> template <int packetSize,bool sharedOrigin,OutputType outputType,bool precompInv>
+void TTriangle<EN>::Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,
+				Output<outputType,f32x4,i32x4> output,int objId,int elemId) const {
+	Vec3p nrm=Nrm();
+	Vec3q ta(a);
+
+	Vec3q sharedTVec;
+	if(sharedOrigin) sharedTVec=rays.Origin(0)-ta;
+
+	for(int q=0;q<packetSize;q++) {
+		floatq det=rays.Dir(q)|nrm;
+		Vec3q tvec=sharedOrigin?sharedTVec:rays.Origin(q)-ta;
+
+		floatq u=rays.Dir(q)|(Vec3q(ba)^tvec);
+		floatq v=rays.Dir(q)|(tvec^Vec3q(ca));
+		f32x4b test=Min(u,v)>=0.0f&&u+v<=det*floatq(ca.t0);
+
+		if(ForAny(test)) {
+			floatq dist=-(tvec|nrm)/det;
+			test=test&&dist<output.dist[q];
+
+			output.dist[q]=Condition(test,dist,output.dist[q]);
+
+			i32x4b itest(test);
+			output.object[q]=Condition(itest,i32x4(objId),output.object[q]);
+			output.element[q]=Condition(itest,i32x4(elemId),output.element[q]);
+		}
+	}
 }
 
 template <template <class> class EN> template <class VecO,class Vec,class real>

@@ -118,7 +118,7 @@ void TraceLight(TracingContext<Group,Selector> &c,const Light &light,int idx) {
 
 	real tDst[Selector::size]; {
 		Vec3q lPos(lightPos.x,lightPos.y,lightPos.z);
-		RayGroup<Group::size,1,0> tGroup(fromLight,&lPos);
+		RayGroup<Group::size,1,0> tGroup(&lPos,fromLight);
 
 		for(int i=0;i<lsel.Num();i++) {
 			int q=lsel[i];
@@ -215,7 +215,7 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 		InitializationShader(c,q,maxDist);
 	}
 
-	tree.Traverse(c.rays,c.selector,Output<primary?otPrimary:otNormal,f32x4,i32x4>(c));
+	tree.TraversePacket(c.rays,c.selector,Output<primary?otPrimary:otNormal,f32x4,i32x4>(c));
 	const vector<PObject> &objects = tree.objects;
 
 	for(int i=0;i<c.selector.Num();i++) {
@@ -237,7 +237,7 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 		
 			const BVH::Node &bvhNode=tree.nodes[c.objId[q][k]];
 			const Matrix<Vec4f> &m=bvhNode.trans;
-			Vec3f d=objects[bvhNode.subNode]->FlatNormals(c.elementId[q][k]);
+			Vec3f d=objects[bvhNode.subNode]->FlatNormals(c.elementId[q][k],0);
 		
 			normals[k].x = d.x*m.x.x+d.y*m.y.x+d.z*m.z.x;
 			normals[k].y = d.x*m.x.y+d.y*m.y.y+d.z*m.z.y;
@@ -293,7 +293,7 @@ void TraceReflection(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 	}
 
 	typedef RayGroup<Group::size> TGroup;
-	TracingContext<TGroup,Selector> rc(TGroup(reflDir,c.position),c.selector);
+	TracingContext<TGroup,Selector> rc(TGroup(c.position,reflDir),c.selector);
 	rc.options=c.options;
 	rc.options.reflections--;
 
@@ -307,6 +307,7 @@ void TraceReflection(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 						c.color[q]);
 	}
 }
+
 
 
 #include "scene.inl"

@@ -126,7 +126,7 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 						tri.vt[k]=atoi(puv+1);
 						if(tri.vt[k]<0) tri.vt[k]=uvs.size()+tri.vt[k];
 					}
-					if(pnrm[1]) {
+					if(pnrm&&pnrm[1]) {
 						tri.vn[k]=atoi(pnrm+1);
 						if(tri.vn[k]<0) tri.vn[k]=normals.size()+tri.vn[k];
 					}
@@ -161,6 +161,12 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 	fb.close();
 	if(tris.size())
 		objects.push_back(BaseScene::Object(verts,uvs,normals,tris));
+	int nTris=0,nVerts=0;
+	for(int n=0;n<objects.size();n++) {
+		nTris+=objects[n].tris.size();
+		nVerts+=objects[n].verts.size();
+	}
+	std::cout << "Done loading. Verts:" << nVerts << " Tris:" << nTris << '\n';
 
 /*	out.resize(tris.size());
 	for(int n=0;n<tris.size();n++) {

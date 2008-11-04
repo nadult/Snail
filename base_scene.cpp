@@ -216,7 +216,7 @@ void BaseScene::Object::BreakToElements(vector<Object> &out) {
 
 void BaseScene::Object::Optimize() {
 	FindOptimalTrans();
-	optBBox=OptBBox(&verts[0],verts.size());
+//	optBBox=OptBBox(&verts[0],verts.size());
 	bbox=BBox(&verts[0],verts.size(),trans);
 }
 
@@ -247,10 +247,10 @@ TriVector BaseScene::Object::ToTriVector() const {
 
 void BaseScene::Object::FindOptimalTrans() {
 	{
-		Matrix<Vec4f> min;
+		Matrix<Vec4f> min=Identity<>();
 		float minSum=1.0f/0.0f;
 		
-		enum { dx=8,dy=8,dz=8 };
+		enum { dx=4,dy=4,dz=4 };
 		
 		for(int x=0;x<dx;x++) for(int y=0;y<dy;y++) for(int z=0;z<dz;z++) {
 			float ax=dx==1?0.0f:ConstPI<float>()*0.5f*float(x)/float(dx-1);
