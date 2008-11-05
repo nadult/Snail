@@ -932,7 +932,7 @@ void RenderBox(const Box &box,const Vec4f &col) {
 void Render(TriVector &tris) {
 	glBegin(GL_TRIANGLES);
 	glColor3f(1,1,1);
-	for(int n=0;n<tris.size();n++) {
+	for(uint n=0;n<tris.size();n++) {
 		const Triangle &tri=tris[n];
 		glNormal3f(-tri.Nrm().x,-tri.Nrm().y,-tri.Nrm().z);
 		glVertex(tri.P1());
@@ -945,8 +945,8 @@ void Render(TriVector &tris) {
 class TBox {
 public:
 	TBox() :tris(0) { }
-	TBox(const TriVector *t) :tris(t),needUpdate(1) { }
-	TBox(const TBox &b) :tris(b.tris),inds(b.inds) {
+	TBox(const TriVector *t) :needUpdate(1),tris(t) { }
+	TBox(const TBox &b) :inds(b.inds),tris(b.tris) {
 		needUpdate=0;
 		b.Update();
 		surface=b.surface;
@@ -1008,7 +1008,7 @@ vector<Box> GenBoxes(const TriVector &tris) {
 
 	Vec3f min(1.0f/0.0f,1.0f/0.0f,1.0f/0.0f),max(-1.0f/0.0f,-1.0f/0.0f,-1.0f/0.0f);
 
-	for(int n=0;n<tris.size();n++) {
+	for(uint n=0;n<tris.size();n++) {
 		min=VMin(VMin(min,tris[n].P1()),VMin(tris[n].P2(),tris[n].P3())); 
 		max=VMax(VMax(max,tris[n].P1()),VMax(tris[n].P2(),tris[n].P3())); 
 
@@ -1022,13 +1022,13 @@ vector<Box> GenBoxes(const TriVector &tris) {
 		printf("|"); fflush(stdout);
 		bool noJoin=1;
 
-		for(int n=0;n<boxes.size()-1;n++) {
+		for(uint n=0;n<boxes.size()-1;n++) {
 		//	int first=std::lower_bound(&boxes[n+1],&boxes.back(),boxes[n],WithinRange(maxDist))-&boxes[0];
 		//	int last=std::upper_bound(&boxes[n+1],&boxes.back(),boxes[n],WithinRange(maxDist))-&boxes[0];
 			int first=n+1;
 			int last=boxes.size()-1;
 
-			for(int k=first;k<=last;k++) {
+			for(uint k=first;k<=last;k++) {
 				TBox u=Union(boxes[n],boxes[k]);
 				float t=boxes[n].Surface()+boxes[k].Surface()-u.Surface();
 				t/=boxes[n].Surface()+boxes[k].Surface();
@@ -1146,14 +1146,14 @@ int TreeVisMain(TriVector &tris) {
 			float maxDist=Sqrt(dir|dir);
 			dir/=maxDist;
 
-			if(window.MouseKey(0)) for(int n=0;n<tris.size();n++) {
+			if(window.MouseKey(0)) for(uint n=0;n<tris.size();n++) {
 				float d[2];
 				d[0]=tris[n].Collide(orig[0], dir);
 				d[1]=tris[n].Collide(orig[1],-dir);
 				if((d[0]>0.0f&&d[0]<maxDist)||(d[1]>0.0f&&d[1]<maxDist))
 					selection[n]=1;
 			}
-			if(window.MouseKey(1)) for(int n=0;n<tris.size();n++) {
+			if(window.MouseKey(1)) for(uint n=0;n<tris.size();n++) {
 				float d[2];
 				d[0]=tris[n].Collide(orig[0], dir);
 				d[1]=tris[n].Collide(orig[1],-dir);
@@ -1220,7 +1220,7 @@ int TreeVisMain(TriVector &tris) {
 				}
 				center/=float(count*3);
 
-				for(int n=0;n<tris.size();n++) {
+				for(uint n=0;n<tris.size();n++) {
 					const Triangle &tri=tris[n];
 					if(selection[n]) {
 						RenderTri(tris[n],Vec3f(0,0,1));
@@ -1243,7 +1243,7 @@ int TreeVisMain(TriVector &tris) {
 
 			RenderBox(box,Vec4f(0,1,0,0.25f));
 
-			for(int n=0;n<boxes.size();n++)
+			for(uint n=0;n<boxes.size();n++)
 				RenderBox(boxes[n],Vec4f(n%3==0,n%3==1,n%3==2,0.25f));
 			glDisable(GL_BLEND);
 		}

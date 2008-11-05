@@ -124,30 +124,8 @@ namespace bih {
 					
 					stats.Intersection(packetSize);
 
+					//todo: if all rays hit, lastShadowTri=idx
 					element.Collide(rays,output,instanceId,idx);
-					/*int passMask=0;
-					
-					for(int q=0;q<packetSize;q++) {
-						floatq dist=element.Collide(rOrigin[sharedOrigin?0:q],tDir[q]);
-						
-						f32x4b mask=dist<out[q]&&dist>0.0f;
-							
-						if(ForAny(mask)) {
-							out[q]=Condition(mask,outputType==otShadow?0.0001f:dist,out[q]);
-							
-							if(Output<outputType,f32x4,i32x4>::objectIndexes) {
-								output.element[q]=Condition(i32x4b(mask),i32x4(idx),output.element[q]);
-								output.object[q]=Condition(i32x4b(mask),i32x4(instanceId),output.object[q]);
-							}
-							passMask += ForWhich(mask);
-							stats.IntersectPass();
-						} else stats.IntersectFail();
-					}*/
-					
-					for(int q=0;q<packetSize;q++)
-						tMax[q]=Min(tMax[q],out[q]);
-
-				//	if(outputType==otShadow&&passMask==15*packetSize) lastShadowTri=idx;
 				}
 
 			POP_STACK:
@@ -236,7 +214,7 @@ namespace bih {
 			idx=node->val[nidx];
 		}
 
-		if(output.stats) output.stats->Update(stats);
+		if(sizeof(Element)==64&&output.stats) output.stats->Update(stats);
 		
 		return lastShadowTri;
 	}

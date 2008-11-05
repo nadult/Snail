@@ -3,8 +3,6 @@ namespace bih {
 
 	template <class Element> template <class Output>
 	void Tree<Element>::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output,int instanceId) const {
-		float maxD=output.dist[0];
-
 		TreeStats stats;
 		stats.TracingRay();
 
@@ -12,13 +10,11 @@ namespace bih {
 		Vec3p invDir=VInv(rDir);
 
 		int dirMask=SignMask(floatq(invDir.m));
-		float minRet=maxD,tMin=ConstEpsilon<float>(),tMax=maxD;
+		float tMin=ConstEpsilon<float>(),tMax=output.dist[0];
 
 		struct Locals { float tMin,tMax; u32 idx; } stackBegin[maxLevel+2],*stack=stackBegin;
 		const Node *node,*node0=&nodes[0];
 		int idx=0;
-
-		tMax=Min(tMax,minRet);
 
 		{
 			Vec3p ttMin=(pMin-rOrigin)*invDir;
@@ -42,23 +38,13 @@ namespace bih {
 				idx&=Node::idxMask;
 				{
 					stats.Intersection();
-					const Element &element=elements[idx];
-					float ret=element.Collide(rOrigin,tDir);
-					if(ret<minRet&&ret>0) {
-						minRet=ret;
-						if(Output::objectIndexes) {
-							output.object[0]=instanceId;
-							output.element[0]=idx;
-						}
-
-						tMax=Min(tMax,minRet);
-					}	
+					elements[idx].Collide(rOrigin,tDir,output,instanceId,idx);
 				}
 POP_STACK:
 				if(stack==stackBegin) break;
 				stack--;
 				tMin=stack->tMin;
-				tMax=Min(stack->tMax,minRet);
+				tMax=Min(stack->tMax,output.dist[0]);
 				idx=stack->idx;
 				continue;
 			}
@@ -96,8 +82,7 @@ POP_STACK:
 			idx=node->val[nidx];
 		}
 
-		if(output.stats) output.stats->Update(stats);
-		output.dist[0]=minRet;
+		if(sizeof(Element)==64&&output.stats) output.stats->Update(stats);
 	}
 
 }

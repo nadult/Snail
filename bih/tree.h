@@ -1,10 +1,10 @@
 #ifndef RTRACER_BIH_TREE_H
 #define RTRACER_BIH_TREE_H
 
-#include "bvh.h"
 #include "ray_group.h"
 #include "tree_stats.h"
 #include "context.h"
+#include "triangle.h"
 
 namespace bih {
 
@@ -55,8 +55,8 @@ namespace bih {
 	void SplitIndices(const vector<Element,AlignedAllocator<Element> > &elements,
 						vector<Index> &inds,int axis,float pos,float maxSize) {
 	//	if(inds.size()<=(maxSize>0.0f?16:64)) return;
-/*		if(inds.size()<=8) return;
-		maxSize*=0.25f;
+		if(inds.size()<=2) return;
+		maxSize*=1.5f;
 
 		for(int n=0,end=inds.size();n<end;n++) {
 			Index &idx=inds[n];
@@ -70,7 +70,7 @@ namespace bih {
 
 			idx=Index(idx.idx,min1,max1,1.0f);
 			inds.push_back(Index(idx.idx,min2,max2,1.0f));
-		} */
+		}
 	}
 
 	void SplitIndices(const TriVector &tris,vector<Index> &inds,int axis,float pos,float maxSize);
@@ -78,11 +78,13 @@ namespace bih {
 //	void OptimizeIndices(vector<Index> &indices);
 
 	template <class Element_>
-	class Tree: public Object {
+	class Tree: public RefCounter {
 	public:
 		Tree() { }
 		typedef Element_ Element;
 		typedef vector<Element,AlignedAllocator<Element> > ElementContainer;
+		//1 for tree of triangles, 2 for tree of trees of triangles etc
+		enum { complexity=Element::complexity+1 };
 		enum { maxLevel=60 };
 
 		BBox GetBBox() const {
@@ -93,8 +95,6 @@ namespace bih {
 			return elements[elementId].Nrm(subElementId);
 		}
 
-		int Complexity() const { return elements.size(); }
-		
 		Tree(const ElementContainer &elements);
 
 		void PrintInfo() const;
@@ -103,9 +103,6 @@ namespace bih {
 
 		template <class Output>
 		void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output,int instanceId) const;
-		void TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output<otNormal,float,u32> output,int instanceId) const {
-			TraverseMono<Output<otNormal,float,u32> >(rOrigin,tDir,output,instanceId);
-		}
 
 	protected:
 		template <int packetSize,bool sharedOrigin,OutputType outputType>
@@ -121,39 +118,44 @@ namespace bih {
 		};
 
 	public:	
-		template <bool filterSigns,bool sharedOrigin,OutputType outputType>
-		void TraversePacket(const RayGroup<1,sharedOrigin,1> &rays,const RaySelector<1> &selector,
+		template <bool sharedOrigin,OutputType outputType,template <int> class Selector>
+		void TraversePacket(bool filterSigns,const RayGroup<1,sharedOrigin,1> &rays,const Selector<1> &selector,
 							Output<outputType,f32x4,i32x4> output,int instanceId) const {
-			if(selector.BitMask(0)==0x0f) {
+			int bitMask=selector.BitMask(0);
+
+			if(bitMask==0x0f) {
 				const Vec3q &dir=rays.Dir(0);
-				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)));
-				int signMask=filterSigns?GetVecSign(rays.Dir(0)):msk&7;
+				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
+				int signMask=filterSigns?GetVecSign(rays.Dir(0)):msk;
 				
 				if(signMask!=8) {
-					TraversePacket<1,sharedOrigin,outputType>(rays,output,instanceId,signMask);
+					TraversePacket<1,sharedOrigin,outputType>(rays,output,instanceId,msk);
 					return;
 				}
-			}	
+			}
 
 			::Output<otNormal,float,u32> out((float*)output.dist,(u32*)output.object,(u32*)output.element,output.stats);
 			const Vec3q &orig=rays.Origin(0),&dir=rays.Dir(0);
-				
+
+//			printf("%d\n",bitMask);			
 			for(int k=0;k<4;k++) {
+				if(!(bitMask&(1<<k))) continue;
+
 				int o=sharedOrigin?0:k;
 				TraverseMono(Vec3p(orig.x[o],orig.y[o],orig.z[o]),Vec3p(dir.x[k],dir.y[k],dir.z[k]),out,instanceId);
 				out.dist++; out.object++; out.element++;
 			}
 		}
 
-		template <bool filterSigns,bool sharedOrigin,OutputType outputType>
-		void TraversePacket(const RayGroup<1,sharedOrigin,1> &rays,Output<outputType,f32x4,i32x4> output,
+		template <bool sharedOrigin,OutputType outputType>
+		void TraversePacket(bool filterSigns,const RayGroup<1,sharedOrigin,1> &rays,Output<outputType,f32x4,i32x4> output,
 							int instanceId) const {
 			const Vec3q &dir=rays.Dir(0);
-			int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)));
+			int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
 			int signMask=filterSigns?GetVecSign(rays.Dir(0)):msk&7;
 				
 			if(signMask!=8) {
-				TraversePacket<1,sharedOrigin,outputType>(rays,output,instanceId,signMask);
+				TraversePacket<1,sharedOrigin,outputType>(rays,output,instanceId,msk);
 				return;
 			}
 
@@ -167,11 +169,13 @@ namespace bih {
 			}
 		}
 
-		template <bool filterSigns,bool sharedOrigin,OutputType outputType,int packetSize>
-		void TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,const RaySelector<packetSize> &selector,
-							Output<outputType,f32x4,i32x4> output,int instanceId) const {
+		template <bool sharedOrigin,OutputType outputType,template <int> class Selector,int packetSize>
+		void TraversePacket(bool filterSigns,const RayGroup<packetSize,sharedOrigin,1> &rays,
+						const Selector<packetSize> &selector,Output<outputType,f32x4,i32x4> output,int instanceId) const {
 			
-			bool selectorsFiltered=packetSize<=16;
+			bool selectorsFiltered=(packetSize<=16);
+//			selectorsFiltered=true;
+
 			for(int n=0;n<packetSize/4;n++) if(selector.BitMask4(n)!=0x0f0f0f0f) {
 				selectorsFiltered=0;
 				break;
@@ -197,14 +201,13 @@ namespace bih {
 				}
 			}	
 			
-			RaySelector<packetSize/4> qSelectors[4];
+			Selector<packetSize/4> qSelectors[4];
 			selector.SplitTo4(qSelectors);
 			Output<outputType,f32x4,i32x4> tOutput(output.dist,output.object,output.element,output.stats);
 				
 			for(int q=0;q<4;q++) {
-				TraversePacket<filterSigns>(
-						RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)),
-						qSelectors[q],tOutput,instanceId);
+				TraversePacket(filterSigns,RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)),
+								qSelectors[q],tOutput,instanceId);
 
 				tOutput.dist+=(packetSize/4);
 				tOutput.object+=(packetSize/4);
@@ -212,11 +215,11 @@ namespace bih {
 			}
 		}
 	
-		template <bool filterSigns,bool sharedOrigin,OutputType outputType,int packetSize>
-		void TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,
+		template <bool sharedOrigin,OutputType outputType,int packetSize>
+		void TraversePacket(bool filterSigns,const RayGroup<packetSize,sharedOrigin,1> &rays,
 							Output<outputType,f32x4,i32x4> output,int instanceId) const {
 			
-			bool signsFiltered=packetSize<=16;
+			bool signsFiltered=1;
 
 			const Vec3q &dir=rays.Dir(0);
 			int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)));
@@ -237,8 +240,7 @@ namespace bih {
 			Output<outputType,f32x4,i32x4> tOutput(output.dist,output.object,output.element,output.stats);
 				
 			for(int q=0;q<4;q++) {
-				TraversePacket<filterSigns>(
-						RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)),tOutput,instanceId);
+				TraversePacket(filterSigns,RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)),tOutput,instanceId);
 
 				tOutput.dist+=(packetSize/4);
 				tOutput.object+=(packetSize/4);
@@ -246,39 +248,10 @@ namespace bih {
 			}
 		}
 		
-		template <bool sharedOrigin,OutputType outputType,int packetSize>
-		INLINE void TraversePacketF1(const RayGroup<packetSize,sharedOrigin,1> &rays,
-							Output<outputType,f32x4,i32x4> output,int instanceId) const {
-			TraversePacket<1>(rays,output,instanceId);
-		}
-	
-		template <bool sharedOrigin,OutputType outputType,int packetSize>
-		INLINE void TraversePacketF0(const RayGroup<packetSize,sharedOrigin,1> &rays,
-							const RaySelector<packetSize> &selector,
-							Output<outputType,f32x4,i32x4> output,int instanceId) const {
-			TraversePacket<0>(rays,selector,output,instanceId);
-		}
-		
 		template <int packetSize,bool sharedOrigin,OutputType outputType>
 		int TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,Output<outputType,f32x4,i32x4> output,int instanceId,
 							int dirMask,int lastShadowTri=-1) const;
 		
-		void TraversePacket1(const RayGroup<1,0,1> &rays,const RaySelector<1> &selector,
-								Output<otNormal,f32x4,i32x4> output,int instanceId) const {
-			TraversePacket<1>(RayGroup<1,1,1>((Vec3q*)&rays.Origin(0),(Vec3q*)&rays.Dir(0),(Vec3q*)rays.idir),selector,output,instanceId);
-		}
-
-		void TraversePacket4(const RayGroup<4,0,1> &rays,const RaySelector<4> &selector,
-								Output<otNormal,f32x4,i32x4> output,int instanceId) const {
-			TraversePacket<1>(RayGroup<4,1,1>((Vec3q*)&rays.Origin(0),(Vec3q*)&rays.Dir(0),(Vec3q*)rays.idir),selector,output,instanceId);
-		}
-
-		void TraversePacket16(const RayGroup<16,0,1> &rays,const RaySelector<16> &selector,
-								Output<otNormal,f32x4,i32x4> output,int instanceId) const {
-			TraversePacket<1>(RayGroup<16,1,1>((Vec3q*)&rays.Origin(0),(Vec3q*)&rays.Dir(0),(Vec3q*)rays.idir),selector,output,instanceId);
-		}
-
-
 		float avgSize;
 		Vec3f pMin,pMax;
 		vector<Node> nodes;
@@ -293,9 +266,10 @@ namespace bih {
 	class BIHBox {
 	public:
 		typedef BaseTree_ BaseTree;
+		enum { complexity=BaseTree::complexity };
 
 		BIHBox() :tree(0) { }
-		BIHBox(const BaseTree *tr,Matrix<Vec4f> m,const BBox &b) :tree(tr),trans(m),invTrans(Inverse(m)),bBox(b) { }
+		BIHBox(const BaseTree *tr,Matrix<Vec4f> m,const BBox &b) :trans(m),invTrans(Inverse(m)),bBox(b),tree(tr) { }
 
 		Vec3f Nrm(int subElementId) const {
 			return trans&tree->FlatNormals(subElementId,0);
@@ -305,16 +279,14 @@ namespace bih {
 		Vec3f BoundMax() const { return bBox.max; }
 		BBox GetBBox() const { return bBox; }
 
-		float Collide(const Vec3f &rOrig,const Vec3f &rDir) const {
+		template <OutputType outputType>
+		void Collide(const Vec3f &rOrig,const Vec3f &rDir,Output<outputType,float,u32> output,int objId,int elemId) const {
 			assert(tree);
 
-			throw 0;
 			Vec3p origin=invTrans*rOrig,dir=invTrans&rDir;
 
 			float out=1.0f/0.0f;
-			u32 t1,t2;
-			tree->TraverseMono(origin,dir,Output<otNormal,float,u32>(&out,&t1,&t2,0),-1);
-			return out;
+			tree->TraverseMono(origin,dir,output,elemId);
 		}
 
 		template <int packetSize,bool sharedOrigin,OutputType outputType,bool precompInv>
@@ -336,7 +308,7 @@ namespace bih {
 				idir[q]=VInv(dir[q]);
 			}
 
-			tree->TraversePacketF1(RayGroup<packetSize,sharedOrigin,1>(origin,dir,idir),output,elemId);
+			tree->TraversePacket(true,RayGroup<packetSize,sharedOrigin,1>(origin,dir,idir),output,elemId);
 		}
 
 //	private:

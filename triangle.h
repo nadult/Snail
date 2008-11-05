@@ -45,6 +45,7 @@ template <template <class> class TEdgeNormals>
 class TTriangle: public TEdgeNormals < TTriangle <TEdgeNormals> >
 {
 public:
+	enum { complexity=0 }; //used in bih::Tree
 	typedef TEdgeNormals< TTriangle<TEdgeNormals> > EdgeNormals;
 
 	TTriangle(const Vec3f &ta,const Vec3f &tb,const Vec3f &tc) {
@@ -89,6 +90,10 @@ public:
 	template <class VecO,class Vec>
 	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
 
+	template <class Output>
+	void Collide(const Vec3f &rOrig,const Vec3f &rDir,Output output,int objId,int elemId) const;
+
+
 	template <int packetSize,bool sharedOrigin,OutputType outputType,bool precompInv>
 	void Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,
 					Output<outputType,f32x4,i32x4> output,int objId,int elemId) const NOINLINE;
@@ -120,6 +125,18 @@ public:
 	Vec3p a,ba,ca;
 	Vec4p plane;
 };
+
+template <template <class> class EN> template <class Output>
+void TTriangle<EN>::Collide(const Vec3f &rOrigin,const Vec3f &rDir,Output output,int objId,int elemId) const {
+	float ret=Collide(rOrigin,rDir);
+	if(ret<output.dist[0]&&ret>0) {
+		output.dist[0]=ret;
+		if(Output::objectIndexes) {
+			output.object[0]=objId;
+			output.element[0]=elemId;
+		}
+	}	
+}
 
 template <template <class> class EN> template <class VecO,class Vec>
 typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) const {

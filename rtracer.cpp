@@ -7,7 +7,6 @@
 #include "bih/tree.h"
 #include "gl_window.h"
 #include "formats/loader.h"
-#include "bvh.h"
 #include "base_scene.h"
 
 
@@ -76,7 +75,6 @@ Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 	return mOut;   
 }
 
-
 int TreeVisMain(TriVector &tris);
 
 int gVals[16]={0,};
@@ -109,86 +107,6 @@ inline i32x4 ConvColor(const Vec3q &rgb) {
 	__m128i c33=_mm_unpacklo_epi8(c3,c3);
 	return _mm_unpacklo_epi16(c12,c33);
 }
-
-template <class Group,class Selector>
-void RayTrace(const bih::Tree<bih::BIHBox<bih::Tree<Triangle> > > &tree,TracingContext<Group,Selector> &c) {
-	enum { primary=0 };
-	
-	typedef typename Vec3q::TScalar real;
-	typedef typename Vec3q::TBool boolean;
-	const floatq maxDist=100000.0f;
-
-	for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector.Idx(i);
-		InitializationShader(c,q,maxDist);
-	}
-
-	tree.TraversePacketF0(c.rays,c.selector,Output<primary?otPrimary:otNormal,f32x4,i32x4>(c),0);
-//	const vector<PObject> &objects = tree.objects;
-
-	for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector.Idx(i);
-//		const Element *obj=&tree.objects[0];
-
-		if(c.selector.DisableWithMask(i,c.distance[q]>=maxDist)) {
-			c.color[q]=Vec3q(Const<real,0>());
-			i--; continue;
-		}
-
-		i32x4b imask(c.selector.Mask(i));
-
-		c.position[q]=c.RayDir(q)*c.distance[q]+c.RayOrigin(q);
-		
-		Vec3f normals[4];
-		for(int k=0;k<4;k++) {
-			if(!((i32x4)imask)[k]) continue;
-	
-			normals[k]=Vec3f(0.0f,1.0f,0.0f);	
-	//		const AccStruct::Node &bvhNode=tree.nodes[c.objId[q][k]];
-	//		const Matrix<Vec4f> &m=bvhNode.trans;
-			normals[k]=tree.FlatNormals(c.objId[q][k],c.elementId[q][k]);
-		
-	//		normals[k].x = d.x*m.x.x+d.y*m.y.x+d.z*m.z.x;
-	//		normals[k].y = d.x*m.x.y+d.y*m.y.y+d.z*m.z.y;
-	//		normals[k].z = d.x*m.x.z+d.y*m.y.z+d.z*m.z.z;
-		}
-		Convert(normals,c.normal[q]);
-		
-	/*	if(c.options.shadingMode==smGouraud)
-			c.normal[q]=GouraudNormals(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
-		else
-			c.normal[q]=FlatNormals<Vec3q>(tree.objects,Condition(imask,c.objId[q]));*/
-	
-	//	DistanceShader(c,q);
-		SimpleLightingShader(c,q);
-	//	Vec2q texCoord=GouraudTexCoords(tree.objects,shadingData,Condition(imask,c.objId[q]),c.RayOrigin(q),c.RayDir(q));
-	//	c.color[q]*=Sample(tex,texCoord);
-	}
-
-	/*if(lightsEnabled) {
-		assert(ShadowCache::size>=lights.size());
-		for(int n=0;n<lights.size();n++)
-			TraceLight(c,lights[n],n);
-	}
-
-	if(c.options.reflections>0&&c.selector.Num())
-		TraceReflection(c);
-
-	if(lights.size()&&lightsEnabled)
-		for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector[i];
-		c.color[q]=Condition(c.selector.Mask(i),c.color[q]*c.light[q]);
-	}
-	else*/
-	for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector[i];
-		c.color[q]=Condition(c.selector.Mask(i),c.color[q]);
-	}
-	if(c.options.rdtscShader)
-		for(int q=0;q<Selector::size;q++)
-			StatsShader(c,q);
-}
-
 
 template <class AccStruct,int QuadLevels>
 struct GenImageTask {
@@ -354,20 +272,6 @@ void PrintHelp() {
 	printf("esc - exit\n\n");
 }
 
-Vec3f RotateVecY(const Vec3f& v,float angle);
-
-void BuildBVH(BVH &bvh,BVHBuilder &bvhBuilder) {
-	static float pos=1.0f; pos+=0.02f;
-	bvhBuilder.instances.clear();
-	Matrix<Vec4f> ident=Identity<>();
-	
-	for(int n=0;n<bvhBuilder.objects.size();n++) {
-		bvhBuilder.AddInstance(n,Identity<>());
-	//	bvhBuilder.AddInstance(n,RotateY(pos*log(0.1f+float(n))));
-	//	bvhBuilder.AddInstance(n,Translate(Vec3f(0,cos(pos+n*0.5f)*0.02f,0)));
-	}
-	bvh.Build(bvhBuilder);
-}
 
 #include <gfxlib_font.h>
 
@@ -376,6 +280,57 @@ class Font {
 	
 	gfxlib::Font font;
 };
+
+typedef bih::Tree<Triangle> StaticTree;
+typedef bih::Tree<bih::BIHBox<bih::Tree<Triangle> > > FullTree;
+
+class SceneBuilder {
+public:
+	struct Object {
+		Matrix<Vec4f> preTrans;
+		bih::Tree<Triangle> *tree;
+		BBox bBox;
+	};
+	
+	struct Instance {
+		Matrix<Vec4f> trans;
+		u32 objId;
+	};
+
+	// box includes preTrans (it can be more optimized than just tree->BBox()*preTrans)
+	void AddObject(bih::Tree<Triangle> *tree,const Matrix<Vec4f> &preTrans,const BBox &box) {
+		Object newObj;
+		newObj.tree=tree;
+		newObj.bBox=box;
+		newObj.preTrans=preTrans;
+		objects.push_back(newObj);
+	}
+
+	void AddInstance(int objId,const Matrix<Vec4f> &trans) {
+		Instance newInst;
+		newInst.trans=trans;
+		newInst.objId=objId;
+		instances.push_back(newInst);
+	}
+
+	typedef bih::BIHBox<bih::Tree<Triangle> > Elem;
+
+	vector<Elem,AlignedAllocator<Elem> > ExtractElements() const {
+		vector<Elem,AlignedAllocator<Elem> > elements;
+
+		for(int n=0;n<instances.size();n++) {
+			const Instance &inst=instances[n];
+			const Object &obj=objects[inst.objId];
+			elements.push_back(Elem(obj.tree,obj.preTrans*inst.trans,obj.bBox));
+		}
+
+		return elements;
+	}
+	
+	vector<Object> objects;
+	vector<Instance> instances;
+};
+
 
 int main(int argc, char **argv) {
 	printf("Unnamed raytracer v0.07 by nadult\n");
@@ -427,15 +382,13 @@ int main(int argc, char **argv) {
 
 	if(treeVisMode) { TreeVisMain(tris); return 0; }
 
-	typedef bih::Tree<Triangle> BIH;
-
 	printf("Building..\n");
-	BVHBuilder bvhBuilder;
+	SceneBuilder builder;
 	for(int n=0;n<baseScene.objects.size();n++) {
 		const BaseScene::Object &obj=baseScene.objects[n];
-		bvhBuilder.AddObject(new BIH(obj.ToTriVector()),obj.GetTrans(),obj.GetBBox(),obj.GetOptBBox());
+		builder.AddObject(new StaticTree(obj.ToTriVector()),obj.GetTrans(),obj.GetBBox());
+		builder.AddInstance(n,Identity<>());
 	}
-//	bvhBuilder.AddObject(new BIH(tris),Identity<>(),baseScene.GetBBox(),OptBBox());
 	printf("Done building\n");
 
 	Image img(resx,resy,16);
@@ -449,11 +402,11 @@ int main(int argc, char **argv) {
 	for(int n=0;n<4;n++)
 		gVals[n]=1;
 
+	StaticTree staticTree(tris);
+
 	if(nonInteractive) {
 		double time=GetTime();
-		BVH bvh;
-		BuildBVH(bvh,bvhBuilder);
-		GenImage(quadLevels,bvh,cam,img,options,threads);
+		GenImage(quadLevels,staticTree,cam,img,options,threads);
 		time=GetTime()-time;
 		minTime=maxTime=time;
 		img.SaveToFile("out/output.tga");
@@ -530,21 +483,13 @@ int main(int argc, char **argv) {
 		
 			double buildTime=GetTime();
 
-			typedef bih::BIHBox<bih::Tree<Triangle> > Elem;
-			vector<Elem,AlignedAllocator<Elem> > elems;
-			if(!gVals[0]) for(int n=0;n<bvhBuilder.instances.size();n++) {
-				const BVHBuilder::Instance &inst=bvhBuilder.instances[n];
-				const BVHBuilder::Obj &obj=bvhBuilder.objects[inst.objId];
-				elems.push_back(Elem((bih::Tree<Triangle>*)&*obj.object,obj.preTrans*inst.trans,obj.bBox));
-			}
-			bih::Tree<Elem> root(elems);
-			BVH bvh; if(gVals[0]) BuildBVH(bvh,bvhBuilder);
+			FullTree tree(builder.ExtractElements());
 
 			buildTime=GetTime()-buildTime;
 			
 			TreeStats stats;
-			if(gVals[0]) stats=GenImage(quadLevels,bvh,cam,img,options,threads);
-			else stats=GenImage(quadLevels,root,cam,img,options,threads);
+			if(gVals[0]) stats=GenImage(quadLevels,staticTree,cam,img,options,threads);
+			else stats=GenImage(quadLevels,tree,cam,img,options,threads);
 
 			out.RenderImage(img);
 			out.SwapBuffers();

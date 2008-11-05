@@ -101,9 +101,8 @@ struct Output
 	Output(TracingContext<Group,Selector> &c) :dist(c.distance),object(c.objId),element(c.elementId),stats(&c.stats) { }
 	Output(const Output &all,int n) :dist(all.dist+n),object(all.object+n),element(all.element+n),stats(all.stats) { }
 	
-	// if you dont like restricts, dont use this class, they wont be removed :)
-	real * __restrict__ dist;
-	integer *__restrict__ object,*__restrict__ element;
+	real * dist;
+	integer *object,*element;
 	TreeStats *stats;
 };
 

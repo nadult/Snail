@@ -26,6 +26,7 @@ namespace bih {
 	Tree<Element>::Tree(const ElementContainer &objs) :split(1) {
 
 		elements.resize(objs.size());
+
 		if(!elements.size()) {
 			nodes.push_back(Node());
 			nodes[0].clip[0]=-1.0f/0.0f;
@@ -93,7 +94,7 @@ namespace bih {
 	template <class Element>
 	void Tree<Element>::Build(vector<Index> &indices,vector<u32> &parents,uint nNode,
 								const Vec3f &min,const Vec3f &max,uint level,bool sah) {
-	/*	{ // eliminating duplicates
+/*		{ // eliminating duplicates
 	RESORT:
 			std::sort(indices.begin(),indices.end());
 			for(int n=1;n<indices.size();n++) {
@@ -107,7 +108,7 @@ namespace bih {
 			}
 		} */
 
-		if(sizeof(Element)!=64) sah=0;
+//		if(sizeof(Element)!=64) sah=0;
 		/*{
 			float sSize; { Vec3p s=pMax-pMin; sSize=s.x*(s.y+s.z)+s.y*s.z; }
 			Vec3p size=max-min;

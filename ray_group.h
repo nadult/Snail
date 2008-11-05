@@ -35,11 +35,11 @@ public:
 	enum { size=size_ };
 private:
 	int num;
-	u8 idx[size];
 	union {
 		char bits[size];
 		int bits4[size/4];
 	};
+	u8 idx[size];
 public:
 	INLINE RaySelector() :num(0) { }
 
@@ -49,15 +49,24 @@ public:
 	INLINE RayIndex operator[](int n) const { return idx[n]; }
 	
 	INLINE void SplitTo4(RaySelector<size/4> part[4]) const {
-		part[0].Clear();
-		part[1].Clear();
-		part[2].Clear();
-		part[3].Clear();
+//		if(size==4) {
+//			part[idx[0]].Add(0,bits[0]);
+//			part[idx[1]].Add(0,bits[1]);
+//			part[idx[2]].Add(0,bits[2]);
+//			part[idx[3]].Add(0,bits[3]);
+//		}
+//		else {
+			part[0].Clear();
+			part[1].Clear();
+			part[2].Clear();
+			part[3].Clear();
 		
-		for(int n=0;n<Num();n++) {
-			int idx=Idx(n);
-			part[idx/(size/4)].Add(idx&(size/4-1),BitMask(n));
-		}
+			for(int n=0;n<Num();n++) {
+				int idx=Idx(n);
+				part[idx/(size/4)].Add(idx&(size/4-1),BitMask(n));
+//				if(size==4) printf("%d\n",part[idx/(size/4)].BitMask(0));
+			}
+//		}
 	}
 
 	// Moves last index to n,
@@ -159,6 +168,8 @@ public:
 		return sel;
 	}
 
+	INLINE void SelectAll() { }
+
 	INLINE int Num() const					{ return size; }
 	INLINE RayIndex Last() const			{ return size-1; }
 	INLINE RayIndex Idx(int n) const		{ return n; }
@@ -204,13 +215,12 @@ public:
 		SplitSelectorsBySign(oldSelector,sel,&Dir(0));
 	}
 
-	INLINE RayGroup(Vec3q *o,Vec3q *d,Vec3q *i=0) :dir(d),origin(o),idir(i) { assert(!precomputedInverses||idir); }
+	INLINE RayGroup(Vec3q *o,Vec3q *d,Vec3q *i=0) :dir(d),idir(i),origin(o) { assert(!precomputedInverses||idir); }
 
 	template <int tSize,bool tPrecomputed>
 	INLINE RayGroup(const RayGroup<tSize,sharedOrigin,tPrecomputed> &other,int shift)
-		:dir(other.dir+shift)
-		,origin(sharedOrigin?other.origin:other.origin+shift)
-		,idir(precomputedInverses&&tPrecomputed?other.idir+shift:0) { }
+		:dir(other.dir+shift),idir(precomputedInverses&&tPrecomputed?other.idir+shift:0)
+		,origin(sharedOrigin?other.origin:other.origin+shift) { }
 
 	INLINE Vec3q &Dir(int n)				{ return dir[n]; }
 	INLINE const Vec3q &Dir(int n) const	{ return dir[n]; }
