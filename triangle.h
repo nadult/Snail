@@ -45,6 +45,9 @@ template <template <class> class TEdgeNormals>
 class TTriangle: public TEdgeNormals < TTriangle <TEdgeNormals> >
 {
 public:
+	template <class real,int packetSize>
+	struct ReturnType { typedef Intersection<real,packetSize,ifDistance> Result; };
+
 	enum { complexity=0 }; //used in bih::Tree
 	typedef TEdgeNormals< TTriangle<TEdgeNormals> > EdgeNormals;
 
@@ -88,15 +91,10 @@ public:
 	inline Vec Normal(const Vec&) const { return Vec(Nrm()); }
 
 	template <class VecO,class Vec>
-	typename Vec::TScalar Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
+	Intersection<typename Vec::TScalar,1,ifDistance> Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
 
-	template <class Output>
-	void Collide(const Vec3f &rOrig,const Vec3f &rDir,Output output,int objId,int elemId) const;
-
-
-	template <int packetSize,bool sharedOrigin,OutputType outputType,bool precompInv>
-	void Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,
-					Output<outputType,f32x4,i32x4> output,int objId,int elemId) const NOINLINE;
+	template <int packetSize,bool sharedOrigin,bool precompInv>
+	Intersection<f32x4,packetSize,ifDistance> Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const NOINLINE;
 
 	template <class Vec0,class Vec,class real>
 	void Barycentric(const Vec0 &rOrig,const Vec &rDir,real &u,real &v) const;
@@ -126,24 +124,12 @@ public:
 	Vec4p plane;
 };
 
-template <template <class> class EN> template <class Output>
-void TTriangle<EN>::Collide(const Vec3f &rOrigin,const Vec3f &rDir,Output output,int objId,int elemId) const {
-	float ret=Collide(rOrigin,rDir);
-	if(ret<output.dist[0]&&ret>0) {
-		output.dist[0]=ret;
-		if(Output::objectIndexes) {
-			output.object[0]=objId;
-			output.element[0]=elemId;
-		}
-	}	
-}
-
 template <template <class> class EN> template <class VecO,class Vec>
-typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) const {
+Intersection<typename Vec::TScalar,1,ifDistance> TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) const {
 	typedef typename Vec::TScalar real;
 	typedef typename Vec::TBool Bool;
 
-	real out=-1.0f;
+	Intersection<typename Vec::TScalar,1,ifDistance> out;
 
 	real det = rDir|Nrm();
 	VecO tvec = rOrig-VecO(a);
@@ -151,22 +137,23 @@ typename Vec::TScalar TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) 
 	real v = rDir|(tvec^VecO(ca));
 	Bool test=Min(u,v)>=0.0f&&u+v<=det*real(ca.t0);
 
-	if (ForAny(test)) {
+//	if (ForAny(test)) {
 		real dist=-(tvec|Nrm())/det;
-		out=Condition(test,dist,out);
-	}
+		out.Distance(0)=Condition(test,dist,real(1.0f/0.0f));
+//	}
 
 	return out;
 }
 
-template<template<class> class EN> template <int packetSize,bool sharedOrigin,OutputType outputType,bool precompInv>
-void TTriangle<EN>::Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,
-				Output<outputType,f32x4,i32x4> output,int objId,int elemId) const {
+template<template<class> class EN> template <int packetSize,bool sharedOrigin,bool precompInv>
+Intersection<f32x4,packetSize,ifDistance> TTriangle<EN>::Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const {
+	Intersection<f32x4,packetSize,ifDistance> out;
 	Vec3p nrm=Nrm();
 	Vec3q ta(a);
 
 	Vec3q sharedTVec;
 	if(sharedOrigin) sharedTVec=rays.Origin(0)-ta;
+	f32x4 infinity=1.0f/0.0f;
 
 	for(int q=0;q<packetSize;q++) {
 		floatq det=rays.Dir(q)|nrm;
@@ -176,17 +163,13 @@ void TTriangle<EN>::Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &
 		floatq v=rays.Dir(q)|(tvec^Vec3q(ca));
 		f32x4b test=Min(u,v)>=0.0f&&u+v<=det*floatq(ca.t0);
 
-		if(ForAny(test)) {
+	//	if(ForAny(test)) {
 			floatq dist=-(tvec|nrm)/det;
-			test=test&&dist<output.dist[q];
-
-			output.dist[q]=Condition(test,dist,output.dist[q]);
-
-			i32x4b itest(test);
-			output.object[q]=Condition(itest,i32x4(objId),output.object[q]);
-			output.element[q]=Condition(itest,i32x4(elemId),output.element[q]);
-		}
+			out.Distance(q)=Condition(test,dist,infinity);
+	//	}
 	}
+
+	return out;
 }
 
 template <template <class> class EN> template <class VecO,class Vec,class real>

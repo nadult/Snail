@@ -1,16 +1,20 @@
 
 namespace bih {
 
-	template <class Element> template <class Output>
-	void Tree<Element>::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,Output output,int instanceId) const {
+	template <class Element>
+	typename Tree<Element>::template ReturnType<float,1>::Result Tree<Element>::TraverseMono
+		(const Vec3p &rOrigin,const Vec3p &tDir) const
+	{
 		TreeStats stats;
 		stats.TracingRay();
+		typename ReturnType<float,1>::Result out;
+		out.Distance(0)=1.0f/0.0f;
 
 		Vec3p rDir=Vec3p(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
 		Vec3p invDir=VInv(rDir);
 
 		int dirMask=SignMask(floatq(invDir.m));
-		float tMin=ConstEpsilon<float>(),tMax=output.dist[0];
+		float tMin=0.0f,tMax=out.Distance(0);
 
 		struct Locals { float tMin,tMax; u32 idx; } stackBegin[maxLevel+2],*stack=stackBegin;
 		const Node *node,*node0=&nodes[0];
@@ -38,13 +42,18 @@ namespace bih {
 				idx&=Node::idxMask;
 				{
 					stats.Intersection();
-					elements[idx].Collide(rOrigin,tDir,output,instanceId,idx);
+					typename ReturnType<float,1>::BaseIntersection tOut=elements[idx].Collide(rOrigin,tDir);
+					if(tOut.Distance(0)<out.Distance(0)) {
+						out.Distance(0)=tOut.Distance(0);
+						out.Object(0)=idx;
+						if(ReturnType<float,1>::Result::flags&ifElement) out.Element(0)=tOut.Element(0);
+					}
 				}
 POP_STACK:
 				if(stack==stackBegin) break;
 				stack--;
 				tMin=stack->tMin;
-				tMax=Min(stack->tMax,output.dist[0]);
+				tMax=Min(stack->tMax,out.Distance(0));
 				idx=stack->idx;
 				continue;
 			}
@@ -82,7 +91,8 @@ POP_STACK:
 			idx=node->val[nidx];
 		}
 
-		if(sizeof(Element)==64&&output.stats) output.stats->Update(stats);
+		//if(sizeof(Element)==64&&output.stats) output.stats->Update(stats);
+		return out;
 	}
 
 }

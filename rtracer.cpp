@@ -184,27 +184,21 @@ struct GenImageTask {
 
 					Vec3q *src=rgb;
 					u8 *dst=outPtr+x*3+y*pitch;
-					int lineDiff=pitch-PWidth*3+12;
+					int lineDiff=pitch-PWidth*3;
 
 					for(int ty=0;ty<PHeight;ty++) {
-						for(int tx=0;tx<PWidth-4;tx+=4) {
+						for(int tx=0;tx<PWidth;tx+=4) {
 							i32x4 col=ConvColor(*src++);
-							u8 *c=(u8*)&col;
-							*(int*)(dst+0)=col[0];
-							*(int*)(dst+3)=col[1];
-							*(int*)(dst+6)=col[2];
-							*(int*)(dst+9)=col[3];
+							const u8 *c=(u8*)&col;
+	
+							dst[ 0]=c[ 0]; dst[ 1]=c[ 1]; dst[ 2]=c[ 2];
+							dst[ 3]=c[ 4]; dst[ 4]=c[ 5]; dst[ 5]=c[ 6];
+							dst[ 6]=c[ 8]; dst[ 7]=c[ 9]; dst[ 8]=c[10];
+							dst[ 9]=c[12]; dst[10]=c[13]; dst[11]=c[14];
+
 							dst+=12;
 						}
-						{
-							i32x4 col=ConvColor(*src++);
-							u8 *c=(u8*)&col;
-							*(int*)(dst+0)=col[0];
-							*(int*)(dst+3)=col[1];
-							*(int*)(dst+6)=col[2];
-							dst[ 9]=c[12]; dst[10]=c[13]; dst[11]=c[14];
-							dst+=lineDiff;
-						}
+						dst+=lineDiff;
 					}
 				}
 			}
@@ -505,5 +499,6 @@ int main(int argc, char **argv) {
 
 	printf("Minimum msec/frame: %.4f (%.2f FPS)\n",minTime*1000.0,1.0f/minTime);
 	printf("Maximum msec/frame: %.4f (%.2f FPS)\n",maxTime*1000.0,1.0f/maxTime);
+
 	return 0;
 }

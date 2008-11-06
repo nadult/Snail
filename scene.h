@@ -165,8 +165,8 @@ Vec3q Sample(const gfxlib::Texture &tex,const Vec2q &uv) {
 	return out*f32x4(1.0f/255.0f);
 }*/
 
-template <class AccStruct,class Group,class Selector>
-void TraceReflection(const AccStruct &tree,TracingContext<Group,Selector> &c);
+//template <class AccStruct,class Group,class Selector>
+//void TraceReflection(const AccStruct &tree,TracingContext<Group,Selector> &c);
 
 template <class AccStruct,class Group,class Selector>
 void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
@@ -181,8 +181,15 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 		InitializationShader(c,q,maxDist);
 	}
 
-	tree.TraversePacket(AccStruct::complexity==2?1:1,c.rays,c.selector,Output<primary?otPrimary:otNormal,f32x4,i32x4>(c),0);
+	typedef typename AccStruct::template ReturnType<f32x4,Selector::size>::Result Intrsct;
+	Intrsct result=tree.TraversePacket(AccStruct::complexity==2?1:1,c.rays);
 	RaySelector<Selector::size> &selector=c.selector;
+
+	for(int q=0;q<Selector::size;q++) {
+		c.distance[q]=result.Distance(q);
+		c.objId[q]=result.Object(q);
+		if(Intrsct::flags&ifElement) c.elementId[q]=result.Element(q);
+	}
 
 	for(int i=0;i<selector.Num();i++) {
 		int q=selector.Idx(i);
@@ -196,13 +203,14 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 		c.position[q]=c.RayDir(q)*c.distance[q]+c.RayOrigin(q);
 		
 		Vec3f normals[4];
+	//	i32x4 objId=c.objId[q][k]&i32x4(imask);
+	//	i32x4 elementId=c.elementId[q][k]&i32x4(imask);
+		
 		for(int k=0;k<4;k++) {
 			if(!((i32x4)imask)[k]) continue;
 	
 			normals[k]=Vec3f(0.0f,1.0f,0.0f);	
-	//		const AccStruct::Node &bvhNode=tree.nodes[c.objId[q][k]];
-	//		const Matrix<Vec4f> &m=bvhNode.trans;
-			normals[k]=tree.FlatNormals(AccStruct::complexity==2?c.objId[q][k]:c.elementId[q][k],c.elementId[q][k]);
+			normals[k]=tree.FlatNormals(c.objId[q][k],c.elementId[q][k]);
 		}
 		Convert(normals,c.normal[q]);
 		
@@ -223,8 +231,8 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 //			TraceLight(c,lights[n],n);
 //	}
 
-	if(c.options.reflections>0&&selector.Num())
-		TraceReflection(tree,c);
+//	if(c.options.reflections>0&&selector.Num())
+//		TraceReflection(tree,c);
 
 //	if(lights.size()&&lightsEnabled)
 //		for(int i=0;i<selector.Num();i++) {
@@ -242,7 +250,7 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 }
 
 
-
+/*
 template <class AccStruct,class Group,class Selector>
 void TraceReflection(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 	typedef typename Vec3q::TScalar real;
@@ -271,7 +279,7 @@ void TraceReflection(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 						c.color[q]);
 	}
 }
-
+*/
 
 
 #include "scene.inl"

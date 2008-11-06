@@ -1,9 +1,11 @@
 
 namespace bih {
 
-	template <class Element> template <int packetSize,bool sharedOrigin,OutputType outputType>
-	int Tree<Element>::TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,
-			Output<outputType,f32x4,i32x4> output,int instanceId,int dirMask,int lastShadowTri) const {
+	template <class Element> template <int packetSize,bool sharedOrigin>
+	typename Tree<Element>::template ReturnType<f32x4,packetSize>::Result Tree<Element>::TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,int dirMask) const {
+		typename ReturnType<f32x4,packetSize>::Result out;
+		for(int q=0;q<packetSize;q++) out.Distance(q)=1.0f/0.0f;
+
 		enum { shared=sharedOrigin };
 
 		TreeStats stats;
@@ -11,20 +13,19 @@ namespace bih {
 		
 		const Vec3q *rOrigin=&rays.Origin(0);
 		const Vec3q *tDir=&rays.Dir(0);
-		f32x4 *out=output.dist;
 
-		if(outputType==otShadow) if(lastShadowTri!=-1&&gVals[0]) {
+	/*	if(outputType==otShadow) if(lastShadowTri!=-1&&gVals[0]) {
 			floatq ret[packetSize];
 			f32x4b mask[packetSize];
 			
 			const Element &element=elements[lastShadowTri];
 
 			throw 0;
-		/*	for(int q=0;q<packetSize;q++) {
-				ret[q]=element.Collide(rOrigin[q],tDir[q]);			
-				mask[q]=ret[q]>0.0f&&ret[q]<out[q];
-				out[q]=Condition(mask[q],floatq(0.0001f),out[q]);
-			} */
+		//	for(int q=0;q<packetSize;q++) {
+		//		ret[q]=element.Collide(rOrigin[q],tDir[q]);			
+		//		mask[q]=ret[q]>0.0f&&ret[q]<out[q];
+		//		out[q]=Condition(mask[q],floatq(0.0001f),out[q]);
+		//	}
 
 			f32x4b test=mask[0];
 			for(int q=1;q<packetSize;q++) test=test&&mask[q];
@@ -35,7 +36,7 @@ namespace bih {
 				return lastShadowTri;
 			}
 			lastShadowTri=-1;
-		}
+		} */
 
 		const Vec3q *invDir=rays.idir;
 		
@@ -65,7 +66,7 @@ namespace bih {
 		floatq tMin[packetSize],tMax[packetSize];
 		for(int q=0;q<packetSize;q++) {
 			tMin[q]=ConstEpsilon<floatq>();
-			tMax[q]=out[q];
+			tMax[q]=1.0f/0.0f; //TODO: insert max distance
 		}
 
 		floatq fStackBegin[packetSize*2*(maxLevel+2)],*fStack=fStackBegin;
@@ -125,7 +126,14 @@ namespace bih {
 					stats.Intersection(packetSize);
 
 					//todo: if all rays hit, lastShadowTri=idx
-					element.Collide(rays,output,instanceId,idx);
+					typename ReturnType<f32x4,packetSize>::BaseIntersection tOut=element.Collide(rays);
+					for(int q=0;q<packetSize;q++) {
+						i32x4b test=tOut.Distance(q)<out.Distance(q);
+						out.Distance(q)=Min(out.Distance(q),tOut.Distance(q));
+						out.Object(q)=Condition(test,i32x4(idx),out.Object(q));
+						if(ReturnType<f32x4,packetSize>::Result::flags&ifElement)
+							out.Element(q)=Condition(test,tOut.Element(q),out.Element(q));
+					}
 				}
 
 			POP_STACK:
@@ -133,7 +141,7 @@ namespace bih {
 
 				fStack-=packetSize*2;
 				for(int q=0;q<packetSize;q++) tMin[q]=fStack[q];
-				for(int q=0;q<packetSize;q++) tMax[q]=Min(fStack[packetSize+q],out[q]);
+				for(int q=0;q<packetSize;q++) tMax[q]=Min(fStack[packetSize+q],out.Distance(q)); //TODO: max dist
 				
 				--nStack;
 				idx=*nStack;
@@ -214,9 +222,9 @@ namespace bih {
 			idx=node->val[nidx];
 		}
 
-		if(sizeof(Element)==64&&output.stats) output.stats->Update(stats);
+	//	if(sizeof(Element)==64&&output.stats) output.stats->Update(stats);
 		
-		return lastShadowTri;
+		return out;
 	}
 
 }

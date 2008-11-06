@@ -39,7 +39,7 @@ namespace bih {
 		const float noSplitCost=hitTestCost*indices.size();
 
 		float minCost[3],dividers[3];
-		const float sub[3]={min.x,min.y,min.z},mul[3]={1.0/(max.x-min.x),1.0/(max.y-min.y),1.0/(max.z-min.z)};
+		const float sub[3]={min.x,min.y,min.z},mul[3]={1.0f/(max.x-min.x),1.0f/(max.y-min.y),1.0f/(max.z-min.z)};
 
 		const float nodeSize[3]={max.x-min.x,max.y-min.y,max.z-min.z};
 		const float iNodeSize=1.0/(nodeSize[0]*nodeSize[1]+nodeSize[0]*nodeSize[2]+nodeSize[1]*nodeSize[2]);

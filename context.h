@@ -106,5 +106,4 @@ struct Output
 	TreeStats *stats;
 };
 
-
 #endif
