@@ -1148,15 +1148,15 @@ int TreeVisMain(TriVector &tris) {
 
 			if(window.MouseKey(0)) for(uint n=0;n<tris.size();n++) {
 				float d[2];
-				d[0]=tris[n].Collide(orig[0], dir);
-				d[1]=tris[n].Collide(orig[1],-dir);
+				d[0]=tris[n].Collide<0>(orig[0], dir).Distance(0);
+				d[1]=tris[n].Collide<0>(orig[1],-dir).Distance(0);
 				if((d[0]>0.0f&&d[0]<maxDist)||(d[1]>0.0f&&d[1]<maxDist))
 					selection[n]=1;
 			}
 			if(window.MouseKey(1)) for(uint n=0;n<tris.size();n++) {
 				float d[2];
-				d[0]=tris[n].Collide(orig[0], dir);
-				d[1]=tris[n].Collide(orig[1],-dir);
+				d[0]=tris[n].Collide<0>(orig[0], dir).Distance(0);
+				d[1]=tris[n].Collide<0>(orig[1],-dir).Distance(0);
 				if((d[0]>0.0f&&d[0]<maxDist)||(d[1]>0.0f&&d[1]<maxDist))
 					selection[n]=0;
 			}

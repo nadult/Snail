@@ -1,4 +1,4 @@
-#include "tree_stats.h"
+#include "rtbase.h"
 #include "image.h"
 #include <stdio.h>
 
@@ -21,8 +21,10 @@
 			}
 		}
 	}
-	void TreeStats::PrintInfo(int resx,int resy,double msRenderTime,double msBuildTime) {
-		double raysPerSec=double(tracedRays)*(1000.0/msRenderTime);
+
+	template <bool enabled>
+	void TreeStats<enabled>::PrintInfo(int resx,int resy,double msRenderTime,double msBuildTime) {
+		double raysPerSec=double(data[2])*(1000.0/msRenderTime);
 		double nPixels=double(resx*resy);
 
 		if(!enabled) {
@@ -30,9 +32,12 @@
 			return;
 		}
 		printf("isct,iter:%5.2f %5.2f  MSec/frame:%6.2f  MRays/sec:%5.2f  "
-				/*"Coh:%.2f%% "*/"br:%.2f%% fa:%.2f%% %.0f R:%d Build:%6.2f\n",
-				double(intersects)/nPixels,double(iters)/nPixels,
-				msRenderTime,raysPerSec*0.000001/*,Coherent()*100.0f*/,
-				TBreaking()*100.0f,TIntersectFail()*100.0f,double(skips),tracedRays,msBuildTime);
+				/*"Coh:%.2f%% " "br:%.2f%% fa:%.2f%%"*/ "%.0f R:%d Build:%6.2f\n",
+				double(data[0])/nPixels,double(data[1])/nPixels,
+				msRenderTime,raysPerSec*0.000001/*,GetCoherent()*100.0f*/,
+				/*GetBreaking()*100.0f,GetIntersectFail()*100.0f,*/double(data[9]),data[2],msBuildTime);
 	}
+
+	template void TreeStats<0>::PrintInfo(int,int,double,double);
+	template void TreeStats<1>::PrintInfo(int,int,double,double);
 

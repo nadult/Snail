@@ -1,13 +1,11 @@
 
-namespace bih {
-
-	template <class Element>
-	typename Tree<Element>::template ReturnType<float,1>::Result Tree<Element>::TraverseMono
-		(const Vec3p &rOrigin,const Vec3p &tDir) const
+	template <int addFlags>
+	Isct<float,1,isctFlags|addFlags> TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir) const
 	{
-		TreeStats stats;
+		Isct<float,1,isctFlags|addFlags> out;
+		TreeStats<1> stats;
+
 		stats.TracingRay();
-		typename ReturnType<float,1>::Result out;
 		out.Distance(0)=1.0f/0.0f;
 
 		Vec3p rDir=Vec3p(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
@@ -42,11 +40,14 @@ namespace bih {
 				idx&=Node::idxMask;
 				{
 					stats.Intersection();
-					typename ReturnType<float,1>::BaseIntersection tOut=elements[idx].Collide(rOrigin,tDir);
+					Isct<float,1,Element::isctFlags|addFlags>
+						tOut=elements[idx].template Collide<addFlags>(rOrigin,tDir);
 					if(tOut.Distance(0)<out.Distance(0)) {
 						out.Distance(0)=tOut.Distance(0);
-						out.Object(0)=idx;
-						if(ReturnType<float,1>::Result::flags&ifElement) out.Element(0)=tOut.Element(0);
+						if(!(addFlags&isct::fShadow)) {
+							out.Object(0)=idx;
+							if(isctFlags&isct::fElement) out.Element(0)=tOut.Element(0);
+						}
 					}
 				}
 POP_STACK:
@@ -91,10 +92,7 @@ POP_STACK:
 			idx=node->val[nidx];
 		}
 
-		//if(sizeof(Element)==64&&output.stats) output.stats->Update(stats);
 		return out;
 	}
-
-}
 
 

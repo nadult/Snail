@@ -45,8 +45,7 @@ template <template <class> class TEdgeNormals>
 class TTriangle: public TEdgeNormals < TTriangle <TEdgeNormals> >
 {
 public:
-	template <class real,int packetSize>
-	struct ReturnType { typedef Intersection<real,packetSize,ifDistance> Result; };
+	enum { isctFlags=isct::fDistance };
 
 	enum { complexity=0 }; //used in bih::Tree
 	typedef TEdgeNormals< TTriangle<TEdgeNormals> > EdgeNormals;
@@ -90,11 +89,13 @@ public:
 	template <class Vec>
 	inline Vec Normal(const Vec&) const { return Vec(Nrm()); }
 
-	template <class VecO,class Vec>
-	Intersection<typename Vec::TScalar,1,ifDistance> Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
+	template <int addFlags,class VecO,class Vec>
+	Isct<typename Vec::TScalar,1,isct::fDistance|addFlags>
+		Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
 
-	template <int packetSize,bool sharedOrigin,bool precompInv>
-	Intersection<f32x4,packetSize,ifDistance> Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const NOINLINE;
+	template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
+	Isct<f32x4,packetSize,isct::fDistance|addFlags>
+		Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const NOINLINE;
 
 	template <class Vec0,class Vec,class real>
 	void Barycentric(const Vec0 &rOrig,const Vec &rDir,real &u,real &v) const;
@@ -124,12 +125,12 @@ public:
 	Vec4p plane;
 };
 
-template <template <class> class EN> template <class VecO,class Vec>
-Intersection<typename Vec::TScalar,1,ifDistance> TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) const {
+template <template <class> class EN> template <int addFlags,class VecO,class Vec>
+Isct<typename Vec::TScalar,1,isct::fDistance|addFlags> TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) const {
 	typedef typename Vec::TScalar real;
 	typedef typename Vec::TBool Bool;
 
-	Intersection<typename Vec::TScalar,1,ifDistance> out;
+	Isct<typename Vec::TScalar,1,isct::fDistance|addFlags> out;
 
 	real det = rDir|Nrm();
 	VecO tvec = rOrig-VecO(a);
@@ -145,9 +146,9 @@ Intersection<typename Vec::TScalar,1,ifDistance> TTriangle<EN>::Collide(const Ve
 	return out;
 }
 
-template<template<class> class EN> template <int packetSize,bool sharedOrigin,bool precompInv>
-Intersection<f32x4,packetSize,ifDistance> TTriangle<EN>::Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const {
-	Intersection<f32x4,packetSize,ifDistance> out;
+template<template<class> class EN> template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
+Isct<f32x4,packetSize,isct::fDistance|addFlags> TTriangle<EN>::Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const {
+	Isct<f32x4,packetSize,isct::fDistance|addFlags> out;
 	Vec3p nrm=Nrm();
 	Vec3q ta(a);
 

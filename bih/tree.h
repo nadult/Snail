@@ -74,7 +74,6 @@ namespace bih {
 	}
 
 	void SplitIndices(const TriVector &tris,vector<Index> &inds,int axis,float pos,float maxSize);
-
 //	void OptimizeIndices(vector<Index> &indices);
 
 	template <class Element_>
@@ -85,11 +84,7 @@ namespace bih {
 		//1 for tree of triangles, 2 for tree of trees of triangles etc
 		enum { complexity=Element::complexity+1 };
 		enum { maxLevel=60 };
-
-		template <class real,int packetSize>
-		struct ReturnType {
-			typedef typename Element_::template ReturnType<real,packetSize>::Result BaseIntersection;
-			typedef Intersection<real,packetSize,BaseIntersection::flags|ifObject> Result; };
+		enum { isctFlags=Element::isctFlags|isct::fObject|isct::fStats };
 		
 		Tree() { }
 
@@ -107,155 +102,145 @@ namespace bih {
 		uint FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const;
 		void Build(vector<Index> &indices,vector<u32> &parents,uint nNode,const Vec3f &min,const Vec3f &max,uint level,bool);
 
-
-	protected:
-		template <int packetSize,bool sharedOrigin,OutputType outputType>
-		class TravContext {
-			const RayGroup<packetSize,sharedOrigin,1> &rays;
-			Output<outputType,f32x4,i32x4> output;
-			
-			int instanceId;
-			
-		public:
-			TravContext(const RayGroup<packetSize,sharedOrigin,1> &r,Output<outputType,f32x4,i32x4> out) :rays(r),output(out) {
-			}
-		};
-
 	public:	
-/*		template <bool sharedOrigin,template <int> class Selector>
-		typename ReturnType<float,1>::Result TraversePacket(
-						bool filterSigns,const RayGroup<1,sharedOrigin,1> &rays,
-						const Selector<1> &selector) const {
+	
+		template <int addFlags,bool sharedOrigin,template <int> class Selector>
+		Isct<f32x4,1,isctFlags|addFlags>
+			TraversePacket(bool filterSigns,const RayGroup<1,sharedOrigin,1> &rays,
+							const Selector<1> &selector) const
+		{
 			int bitMask=selector.BitMask(0);
+			const Vec3q &dir=rays.Dir(0);
+			Isct<f32x4,1,isctFlags|addFlags> out;
 
-			if(bitMask==0x0f) {
-				const Vec3q &dir=rays.Dir(0);
+			bool split=1;
+
+			if(bitMask==0x0f) {	
 				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
-				int signMask=filterSigns?GetVecSign(rays.Dir(0)):msk;
+				int signMask=filterSigns?GetVecSign(rays.Dir(0)):msk&7;
 				
 				if(signMask!=8) {
-					TraversePacket<1,sharedOrigin>(rays,instanceId,msk);
-					return;
+					out=TraversePacket<addFlags>(rays,msk);
+					split=0;
 				}
 			}
 
-			::Output<otNormal,float,u32> out((float*)output.dist,(u32*)output.object,(u32*)output.element,output.stats);
-			const Vec3q &orig=rays.Origin(0),&dir=rays.Dir(0);
-
-//			printf("%d\n",bitMask);			
-			for(int k=0;k<4;k++) {
-				if(!(bitMask&(1<<k))) continue;
-
-				int o=sharedOrigin?0:k;
-				TraverseMono(Vec3p(orig.x[o],orig.y[o],orig.z[o]),Vec3p(dir.x[k],dir.y[k],dir.z[k]),out,instanceId);
-				out.dist++; out.object++; out.element++;
-			}
-		} */
-
-		template <bool sharedOrigin>
-		typename ReturnType<f32x4,1>::Result TraversePacket(bool filterSigns,const RayGroup<1,sharedOrigin,1> &rays) const {
-			const Vec3q &dir=rays.Dir(0);
-			int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
-			int signMask=filterSigns?GetVecSign(rays.Dir(0)):msk&7;
-
-			typedef typename ReturnType<f32x4,1>::Result Result;
-			Result out;
-				
-			if(signMask!=8) out=TraversePacket<1,sharedOrigin>(rays,msk);
-			else {
+			if(split) {
 				const Vec3q &orig=rays.Origin(0);
 				for(int q=0;q<4;q++) {	
 					int o=sharedOrigin?0:q;
-					typename ReturnType<float,1>::Result tOut=	
-						TraverseMono(Vec3p(orig.x[o],orig.y[o],orig.z[o]),Vec3p(dir.x[q],dir.y[q],dir.z[q]));
-					if(Result::flags&ifDistance) out.Distance(0)[q]=tOut.Distance(0);
-					if(Result::flags&ifObject  ) out.Object  (0)[q]=tOut.Object  (0);
-					if(Result::flags&ifElement ) out.Element (0)[q]=tOut.Element (0);
-				}
-			}
+					if(!(bitMask&(1<<q))) continue;
 
-			return out;
-		}
-
-/*		template <bool sharedOrigin,OutputType outputType,template <int> class Selector,int packetSize>
-		void TraversePacket(bool filterSigns,const RayGroup<packetSize,sharedOrigin,1> &rays,
-						const Selector<packetSize> &selector,Output<outputType,f32x4,i32x4> output,int instanceId) const {
-			
-			bool selectorsFiltered=(packetSize<=16);
-//			selectorsFiltered=true;
-
-			for(int n=0;n<packetSize/4;n++) if(selector.BitMask4(n)!=0x0f0f0f0f) {
-				selectorsFiltered=0;
-				break;
-			}
-				
-			if(selectorsFiltered) {
-				bool signsFiltered=1;
-
-				const Vec3q &dir=rays.Dir(0);
-				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)));
-				int signMask=msk&7;
-
-				if(filterSigns) {					
-					for(int n=0;n<packetSize;n++) if(GetVecSign(rays.Dir(n))!=signMask) {
-						signsFiltered=0;
-						break;
-					}
-				}
-			
-				if(signsFiltered) {
-					TraversePacket<packetSize,sharedOrigin>(rays,output,instanceId,signMask);
-					return;
-				}
-			}	
-			
-			Selector<packetSize/4> qSelectors[4];
-			selector.SplitTo4(qSelectors);
-			Output<outputType,f32x4,i32x4> tOutput(output.dist,output.object,output.element,output.stats);
-				
-			for(int q=0;q<4;q++) {
-				TraversePacket(filterSigns,RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)),
-								qSelectors[q],tOutput,instanceId);
-
-				tOutput.dist+=(packetSize/4);
-				tOutput.object+=(packetSize/4);
-				tOutput.element+=(packetSize/4);
-			}
-		} */
-	
-		template <bool sharedOrigin,int packetSize>
-		typename ReturnType<f32x4,packetSize>::Result TraversePacket(bool filterSigns,const RayGroup<packetSize,sharedOrigin,1> &rays) const {
-		
-			typename ReturnType<f32x4,packetSize>::Result out;	
-			bool signsFiltered=1;
-
-			const Vec3q &dir=rays.Dir(0);
-			int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)));
-			int signMask=msk&7;
-
-			if(filterSigns) {					
-				for(int n=0;n<packetSize;n++) if(GetVecSign(rays.Dir(n))!=signMask) {
-					signsFiltered=0;
-					break;
-				}
-			}
-			
-			if(signsFiltered) out=TraversePacket<packetSize,sharedOrigin>(rays,signMask);
-			else {
-				for(int q=0;q<4;q++) {
-					typename ReturnType<f32x4,packetSize/4>::Result tOut=
-						TraversePacket(filterSigns,RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)));
+					Isct<float,1,isctFlags|addFlags> tOut=	
+						TraverseMono<addFlags>(Vec3p(orig.x[o],orig.y[o],orig.z[o]),Vec3p(dir.x[q],dir.y[q],dir.z[q]));
 					out.Insert(tOut,q);
 				}
 			}
 
 			return out;
 		}
-		
-		template <int packetSize,bool sharedOrigin>
-		typename ReturnType<f32x4,packetSize>::Result TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,int dirMask) const;
-		
-		typename ReturnType<float,1>::Result TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir) const;
+
+		template <int addFlags,bool sharedOrigin>
+		Isct<f32x4,1,isctFlags|addFlags>
+			TraversePacket(bool filterSigns,const RayGroup<1,sharedOrigin,1> &rays) const
+		{
+			const Vec3q &dir=rays.Dir(0);
+			int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
+			int signMask=filterSigns?GetVecSign(rays.Dir(0)):msk&7;
+
+			Isct<f32x4,1,isctFlags|addFlags> out;
+				
+			if(signMask!=8) out=TraversePacket<addFlags>(rays,msk);
+			else {
+				const Vec3q &orig=rays.Origin(0);
+				for(int q=0;q<4;q++) {	
+					int o=sharedOrigin?0:q;
+					Isct<float,1,isctFlags|addFlags> tOut=	
+						TraverseMono<addFlags>(Vec3p(orig.x[o],orig.y[o],orig.z[o]),Vec3p(dir.x[q],dir.y[q],dir.z[q]));
+					out.Insert(tOut,q);
+				}
+			}
+
+			return out;
+		}
+
+		template <int addFlags,bool sharedOrigin,template <int> class Selector,int packetSize>
+		Isct<f32x4,packetSize,isctFlags|addFlags>
+			TraversePacket(bool filterSigns,const RayGroup<packetSize,sharedOrigin,1> &rays,
+							const Selector<packetSize> &selector) const
+		{
+			Isct<f32x4,packetSize,isctFlags|addFlags> out;	
+			bool split=1;
+
+			bool selectorsFiltered=1;
+			for(int n=0;n<packetSize/4;n++)
+				if(selector.BitMask4(n)!=0x0f0f0f0f) {
+					selectorsFiltered=0;
+					break;
+				}
+
+			if(selectorsFiltered) {
+				const Vec3q &dir=rays.Dir(0);
+				bool signsFiltered=1;
+				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
+
+				if(filterSigns) {					
+					for(int n=0;n<packetSize;n++) if(GetVecSign(rays.Dir(n))!=msk) {
+						signsFiltered=0;
+						break;
+					}
+				}
+			
+				if(signsFiltered) {
+					out=TraversePacket<addFlags>(rays,msk);
+					split=0;
+				}
+			}
+
+			if(split) {
+				Selector<packetSize/4> qSelectors[4];
+				selector.SplitTo4(qSelectors);
+
+				for(int q=0;q<4;q++) {
+					Isct<f32x4,packetSize/4,isctFlags|addFlags> tOut=
+						TraversePacket<addFlags>(filterSigns,RayGroup<packetSize/4,sharedOrigin,1>
+								(rays,q*(packetSize/4)),qSelectors[q]);
+					out.Insert(tOut,q);
+				}
+			}
+
+			return out;
+		}
+
+		template <int addFlags,bool sharedOrigin,int packetSize>
+		Isct<f32x4,packetSize,isctFlags|addFlags> TraversePacket(bool filterSigns,const RayGroup<packetSize,sharedOrigin,1> &rays) const {
+			Isct<f32x4,packetSize,isctFlags|addFlags> out;	
+			bool signsFiltered=1;
+
+			const Vec3q &dir=rays.Dir(0);
+			int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
+
+			if(filterSigns) {					
+				for(int n=0;n<packetSize;n++) if(GetVecSign(rays.Dir(n))!=msk) {
+					signsFiltered=0;
+					break;
+				}
+			}
+			
+			if(signsFiltered) out=TraversePacket<addFlags>(rays,msk);
+			else {
+				for(int q=0;q<4;q++) {
+					Isct<f32x4,packetSize/4,isctFlags|addFlags> tOut=
+						TraversePacket<addFlags>(filterSigns,RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)));
+					out.Insert(tOut,q);
+				}
+			}
+
+			return out;
+		}
+	
+		#include "bih/traverse_mono.h"
+		#include "bih/traverse_packet.h"	
 
 		float avgSize;
 		Vec3f pMin,pMax;
@@ -272,15 +257,11 @@ namespace bih {
 	public:
 		typedef BaseTree_ BaseTree;
 		enum { complexity=BaseTree::complexity };
-	
-
-		template <class real,int packetSize>
-		struct ReturnType {
-			typedef typename BaseTree_::template ReturnType<real,packetSize>::Result BaseIntersection;
-			typedef Intersection<real,packetSize,BaseIntersection::flags|ifElement> Result; };
+		enum { isctFlags=BaseTree::isctFlags|isct::fElement };
 
 		BIHBox() :tree(0) { }
-		BIHBox(const BaseTree *tr,Matrix<Vec4f> m,const BBox &b) :trans(m),invTrans(Inverse(m)),bBox(b),tree(tr) { }
+		BIHBox(const BaseTree *tr,Matrix<Vec4f> m,const BBox &b)
+			:trans(m),invTrans(Inverse(m)),bBox(b),tree(tr) { }
 
 		Vec3f Nrm(int subElementId) const {
 			return trans&tree->FlatNormals(subElementId,0);
@@ -290,26 +271,29 @@ namespace bih {
 		Vec3f BoundMax() const { return bBox.max; }
 		BBox GetBBox() const { return bBox; }
 
-		typename ReturnType<float,1>::Result Collide(const Vec3f &rOrig,const Vec3f &rDir) const {
+		template <int addFlags>
+		Isct<float,1,isctFlags|addFlags> Collide(const Vec3f &rOrig,const Vec3f &rDir) const {
 			assert(tree);
-			typename ReturnType<float,1>::Result out;
-
-			typename ReturnType<float,1>::BaseIntersection tOut=tree->TraverseMono(invTrans*rOrig,invTrans&rDir);
+			Isct<float,1,isctFlags|addFlags> out;
+			Isct<float,1,BaseTree::isctFlags|addFlags> tOut=
+				tree->template TraverseMono<addFlags>(invTrans*rOrig,invTrans&rDir);
 
 			out.Distance(0)=tOut.Distance(0);
-			out.Element(0)=tOut.Object(0);
-		//	out.object[0]=0;
+			if(!(addFlags&isct::fShadow)) {
+				out.Element(0)=tOut.Object(0);
+			//	out.object[0]=0;
+			}
 
 			return out;
 		}
 
-		template <int packetSize,bool sharedOrigin,bool precompInv>
-		typename ReturnType<f32x4,packetSize>::Result Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const {
+		template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
+		Isct<f32x4,packetSize,isctFlags|addFlags> Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const {
 			assert(tree);
 
 			// TODO: nie dziala dla precompInv==0 
 
-			typename ReturnType<f32x4,packetSize>::Result out;
+			Isct<f32x4,packetSize,isctFlags|addFlags> out;
 
 			bool test=0; test=1;
 //			if(sharedOrigin) test=bBox.TestIP<packetSize>(rays.Origin(0),rays.idir,output.dist);
@@ -324,11 +308,13 @@ namespace bih {
 					idir[q]=VInv(dir[q]);
 				}
 
-				typename ReturnType<f32x4,packetSize>::BaseIntersection tOut=
-					tree->TraversePacket(true,RayGroup<packetSize,sharedOrigin,1>(origin,dir,idir));
+				Isct<f32x4,packetSize,BaseTree::isctFlags|addFlags> tOut=
+					tree->template TraversePacket<addFlags>(true,RayGroup<packetSize,sharedOrigin,1>(origin,dir,idir));
 				for(int q=0;q<packetSize;q++) out.Distance(q)=tOut.Distance(q);
-				for(int q=0;q<packetSize;q++) out.Element(q)=tOut.Object(q);
-			//	for(int q=0;q<packetSize;q++) out.object[q]=0;
+				if(!(addFlags&isct::fShadow)) {
+					for(int q=0;q<packetSize;q++) out.Element(q)=tOut.Object(q);
+				//	for(int q=0;q<packetSize;q++) out.object[q]=0;
+				}
 			}
 			else {
 				for(int q=0;q<packetSize;q++)
@@ -347,8 +333,6 @@ namespace bih {
 }
 
 #include "bih/tree_impl.h"
-#include "bih/traverse_mono.h"
-#include "bih/traverse_packet.h"
 
 
 #endif

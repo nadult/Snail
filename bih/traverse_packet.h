@@ -1,14 +1,14 @@
 
-namespace bih {
-
-	template <class Element> template <int packetSize,bool sharedOrigin>
-	typename Tree<Element>::template ReturnType<f32x4,packetSize>::Result Tree<Element>::TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,int dirMask) const {
-		typename ReturnType<f32x4,packetSize>::Result out;
+	template <int addFlags,int packetSize,bool sharedOrigin>
+	Isct<f32x4,packetSize,isctFlags|addFlags>
+		TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,int dirMask) const
+	{
+		Isct<f32x4,packetSize,isctFlags|addFlags> out;
 		for(int q=0;q<packetSize;q++) out.Distance(q)=1.0f/0.0f;
 
 		enum { shared=sharedOrigin };
 
-		TreeStats stats;
+		TreeStats<1> stats;
 		stats.TracingPacket(4*packetSize);
 		
 		const Vec3q *rOrigin=&rays.Origin(0);
@@ -119,20 +119,21 @@ namespace bih {
 
 				if(!mailbox.Find(idx)) {
 					mailbox.Insert(idx);
-					stats.Intersection(packetSize);
-
 					const Element &element=elements[idx];
 					
 					stats.Intersection(packetSize);
 
-					//todo: if all rays hit, lastShadowTri=idx
-					typename ReturnType<f32x4,packetSize>::BaseIntersection tOut=element.Collide(rays);
+					//TODO: if all rays hit, lastShadowTri=idx
+					Isct<f32x4,packetSize,Element::isctFlags|addFlags> tOut=
+						element.template Collide<addFlags>(rays);
 					for(int q=0;q<packetSize;q++) {
 						i32x4b test=tOut.Distance(q)<out.Distance(q);
 						out.Distance(q)=Min(out.Distance(q),tOut.Distance(q));
-						out.Object(q)=Condition(test,i32x4(idx),out.Object(q));
-						if(ReturnType<f32x4,packetSize>::Result::flags&ifElement)
-							out.Element(q)=Condition(test,tOut.Element(q),out.Element(q));
+						if(!(addFlags&isct::fShadow)) {
+							out.Object(q)=Condition(test,i32x4(idx),out.Object(q));
+							if(isctFlags&isct::fElement)
+								out.Element(q)=Condition(test,tOut.Element(q),out.Element(q));
+						}
 					}
 				}
 
@@ -221,11 +222,7 @@ namespace bih {
 		
 			idx=node->val[nidx];
 		}
-
-	//	if(sizeof(Element)==64&&output.stats) output.stats->Update(stats);
 		
 		return out;
 	}
-
-}
 

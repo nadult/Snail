@@ -162,7 +162,7 @@ class FullSelector {
 public:
 	enum { size=size_ };
 
-	operator RaySelector<size>() const {
+	INLINE operator RaySelector<size>() const {
 		RaySelector<size> sel;
 		sel.SelectAll();
 		return sel;

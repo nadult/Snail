@@ -66,6 +66,8 @@ public:
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f>&);
 
+#include "tree_stats.h"
+
 
 template <class A,class B> struct TIsSame { enum { value=0 }; };
 template<class A> struct TIsSame<A,A> { enum { value=1 }; };
@@ -73,87 +75,96 @@ template<class A> struct TIsSame<A,A> { enum { value=1 }; };
 template <class A,class B,bool v> struct TSwitch { typedef A Result; };
 template <class A,class B> struct TSwitch<A,B,false> { typedef B Result; };
 
-enum IntersectionFlags {
-	ifDistance	=1,
-	ifElement	=2,
-	ifObject	=4,
-};
+namespace isct {
 
-template <class real,int packetSize,int flags_>
-class Intersection /*: public Intersection2<real,packetSize,flags_>*/ {
+	enum Flags {
+		fDistance	= 0x1,
+		fElement	= 0x2,
+		fObject		= 0x4,
+		fStats		= 0x8,
+
+		fPrimary	= 0x100,
+		fShadow		= 0x200,	// fObject, fElement will be excluded
+	};
+
+}
+
+// Intersection
+template <class Real,int packetSize,int flags_>
+class Isct {
+	enum { flags_0=flags_&isct::fShadow?flags_&0xff01:flags_ };
+
 public:
-	typedef typename TSwitch<i32x4,u32,TIsSame<real,f32x4>::value>::Result integer;
-	typedef typename TSwitch<Vec3q,Vec3f,TIsSame<real,f32x4>::value>::Result Vec;
-	enum { flags=flags_ };
+	enum { flags=flags_0 };
+	typedef typename TSwitch<i32x4,u32,TIsSame<Real,f32x4>::value>::Result Int;
+	typedef typename TSwitch<Vec3q,Vec3f,TIsSame<Real,f32x4>::value>::Result Vec3;
 
 private:
-	real    distance[flags&ifDistance?packetSize:0];
-	integer	object[flags&ifObject?packetSize:0];
-	integer	element[flags&ifElement?packetSize:0];
+	Real    distance[flags&isct::fDistance?packetSize:0];
+	Int		object  [flags&isct::fObject  ?packetSize:0];
+	Int		element [flags&isct::fElement ?packetSize:0];
+
+	typedef TreeStats<flags&isct::fStats?1:0> TStats;
+	TStats stats;
 
 public:
-	real &Distance(int q=0) {
-	//	static_assert(flags&ifDistance,"Structure doesnt contain 'distance' member.");
+	//Dont worry about those if's, they will be optimized out
+
+	Real &Distance(int q=0) {
+		if(!(flags&isct::fDistance)) ThrowException("Structure doesnt contain 'distance' member.");
 		return distance[q];
 	}
-	const real &Distance(int q=0) const {
-	//	static_assert(flags&ifDistance,"Structure doesnt contain 'distance' member.");
+	const Real &Distance(int q=0) const {
+		if(!(flags&isct::fDistance)) ThrowException("Structure doesnt contain 'distance' member.");
 		return distance[q];
 	}
-	integer &Object(int q=0) {
-	//	static_assert(flags&ifObject,"Structure doesnt contain 'object' member.");
+	Int &Object(int q=0) {
+		if(!(flags&isct::fObject)) ThrowException("Structure doesnt contain 'object' member.");
 		return object[q];
 	}
-	const integer &Object(int q=0) const {
-	//	static_assert(flags&ifObject,"Structure doesnt contain 'object' member.");
+	const Int &Object(int q=0) const {
+		if(!(flags&isct::fObject)) ThrowException("Structure doesnt contain 'object' member.");
 		return object[q];
 	}
-	integer &Element(int q=0) {
-	//	static_assert(flags&ifElement,"Structure doesnt contain 'element' member.");
+	Int &Element(int q=0) {
+		if(!(flags&isct::fElement)) ThrowException("Structure doesnt contain 'element' member.");
 		return element[q];
 	}
-	const integer &Element(int q=0) const {
-	//	static_assert(flags&ifElement,"Structure doesnt contain 'element' member.");
+	const Int &Element(int q=0) const {
+		if(!(flags&isct::fElement)) ThrowException("Structure doesnt contain 'element' member.");
 		return element[q];
+	}
+
+	TStats &Stats() { return stats; }
+	const TStats &Stats() const { return stats; }
+
+	template <int tflags>
+	void Insert(const Isct<Real,packetSize/4,tflags> &rhs,int pos) {
+		enum { cflags=tflags&flags };
+		if(cflags&isct::fDistance) for(int q=0;q<packetSize/4;q++) distance[q+pos*(packetSize/4)]=rhs.Distance(q);
+		if(cflags&isct::fObject  ) for(int q=0;q<packetSize/4;q++) object  [q+pos*(packetSize/4)]=rhs.Object  (q);
+		if(cflags&isct::fElement ) for(int q=0;q<packetSize/4;q++) element [q+pos*(packetSize/4)]=rhs.Element (q);
+//		if(cflags&isct::fStats   ) stats+=rhs.Stats();
+	}
+
+	// Works for Isct<f32x4,1,..>
+	template <int tflags>
+	void Insert(const Isct<float,1,tflags> &rhs,int pos) {
+		enum { cflags=tflags&flags };
+		if(cflags&isct::fDistance) distance[0][pos]=rhs.Distance(0);
+		if(cflags&isct::fObject  ) object  [0][pos]=rhs.Object  (0);
+		if(cflags&isct::fElement ) element [0][pos]=rhs.Element (0);
+//		if(cflags&isct::fStats   ) stats+=rhs.Stats();
 	}
 
 	template <int tflags>
-	void Insert(const Intersection<real,packetSize/4,tflags> &rhs,int pos) {
+	const Isct &operator=(const Isct<Real,packetSize,tflags> &rhs) {
 		enum { cflags=tflags&flags };
-		if(cflags&ifDistance) for(int q=0;q<packetSize/4;q++) distance[q+pos*(packetSize/4)]=rhs.Distance(q);
-		if(cflags&ifObject  ) for(int q=0;q<packetSize/4;q++) object  [q+pos*(packetSize/4)]=rhs.Object  (q);
-		if(cflags&ifElement ) for(int q=0;q<packetSize/4;q++) element [q+pos*(packetSize/4)]=rhs.Element (q);
+		if(cflags&isct::fDistance) for(int q=0;q<packetSize;q++) distance[q]=rhs.Distance(q);
+		if(cflags&isct::fObject  ) for(int q=0;q<packetSize;q++) object  [q]=rhs.Object  (q);
+		if(cflags&isct::fElement ) for(int q=0;q<packetSize;q++) element [q]=rhs.Element (q);
+//		if(cflags&isct::fStats   ) stats=rhs.Stats();
 	}
-
-	template <int tflags>
-	const Intersection &operator=(const Intersection<real,packetSize,tflags> &rhs) {
-		enum { cflags=tflags&flags };
-		if(cflags&ifDistance) for(int q=0;q<packetSize;q++) distance[q]=rhs.distance(q);
-		if(cflags&ifObject  ) for(int q=0;q<packetSize;q++) object  [q]=rhs.object  (q);
-		if(cflags&ifElement ) for(int q=0;q<packetSize;q++) element [q]=rhs.element (q);
-	}
-};
-
-template<>
-class Intersection<float,1,ifDistance> {
-public:
-	enum { flags=ifDistance };
-	typedef u32 integer;
-	typedef Vec3f Vec;
-
-private:
-	float distance[1];
-
-public:
-	float &Distance(int) { return distance[0]; }
-	const float &Distance(int) const { return distance[0]; }
-	u32 &Object(int) { throw 0; }
-	const u32 &Object(int) const { throw 0; }
-	u32 &Element(int) { throw 0; }
-	const u32 &Element(int) const { throw 0; }
-	
-
-	operator float() const { return distance[0]; }
 };
 
 #include "bounding_box.h"

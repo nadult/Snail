@@ -65,45 +65,8 @@ public:
 
 	real distance[size];
 	integer objId[size],elementId[size];
-
-	TreeStats stats;
-
-	ShadowCache shadowCache;
-};
-
-enum OutputType {
-	otNormal	=0,
-	otPrimary	=1,
-	otShadow	=2,
-};
-
-// Only to eliminate some idiotic warnings
-inline bool operator==(const OutputType &a,int b) { return int(a)==b; }
-inline bool operator==(int a,const OutputType &b) { return a==int(b); }
-
-inline bool operator!=(const OutputType &a,int b) { return int(a)!=b; }
-inline bool operator!=(int a,const OutputType &b) { return a!=int(b); }
-
-
-//
-// Output classes hold pointers, so you can
-// still modify the data when referencing to it
-// with a const reference
-
-template <OutputType type_,class real,class integer>
-struct Output
-{
-	enum { objectIndexes=type_!=otShadow, type=type_ };
-
-	Output(real *d,integer *i,integer *e,TreeStats *st) :dist(d),object(i),element(e),stats(st) { }
-
-	template <class Group,class Selector>
-	Output(TracingContext<Group,Selector> &c) :dist(c.distance),object(c.objId),element(c.elementId),stats(&c.stats) { }
-	Output(const Output &all,int n) :dist(all.dist+n),object(all.object+n),element(all.element+n),stats(all.stats) { }
 	
-	real * dist;
-	integer *object,*element;
-	TreeStats *stats;
+	ShadowCache shadowCache;
 };
 
 #endif

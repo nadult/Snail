@@ -3,6 +3,15 @@
 
 #include "rtbase.h"
 
+namespace stats {
+
+	enum {
+		memPatternEnabled	= 0,
+		treeStatsEnabled	= 1,
+	};
+
+}
+
 class Image;
 
 // Gives information about what memory chunks are needed
@@ -26,65 +35,68 @@ private:
 	vector<int> data;
 };
 
-
+// disabled TreeStats are zero-sized, and all update functions do nothing
+template <bool enabled_>
 class TreeStats
 {
 public:
-	enum { enabled=1 };
+	enum { enabled=enabled_&&stats::treeStatsEnabled, dataSize=enabled?10:0 };
 
-	inline TreeStats() { Init(); }
-	inline void Update(const TreeStats &local) {
+	inline TreeStats() { if(enabled) Init(); }
+	inline TreeStats(const TreeStats &rhs) { if(enabled) for(int n=0;n<dataSize;n++) data[n]=rhs.data[n]; }
+	inline void Init() { if(enabled) for(int n=0;n<dataSize;n++) data[n]=0; }
+	inline const TreeStats &operator=(const TreeStats &rhs) {
+		if(enabled) { for(int n=0;n<dataSize;n++) data[n]=rhs.data[n]; }
+		return *this;
+	}
+
+	inline const TreeStats &operator+=(const TreeStats &rhs) {
 		if(enabled) {
-			intersects+=local.intersects;
-			iters+=local.iters;
-			tracedRays+=local.tracedRays;
-			coherent+=local.coherent;
-			nonCoherent+=local.nonCoherent;
-			breaking+=local.breaking;
-			notBreaking+=local.notBreaking;
-
-			intersectPass+=local.intersectPass;
-			intersectFail+=local.intersectFail;
-
-			skips+=local.skips;
+			for(int n=0;n<dataSize;n++)
+				data[n]=rhs.data[n];
 		}
+		return *this;
 	}
 
-	inline void Init() {
-		if(enabled) for(int n=0;n<sizeof(TreeStats)/sizeof(u32);n++) ((u32*)this)[n]=0;
-	}
-	double Coherent() const			{ return enabled?coherent/double(coherent+nonCoherent):0; }
-	double TBreaking() const		{ return enabled?breaking/double(breaking+notBreaking):0; }
-	double TIntersectFail() const	{ return enabled?intersectFail/double(intersectFail+intersectPass):0; }
+	double GetCoherent() const		{ return enabled?double(data[3])/double(data[3]+data[4]):0.0; }
+	double GetBreaking() const		{ return enabled?double(data[5])/double(data[5]+data[6]):0.0; }
+	double GetIntersectFail() const	{ return enabled?double(data[8])/double(data[7]+data[8]):0.0; }
 
-	uint TracedRays() const { return enabled?tracedRays:0; }
-	uint Intersects() const { return enabled?intersects:0; }
-	uint LoopIters() const { return enabled?iters:0; }
-	uint Skips() const { return enabled?skips:0; }
+	uint GetIntersects() const { return enabled?data[0]:0; }
+	uint GetLoopIters() const { return enabled?data[1]:0; }
+	uint GetTracedRays() const { return enabled?data[2]:0; }
+	uint GetSkips() const { return enabled?data[9]:0; }
 
 	void PrintInfo(int resx,int resy,double msRenderTime,double msBuildTime);
 
-	inline void Breaking(uint val=1) { if(enabled) breaking+=val; }
-	inline void NotBreaking(uint val=1) { if(enabled) notBreaking+=val; }
+	inline void Intersection(uint val=1) { if(enabled) data[0]+=val; }
 
-	inline void LoopIteration(uint val=1) { if(enabled) iters+=val; }
-	inline void Intersection(uint val=1) { if(enabled) intersects+=val; }
-	inline void Skip(uint val=1) { if(enabled) skips+=val; }
+	inline void IntersectPass(uint val=1) { if(enabled) { data[0]+=val; data[7]+=val; } }
+	inline void IntersectFail(uint val=1) { if(enabled) { data[0]+=val; data[8]+=val; } }
 
-	inline void IntersectFail(uint val=1) { if(enabled) intersectFail+=val; }
-	inline void IntersectPass(uint val=1) { if(enabled) intersectPass+=val; }
+	inline void LoopIteration(uint val=1) { if(enabled) data[1]+=val; }
 
-	inline void TracingRay(uint val=1) { if(enabled) { tracedRays+=val; nonCoherent+=val; } }
-	inline void TracingPacket(uint val=1) { if(enabled) { tracedRays+=val; coherent+=val; } }
+	inline void Breaking(uint val=1) { if(enabled) data[5]+=val; }
+	inline void NotBreaking(uint val=1) { if(enabled) data[6]+=val; }
+
+	inline void Skip(uint val=1) { if(enabled) data[9]+=val; }
+
+	inline void TracingRay(uint val=1) { if(enabled) { data[2]+=val; data[4]+=val; } }
+	inline void TracingPacket(uint val=1) { if(enabled) { data[2]+=val; data[3]+=val; } }
 
 
-//private:
-	u32 intersects,iters,tracedRays;
-	u32 coherent,nonCoherent;
-
-	u32 breaking,notBreaking;
-	u32 intersectPass,intersectFail;
-	u32 skips;
+private:
+	u32 data[dataSize];
+	// intersects		0
+	// iters			1
+	// tracedRays		2
+	// coherent			3
+	// nonCoherent		4
+	// breaking			5
+	// notBreaking		6
+	// intersectPass	7
+	// intersectFail	8
+	// skips			9
 };
 
 #endif

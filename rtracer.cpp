@@ -110,14 +110,15 @@ inline i32x4 ConvColor(const Vec3q &rgb) {
 
 template <class AccStruct,int QuadLevels>
 struct GenImageTask {
-	GenImageTask(const AccStruct *tr,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,uint tw,uint th,TreeStats *outSt)
-		:tree(tr),camera(cam),out(tOut),options(opt),startX(tx),startY(ty),width(tw),height(th),outStats(outSt) {
+	GenImageTask(const AccStruct *tr,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,
+					uint tw,uint th,TreeStats<1> *outSt) :tree(tr),camera(cam),out(tOut),options(opt),
+					startX(tx),startY(ty),width(tw),height(th),outStats(outSt) {
 		}
 
 	uint startX,startY;
 	uint width,height;
 
-	TreeStats *outStats;
+	TreeStats<1> *outStats;
 	const AccStruct *tree;
 	Camera camera;
 	Image *out;
@@ -137,9 +138,6 @@ struct GenImageTask {
 		u8 *outPtr=(u8*)&out->buffer[startY*pitch+startX*3];
 		ShadowCache shadowCache;
 
-	//	for(int ky=0;ky<height;ky+=PHeight*2) for(int kx=0;kx<width;kx+=PWidth*2)
-//			for(int y=ky;y<=ky+PHeight;y+=PHeight) { for(int x=kx;x<=kx+PWidth;x+=PWidth) {
-				
 		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
 				Vec3q dir[NQuads],idir[NQuads];
@@ -164,8 +162,6 @@ struct GenImageTask {
 				context.shadowCache=shadowCache;
 				RayTrace(*tree,context);
 				shadowCache=context.shadowCache;
-
-				outStats->Update(context.stats);
 
 				if(NQuads==1) {
 					i32x4 col=ConvColor(rgb[0]);
@@ -207,12 +203,12 @@ struct GenImageTask {
 };
 
 template <int QuadLevels,class AccStruct>
-TreeStats GenImage(const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
+TreeStats<1> GenImage(const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
 	enum { taskSize=64 };
 
 	uint numTasks=(image.width+taskSize-1)*(image.height+taskSize-1)/(taskSize*taskSize);
 
-	vector<TreeStats> taskStats(numTasks);
+	vector<TreeStats<1> > taskStats(numTasks);
 
 	TaskSwitcher<GenImageTask<AccStruct,QuadLevels> > switcher(numTasks);
 	uint num=0;
@@ -225,14 +221,14 @@ TreeStats GenImage(const AccStruct &tree,const Camera &camera,Image &image,const
 
 	switcher.Work(tasks);
 
-	TreeStats stats;
+	TreeStats<1> stats;
 	for(uint n=0;n<numTasks;n++)
-		stats.Update(taskStats[n]);
+		stats+=taskStats[n];
 	return stats;
 }
 
 template <class AccStruct>
-TreeStats GenImage(int quadLevels,const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
+TreeStats<1> GenImage(int quadLevels,const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
 	switch(quadLevels) {
 	case 0: return GenImage<0>(tree,camera,image,options,tasks);
 	case 1: return GenImage<1>(tree,camera,image,options,tasks);
@@ -481,7 +477,7 @@ int main(int argc, char **argv) {
 
 			buildTime=GetTime()-buildTime;
 			
-			TreeStats stats;
+			TreeStats<1> stats;
 			if(gVals[0]) stats=GenImage(quadLevels,staticTree,cam,img,options,threads);
 			else stats=GenImage(quadLevels,tree,cam,img,options,threads);
 
