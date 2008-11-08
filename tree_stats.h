@@ -7,7 +7,7 @@ namespace stats {
 
 	enum {
 		memPatternEnabled	= 0,
-		treeStatsEnabled	= 0,
+		treeStatsEnabled	= 1,
 	};
 
 }

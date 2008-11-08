@@ -14,7 +14,7 @@
 		int dirMask=SignMask(floatq(invDir.m));
 		float tMin=0.0f,tMax=out.Distance(0);
 
-		struct Locals { float tMin,tMax; u32 idx; } stackBegin[maxLevel+2],*stack=stackBegin;
+		struct Locals { float tMin,tMax; u32 idx; } stackBegin[200],*stack=stackBegin;
 		const Node *node,*node0=&nodes[0];
 		int idx=0;
 

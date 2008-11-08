@@ -75,15 +75,6 @@ public:
 		nan=nan||isnan(plane.x)||isnan(plane.y)||isnan(plane.z);
 
 		return !nan;
-	/*	if(nan) {
-			printf("%f %f %f\n",a.x,a.y,a.z);
-			printf("%f %f %f\n",ba.x,ba.y,ba.z);
-			printf("%f %f %f\n",ca.x,ca.y,ca.z);
-			printf("%f %f %f %f\n",plane.x,plane.y,plane.z,plane.w);
-			Vec3p cross=ba^ca;
-			printf("%f %f %f\n",cross.x,cross.y,cross.z);
-			ThrowException("NANs in triangle");
-		}*/
 	}
 
 	inline Vec3p P1() const { return a; }

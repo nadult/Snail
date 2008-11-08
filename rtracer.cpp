@@ -152,8 +152,6 @@ struct GenImageTask {
 					dir[n].y+=floatq(0.000000000001f);
 					dir[n].z+=floatq(0.000000000001f);
 					idir[n]=VInv(dir[n]);
-
-					TestForNans(dir[n],-1);	
 				}
 
 				TracingContext<RayGroup<NQuads,1,1>,RaySelector<NQuads> > context(RayGroup<NQuads,1,1>(&origin,dir,idir));
@@ -325,7 +323,7 @@ public:
 
 
 int main(int argc, char **argv) {
-	printf("Unnamed raytracer v0.07 by nadult\n");
+	printf("Unnamed raytracer v0.08 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
 		PrintHelp();
 		return 0;

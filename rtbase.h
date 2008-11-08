@@ -94,6 +94,7 @@ namespace isct {
 
 }
 
+/*
 inline bool TestForNans(const Vec3q &v,int id,bool thr=1) {
 	bool nan=isnan(v.x[0])||isnan(v.x[1])||isnan(v.x[2])||isnan(v.x[3]);
 	nan=nan||isnan(v.y[0])||isnan(v.y[1])||isnan(v.y[2])||isnan(v.y[3]);
@@ -109,7 +110,7 @@ inline bool TestForNans(const Vec3q &v,int id,bool thr=1) {
 	}
 
 	return 0;
-}
+}*/
 
 // Intersection
 template <class Real,int packetSize,int flags_>

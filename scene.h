@@ -63,9 +63,11 @@ Vec2q GouraudTexCoords(const Container &objects,const ShadingDataVec &shadingDat
 	return nrm;
 }
 
+
 template <int packetSize,class AccStruct>
 void TraceLight(const AccStruct &tree,const floatq *dist,const Vec3q *position,const Vec3q *normal,
 				Vec3q * __restrict__ out,const Light &light,int idx) {
+	enum { size=packetSize };
 	Vec3p lightPos=light.pos;
 
 	Vec3q fromLight[packetSize];
@@ -75,9 +77,10 @@ void TraceLight(const AccStruct &tree,const floatq *dist,const Vec3q *position,c
 	RaySelector<packetSize> sel;
 	sel.SelectAll();
 
-	for(int i=0;i<sel.Num();i++) {
-		int q=sel.Idx(i);
-		if(sel.DisableWithMask(i,dist[q]>=1000.0f)) { i--; continue; }
+	for(int q=0;q<size;q++) {
+		f32x4b mask=dist[q]<(1.0f/0.0f);
+		sel[q]&=ForWhich(mask);
+		if(!sel[q]) continue;
 
 		Vec3q lightVec=(position[q]-Vec3q(lightPos));
 		f32x4b close=LengthSq(lightVec)<0.0001f;
@@ -86,52 +89,36 @@ void TraceLight(const AccStruct &tree,const floatq *dist,const Vec3q *position,c
 		lightDist[q]=Sqrt(lightVec|lightVec);
 		fromLight[q]=lightVec*Inv(lightDist[q]);
 		fromLightInv[q]=VInv(fromLight[q]);
-			
-		Vec3q vec=fromLight[q]; vec=Condition(sel.Mask(i),vec,Vec3q(0.0f,1.0f,0.0f));
-		TestForNans(vec,33);
 	}
 
 	floatq dot[packetSize];
 
-	for(int i=0;i<sel.Num();i++) {
-		int q=sel[i];
-		dot[q]=normal[q]|fromLight[q]; {
-			if(sel.DisableWithMask(i,dot[q]<=0.0f)) { i--; continue; }
-			dot[q]=Condition(sel.Mask(i),dot[q]);
-		}
+	for(int q=0;q<size;q++) {
+		dot[q]=normal[q]|fromLight[q];
+		f32x4b mask=dot[q]>0.0f;
+		sel[q]&=ForWhich(mask);
+		dot[q]=Condition(mask,dot[q]);
 	}
 
-	if(!sel.Num()) return;
+	bool allDisabled=1;
+	if(size>1) { for(int q=0;q<size/4&&allDisabled;q++) if(sel.Mask4(q)) allDisabled=0; }
+	else  allDisabled=0;
+	if(allDisabled) return;
 
 	f32x4 maxDist[packetSize];
-	Isct<f32x4,packetSize,AccStruct::isctFlags|isct::fShadow> result; {
+	Isct<f32x4,packetSize,AccStruct::isctFlags> result; {
 		Vec3q lPos(lightPos.x,lightPos.y,lightPos.z);
 		RayGroup<packetSize,1,1> rays(&lPos,fromLight,fromLightInv);
 
-		for(int i=0;i<sel.Num();i++) {
-			int q=sel[i];
-			maxDist[q]=lightDist[q]*0.99999f;
-		}
-
-		if(sel.BitMask4(0)==0xf0f0f0f) for(int i=0;i<sel.Num();i++) {
-			int q=sel[i];
-			Vec3q vec=fromLight[q];
-	//		vec=Condition(sel.Mask(i),vec,Vec3q(0.0f,1.0f,0.0f));
-			TestForNans(vec,3);
-		}
-//		for(int q=0;q<packetSize;q++) TestForNans(rays.Dir(q),-3,0);
-
-		result=tree.template TraversePacket<isct::fShadow>(rays,sel,maxDist);
+		for(int q=0;q<size;q++) maxDist[q]=lightDist[q]*0.99999f;
+		result=tree.template TraversePacket<0>(rays,sel,maxDist);
 	}
 
 	Vec3q lightColor(light.color);
-	for(int i=0;i<sel.Num();i++) {
-		int q=sel.Idx(i);
-
-		if(sel.DisableWithMask(i,lightDist[q]-result.Distance(q)>lightDist[q]*0.0001f)) { i--; continue; }
-
-		out[q]+=Condition(sel.Mask(i),
-				ShadeLight(lightColor,dot[q],lightDist[q]) );
+	for(int q=0;q<size;q++) {
+		if(!sel[q]) continue;
+		f32x4b mask=lightDist[q]-result.Distance(q)<=lightDist[q]*0.0001f;
+		out[q]+=Condition(mask,ShadeLight(lightColor,dot[q],lightDist[q]));
 	}
 }
 
@@ -167,39 +154,32 @@ Vec3q Sample(const gfxlib::Texture &tex,const Vec2q &uv) {
 
 template <class AccStruct,class Group,class Selector>
 void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
-	enum { primary=0 };
+	enum { primary=0, size=Selector::size };
 	
-
 	typedef typename Vec3q::TScalar real;
 	typedef typename Vec3q::TBool boolean;
 	const floatq maxDist=100000.0f;
 
-	for(int i=0;i<c.selector.Num();i++) {
-		int q=c.selector.Idx(i);
+	for(int q=0;q<size;q++)
 		InitializationShader(c,q,maxDist);
-	}
 
-	for(int q=0;q<Selector::size;q++)
-		TestForNans(c.rays.Dir(q),1);
+	Isct<f32x4,size,AccStruct::isctFlags> result=
+		tree.template TraversePacket<0>(c.rays,FullSelector<size>());
+	RaySelector<size> &selector=c.selector;
 
-	Isct<f32x4,Selector::size,AccStruct::isctFlags> result=
-		tree.template TraversePacket<0>(c.rays,FullSelector<Selector::size>());
-	RaySelector<Selector::size> &selector=c.selector;
-
-	for(int q=0;q<Selector::size;q++) {
+	for(int q=0;q<size;q++) {
 		c.distance[q]=result.Distance(q);
 		c.objId[q]=result.Object(q);
 		if(AccStruct::isctFlags&isct::fElement) c.elementId[q]=result.Element(q);
 	}
 
-	for(int i=0;i<selector.Num();i++) {
-		int q=selector.Idx(i);
-		if(selector.DisableWithMask(i,c.distance[q]>=maxDist)) {
-			c.color[q]=Vec3q(Const<real,0>());
-			i--; continue;
-		}
+	for(int q=0;q<size;q++) {
+		f32x4b mask=c.distance[q]<maxDist;
+		selector[q]=ForWhich(mask);
+		c.color[q]=Vec3q(0.0f,0.0f,0.0f);
+		if(!selector[q]) continue;
 
-		i32x4b imask(selector.Mask(i));
+		i32x4b imask(mask);
 
 		c.position[q]=c.RayDir(q)*c.distance[q]+c.RayOrigin(q);
 		
@@ -229,26 +209,23 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 	enum { lightsEnabled=1 };
 
 	if(lightsEnabled) {
-		vector<Light> lights;
-		lights.push_back(Light(Vec3f(0,-1.5f,0),Vec3f(5,5,3)*0.5f));
-		lights.push_back(Light(Vec3f(1,-1.5f,0),Vec3f(1,5,2)*0.5f));
-		lights.push_back(Light(Vec3f(0,-1.5f,1),Vec3f(5,1,1)*0.5f));
+		Light lights[]={
+			Light(Vec3f(0,-1.5f,0),Vec3f(5,5,3)*0.5f),
+			Light(Vec3f(1,-1.5f,0),Vec3f(1,5,2)*0.5f),
+		/*	Light(Vec3f(0,-1.5f,1),Vec3f(5,1,1)*0.5f),*/ };
 
-		assert(ShadowCache::size>=lights.size());
-		for(int n=0;n<lights.size();n++)
+		for(int n=0;n<sizeof(lights)/sizeof(Light);n++)
 			TraceLight<Group::size>(tree,c.distance,c.position,c.normal,c.light,lights[n],n);
 	}
 
 //	if(c.options.reflections>0&&selector.Num())
 //		TraceReflection(tree,c);
 
-	if(lightsEnabled) for(int i=0;i<selector.Num();i++) {
-		int q=selector[i];
-		c.color[q]=Condition(selector.Mask(i),c.color[q]*c.light[q]);
+	if(lightsEnabled) for(int q=0;q<size;q++) {
+		c.color[q]=Condition(selector.SSEMask(q),c.color[q]*c.light[q]);
 	}
-	else for(int i=0;i<selector.Num();i++) {
-		int q=selector[i];
-		c.color[q]=Condition(selector.Mask(i),c.color[q]);
+	else for(int q=0;q<size;q++) {
+		c.color[q]=Condition(selector.SSEMask(q),c.color[q]);
 	}
 	if(c.options.rdtscShader)
 		for(int q=0;q<Selector::size;q++)

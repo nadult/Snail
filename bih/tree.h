@@ -110,7 +110,7 @@ namespace bih {
 			TraversePacket(const RayGroup<1,sharedOrigin,1> &rays,
 							const Selector<1> &selector,const f32x4 *maxDist=0) const
 		{
-			int bitMask=selector.BitMask(0);
+			int bitMask=selector[0];
 			const Vec3q &dir=rays.Dir(0);
 			Isct<f32x4,1,isctFlags|addFlags> out;
 
@@ -157,24 +157,18 @@ namespace bih {
 			TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,
 							const Selector<packetSize> &selector,const f32x4 *maxDist=0) const
 		{
-		//	for(int q=0;q<packetSize;q++) TestForNans(rays.Dir(q),-1);
-
 			Isct<f32x4,packetSize,isctFlags|addFlags> out;	
 			bool split=1;
 
 			bool selectorsFiltered=0;
-			if(!Selector<packetSize>::full) for(int n=0;n<packetSize;n++)
-				if(selector.BitMask4(n)!=0x0f0f0f0f) {
-					selectorsFiltered=0;
-					break;
-				}
+			if(!Selector<packetSize>::full)
+				for(int n=0;n<packetSize;n++)
+					if(selector.Mask4(n)!=0x0f0f0f0f) {
+						selectorsFiltered=0;
+						break;
+					}
 
 			if(Selector<packetSize>::full||selectorsFiltered) {
-		//		for(int q=0;q<packetSize;q++)
-		//		if(TestForNans(rays.Dir(q),1000+packetSize,0)) {
-		//			printf("mask: %x\n",selector.BitMask4(0));
-		//		}
-
 				const Vec3q &dir=rays.Dir(0);
 				bool signsFiltered=1;
 				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
@@ -193,13 +187,10 @@ namespace bih {
 			}
 
 			if(split) {
-				Selector<packetSize/4> qSelectors[4];
-				selector.SplitTo4(qSelectors);
-
 				for(int q=0;q<4;q++) {
 					Isct<f32x4,packetSize/4,isctFlags|addFlags> tOut=
 						TraversePacket<addFlags>(RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)),
-								qSelectors[q],maxDist?maxDist+q*(packetSize/4):0);
+								selector.SubSelector(q),maxDist?maxDist+q*(packetSize/4):0);
 					out.Insert(tOut,q);
 				}
 			}

@@ -41,8 +41,6 @@
 
 		const Vec3q *invDir=rays.idir;
 	
-		for(int q=0;q<packetSize;q++) TestForNans(invDir[q],1000+packetSize+(addFlags&isct::fShadow?2000:0));
-	
 		floatq tinv[3][packetSize];
 		for(int q=0;q<packetSize;q++) {
 			tinv[0][q]=invDir[q].x;
@@ -123,9 +121,6 @@
 				if(!mailbox.Find(idx)) {
 					mailbox.Insert(idx);
 
-					if(idx>=elements.size()||idx<0)
-						ThrowException("sux",idx);
-
 					const Element &element=elements[idx];
 					stats.Intersection(packetSize);
 
@@ -155,9 +150,6 @@
 				continue;
 			}
 
-			if((idx&Node::idxMask)>=nodes.size()) {
-				ThrowException("idx= ",idx," / ",int(nodes.size()));
-			}
 			const Node *node=node0+(idx&Node::idxMask);
 
 			int axis=node->Axis();
@@ -182,16 +174,6 @@
 						
 						test1=test1&&tMin[q]>near[q];
 						test2=test2&&tMax[q]<far [q];
-					}
-	
-					for(int q=0;q<packetSize;q++) {
-						const floatq &st=inv[q];
-						bool nan=isnan(st[0])||isnan(st[1])||isnan(st[2])||isnan(st[3]);
-						if(nan) {
-							printf("%f %f %f %f\n%f %f %f %f\n",
-									st[0],st[1],st[2],st[3],tMin[q][0],tMin[q][1],tMin[q][2],tMin[q][3]);
-							ThrowException("NANs! run for your lives!");
-						}
 					}
 				}
 				else {

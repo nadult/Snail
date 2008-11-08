@@ -33,78 +33,28 @@ template <int size_>
 class RaySelector {
 public:
 	enum { size=size_, full=0 };
+	static_assert((size&3)==0,"Selector size must be a power of 4");
+
 private:
-	int num;
 	union {
+		RaySelector<size/4> sub[4];
 		char bits[size];
 		int bits4[size/4];
 	};
-	u8 idx[size];
 public:
-	INLINE RaySelector() :num(0) { }
+	INLINE f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(bits[idx]); }
 
-	INLINE int Num() const					{ return num; }
-	INLINE RayIndex Last() const			{ return idx[num-1]; }
-	INLINE RayIndex Idx(int n) const		{ return idx[n]; }
-	INLINE RayIndex operator[](int n) const { return idx[n]; }
-	
-	INLINE void SplitTo4(RaySelector<size/4> part[4]) const {
-//		if(size==4) {
-//			part[idx[0]].Add(0,bits[0]);
-//			part[idx[1]].Add(0,bits[1]);
-//			part[idx[2]].Add(0,bits[2]);
-//			part[idx[3]].Add(0,bits[3]);
-//		}
-//		else {
-			part[0].Clear();
-			part[1].Clear();
-			part[2].Clear();
-			part[3].Clear();
-		
-			for(int n=0;n<Num();n++) {
-				int idx=Idx(n);
-				part[idx/(size/4)].Add(idx&(size/4-1),BitMask(n));
-//				if(size==4) printf("%d\n",part[idx/(size/4)].BitMask(0));
-			}
-//		}
-	}
+	INLINE RaySelector<size/4> &SubSelector(int idx) { return sub[idx]; }
+	INLINE const RaySelector<size/4> &SubSelector(int idx) const { return sub[idx]; }
 
-	// Moves last index to n,
-	// decreases number of selected rays
-	INLINE void Disable(int n)				{ idx[n]=idx[--num]; bits[n]=bits[num]; }
-	INLINE bool DisableWithMask(int n,const f32x4b &m) {
-		int newMask=_mm_movemask_ps(m.m);
-		bits[n]&=~newMask;
-		bool disable=!bits[n];
-		if(disable) Disable(n);
-		return disable;
-	}
-	INLINE bool DisableWithBitMask(int n,int newMask) {
-		bits[n]&=~newMask;
-		bool disable=!bits[n];
-		if(disable) Disable(n);
-		return disable;
-	}
+	INLINE char &operator[](int idx)				{ return bits[idx]; }
+	INLINE const char &operator[](int idx) const	{ return bits[idx]; }
 
-	INLINE void Add(RayIndex i,int bitMask=15) {
-		assert(num<size);
-		bits[num]=bitMask;
-		idx[num++]=i;
-	}
-	template <class Selector>
-	INLINE void Add(const Selector &other,int n)	{ Add(other[n],other.BitMask(n)); }
+	INLINE int &Mask4(int idx) 						{ return bits4[idx]; }
+	INLINE const int &Mask4(int idx) const 			{ return bits4[idx]; }
 
-	INLINE int	BitMask4(int n) const			{ return bits4[n]; }
-	INLINE int  BitMask(int n) const			{ return bits[n]; }
-	INLINE f32x4b Mask(int n) const				{ return GetSSEMaskFromBits(bits[n]); }
-	INLINE void SetBitMask(int n,int m)			{ bits[n]=m; }
-	INLINE void SetMask(int n,const f32x4b &m)	{ bits[n]=_mm_movemask_ps(m.m); }
-
-	INLINE void Clear() { num=0; }
-	INLINE void SelectAll() {
-		num=size;
-		for(int n=0;n<size;n++) { idx[n]=n; bits[n]=15; }
-	}
+	INLINE void Clear()			{ for(int n=0;n<size;n++) bits[n]=0; }
+	INLINE void SelectAll() 	{ for(int n=0;n<size;n++) bits[n]=15; }
 };
 
 template <>
@@ -114,46 +64,16 @@ public:
 private:
 	char bits;
 public:
-	INLINE RaySelector() :bits(0) { }
+	INLINE f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(bits); }
 
-	INLINE int Num() const					{ return bits?1:0; }
-	INLINE RayIndex Last() const			{ return 0; }
-	INLINE RayIndex Idx(int n) const		{ return 0; }
-	INLINE RayIndex operator[](int n) const { return 0; }
-	
-	// Moves last index to n,
-	// decreases number of selected rays
-	INLINE void Disable(int n) {
-		assert(n==0);
-		bits=0;
-	}
-	INLINE bool DisableWithMask(int n,const f32x4b &m) {
-		assert(n==0); 
-		int newMask=_mm_movemask_ps(m.m);
-		bits&=~newMask;
-		return !bits;
-	}
-	INLINE bool DisableWithBitMask(int n,int newMask) {
-		assert(n==0);
-		bits&=~newMask;
-		return !bits;
-	}
+	INLINE char &operator[](int idx)				{ return bits; }
+	INLINE const char &operator[](int idx) const	{ return bits; }
 
-	INLINE void Add(RayIndex i,int bitMask=15) {
-		assert(bits==0);
-		bits=bitMask;
-	}
-	template <class Selector>
-	INLINE void Add(const Selector &other,int n)	{ Add(other[n],other.BitMask(n)); }
+	INLINE char &Mask4(int idx) 					{ return bits; }
+	INLINE const char &Mask4(int idx) const 		{ return bits; }
 
-	INLINE int	BitMask4(int n) const			{ return bits; }
-	INLINE int  BitMask(int n) const			{ return bits; }
-	INLINE f32x4b Mask(int n) const				{ return GetSSEMaskFromBits(bits); }
-	INLINE void SetBitMask(int n,int m)			{ bits=m; }
-	INLINE void SetMask(int n,const f32x4b &m)	{ bits=_mm_movemask_ps(m.m); }
-
-	INLINE void Clear() { bits=0; }
-	INLINE void SelectAll() { bits=0xf; }
+	INLINE void Clear()			{ bits=0; }
+	INLINE void SelectAll() 	{ bits=15; }
 };
 
 
@@ -161,26 +81,45 @@ template <int size_>
 class FullSelector {
 public:
 	enum { size=size_, full=1 };
+	static_assert((size&3)==0,"Selector size must be a power of 4");
+	
+private:
+	FullSelector<size/4> sub[4];
+
+public:
+	INLINE f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(15); }
+
+	INLINE FullSelector<size/4> &SubSelector(int idx) { return sub[idx]; }
+	INLINE const FullSelector<size/4> &SubSelector(int idx) const { return sub[idx]; }
+
+	INLINE char operator[](int idx) const			{ return 15; }
+	INLINE int Mask4(int idx) const 				{ return 0xf0f0f0f; }
+
+	INLINE void SelectAll() 	{ }
 
 	INLINE operator RaySelector<size>() const {
 		RaySelector<size> sel;
 		sel.SelectAll();
 		return sel;
 	}
+};
 
-	INLINE void SelectAll() { }
-
-	INLINE int Num() const					{ return size; }
-	INLINE RayIndex Last() const			{ return size-1; }
-	INLINE RayIndex Idx(int n) const		{ return n; }
-	INLINE RayIndex operator[](int n) const { return n; }
+template <>
+class FullSelector<1> {
+public:
+	enum { size=1, full=1 };
 	
-	INLINE void SplitTo4(FullSelector<size/4> part[4]) const { }
+public:
+	INLINE char operator[](int idx) const	{ return 15; }
+	INLINE int Mask4(int idx) const 		{ return 15; }
 
-	INLINE int	BitMask4(int n) const			{ return 0x0f0f0f0f; }
-	INLINE int  BitMask(int n) const			{ return 0xf; }
-	INLINE f32x4b Mask(int n) const				{ return GetSSEMaskFromBits(0xf); }
+	INLINE void SelectAll() 	{ }
 
+	INLINE operator RaySelector<1>() const {
+		RaySelector<1> sel;
+		sel.SelectAll();
+		return sel;
+	}
 };
 
 // returns 8 for mixed rays
