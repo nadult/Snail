@@ -68,6 +68,24 @@ public:
 	TTriangle() {
 	}
 
+	bool Test() const {
+		bool nan=isnan(a.x)||isnan(a.y)||isnan(a.z);
+		nan=nan||isnan(ba.x)||isnan(ba.y)||isnan(ba.z);
+		nan=nan||isnan(ca.x)||isnan(ca.y)||isnan(ca.z);
+		nan=nan||isnan(plane.x)||isnan(plane.y)||isnan(plane.z);
+
+		return !nan;
+	/*	if(nan) {
+			printf("%f %f %f\n",a.x,a.y,a.z);
+			printf("%f %f %f\n",ba.x,ba.y,ba.z);
+			printf("%f %f %f\n",ca.x,ca.y,ca.z);
+			printf("%f %f %f %f\n",plane.x,plane.y,plane.z,plane.w);
+			Vec3p cross=ba^ca;
+			printf("%f %f %f\n",cross.x,cross.y,cross.z);
+			ThrowException("NANs in triangle");
+		}*/
+	}
+
 	inline Vec3p P1() const { return a; }
 	inline Vec3p P2() const { return ba+a; }
 	inline Vec3p P3() const { return ca+a; }
@@ -93,9 +111,19 @@ public:
 	Isct<typename Vec::TScalar,1,isct::fDistance|addFlags>
 		Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
 
+	template <int addFlags,class VecO,class Vec>
+	INLINE Isct<typename Vec::TScalar,1,isct::fDistance|addFlags>
+		Collide(const VecO &rOrig,const Vec &rDir,float maxDist) const
+		{ return Collide<addFlags>(rOrig,rDir); }
+
 	template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
 	Isct<f32x4,packetSize,isct::fDistance|addFlags>
 		Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const NOINLINE;
+
+	template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
+	INLINE Isct<f32x4,packetSize,isct::fDistance|addFlags>
+		Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,const f32x4 *maxDist) const
+		{ return Collide<addFlags>(rays); }
 
 	template <class Vec0,class Vec,class real>
 	void Barycentric(const Vec0 &rOrig,const Vec &rDir,real &u,real &v) const;

@@ -83,8 +83,9 @@ namespace bih {
 		typedef vector<Element,AlignedAllocator<Element> > ElementContainer;
 		//1 for tree of triangles, 2 for tree of trees of triangles etc
 		enum { complexity=Element::complexity+1 };
-		enum { maxLevel=60 };
 		enum { isctFlags=Element::isctFlags|isct::fObject|isct::fStats };
+		enum { filterSigns=1 };
+		enum { desiredMaxLevel=60 }; // Can be more, depends on the scene
 		
 		Tree() { }
 
@@ -106,8 +107,8 @@ namespace bih {
 	
 		template <int addFlags,bool sharedOrigin,template <int> class Selector>
 		Isct<f32x4,1,isctFlags|addFlags>
-			TraversePacket(bool filterSigns,const RayGroup<1,sharedOrigin,1> &rays,
-							const Selector<1> &selector) const
+			TraversePacket(const RayGroup<1,sharedOrigin,1> &rays,
+							const Selector<1> &selector,const f32x4 *maxDist=0) const
 		{
 			int bitMask=selector.BitMask(0);
 			const Vec3q &dir=rays.Dir(0);
@@ -115,24 +116,29 @@ namespace bih {
 
 			bool split=1;
 
-			if(bitMask==0x0f) {	
+
+			if(Selector<1>::full||bitMask==0x0f) {	
 				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
 				int signMask=filterSigns?GetVecSign(rays.Dir(0)):msk&7;
 				
 				if(signMask!=8) {
-					out=TraversePacket<addFlags>(rays,msk);
+					out=TraversePacket<addFlags>(rays,msk,maxDist);
 					split=0;
 				}
 			}
 
 			if(split) {
+				if(bitMask==0) return out;
+
 				const Vec3q &orig=rays.Origin(0);
 				for(int q=0;q<4;q++) {	
 					int o=sharedOrigin?0:q;
 					if(!(bitMask&(1<<q))) continue;
+					float tMaxDist=maxDist?maxDist[0][q]:1.0f/0.0f;
 
 					Isct<float,1,isctFlags|addFlags> tOut=	
-						TraverseMono<addFlags>(Vec3p(orig.x[o],orig.y[o],orig.z[o]),Vec3p(dir.x[q],dir.y[q],dir.z[q]));
+						TraverseMono<addFlags>(Vec3p(orig.x[o],orig.y[o],orig.z[o]),
+												Vec3p(dir.x[q],dir.y[q],dir.z[q]),tMaxDist);
 					out.Insert(tOut,q);
 				}
 			}
@@ -141,45 +147,34 @@ namespace bih {
 		}
 
 		template <int addFlags,bool sharedOrigin>
-		Isct<f32x4,1,isctFlags|addFlags>
-			TraversePacket(bool filterSigns,const RayGroup<1,sharedOrigin,1> &rays) const
-		{
-			const Vec3q &dir=rays.Dir(0);
-			int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
-			int signMask=filterSigns?GetVecSign(rays.Dir(0)):msk&7;
-
-			Isct<f32x4,1,isctFlags|addFlags> out;
-				
-			if(signMask!=8) out=TraversePacket<addFlags>(rays,msk);
-			else {
-				const Vec3q &orig=rays.Origin(0);
-				for(int q=0;q<4;q++) {	
-					int o=sharedOrigin?0:q;
-					Isct<float,1,isctFlags|addFlags> tOut=	
-						TraverseMono<addFlags>(Vec3p(orig.x[o],orig.y[o],orig.z[o]),Vec3p(dir.x[q],dir.y[q],dir.z[q]));
-					out.Insert(tOut,q);
-				}
-			}
-
-			return out;
+		INLINE Isct<f32x4,1,isctFlags|addFlags>
+			TraversePacket(const RayGroup<1,sharedOrigin,1> &rays,const f32x4 *maxDist) const {
+			return TraversePacket<addFlags>(rays,FullSelector<1>(),maxDist);
 		}
 
-		template <int addFlags,bool sharedOrigin,template <int> class Selector,int packetSize>
+		template <int addFlags,bool sharedOrigin,int packetSize,template <int> class Selector>
 		Isct<f32x4,packetSize,isctFlags|addFlags>
-			TraversePacket(bool filterSigns,const RayGroup<packetSize,sharedOrigin,1> &rays,
-							const Selector<packetSize> &selector) const
+			TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,
+							const Selector<packetSize> &selector,const f32x4 *maxDist=0) const
 		{
+		//	for(int q=0;q<packetSize;q++) TestForNans(rays.Dir(q),-1);
+
 			Isct<f32x4,packetSize,isctFlags|addFlags> out;	
 			bool split=1;
 
-			bool selectorsFiltered=1;
-			for(int n=0;n<packetSize/4;n++)
+			bool selectorsFiltered=0;
+			if(!Selector<packetSize>::full) for(int n=0;n<packetSize;n++)
 				if(selector.BitMask4(n)!=0x0f0f0f0f) {
 					selectorsFiltered=0;
 					break;
 				}
 
-			if(selectorsFiltered) {
+			if(Selector<packetSize>::full||selectorsFiltered) {
+		//		for(int q=0;q<packetSize;q++)
+		//		if(TestForNans(rays.Dir(q),1000+packetSize,0)) {
+		//			printf("mask: %x\n",selector.BitMask4(0));
+		//		}
+
 				const Vec3q &dir=rays.Dir(0);
 				bool signsFiltered=1;
 				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
@@ -203,8 +198,8 @@ namespace bih {
 
 				for(int q=0;q<4;q++) {
 					Isct<f32x4,packetSize/4,isctFlags|addFlags> tOut=
-						TraversePacket<addFlags>(filterSigns,RayGroup<packetSize/4,sharedOrigin,1>
-								(rays,q*(packetSize/4)),qSelectors[q]);
+						TraversePacket<addFlags>(RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)),
+								qSelectors[q],maxDist?maxDist+q*(packetSize/4):0);
 					out.Insert(tOut,q);
 				}
 			}
@@ -213,30 +208,9 @@ namespace bih {
 		}
 
 		template <int addFlags,bool sharedOrigin,int packetSize>
-		Isct<f32x4,packetSize,isctFlags|addFlags> TraversePacket(bool filterSigns,const RayGroup<packetSize,sharedOrigin,1> &rays) const {
-			Isct<f32x4,packetSize,isctFlags|addFlags> out;	
-			bool signsFiltered=1;
-
-			const Vec3q &dir=rays.Dir(0);
-			int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
-
-			if(filterSigns) {					
-				for(int n=0;n<packetSize;n++) if(GetVecSign(rays.Dir(n))!=msk) {
-					signsFiltered=0;
-					break;
-				}
-			}
-			
-			if(signsFiltered) out=TraversePacket<addFlags>(rays,msk);
-			else {
-				for(int q=0;q<4;q++) {
-					Isct<f32x4,packetSize/4,isctFlags|addFlags> tOut=
-						TraversePacket<addFlags>(filterSigns,RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)));
-					out.Insert(tOut,q);
-				}
-			}
-
-			return out;
+		INLINE Isct<f32x4,packetSize,isctFlags|addFlags>
+			TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,const f32x4 *maxDist=0) const {
+			return TraversePacket<addFlags>(rays,FullSelector<packetSize>(),maxDist);
 		}
 	
 		#include "bih/traverse_mono.h"
@@ -247,7 +221,7 @@ namespace bih {
 		vector<Node> nodes;
 		ElementContainer elements;
 
-		int objectId;
+		int objectId,maxLevel;
 		float maxDensity;
 		bool split;
 	};
@@ -272,11 +246,11 @@ namespace bih {
 		BBox GetBBox() const { return bBox; }
 
 		template <int addFlags>
-		Isct<float,1,isctFlags|addFlags> Collide(const Vec3f &rOrig,const Vec3f &rDir) const {
+		Isct<float,1,isctFlags|addFlags> Collide(const Vec3f &rOrig,const Vec3f &rDir,float maxDist) const {
 			assert(tree);
 			Isct<float,1,isctFlags|addFlags> out;
 			Isct<float,1,BaseTree::isctFlags|addFlags> tOut=
-				tree->template TraverseMono<addFlags>(invTrans*rOrig,invTrans&rDir);
+				tree->template TraverseMono<addFlags>(invTrans*rOrig,invTrans&rDir,maxDist);
 
 			out.Distance(0)=tOut.Distance(0);
 			if(!(addFlags&isct::fShadow)) {
@@ -288,7 +262,8 @@ namespace bih {
 		}
 
 		template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
-		Isct<f32x4,packetSize,isctFlags|addFlags> Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const {
+		Isct<f32x4,packetSize,isctFlags|addFlags>
+			Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,const f32x4 *maxDist) const {
 			assert(tree);
 
 			// TODO: nie dziala dla precompInv==0 
@@ -309,7 +284,9 @@ namespace bih {
 				}
 
 				Isct<f32x4,packetSize,BaseTree::isctFlags|addFlags> tOut=
-					tree->template TraversePacket<addFlags>(true,RayGroup<packetSize,sharedOrigin,1>(origin,dir,idir));
+					tree->template TraversePacket<addFlags>
+						(RayGroup<packetSize,sharedOrigin,1>(origin,dir,idir),maxDist);
+
 				for(int q=0;q<packetSize;q++) out.Distance(q)=tOut.Distance(q);
 				if(!(addFlags&isct::fShadow)) {
 					for(int q=0;q<packetSize;q++) out.Element(q)=tOut.Object(q);

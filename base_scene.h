@@ -34,7 +34,10 @@ public:
 	public:
 		Object(const vector<Vec3f> &verts,const vector<Vec2f> &uvs,const vector<Vec3f> &normals,const vector<IndexedTri> &tris);
 		Object() { }
-		
+
+		// erases bad triangles
+		void Repair();
+
 		Triangle GetTriangle(uint n) const;
 		TriVector ToTriVector() const;
 		

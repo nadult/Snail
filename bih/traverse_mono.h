@@ -1,12 +1,12 @@
 
-	template <int addFlags>
-	Isct<float,1,isctFlags|addFlags> TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir) const
+	template <int addFlags> Isct<float,1,isctFlags|addFlags>
+		TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,float maxDist=1.0f/0.0f) const
 	{
 		Isct<float,1,isctFlags|addFlags> out;
 		TreeStats<1> stats;
 
 		stats.TracingRay();
-		out.Distance(0)=1.0f/0.0f;
+		out.Distance(0)=maxDist;
 
 		Vec3p rDir=Vec3p(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
 		Vec3p invDir=VInv(rDir);
@@ -41,7 +41,7 @@
 				{
 					stats.Intersection();
 					Isct<float,1,Element::isctFlags|addFlags>
-						tOut=elements[idx].template Collide<addFlags>(rOrigin,tDir);
+						tOut=elements[idx].template Collide<addFlags>(rOrigin,tDir,out.Distance(0));
 					if(tOut.Distance(0)<out.Distance(0)) {
 						out.Distance(0)=tOut.Distance(0);
 						if(!(addFlags&isct::fShadow)) {

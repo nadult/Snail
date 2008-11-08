@@ -43,6 +43,7 @@ namespace bih {
 
 		pMin=elements[0].BoundMin();
 		pMax=elements[0].BoundMax();
+		maxLevel=0;
 
 		Vec3p sumSize(0,0,0);
 		for(uint n=1;n<elements.size();n++) {
@@ -77,7 +78,8 @@ namespace bih {
 		double objBytes=elements.size()*sizeof(Element);
 		printf("Elems:  %8d * %2d = %6.2fMB\n",elements.size(),sizeof(Element),objBytes*0.000001);
 		printf("Nodes: %8d * %2d = %6.2fMB\n",nodes.size(),sizeof(Node),nodeBytes*0.000001);
-		printf("~ %.0f bytes per triangle\n\n",(nodeBytes+objBytes)/double(elements.size()));
+		printf("~ %.0f bytes per triangle\n",(nodeBytes+objBytes)/double(elements.size()));
+		printf("Levels: %d\n\n",maxLevel);
 	}
 
 	// Znajduje ojca z taka sama osia podzialu i ktory ma tylko
@@ -94,6 +96,8 @@ namespace bih {
 	template <class Element>
 	void Tree<Element>::Build(vector<Index> &indices,vector<u32> &parents,uint nNode,
 								const Vec3f &min,const Vec3f &max,uint level,bool sah) {
+		maxLevel=Max(maxLevel,level+1);
+		
 /*		{ // eliminating duplicates
 	RESORT:
 			std::sort(indices.begin(),indices.end());
@@ -116,7 +120,7 @@ namespace bih {
 			float density=float(indices.size())/nodeSize;
 			nodes[nNode].density=density*0.5f;
 		}*/
-		if(level>50) sah=0;
+		if(level>Max(0,desiredMaxLevel-10)) sah=0;
 
 		float split; int axis;
 		FindSplit(indices,min,max,axis,split);
@@ -126,7 +130,7 @@ namespace bih {
 		SplitIndices(elements,indices,axis,split,sah?0.0f:avgSize);
 
 		int right=indices.size()-1;
-		if(level>=maxLevel) {
+		if(level>=desiredMaxLevel) {
 			double sum=0;
 			for(int n=0;n<indices.size();n++) {
 				float min=(&indices[n].min.x)[axis];

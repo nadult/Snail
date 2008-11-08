@@ -152,6 +152,8 @@ struct GenImageTask {
 					dir[n].y+=floatq(0.000000000001f);
 					dir[n].z+=floatq(0.000000000001f);
 					idir[n]=VInv(dir[n]);
+
+					TestForNans(dir[n],-1);	
 				}
 
 				TracingContext<RayGroup<NQuads,1,1>,RaySelector<NQuads> > context(RayGroup<NQuads,1,1>(&origin,dir,idir));
@@ -334,6 +336,9 @@ int main(int argc, char **argv) {
 	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
 
 	int resx=800,resy=600;
+#ifndef NDEBUG
+	resx/=2; resy/=2;
+#endif
 	bool fullscreen=0,nonInteractive=0;
 	int threads=4;
 	const char *modelFile="abrams.obj";
@@ -358,6 +363,12 @@ int main(int argc, char **argv) {
 	BaseScene baseScene; {
 		baseScene.LoadWavefrontObj(string("scenes/")+modelFile);
 		tris=baseScene.ToTriVector();
+		for(int n=0;n<tris.size();n++)
+			if(!tris[n].Test()) {
+				tris[n]=tris.back();
+				tris.pop_back();
+				n--;
+			}
 	/*	if(baseScene.objects.size()==1) {
 			BaseScene::Object obj=baseScene.objects[0];
 			baseScene.objects[0]=baseScene.objects.back();
@@ -393,6 +404,7 @@ int main(int argc, char **argv) {
 		gVals[n]=1;
 
 	StaticTree staticTree(tris);
+	staticTree.PrintInfo();
 
 	if(nonInteractive) {
 		double time=GetTime();

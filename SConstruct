@@ -24,7 +24,7 @@ release = default.Clone(
 	BUILDDIR='build/release/'
 )
 debug = default.Clone(
-	CXXFLAGS='-O0 -msse2 -g',
+	CXXFLAGS='-O0 -msse2 -g -gdwarf-2',
 	BUILDDIR='build/debug/'
 )
 

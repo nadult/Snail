@@ -32,7 +32,7 @@ typedef int RayIndex;
 template <int size_>
 class RaySelector {
 public:
-	enum { size=size_ };
+	enum { size=size_, full=0 };
 private:
 	int num;
 	union {
@@ -110,7 +110,7 @@ public:
 template <>
 class RaySelector<1> {
 public:
-	enum { size=1 };
+	enum { size=1, full=0 };
 private:
 	char bits;
 public:
@@ -160,7 +160,7 @@ public:
 template <int size_>
 class FullSelector {
 public:
-	enum { size=size_ };
+	enum { size=size_, full=1 };
 
 	INLINE operator RaySelector<size>() const {
 		RaySelector<size> sel;

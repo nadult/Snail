@@ -78,21 +78,43 @@ template <class A,class B> struct TSwitch<A,B,false> { typedef B Result; };
 namespace isct {
 
 	enum Flags {
-		fDistance	= 0x1,
-		fElement	= 0x2,
-		fObject		= 0x4,
-		fStats		= 0x8,
+		// Isct flags:
+		fDistance	= 0x01,
+		fElement	= 0x02,
+		fObject		= 0x04,
+		fStats		= 0x08,
 
+		// Isct & IsctOptions flags:
 		fPrimary	= 0x100,
 		fShadow		= 0x200,	// fObject, fElement will be excluded
+
+		// IsctOptions flags:
+		fMaxDist	= 0x010000,
 	};
 
+}
+
+inline bool TestForNans(const Vec3q &v,int id,bool thr=1) {
+	bool nan=isnan(v.x[0])||isnan(v.x[1])||isnan(v.x[2])||isnan(v.x[3]);
+	nan=nan||isnan(v.y[0])||isnan(v.y[1])||isnan(v.y[2])||isnan(v.y[3]);
+	nan=nan||isnan(v.z[0])||isnan(v.z[1])||isnan(v.z[2])||isnan(v.z[3]);
+
+	if(nan) {
+		printf("%d: %f %f %f %f\n%f %f %f %f\n%f %f %f %f\n",id,
+				v.x[0],v.x[1],v.x[2],v.x[3],
+				v.y[0],v.y[1],v.y[2],v.y[3],
+				v.z[0],v.z[1],v.z[2],v.z[3]);
+		if(thr) ThrowException("NANs! run for your lives!");
+		return 1;
+	}
+
+	return 0;
 }
 
 // Intersection
 template <class Real,int packetSize,int flags_>
 class Isct {
-	enum { flags_0=flags_&isct::fShadow?flags_&0xff01:flags_ };
+	enum { flags_0=(flags_&isct::fShadow?flags_&0xff01:flags_)&0xffff };
 
 public:
 	enum { flags=flags_0 };
@@ -164,6 +186,26 @@ public:
 		if(cflags&isct::fObject  ) for(int q=0;q<packetSize;q++) object  [q]=rhs.Object  (q);
 		if(cflags&isct::fElement ) for(int q=0;q<packetSize;q++) element [q]=rhs.Element (q);
 //		if(cflags&isct::fStats   ) stats=rhs.Stats();
+	}
+};
+
+
+
+template <class Real,int packetSize,int flags_>
+class IsctOptions {
+public:
+	enum { flags=flags_&0xffff00 };
+
+private:
+	Real maxDist[flags&isct::fMaxDist];
+
+public:
+	void SetMaxDist(int q,const Real &v) {
+		if(!(flags&isct::fMaxDist)) ThrowException("Structure doesnt contain 'maxDist' member.");
+		maxDist[q]=v;
+	}
+	INLINE Real MaxDist(int q) const {
+		return flags&isct::fMaxDist?maxDist[q]:Real(1.0f/0.0f);
 	}
 };
 

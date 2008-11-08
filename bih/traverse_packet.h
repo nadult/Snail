@@ -1,10 +1,10 @@
 
-	template <int addFlags,int packetSize,bool sharedOrigin>
-	Isct<f32x4,packetSize,isctFlags|addFlags>
-		TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,int dirMask) const
+	template <int addFlags,int packetSize,bool sharedOrigin> Isct<f32x4,packetSize,isctFlags|addFlags>
+		TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,int dirMask,const f32x4 *maxDist=0) const
 	{
 		Isct<f32x4,packetSize,isctFlags|addFlags> out;
-		for(int q=0;q<packetSize;q++) out.Distance(q)=1.0f/0.0f;
+		if(maxDist) for(int q=0;q<packetSize;q++) out.Distance(q)=maxDist[q];
+		else for(int q=0;q<packetSize;q++) out.Distance(q)=1.0f/0.0f;
 
 		enum { shared=sharedOrigin };
 
@@ -13,6 +13,7 @@
 		
 		const Vec3q *rOrigin=&rays.Origin(0);
 		const Vec3q *tDir=&rays.Dir(0);
+
 
 	/*	if(outputType==otShadow) if(lastShadowTri!=-1&&gVals[0]) {
 			floatq ret[packetSize];
@@ -39,7 +40,9 @@
 		} */
 
 		const Vec3q *invDir=rays.idir;
-		
+	
+		for(int q=0;q<packetSize;q++) TestForNans(invDir[q],1000+packetSize+(addFlags&isct::fShadow?2000:0));
+	
 		floatq tinv[3][packetSize];
 		for(int q=0;q<packetSize;q++) {
 			tinv[0][q]=invDir[q].x;
@@ -119,13 +122,16 @@
 
 				if(!mailbox.Find(idx)) {
 					mailbox.Insert(idx);
+
+					if(idx>=elements.size()||idx<0)
+						ThrowException("sux",idx);
+
 					const Element &element=elements[idx];
-					
 					stats.Intersection(packetSize);
 
 					//TODO: if all rays hit, lastShadowTri=idx
 					Isct<f32x4,packetSize,Element::isctFlags|addFlags> tOut=
-						element.template Collide<addFlags>(rays);
+						element.template Collide<addFlags>(rays,&out.Distance(0));
 					for(int q=0;q<packetSize;q++) {
 						i32x4b test=tOut.Distance(q)<out.Distance(q);
 						out.Distance(q)=Min(out.Distance(q),tOut.Distance(q));
@@ -142,13 +148,16 @@
 
 				fStack-=packetSize*2;
 				for(int q=0;q<packetSize;q++) tMin[q]=fStack[q];
-				for(int q=0;q<packetSize;q++) tMax[q]=Min(fStack[packetSize+q],out.Distance(q)); //TODO: max dist
+				for(int q=0;q<packetSize;q++) tMax[q]=Min(fStack[packetSize+q],out.Distance(q));
 				
 				--nStack;
 				idx=*nStack;
 				continue;
 			}
 
+			if((idx&Node::idxMask)>=nodes.size()) {
+				ThrowException("idx= ",idx," / ",int(nodes.size()));
+			}
 			const Node *node=node0+(idx&Node::idxMask);
 
 			int axis=node->Axis();
@@ -173,6 +182,16 @@
 						
 						test1=test1&&tMin[q]>near[q];
 						test2=test2&&tMax[q]<far [q];
+					}
+	
+					for(int q=0;q<packetSize;q++) {
+						const floatq &st=inv[q];
+						bool nan=isnan(st[0])||isnan(st[1])||isnan(st[2])||isnan(st[3]);
+						if(nan) {
+							printf("%f %f %f %f\n%f %f %f %f\n",
+									st[0],st[1],st[2],st[3],tMin[q][0],tMin[q][1],tMin[q][2],tMin[q][3]);
+							ThrowException("NANs! run for your lives!");
+						}
 					}
 				}
 				else {

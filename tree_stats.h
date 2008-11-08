@@ -7,7 +7,7 @@ namespace stats {
 
 	enum {
 		memPatternEnabled	= 0,
-		treeStatsEnabled	= 1,
+		treeStatsEnabled	= 0,
 	};
 
 }
@@ -87,6 +87,7 @@ public:
 
 private:
 	u32 data[dataSize];
+	u32 dummy;
 	// intersects		0
 	// iters			1
 	// tracedRays		2

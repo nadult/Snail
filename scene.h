@@ -80,9 +80,15 @@ void TraceLight(const AccStruct &tree,const floatq *dist,const Vec3q *position,c
 		if(sel.DisableWithMask(i,dist[q]>=1000.0f)) { i--; continue; }
 
 		Vec3q lightVec=(position[q]-Vec3q(lightPos));
+		f32x4b close=LengthSq(lightVec)<0.0001f;
+		lightVec=Condition(close,Vec3q(0.0f,1.0f,0.0f),lightVec);
+
 		lightDist[q]=Sqrt(lightVec|lightVec);
 		fromLight[q]=lightVec*Inv(lightDist[q]);
 		fromLightInv[q]=VInv(fromLight[q]);
+			
+		Vec3q vec=fromLight[q]; vec=Condition(sel.Mask(i),vec,Vec3q(0.0f,1.0f,0.0f));
+		TestForNans(vec,33);
 	}
 
 	floatq dot[packetSize];
@@ -97,25 +103,35 @@ void TraceLight(const AccStruct &tree,const floatq *dist,const Vec3q *position,c
 
 	if(!sel.Num()) return;
 
-	Isct<f32x4,packetSize,AccStruct::isctFlags> result; {
+	f32x4 maxDist[packetSize];
+	Isct<f32x4,packetSize,AccStruct::isctFlags|isct::fShadow> result; {
 		Vec3q lPos(lightPos.x,lightPos.y,lightPos.z);
 		RayGroup<packetSize,1,1> rays(&lPos,fromLight,fromLightInv);
 
 		for(int i=0;i<sel.Num();i++) {
 			int q=sel[i];
-			result.Distance(q)=lightDist[q]*0.99999f;
+			maxDist[q]=lightDist[q]*0.99999f;
 		}
 
-		result=tree.template TraversePacket<0>(1,rays,sel);
+		if(sel.BitMask4(0)==0xf0f0f0f) for(int i=0;i<sel.Num();i++) {
+			int q=sel[i];
+			Vec3q vec=fromLight[q];
+	//		vec=Condition(sel.Mask(i),vec,Vec3q(0.0f,1.0f,0.0f));
+			TestForNans(vec,3);
+		}
+//		for(int q=0;q<packetSize;q++) TestForNans(rays.Dir(q),-3,0);
+
+		result=tree.template TraversePacket<isct::fShadow>(rays,sel,maxDist);
 	}
 
 	Vec3q lightColor(light.color);
 	for(int i=0;i<sel.Num();i++) {
 		int q=sel.Idx(i);
 
-		if(sel.DisableWithMask(i,lightDist[q]-result.Distance(q)>lightDist[q]*0.001f)) { i--; continue; }
+		if(sel.DisableWithMask(i,lightDist[q]-result.Distance(q)>lightDist[q]*0.0001f)) { i--; continue; }
 
-		out[q]+=Condition(sel.Mask(i),ShadeLight(lightColor,dot[q],lightDist[q]));
+		out[q]+=Condition(sel.Mask(i),
+				ShadeLight(lightColor,dot[q],lightDist[q]) );
 	}
 }
 
@@ -153,6 +169,7 @@ template <class AccStruct,class Group,class Selector>
 void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 	enum { primary=0 };
 	
+
 	typedef typename Vec3q::TScalar real;
 	typedef typename Vec3q::TBool boolean;
 	const floatq maxDist=100000.0f;
@@ -162,8 +179,11 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 		InitializationShader(c,q,maxDist);
 	}
 
+	for(int q=0;q<Selector::size;q++)
+		TestForNans(c.rays.Dir(q),1);
+
 	Isct<f32x4,Selector::size,AccStruct::isctFlags> result=
-		tree.template TraversePacket<0>(AccStruct::complexity==2?1:1,c.rays);
+		tree.template TraversePacket<0>(c.rays,FullSelector<Selector::size>());
 	RaySelector<Selector::size> &selector=c.selector;
 
 	for(int q=0;q<Selector::size;q++) {
@@ -206,11 +226,13 @@ void RayTrace(const AccStruct &tree,TracingContext<Group,Selector> &c) {
 	//	c.color[q]*=Sample(tex,texCoord);
 	}
 
-	enum { lightsEnabled=0 };
+	enum { lightsEnabled=1 };
 
 	if(lightsEnabled) {
 		vector<Light> lights;
-		lights.push_back(Light(Vec3f(0,-1.5f,0),Vec3f(5,5,3)));
+		lights.push_back(Light(Vec3f(0,-1.5f,0),Vec3f(5,5,3)*0.5f));
+		lights.push_back(Light(Vec3f(1,-1.5f,0),Vec3f(1,5,2)*0.5f));
+		lights.push_back(Light(Vec3f(0,-1.5f,1),Vec3f(5,1,1)*0.5f));
 
 		assert(ShadowCache::size>=lights.size());
 		for(int n=0;n<lights.size();n++)

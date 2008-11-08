@@ -98,6 +98,19 @@ void BaseScene::Object::Transform(const Matrix<Vec4f> &mat) {
 	optBBox=OptBBox(bbox,Inverse(trans));
 }
 
+void BaseScene::Object::Repair() {
+	for(int n=0;n<tris.size();n++) {
+		IndexedTri &tri=tris[n];
+		Vec3f v[3]={verts[tri.v[0]],verts[tri.v[1]],verts[tri.v[2]]};
+		Vec3f nrm=(v[1]-v[0])^(v[2]-v[0]);
+		if(Abs(nrm.x)<0.00000001f&&Abs(nrm.y)<0.00000001f&&Abs(nrm.z)<0.00000001f) {
+			tris[n]=tris.back();
+			tris.pop_back();
+			n--;
+		}
+	}
+}
+
 namespace {
 	
 	struct Tri {
