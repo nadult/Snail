@@ -230,10 +230,10 @@ TreeStats<1> GenImage(const AccStruct &tree,const Camera &camera,Image &image,co
 template <class AccStruct>
 TreeStats<1> GenImage(int quadLevels,const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
 	switch(quadLevels) {
-	case 0: return GenImage<0>(tree,camera,image,options,tasks);
-	case 1: return GenImage<1>(tree,camera,image,options,tasks);
+//	case 0: return GenImage<0>(tree,camera,image,options,tasks);
+//	case 1: return GenImage<1>(tree,camera,image,options,tasks);
 	case 2: return GenImage<2>(tree,camera,image,options,tasks);
-	case 3: return GenImage<3>(tree,camera,image,options,tasks);
+//	case 3: return GenImage<3>(tree,camera,image,options,tasks);
 //	case 4: return GenImage<4>(tree,camera,image,options,tasks);
 	default: throw Exception("Quad level not supported.");
 	}
@@ -395,7 +395,7 @@ int main(int argc, char **argv) {
 	if(!camConfigs.GetConfig(string(modelFile),cam))
 		cam.pos=Center(tris);
 
-	uint quadLevels=1;
+	uint quadLevels=2;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
 	for(int n=0;n<4;n++)
@@ -451,10 +451,10 @@ int main(int argc, char **argv) {
 		//		if(out.KeyDown('3')&&scene.lights.size()>=3) scene.lights[2].pos=cam.pos;
 			}
 			else {
-				if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
-				if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
+			//	if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
+			//	if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
 				if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
-				if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
+		//		if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 			}
 
 			if(out.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 1 %s\n",gVals[0]?"on":"off"); }

@@ -89,7 +89,8 @@ namespace isct {
 		fShadow		= 0x200,	// fObject, fElement will be excluded
 
 		// IsctOptions flags:
-		fMaxDist	= 0x010000,
+		fMaxDist	= 0x010000,	// single value
+		fFullMaxDist= 0x020000, // array of values
 	};
 
 }
@@ -115,7 +116,7 @@ inline bool TestForNans(const Vec3q &v,int id,bool thr=1) {
 // Intersection
 template <class Real,int packetSize,int flags_>
 class Isct {
-	enum { flags_0=(flags_&isct::fShadow?flags_&0xff01:flags_)&0xffff };
+	enum { flags_0=(flags_&isct::fShadow?flags_&0xff09:flags_)&0xffff };
 
 public:
 	enum { flags=flags_0 };
@@ -131,6 +132,7 @@ private:
 	TStats stats;
 
 public:
+	int lastShadowTri;
 	//Dont worry about those if's, they will be optimized out
 
 	Real &Distance(int q=0) {
@@ -157,6 +159,8 @@ public:
 		if(!(flags&isct::fElement)) ThrowException("Structure doesnt contain 'element' member.");
 		return element[q];
 	}
+	const int LastShadowTri() const { return lastShadowTri; }
+	int &LastShadowTri() { return lastShadowTri; } 
 
 	TStats &Stats() { return stats; }
 	const TStats &Stats() const { return stats; }
@@ -167,7 +171,8 @@ public:
 		if(cflags&isct::fDistance) for(int q=0;q<packetSize/4;q++) distance[q+pos*(packetSize/4)]=rhs.Distance(q);
 		if(cflags&isct::fObject  ) for(int q=0;q<packetSize/4;q++) object  [q+pos*(packetSize/4)]=rhs.Object  (q);
 		if(cflags&isct::fElement ) for(int q=0;q<packetSize/4;q++) element [q+pos*(packetSize/4)]=rhs.Element (q);
-//		if(cflags&isct::fStats   ) stats+=rhs.Stats();
+		if(cflags&isct::fStats   ) stats+=rhs.Stats();
+		lastShadowTri=rhs.LastShadowTri();
 	}
 
 	// Works for Isct<f32x4,1,..>
@@ -177,7 +182,8 @@ public:
 		if(cflags&isct::fDistance) distance[0][pos]=rhs.Distance(0);
 		if(cflags&isct::fObject  ) object  [0][pos]=rhs.Object  (0);
 		if(cflags&isct::fElement ) element [0][pos]=rhs.Element (0);
-//		if(cflags&isct::fStats   ) stats+=rhs.Stats();
+		if(cflags&isct::fStats   ) stats+=rhs.Stats();
+		lastShadowTri=rhs.LastShadowTri();
 	}
 
 	template <int tflags>
@@ -186,11 +192,10 @@ public:
 		if(cflags&isct::fDistance) for(int q=0;q<packetSize;q++) distance[q]=rhs.Distance(q);
 		if(cflags&isct::fObject  ) for(int q=0;q<packetSize;q++) object  [q]=rhs.Object  (q);
 		if(cflags&isct::fElement ) for(int q=0;q<packetSize;q++) element [q]=rhs.Element (q);
-//		if(cflags&isct::fStats   ) stats=rhs.Stats();
+		if(cflags&isct::fStats   ) stats=rhs.Stats();
+		lastShadowTri=rhs.LastShadowTri();
 	}
 };
-
-
 
 template <class Real,int packetSize,int flags_>
 class IsctOptions {
@@ -198,16 +203,34 @@ public:
 	enum { flags=flags_&0xffff00 };
 
 private:
-	Real maxDist[flags&isct::fMaxDist];
+	Real *maxDist;
 
 public:
-	void SetMaxDist(int q,const Real &v) {
-		if(!(flags&isct::fMaxDist)) ThrowException("Structure doesnt contain 'maxDist' member.");
-		maxDist[q]=v;
+	int lastShadowTri;
+
+	IsctOptions() { lastShadowTri=-1; maxDist=0; }
+	template <int pSize,int tflags>
+	IsctOptions(const IsctOptions<Real,pSize,tflags> &opts,int shift) {
+		SetMaxDist(opts.MaxDistPtr()+(tflags&isct::fFullMaxDist?shift:0));
+		lastShadowTri=opts.LastShadowTri();
 	}
+	IsctOptions(Real *maxDist_,int lastShadowTri_=-1) {
+		SetMaxDist(maxDist_);
+		lastShadowTri=lastShadowTri_;
+	}
+	void SetMaxDist(Real *ptr) {
+		if(flags&(isct::fFullMaxDist|isct::fMaxDist)) {
+			assert(ptr);
+			maxDist=ptr;
+		}
+	}
+	INLINE Real *MaxDistPtr() const { return maxDist; }
+
 	INLINE Real MaxDist(int q) const {
-		return flags&isct::fMaxDist?maxDist[q]:Real(1.0f/0.0f);
+		return flags&(isct::fMaxDist|isct::fFullMaxDist)?maxDist[flags&isct::fFullMaxDist?q:0]:Real(1.0f/0.0f);
 	}
+	INLINE int &LastShadowTri() { return lastShadowTri; }
+	INLINE int  LastShadowTri() const { return lastShadowTri; }
 };
 
 #include "bounding_box.h"

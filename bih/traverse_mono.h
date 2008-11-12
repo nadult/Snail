@@ -3,7 +3,7 @@
 		TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,float maxDist=1.0f/0.0f) const
 	{
 		Isct<float,1,isctFlags|addFlags> out;
-		TreeStats<1> stats;
+		TreeStats<1> &stats=out.Stats();
 
 		stats.TracingRay();
 		out.Distance(0)=maxDist;
@@ -11,10 +11,10 @@
 		Vec3p rDir=Vec3p(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
 		Vec3p invDir=VInv(rDir);
 
-		int dirMask=SignMask(floatq(invDir.m));
+		int dirMask=SignMask(floatq(invDir.m))&7;
 		float tMin=0.0f,tMax=out.Distance(0);
 
-		struct Locals { float tMin,tMax; u32 idx; } stackBegin[200],*stack=stackBegin;
+		struct Locals { float tMin,tMax; u32 idx; } stackBegin[maxLevel+2],*stack=stackBegin;
 		const Node *node,*node0=&nodes[0];
 		int idx=0;
 

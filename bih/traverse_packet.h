@@ -1,43 +1,50 @@
 
 	template <int addFlags,int packetSize,bool sharedOrigin> Isct<f32x4,packetSize,isctFlags|addFlags>
-		TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,int dirMask,const f32x4 *maxDist=0) const
+		TraversePacket0(const RayGroup<packetSize,sharedOrigin,1> &rays,
+						const IsctOptions<f32x4,packetSize,addFlags> &options) const
 	{
 		Isct<f32x4,packetSize,isctFlags|addFlags> out;
-		if(maxDist) for(int q=0;q<packetSize;q++) out.Distance(q)=maxDist[q];
-		else for(int q=0;q<packetSize;q++) out.Distance(q)=1.0f/0.0f;
+
+		for(int q=0;q<packetSize;q++)
+			out.Distance(q)=options.MaxDist(q);
 
 		enum { shared=sharedOrigin };
 
-		TreeStats<1> stats;
+		int dirMask=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(rays.Dir(0).x.m,rays.Dir(0).y.m,0),
+																	rays.Dir(0).z.m,0+(2<<2)))&7;
+		TreeStats<1> &stats=out.Stats();
 		stats.TracingPacket(4*packetSize);
 		
 		const Vec3q *rOrigin=&rays.Origin(0);
 		const Vec3q *tDir=&rays.Dir(0);
 
-
-	/*	if(outputType==otShadow) if(lastShadowTri!=-1&&gVals[0]) {
-			floatq ret[packetSize];
+		if(addFlags&isct::fShadow&&options.LastShadowTri()!=-1&&gVals[1]&&
+				options.LastShadowTri()<elements.size()) {
+			stats.Skip();
 			f32x4b mask[packetSize];
 			
-			const Element &element=elements[lastShadowTri];
+			const Element &element=elements[options.LastShadowTri()];
 
-			throw 0;
-		//	for(int q=0;q<packetSize;q++) {
-		//		ret[q]=element.Collide(rOrigin[q],tDir[q]);			
-		//		mask[q]=ret[q]>0.0f&&ret[q]<out[q];
-		//		out[q]=Condition(mask[q],floatq(0.0001f),out[q]);
-		//	}
+			IsctOptions<f32x4,packetSize,addFlags|isct::fFullMaxDist> opts(options,0);
+
+			//TODO: if all rays hit, lastShadowTri=idx
+			Isct<f32x4,packetSize,Element::isctFlags|addFlags|isct::fFullMaxDist>
+				tOut=element.Collide(rays,opts);
+
+			for(int q=0;q<packetSize;q++) {
+				mask[q]=tOut.Distance(q)<out.Distance(q);
+				out.Distance(q)=Condition(mask[q],floatq(0.0001f),out.Distance(q));
+			}
 
 			f32x4b test=mask[0];
 			for(int q=1;q<packetSize;q++) test=test&&mask[q];
 			
 			if(ForAll(test)) {
-				stats.Skip();
-				if(output.stats) output.stats->Update(stats);
-				return lastShadowTri;
+				out.LastShadowTri()=options.LastShadowTri();
+				return out;
 			}
-			lastShadowTri=-1;
-		} */
+			out.LastShadowTri()=-1;
+		}
 
 		const Vec3q *invDir=rays.idir;
 	
@@ -124,18 +131,24 @@
 					const Element &element=elements[idx];
 					stats.Intersection(packetSize);
 
-					//TODO: if all rays hit, lastShadowTri=idx
-					Isct<f32x4,packetSize,Element::isctFlags|addFlags> tOut=
-						element.template Collide<addFlags>(rays,&out.Distance(0));
+					IsctOptions<f32x4,packetSize,addFlags> opts(options,0);
+
+					Isct<f32x4,packetSize,Element::isctFlags|addFlags>
+						tOut=element.Collide(rays,opts);
+
+					i32x4b fullMask(i32x4(0xffffffff).m);
 					for(int q=0;q<packetSize;q++) {
 						i32x4b test=tOut.Distance(q)<out.Distance(q);
 						out.Distance(q)=Min(out.Distance(q),tOut.Distance(q));
-						if(!(addFlags&isct::fShadow)) {
+						if(addFlags&isct::fShadow) fullMask=fullMask&&test;
+						else {
 							out.Object(q)=Condition(test,i32x4(idx),out.Object(q));
 							if(isctFlags&isct::fElement)
 								out.Element(q)=Condition(test,tOut.Element(q),out.Element(q));
 						}
 					}
+					if(addFlags&&isct::fShadow&&ForAll(fullMask))
+						out.LastShadowTri()=idx;
 				}
 
 			POP_STACK:

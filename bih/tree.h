@@ -84,7 +84,7 @@ namespace bih {
 		//1 for tree of triangles, 2 for tree of trees of triangles etc
 		enum { complexity=Element::complexity+1 };
 		enum { isctFlags=Element::isctFlags|isct::fObject|isct::fStats };
-		enum { filterSigns=1 };
+		enum { filterSigns=sizeof(Element)==64 };
 		enum { desiredMaxLevel=60 }; // Can be more, depends on the scene
 		
 		Tree() { }
@@ -108,7 +108,7 @@ namespace bih {
 		template <int addFlags,bool sharedOrigin,template <int> class Selector>
 		Isct<f32x4,1,isctFlags|addFlags>
 			TraversePacket(const RayGroup<1,sharedOrigin,1> &rays,
-							const Selector<1> &selector,const f32x4 *maxDist=0) const
+							const Selector<1> &selector,const IsctOptions<f32x4,1,addFlags> &options) const
 		{
 			int bitMask=selector[0];
 			const Vec3q &dir=rays.Dir(0);
@@ -116,13 +116,9 @@ namespace bih {
 
 			bool split=1;
 
-
 			if(Selector<1>::full||bitMask==0x0f) {	
-				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
-				int signMask=filterSigns?GetVecSign(rays.Dir(0)):msk&7;
-				
-				if(signMask!=8) {
-					out=TraversePacket<addFlags>(rays,msk,maxDist);
+				if(!filterSigns||GetVecSign(rays.Dir(0))!=8) {
+					out=TraversePacket0(rays,options);
 					split=0;
 				}
 			}
@@ -134,7 +130,8 @@ namespace bih {
 				for(int q=0;q<4;q++) {	
 					int o=sharedOrigin?0:q;
 					if(!(bitMask&(1<<q))) continue;
-					float tMaxDist=maxDist?maxDist[0][q]:1.0f/0.0f;
+					f32x4 maxDist=options.MaxDist(0);
+					float tMaxDist=maxDist[q];
 
 					Isct<float,1,isctFlags|addFlags> tOut=	
 						TraverseMono<addFlags>(Vec3p(orig.x[o],orig.y[o],orig.z[o]),
@@ -148,19 +145,21 @@ namespace bih {
 
 		template <int addFlags,bool sharedOrigin>
 		INLINE Isct<f32x4,1,isctFlags|addFlags>
-			TraversePacket(const RayGroup<1,sharedOrigin,1> &rays,const f32x4 *maxDist) const {
-			return TraversePacket<addFlags>(rays,FullSelector<1>(),maxDist);
+			TraversePacket(const RayGroup<1,sharedOrigin,1> &rays,
+							const IsctOptions<f32x4,1,addFlags> &options) const {
+			return TraversePacket<addFlags>(rays,FullSelector<1>(),options);
 		}
 
 		template <int addFlags,bool sharedOrigin,int packetSize,template <int> class Selector>
 		Isct<f32x4,packetSize,isctFlags|addFlags>
 			TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,
-							const Selector<packetSize> &selector,const f32x4 *maxDist=0) const
+							const Selector<packetSize> &selector,
+							IsctOptions<f32x4,packetSize,addFlags> options) const
 		{
 			Isct<f32x4,packetSize,isctFlags|addFlags> out;	
 			bool split=1;
 
-			bool selectorsFiltered=0;
+			bool selectorsFiltered=packetSize<=4;
 			if(!Selector<packetSize>::full)
 				for(int n=0;n<packetSize;n++)
 					if(selector.Mask4(n)!=0x0f0f0f0f) {
@@ -168,7 +167,7 @@ namespace bih {
 						break;
 					}
 
-			if(Selector<packetSize>::full||selectorsFiltered) {
+			if((Selector<packetSize>::full||selectorsFiltered)&&packetSize<=4) {
 				const Vec3q &dir=rays.Dir(0);
 				bool signsFiltered=1;
 				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
@@ -181,7 +180,7 @@ namespace bih {
 				}
 			
 				if(signsFiltered) {
-					out=TraversePacket<addFlags>(rays,msk);
+					out=TraversePacket0(rays,options);
 					split=0;
 				}
 			}
@@ -189,8 +188,10 @@ namespace bih {
 			if(split) {
 				for(int q=0;q<4;q++) {
 					Isct<f32x4,packetSize/4,isctFlags|addFlags> tOut=
-						TraversePacket<addFlags>(RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)),
-								selector.SubSelector(q),maxDist?maxDist+q*(packetSize/4):0);
+						TraversePacket(RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)),
+								selector.SubSelector(q),
+								IsctOptions<f32x4,packetSize/4,addFlags>(options,q*(packetSize/4)) );
+					options.LastShadowTri()=tOut.LastShadowTri();
 					out.Insert(tOut,q);
 				}
 			}
@@ -200,8 +201,9 @@ namespace bih {
 
 		template <int addFlags,bool sharedOrigin,int packetSize>
 		INLINE Isct<f32x4,packetSize,isctFlags|addFlags>
-			TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,const f32x4 *maxDist=0) const {
-			return TraversePacket<addFlags>(rays,FullSelector<packetSize>(),maxDist);
+			TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,
+							const IsctOptions<f32x4,packetSize,addFlags> &options) const {
+			return TraversePacket<addFlags>(rays,FullSelector<packetSize>(),options);
 		}
 	
 		#include "bih/traverse_mono.h"
@@ -254,17 +256,24 @@ namespace bih {
 
 		template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
 		Isct<f32x4,packetSize,isctFlags|addFlags>
-			Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,const f32x4 *maxDist) const {
+			Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,
+					const IsctOptions<f32x4,packetSize,addFlags> &options) const {
 			assert(tree);
-
-			// TODO: nie dziala dla precompInv==0 
 
 			Isct<f32x4,packetSize,isctFlags|addFlags> out;
 
-			bool test=0; test=1;
-//			if(sharedOrigin) test=bBox.TestIP<packetSize>(rays.Origin(0),rays.idir,output.dist);
-//			else for(int q=0;q<packetSize&&!test;q++)
-//				test|=bBox.TestI(rays.Origin(sharedOrigin?0:q),rays.idir[q],output.dist[q]);	
+			floatq maxDist[packetSize]; Vec3q tinv[packetSize];
+			for(int q=0;q<packetSize;q++) maxDist[q]=1.0f/0.0f;
+			if(!precompInv) for(int q=0;q<packetSize;q++) tinv[q]=VInv(rays.Dir(q));
+
+			bool test=0;
+
+			if(gVals[2]) {
+				if(sharedOrigin) test=bBox.TestIP<packetSize>(rays.Origin(0),precompInv?rays.idir:tinv,maxDist);
+				else for(int q=0;q<packetSize&&!test;q++)
+					test|=bBox.TestI(rays.Origin(sharedOrigin?0:q),precompInv?rays.idir[q]:tinv[q],maxDist[q]);
+			} else test=1;
+
 			if(test) {
 				Vec3q origin[packetSize],dir[packetSize],idir[packetSize];
 				for(int q=0;q<(sharedOrigin?1:packetSize);q++)
@@ -275,8 +284,7 @@ namespace bih {
 				}
 
 				Isct<f32x4,packetSize,BaseTree::isctFlags|addFlags> tOut=
-					tree->template TraversePacket<addFlags>
-						(RayGroup<packetSize,sharedOrigin,1>(origin,dir,idir),maxDist);
+					tree->TraversePacket(RayGroup<packetSize,sharedOrigin,1>(origin,dir,idir),options);
 
 				for(int q=0;q<packetSize;q++) out.Distance(q)=tOut.Distance(q);
 				if(!(addFlags&isct::fShadow)) {

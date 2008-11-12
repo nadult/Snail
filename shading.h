@@ -69,14 +69,14 @@ Vec ShadeLight(const Vec &lightColor,const real &dot,const real &lightDist) {
 }
 
 template <class Context>
-void StatsShader(Context &c,uint i) {
+void StatsShader(Context &c,uint i,const TreeStats<1> &stats) {
 	typedef typename Context::real real;
 
-	c.color[i].x*=0.1f;
-	c.color[i].y*=0.1f;
-//	c.color[i].x=float(c.stats.GetIntersects())*(0.005f/Context::size);
-//	c.color[i].y=float(c.stats.GetLoopIters())*(0.002f/Context::size);
-//	c.color[i].z=float(c.stats.GetSkips()*0.025f);
+//	c.color[i].x*=0.1f;
+//	c.color[i].y*=0.1f;
+	c.color[i].x=float(stats.GetIntersects())*(0.1f/Context::size);
+	c.color[i].y=float(stats.GetLoopIters())*(0.1f/Context::size);
+	c.color[i].z=float(stats.GetSkips()*0.25f);
 }
 	
 

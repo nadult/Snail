@@ -113,7 +113,8 @@ public:
 
 	template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
 	INLINE Isct<f32x4,packetSize,isct::fDistance|addFlags>
-		Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,const f32x4 *maxDist) const
+		Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,
+				const IsctOptions<f32x4,packetSize,addFlags>&) const
 		{ return Collide<addFlags>(rays); }
 
 	template <class Vec0,class Vec,class real>

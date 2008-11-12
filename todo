@@ -1,32 +1,19 @@
-- Zrobic hierarchie zorientowanych obiektow (bez cieniowania)
-
-
-
-
-
 BIH:
 - problem w kolejnosci mnozenia macierzy
 - przyspieszyc budowe eliminujac zbedne wywolania rekurencyjne
 - przyspieszyc budowe; optymalizacje boxow otaczajacych robic na krawedziach a nie trojkatach
 - uzyc RayGroup::IDir
-- poprawic bug na sponzie
 - uwzglednic w SAH to ze niektore trojkaty moga wystepowac kilka razy przez co jest wieksza szansa
   ze beda kilka razy sprawdzane, z pelnym kosztem tylko za pierwszym razem
 
 - Zapamietac: Bindy sie hujowo rozwijaja :(((
-- GCC ma jakis problem z boolami 
 
 Kdtree: ( olac :) )
 - Poprawnie wyliczyc epsilon w Triangle::BeamCollide
 - Obsluzyc beamCollision == 2
 
 
-- UPROSCIC SELEKTORY
-
-
-
 ------------
-- specjalizacja RaySelector<1>
 - zrobic procedurke RepairRays ktora zabezpiecza przed dzieleniem przed zero dodajac 0.00000001 
    (a moze zrobic tak jak w travmono ? )
 
