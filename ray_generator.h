@@ -3,6 +3,22 @@
 
 #include "rtbase.h"
 
+extern const float bestCandidateSamples[4096][5];
+
+class GridSampler {
+public:
+	INLINE Vec2f operator()(int x,int y) { return Vec2f(x,y); }
+};
+
+class BestCandidateSampler {
+public:
+	INLINE Vec2f operator()(int x,int y) {
+		int offset=(x&63)+(y&63)*64;
+		return Vec2f(	float(x)+bestCandidateSamples[offset][0],
+						float(y)+bestCandidateSamples[offset][1] );
+	}
+};
+
 /*!
 	Generates primary ray packets
 */
@@ -45,9 +61,8 @@ public:
 private:
 	void Generate(int level,int pw,int ph,int x,int y,Vec3q *out);
 
-	Vec3q addVec;
 	// invW is multiplied by ratio (w/h)
-	float invW,invH,planeDist;
+	float w,h,invW,invH,planeDist;
 	int tLevel;
 };
 

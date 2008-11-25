@@ -3,8 +3,6 @@ BIH:
 - przyspieszyc budowe eliminujac zbedne wywolania rekurencyjne
 - przyspieszyc budowe; optymalizacje boxow otaczajacych robic na krawedziach a nie trojkatach
 - uzyc RayGroup::IDir
-- uwzglednic w SAH to ze niektore trojkaty moga wystepowac kilka razy przez co jest wieksza szansa
-  ze beda kilka razy sprawdzane, z pelnym kosztem tylko za pierwszym razem
 
 - Zapamietac: Bindy sie hujowo rozwijaja :(((
 
@@ -12,6 +10,7 @@ Kdtree: ( olac :) )
 - Poprawnie wyliczyc epsilon w Triangle::BeamCollide
 - Obsluzyc beamCollision == 2
 
+- bug na abramsie w strukturce bih< bihbox < bih < tri > > >
 
 ------------
 - zrobic procedurke RepairRays ktora zabezpiecza przed dzieleniem przed zero dodajac 0.00000001 

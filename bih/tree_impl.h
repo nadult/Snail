@@ -120,7 +120,7 @@ namespace bih {
 			float density=float(indices.size())/nodeSize;
 			nodes[nNode].density=density*0.5f;
 		}*/
-		if(level>Max(0,desiredMaxLevel-10)) sah=0;
+		if(level>Max(0,desiredMaxLevel-10)||sizeof(Element)!=64) sah=0;
 
 		float split; int axis;
 		FindSplit(indices,min,max,axis,split);

@@ -31,6 +31,11 @@ void BaseScene::Transform(const Matrix<Vec4f> &mat) {
 	for(int n=0;n<objects.size();n++)
 		objects[n].Transform(mat);
 }
+void BaseScene::TransformData(const Matrix<Vec4f> &mat) {
+	for(int n=0;n<objects.size();n++)
+		objects[n].TransformData(mat);
+}
+
 void BaseScene::Optimize() {
 	for(int n=0;n<objects.size();n++)
 		objects[n].Optimize();

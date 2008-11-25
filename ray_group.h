@@ -141,40 +141,169 @@ inline void SplitSelectorsBySign(const Selector1 &in,Selector2 out[9],Vec3q *dir
 		out[GetVecSign(dir[n])].Add(in,i);
 	}
 }
-	
 
-template <int size_,bool tSharedOrigin=0,bool tPrecomputedInverses=0>
-class RayGroup
-{
+template <int size_,bool shared_>
+class RayOrigin {
 public:
-	enum { sharedOrigin=tSharedOrigin, precomputedInverses=tPrecomputedInverses, size=size_ };
+	enum { size=size_, shared=shared_ };
+	INLINE RayOrigin() { }
+	RayOrigin(const Vec3q *orig) { for(int q=0;q<size;q++) data[q]=orig[q]; }
+	RayOrigin(const Vec3q &orig) { for(int q=0;q<size;q++) data[q]=orig; }
+	RayOrigin(const Vec3p &orig) {
+		Vec3q t; Broadcast(orig,t);
+		for(int q=0;q<size;q++) data[q]=t;
+	}
+	RayOrigin(const RayOrigin<size,1> &rhs) { for(int q=0;q<size;q++) data[q]=rhs[q]; }
 
-	template <class Selector1,class Selector2>
-	void GenSelectors(const Selector1 &oldSelector,Selector2 sel[9]) {
-		SplitSelectorsBySign(oldSelector,sel,&Dir(0));
+	const RayOrigin<size,0> &operator*=(const Matrix<Vec4f> &trans) {
+		for(int q=0;q<size;q++) data[q]=trans*data[q];
+		return *this;
 	}
 
-	INLINE RayGroup(Vec3q *o,Vec3q *d,Vec3q *i=0) :dir(d),idir(i),origin(o) { assert(!precomputedInverses||idir); }
+	INLINE const Vec3q &operator[](int q) const { return data[q]; }
+	INLINE void Set(int q,const Vec3q &orig) { data[q]=orig; }
+	INLINE void Set(int q,const Vec3p &orig) { Broadcast(orig,data[q]); }
 
-	template <int tSize,bool tPrecomputed>
-	INLINE RayGroup(const RayGroup<tSize,sharedOrigin,tPrecomputed> &other,int shift)
-		:dir(other.dir+shift),idir(precomputedInverses&&tPrecomputed?other.idir+shift:0)
-		,origin(sharedOrigin?other.origin:other.origin+shift) { }
+private:
+	Vec3q data[size];
+};
 
-	INLINE Vec3q &Dir(int n)				{ return dir[n]; }
-	INLINE const Vec3q &Dir(int n) const	{ return dir[n]; }
+template <int size_>
+class RayOrigin<size_,1> {
+public:
+	enum { size=size_, shared=1 };
 
-	INLINE Vec3q &Origin(int n)				{ return origin[sharedOrigin?0:n]; }
-	INLINE const Vec3q &Origin(int n) const { return origin[sharedOrigin?0:n]; }
+	INLINE RayOrigin() { }
+	INLINE RayOrigin(const Vec3q *orig) :data(orig[0].x[0],orig[0].y[0],orig[0].z[0]) { }
+	INLINE RayOrigin(const Vec3p &orig) :data(orig) { } 
+	INLINE RayOrigin(const Vec3q &orig) :data(orig.x[0],orig.y[0],orig.z[0]) { }
 
-	INLINE Vec3q IDir(int n) const			{ return precomputedInverses?idir[n]:VInv(dir[n]); }
+	const RayOrigin<size,1> &operator*=(const Matrix<Vec4f> &trans) {
+		data=trans*Vec3f(data);
+		return *this;
+	}
 
-	INLINE Vec3q *DirPtr()		{ return dir; }
-	INLINE Vec3q *OriginPtr()	{ return origin; }
-	INLINE Vec3q *IDirPtr()		{ return precomputedInverses?idir:0; }
+	INLINE Vec3q operator[](int q) const { Vec3q out; Broadcast(data,out); return out; }
+	INLINE void Set(int q,const Vec3q &orig) { data=Vec3p(orig.x[0],orig.y[0],orig.z[0]); }
+	INLINE void Set(int q,const Vec3p &orig) { data=orig; }
+
+private:
+	Vec3p data;
+};
+
+template <int size_,bool inverses_>
+class RayDir {
+public:
+	enum { size=size_, inverses=inverses_ };
+	INLINE RayDir() { }
+	RayDir(const Vec3q *d) { for(int q=0;q<size;q++) dir[q]=d[q]; }
+	RayDir(const Vec3q *d,const Vec3q*) { for(int q=0;q<size;q++) dir[q]=d[q]; }
+	RayDir(const RayDir<size,1> &rhs) { for(int q=0;q<size;q++) dir[q]=rhs[q]; }
+
+	INLINE const Vec3q &operator[](int q) const { return dir[q]; }
+	INLINE Vec3q Inv(int q) const { return VInv(dir[q]); }
+	INLINE void Set(int q,const Vec3q &d) { dir[q]=d; }
+	INLINE void Set(int q,const Vec3q &d,const Vec3q&) { dir[q]=d; }
+
+private:
+	Vec3q dir[size];
+};
+
+template <int size_>
+class RayDir<size_,1> {
+public:
+	enum { size=size_, inverses=1 };
+	INLINE RayDir() { }
+	RayDir(const Vec3q *d) { for(int q=0;q<size;q++) { dir[q]=d[q]; inv[q]=VInv(dir[q]); } } 
+	RayDir(const Vec3q *d,const Vec3q *i) {
+		for(int q=0;q<size;q++) dir[q]=d[q];
+		for(int q=0;q<size;q++) inv[q]=i[q];
+	}
+	RayDir(const RayDir<size,0> &rhs) { for(int q=0;q<size;q++) { dir[q]=rhs[q]; inv[q]=VInv(dir[q]); } }
+
+	INLINE const Vec3q &operator[](int q) const { return dir[q]; }
+	INLINE const Vec3q &Inv(int q) const { return inv[q]; }
+	INLINE void Set(int q,const Vec3q &d) { dir[q]=d; inv[q]=VInv(dir[q]); }
+	INLINE void Set(int q,const Vec3q &d,const Vec3q &i) { dir[q]=d; inv[q]=i; }
+
+private:
+	Vec3q dir[size];
+	Vec3q inv[size];
+};
+
+template <int size_,bool enabled_>
+class RayMaxDist {
+public:
+	enum { size=size_, enabled=enabled_ };
+	INLINE RayMaxDist() { }
+	INLINE RayMaxDist(const floatq&) { }
+	INLINE RayMaxDist(const floatq*) { }
+
+	INLINE floatq operator[](int q) const { return floatq(1.0f/0.0f); }
+	INLINE void Set(int q,floatq dist) { }
+};
+
+template <int size_>
+class RayMaxDist<size_,1> {
+public:
+	enum { size=size_, enabled=1 };
+	INLINE RayMaxDist() { }
+	INLINE RayMaxDist(const floatq &dist) { for(int q=0;q<size;q++) data[q]=dist; }
+	INLINE RayMaxDist(const floatq *dist) { for(int q=0;q<size;q++) data[q]=dist[q]; }
+	INLINE RayMaxDist(const RayMaxDist<size,0> &rhs) { for(int q=0;q<size;q++) data[q]=rhs[q]; }
+
+	INLINE const floatq &operator[](int q) const { return data[q]; }
+	INLINE void Set(int q,floatq dist) { data[q]=dist; }
+
+private:
+	floatq data[size];
+};
+
+
+template <int size_,int flags_>
+class RayGroup {
+public:
+	enum { size=size_, flags=flags_, sharedOrigin=flags&isct::fShOrig?1:0,
+			inverses=flags&isct::fInvDir?1:0, hasMaxDist=flags&isct::fMaxDist?1:0 };
+
+	RayGroup() :lastShadowTri(-1) { }
+	template <int fl>
+	RayGroup(const RayGroup<size,fl> &rhs) {
+		origin=rhs.origin;
+		dir=rhs.dir;
+		maxDist=rhs.maxDist;
+		lastShadowTri=rhs.lastShadowTri;
+	}
+	RayGroup(const RayOrigin<size,sharedOrigin> &o,const RayDir<size,inverses> &d,
+			  const RayMaxDist<size,hasMaxDist> &dst) :origin(o),dir(d),maxDist(dst),lastShadowTri(-1) { }
+	RayGroup(const RayOrigin<size,sharedOrigin> &o,const RayDir<size,inverses> &d) :origin(o),dir(d),lastShadowTri(-1) { }
+
+	template <int fl>
+	void Split(RayGroup<size/4,fl> groups[4]) const {
+		for(int k=0;k<4;k++) for(int q=0;q<size/4;q++) groups[k].origin.Set(q,Origin(k*(size/4)+q));
+		if(fl&isct::fInvDir)
+			for(int k=0;k<4;k++) for(int q=0;q<size/4;q++) groups[k].dir.Set(q,Dir(k*(size/4)+q),IDir(k*(size/4)+q));
+		else
+			for(int k=0;k<4;k++) for(int q=0;q<size/4;q++) groups[k].dir.Set(q,Dir(k*(size/4)+q));
+		for(int k=0;k<4;k++) for(int q=0;q<size/4;q++) groups[k].maxDist.Set(q,MaxDist(k*(size/4)+q));
+	}
+
+	void operator*=(const Matrix<Vec4f> &trans) {
+		origin*=trans;
+		for(int q=0;q<size;q++) dir.Set(q,trans&dir[q]);
+		//TODO: scale max dist properly
+	}
+
+	INLINE Vec3q Origin(int q) const { return origin[q]; }
+	INLINE Vec3q Dir(int q) const { return dir[q]; }
+	INLINE Vec3q IDir(int q) const { return dir.Inv(q); }
+	INLINE floatq MaxDist(int q) const { return maxDist[q]; }
 
 //private:
-	Vec3q *dir,*idir,*origin;
+	RayOrigin<size,sharedOrigin> origin;
+	RayDir<size,inverses> dir;
+	RayMaxDist<size,hasMaxDist> maxDist;
+	int lastShadowTri;
 };
 
 #endif

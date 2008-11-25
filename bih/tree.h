@@ -96,6 +96,12 @@ namespace bih {
 		Vec3f FlatNormals(u32 elementId,u32 subElementId) const {
 			return elements[elementId].Nrm(subElementId);
 		}
+		Vec2q Barycentric(const Vec3q &dir,const Vec3q &orig,int elementId,int subElementId) const {
+			return elements[elementId].Barycentric(dir,orig,subElementId);
+		}
+		const typename Element::BaseElement &GetElement(int elem,int subElem) const {
+			return elements[elem].GetElement(subElem);
+		}
 
 		Tree(const ElementContainer &elements);
 
@@ -105,20 +111,21 @@ namespace bih {
 
 	public:	
 	
-		template <int addFlags,bool sharedOrigin,template <int> class Selector>
-		Isct<f32x4,1,isctFlags|addFlags>
-			TraversePacket(const RayGroup<1,sharedOrigin,1> &rays,
-							const Selector<1> &selector,const IsctOptions<f32x4,1,addFlags> &options) const
+		template <int flags,template <int> class Selector>
+		Isct<f32x4,1,isctFlags|flags>
+			TraversePacket(const RayGroup<1,flags> &rays,const Selector<1> &selector) const
 		{
+			static_assert(flags&isct::fInvDir,"");
+
 			int bitMask=selector[0];
 			const Vec3q &dir=rays.Dir(0);
-			Isct<f32x4,1,isctFlags|addFlags> out;
+			Isct<f32x4,1,isctFlags|flags> out;
 
 			bool split=1;
 
 			if(Selector<1>::full||bitMask==0x0f) {	
 				if(!filterSigns||GetVecSign(rays.Dir(0))!=8) {
-					out=TraversePacket0(rays,options);
+					out=TraversePacket0(rays);
 					split=0;
 				}
 			}
@@ -128,14 +135,14 @@ namespace bih {
 
 				const Vec3q &orig=rays.Origin(0);
 				for(int q=0;q<4;q++) {	
-					int o=sharedOrigin?0:q;
+					int o=flags&isct::fShOrig?0:q;
 					if(!(bitMask&(1<<q))) continue;
-					f32x4 maxDist=options.MaxDist(0);
+					f32x4 maxDist=rays.MaxDist(0);
 					float tMaxDist=maxDist[q];
 
-					Isct<float,1,isctFlags|addFlags> tOut=	
-						TraverseMono<addFlags>(Vec3p(orig.x[o],orig.y[o],orig.z[o]),
-												Vec3p(dir.x[q],dir.y[q],dir.z[q]),tMaxDist);
+					Isct<float,1,isctFlags|flags> tOut=	
+						TraverseMono<flags>
+						(Vec3p(orig.x[o],orig.y[o],orig.z[o]),Vec3p(dir.x[q],dir.y[q],dir.z[q]),tMaxDist);
 					out.Insert(tOut,q);
 				}
 			}
@@ -143,25 +150,24 @@ namespace bih {
 			return out;
 		}
 
-		template <int addFlags,bool sharedOrigin>
-		INLINE Isct<f32x4,1,isctFlags|addFlags>
-			TraversePacket(const RayGroup<1,sharedOrigin,1> &rays,
-							const IsctOptions<f32x4,1,addFlags> &options) const {
-			return TraversePacket<addFlags>(rays,FullSelector<1>(),options);
+		template <int flags>
+		INLINE Isct<f32x4,1,isctFlags|flags>
+			TraversePacket(const RayGroup<1,flags> &rays) const {
+			return TraversePacket(rays,FullSelector<1>());
 		}
 
-		template <int addFlags,bool sharedOrigin,int packetSize,template <int> class Selector>
-		Isct<f32x4,packetSize,isctFlags|addFlags>
-			TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,
-							const Selector<packetSize> &selector,
-							IsctOptions<f32x4,packetSize,addFlags> options) const
+		template <int flags,int packetSize,template <int> class Selector>
+		Isct<f32x4,packetSize,isctFlags|flags>
+			TraversePacket(const RayGroup<packetSize,flags> &rays,const Selector<packetSize> &selector) const
 		{
-			Isct<f32x4,packetSize,isctFlags|addFlags> out;	
+			static_assert(flags&isct::fInvDir,"");
+
+			Isct<f32x4,packetSize,isctFlags|flags> out;	
 			bool split=1;
 
 			bool selectorsFiltered=packetSize<=4;
 			if(!Selector<packetSize>::full)
-				for(int n=0;n<packetSize;n++)
+				for(int n=0;n<packetSize/4;n++)
 					if(selector.Mask4(n)!=0x0f0f0f0f) {
 						selectorsFiltered=0;
 						break;
@@ -180,30 +186,31 @@ namespace bih {
 				}
 			
 				if(signsFiltered) {
-					out=TraversePacket0(rays,options);
+					out=TraversePacket0(rays);
 					split=0;
 				}
 			}
 
 			if(split) {
+				RayGroup<packetSize/4,flags> subGroups[4];
+				rays.Split(subGroups);
+				subGroups[0].lastShadowTri=rays.lastShadowTri;
+
 				for(int q=0;q<4;q++) {
-					Isct<f32x4,packetSize/4,isctFlags|addFlags> tOut=
-						TraversePacket(RayGroup<packetSize/4,sharedOrigin,1>(rays,q*(packetSize/4)),
-								selector.SubSelector(q),
-								IsctOptions<f32x4,packetSize/4,addFlags>(options,q*(packetSize/4)) );
-					options.LastShadowTri()=tOut.LastShadowTri();
+					Isct<f32x4,packetSize/4,isctFlags|flags> tOut=
+						TraversePacket(subGroups[q],selector.SubSelector(q));
+					if(q!=3) subGroups[q+1].lastShadowTri=tOut.LastShadowTri();
 					out.Insert(tOut,q);
 				}
+
 			}
 
 			return out;
 		}
 
-		template <int addFlags,bool sharedOrigin,int packetSize>
-		INLINE Isct<f32x4,packetSize,isctFlags|addFlags>
-			TraversePacket(const RayGroup<packetSize,sharedOrigin,1> &rays,
-							const IsctOptions<f32x4,packetSize,addFlags> &options) const {
-			return TraversePacket<addFlags>(rays,FullSelector<packetSize>(),options);
+		template <int flags,int packetSize> INLINE Isct<f32x4,packetSize,isctFlags|flags>
+			TraversePacket(const RayGroup<packetSize,flags> &rays) const {
+			return TraversePacket(rays,FullSelector<packetSize>());
 		}
 	
 		#include "bih/traverse_mono.h"
@@ -223,6 +230,8 @@ namespace bih {
 	class BIHBox {
 	public:
 		typedef BaseTree_ BaseTree;
+		typedef typename BaseTree::Element BaseElement;
+
 		enum { complexity=BaseTree::complexity };
 		enum { isctFlags=BaseTree::isctFlags|isct::fElement };
 
@@ -233,20 +242,29 @@ namespace bih {
 		Vec3f Nrm(int subElementId) const {
 			return trans&tree->FlatNormals(subElementId,0);
 		}
+		Vec2q Barycentric(const Vec3q &dir,const Vec3q &orig,int subElementId) const {
+			const Vec3q tDir=invTrans&dir;
+			const Vec3q tOrig=invTrans*orig;
+
+			return tree->Barycentric(dir,orig,subElementId,0);
+		}
+		const typename BaseTree::Element &GetElement(int elem) const {
+			return tree->GetElement(elem,0);
+		}
 
 		Vec3f BoundMin() const { return bBox.min; }
 		Vec3f BoundMax() const { return bBox.max; }
 		BBox GetBBox() const { return bBox; }
 
-		template <int addFlags>
-		Isct<float,1,isctFlags|addFlags> Collide(const Vec3f &rOrig,const Vec3f &rDir,float maxDist) const {
+		template <int flags>
+		Isct<float,1,isctFlags|flags> Collide(const Vec3f &rOrig,const Vec3f &rDir,float maxDist) const {
 			assert(tree);
-			Isct<float,1,isctFlags|addFlags> out;
-			Isct<float,1,BaseTree::isctFlags|addFlags> tOut=
-				tree->template TraverseMono<addFlags>(invTrans*rOrig,invTrans&rDir,maxDist);
+			Isct<float,1,isctFlags|flags> out;
+			Isct<float,1,BaseTree::isctFlags|flags> tOut=
+				tree->template TraverseMono<flags>(invTrans*rOrig,invTrans&rDir,maxDist);
 
 			out.Distance(0)=tOut.Distance(0);
-			if(!(addFlags&isct::fShadow)) {
+			if(!(flags&isct::fShadow)) {
 				out.Element(0)=tOut.Object(0);
 			//	out.object[0]=0;
 			}
@@ -254,40 +272,29 @@ namespace bih {
 			return out;
 		}
 
-		template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
-		Isct<f32x4,packetSize,isctFlags|addFlags>
-			Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,
-					const IsctOptions<f32x4,packetSize,addFlags> &options) const {
+		template <int flags,int packetSize>
+		Isct<f32x4,packetSize,isctFlags|flags>
+			Collide(const RayGroup<packetSize,flags> &rays) const {
 			assert(tree);
 
-			Isct<f32x4,packetSize,isctFlags|addFlags> out;
-
-			floatq maxDist[packetSize]; Vec3q tinv[packetSize];
-			for(int q=0;q<packetSize;q++) maxDist[q]=1.0f/0.0f;
-			if(!precompInv) for(int q=0;q<packetSize;q++) tinv[q]=VInv(rays.Dir(q));
-
+			Isct<f32x4,packetSize,isctFlags|flags> out;
 			bool test=0;
 
-			if(gVals[2]) {
-				if(sharedOrigin) test=bBox.TestIP<packetSize>(rays.Origin(0),precompInv?rays.idir:tinv,maxDist);
-				else for(int q=0;q<packetSize&&!test;q++)
-					test|=bBox.TestI(rays.Origin(sharedOrigin?0:q),precompInv?rays.idir[q]:tinv[q],maxDist[q]);
-			} else test=1;
+		//	if(gVals[2]) {
+			//	if(sharedOrigin) test=bBox.TestIP<packetSize>(rays.Origin(0),precompInv?rays.idir:tinv,maxDist);
+			//	else
+					for(int q=0;q<packetSize&&!test;q++)
+					test|=bBox.TestI(rays.Origin(flags&isct::fShOrig?0:q),rays.IDir(q),f32x4(1.0f/0.0f));
+		//	} else test=1;
 
 			if(test) {
-				Vec3q origin[packetSize],dir[packetSize],idir[packetSize];
-				for(int q=0;q<(sharedOrigin?1:packetSize);q++)
-					origin[q]=invTrans*rays.Origin(q);
-				for(int q=0;q<packetSize;q++) {
-					dir[q]=invTrans&rays.Dir(q);
-					idir[q]=VInv(dir[q]);
-				}
+				RayGroup<packetSize,flags> trays(rays);
+				trays *= invTrans;
 
-				Isct<f32x4,packetSize,BaseTree::isctFlags|addFlags> tOut=
-					tree->TraversePacket(RayGroup<packetSize,sharedOrigin,1>(origin,dir,idir),options);
+				Isct<f32x4,packetSize,BaseTree::isctFlags|flags> tOut=tree->TraversePacket(trays);
 
 				for(int q=0;q<packetSize;q++) out.Distance(q)=tOut.Distance(q);
-				if(!(addFlags&isct::fShadow)) {
+				if(!(flags&isct::fShadow)) {
 					for(int q=0;q<packetSize;q++) out.Element(q)=tOut.Object(q);
 				//	for(int q=0;q<packetSize;q++) out.object[q]=0;
 				}

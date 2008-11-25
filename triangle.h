@@ -47,8 +47,11 @@ class TTriangle: public TEdgeNormals < TTriangle <TEdgeNormals> >
 public:
 	enum { isctFlags=isct::fDistance };
 
+	typedef TTriangle BaseElement;
 	enum { complexity=0 }; //used in bih::Tree
 	typedef TEdgeNormals< TTriangle<TEdgeNormals> > EdgeNormals;
+
+	const TTriangle &GetElement(int) const { return *this; }
 
 	TTriangle(const Vec3f &ta,const Vec3f &tb,const Vec3f &tc) {
 		Vec3p b,c;
@@ -98,27 +101,21 @@ public:
 	template <class Vec>
 	inline Vec Normal(const Vec&) const { return Vec(Nrm()); }
 
-	template <int addFlags,class VecO,class Vec>
-	Isct<typename Vec::TScalar,1,isct::fDistance|addFlags>
+	template <int flags,class VecO,class Vec>
+	Isct<typename Vec::TScalar,1,isct::fDistance|flags>
 		Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
 
-	template <int addFlags,class VecO,class Vec>
-	INLINE Isct<typename Vec::TScalar,1,isct::fDistance|addFlags>
+	template <int flags,class VecO,class Vec>
+	INLINE Isct<typename Vec::TScalar,1,isct::fDistance|flags>
 		Collide(const VecO &rOrig,const Vec &rDir,float maxDist) const
-		{ return Collide<addFlags>(rOrig,rDir); }
+		{ return Collide<flags>(rOrig,rDir); }
 
-	template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
-	Isct<f32x4,packetSize,isct::fDistance|addFlags>
-		Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const NOINLINE;
+	template <int flags,int packetSize>
+	Isct<f32x4,packetSize,isct::fDistance|flags>
+		Collide(const RayGroup<packetSize,flags> &rays) const NOINLINE;
 
-	template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
-	INLINE Isct<f32x4,packetSize,isct::fDistance|addFlags>
-		Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays,
-				const IsctOptions<f32x4,packetSize,addFlags>&) const
-		{ return Collide<addFlags>(rays); }
-
-	template <class Vec0,class Vec,class real>
-	void Barycentric(const Vec0 &rOrig,const Vec &rDir,real &u,real &v) const;
+	template <class Vec0,class Vec>
+	Vec2<typename Vec::TScalar> Barycentric(const Vec0 &rOrig,const Vec &rDir,int) const;
 
 	int PrimaryBeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const;
 	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const;
@@ -145,12 +142,12 @@ public:
 	Vec4p plane;
 };
 
-template <template <class> class EN> template <int addFlags,class VecO,class Vec>
-Isct<typename Vec::TScalar,1,isct::fDistance|addFlags> TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) const {
+template <template <class> class EN> template <int flags,class VecO,class Vec>
+Isct<typename Vec::TScalar,1,isct::fDistance|flags> TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) const {
 	typedef typename Vec::TScalar real;
 	typedef typename Vec::TBool Bool;
 
-	Isct<typename Vec::TScalar,1,isct::fDistance|addFlags> out;
+	Isct<typename Vec::TScalar,1,isct::fDistance|flags> out;
 
 	real det = rDir|Nrm();
 	VecO tvec = rOrig-VecO(a);
@@ -160,25 +157,25 @@ Isct<typename Vec::TScalar,1,isct::fDistance|addFlags> TTriangle<EN>::Collide(co
 
 //	if (ForAny(test)) {
 		real dist=-(tvec|Nrm())/det;
-		out.Distance(0)=Condition(test,dist,real(1.0f/0.0f));
+		out.Distance()=Condition(test,dist,real(1.0f/0.0f));
 //	}
 
 	return out;
 }
 
-template<template<class> class EN> template <int addFlags,int packetSize,bool sharedOrigin,bool precompInv>
-Isct<f32x4,packetSize,isct::fDistance|addFlags> TTriangle<EN>::Collide(const RayGroup<packetSize,sharedOrigin,precompInv> &rays) const {
-	Isct<f32x4,packetSize,isct::fDistance|addFlags> out;
+template<template<class> class EN> template <int flags,int packetSize>
+Isct<f32x4,packetSize,isct::fDistance|flags> TTriangle<EN>::Collide(const RayGroup<packetSize,flags> &rays) const {
+	Isct<f32x4,packetSize,isct::fDistance|flags> out;
 	Vec3p nrm=Nrm();
 	Vec3q ta(a);
 
 	Vec3q sharedTVec;
-	if(sharedOrigin) sharedTVec=rays.Origin(0)-ta;
+	if(flags&isct::fShOrig) sharedTVec=rays.Origin(0)-ta;
 	f32x4 infinity=1.0f/0.0f;
 
 	for(int q=0;q<packetSize;q++) {
 		floatq det=rays.Dir(q)|nrm;
-		Vec3q tvec=sharedOrigin?sharedTVec:rays.Origin(q)-ta;
+		Vec3q tvec=flags&isct::fShOrig?sharedTVec:rays.Origin(q)-ta;
 
 		floatq u=rays.Dir(q)|(Vec3q(ba)^tvec);
 		floatq v=rays.Dir(q)|(tvec^Vec3q(ca));
@@ -193,15 +190,18 @@ Isct<f32x4,packetSize,isct::fDistance|addFlags> TTriangle<EN>::Collide(const Ray
 	return out;
 }
 
-template <template <class> class EN> template <class VecO,class Vec,class real>
-void TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,real &u,real &v) const {
+template <template <class> class EN> template <class VecO,class Vec>
+Vec2<typename Vec::TScalar> TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,int) const {
 	typedef typename Vec::TBool Bool;
+	Vec2<typename Vec::TScalar> out;
 
-	real det = (rDir|Nrm())*((float*)&ca)[3];
+	typename Vec::TScalar det = (rDir|Nrm())*ca.t0;
 	VecO tvec = rOrig-VecO(a);
-	real idet=Inv(det);
-	u = (rDir|(VecO(ba)^tvec))*idet;
-	v = (rDir|(tvec^VecO(ca)))*idet;
+	typename Vec::TScalar idet=Inv(det);
+	out.x = (rDir|(VecO(ba)^tvec))*idet;
+	out.y = (rDir|(tvec^VecO(ca)))*idet;
+
+	return out;
 }
 
 template <template <class> class EN>

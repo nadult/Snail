@@ -1,35 +1,28 @@
 
-	template <int addFlags,int packetSize,bool sharedOrigin> Isct<f32x4,packetSize,isctFlags|addFlags>
-		TraversePacket0(const RayGroup<packetSize,sharedOrigin,1> &rays,
-						const IsctOptions<f32x4,packetSize,addFlags> &options) const
+	template <int flags,int packetSize> Isct<f32x4,packetSize,isctFlags|flags>
+		TraversePacket0(const RayGroup<packetSize,flags> &rays) const
 	{
-		Isct<f32x4,packetSize,isctFlags|addFlags> out;
+		static_assert(flags&isct::fInvDir,"");
+
+		Isct<f32x4,packetSize,isctFlags|flags> out;
 
 		for(int q=0;q<packetSize;q++)
-			out.Distance(q)=options.MaxDist(q);
-
-		enum { shared=sharedOrigin };
+			out.Distance(q)=rays.MaxDist(q);
 
 		int dirMask=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(rays.Dir(0).x.m,rays.Dir(0).y.m,0),
 																	rays.Dir(0).z.m,0+(2<<2)))&7;
 		TreeStats<1> &stats=out.Stats();
 		stats.TracingPacket(4*packetSize);
-		
-		const Vec3q *rOrigin=&rays.Origin(0);
-		const Vec3q *tDir=&rays.Dir(0);
 
-		if(addFlags&isct::fShadow&&options.LastShadowTri()!=-1&&gVals[1]&&
-				options.LastShadowTri()<elements.size()) {
+		if(flags&isct::fShadow&&rays.lastShadowTri!=-1&&rays.lastShadowTri<elements.size()) {
 			stats.Skip();
 			f32x4b mask[packetSize];
 			
-			const Element &element=elements[options.LastShadowTri()];
-
-			IsctOptions<f32x4,packetSize,addFlags|isct::fFullMaxDist> opts(options,0);
+			const Element &element=elements[rays.lastShadowTri];
 
 			//TODO: if all rays hit, lastShadowTri=idx
-			Isct<f32x4,packetSize,Element::isctFlags|addFlags|isct::fFullMaxDist>
-				tOut=element.Collide(rays,opts);
+			Isct<f32x4,packetSize,Element::isctFlags|flags>
+				tOut=element.Collide(rays);
 
 			for(int q=0;q<packetSize;q++) {
 				mask[q]=tOut.Distance(q)<out.Distance(q);
@@ -40,34 +33,33 @@
 			for(int q=1;q<packetSize;q++) test=test&&mask[q];
 			
 			if(ForAll(test)) {
-				out.LastShadowTri()=options.LastShadowTri();
+				out.LastShadowTri()=rays.lastShadowTri;
 				return out;
 			}
 			out.LastShadowTri()=-1;
 		}
 
-		const Vec3q *invDir=rays.idir;
-	
 		floatq tinv[3][packetSize];
 		for(int q=0;q<packetSize;q++) {
-			tinv[0][q]=invDir[q].x;
-			tinv[1][q]=invDir[q].y;
-			tinv[2][q]=invDir[q].z;
+			Vec3q idir=rays.IDir(q);
+			tinv[0][q]=idir.x;
+			tinv[1][q]=idir.y;
+			tinv[2][q]=idir.z;
 		}
 
 		float sharedOrig[3];
 		floatq torig[3][packetSize];
 
-		if(sharedOrigin) {
-			sharedOrig[0]=rOrigin[0].x[0];
-			sharedOrig[1]=rOrigin[0].y[0];
-			sharedOrig[2]=rOrigin[0].z[0];
+		if(flags&isct::fShOrig) {
+			sharedOrig[0]=rays.Origin(0).x[0];
+			sharedOrig[1]=rays.Origin(0).y[0];
+			sharedOrig[2]=rays.Origin(0).z[0];
 		}
 		else {
 			for(int q=0;q<packetSize;q++) {
-				torig[0][q]=rOrigin[q].x;
-				torig[1][q]=rOrigin[q].y;
-				torig[2][q]=rOrigin[q].z;
+				torig[0][q]=rays.Origin(q).x;
+				torig[1][q]=rays.Origin(q).y;
+				torig[2][q]=rays.Origin(q).z;
 			}
 		}
 
@@ -87,18 +79,18 @@
 			if(dirMask&4) Swap(rMin.z,rMax.z);
 
 			Vec3q ttMin[packetSize],ttMax[packetSize];
-			if(sharedOrigin) {
-				Vec3q rrMin=Vec3q(rMin)-rOrigin[0],rrMax=Vec3q(rMax)-rOrigin[0];
+			if(flags&isct::fShOrig) {
+				Vec3q rrMin=Vec3q(rMin)-rays.Origin(0),rrMax=Vec3q(rMax)-rays.Origin(0);
 
 				for(int q=0;q<packetSize;q++) {
-					ttMin[q]=rrMin*invDir[q];
-					ttMax[q]=rrMax*invDir[q];
+					ttMin[q]=rrMin*rays.IDir(q);
+					ttMax[q]=rrMax*rays.IDir(q);
 				}
 			}
 			else {
 				for(int q=0;q<packetSize;q++) {
-					ttMin[q]=(Vec3q(rMin)-rOrigin[q])*invDir[q];
-					ttMax[q]=(Vec3q(rMax)-rOrigin[q])*invDir[q];
+					ttMin[q]=(Vec3q(rMin)-rays.Origin(q))*rays.IDir(q);
+					ttMax[q]=(Vec3q(rMax)-rays.Origin(q))*rays.IDir(q);
 				}
 			}
 
@@ -131,23 +123,21 @@
 					const Element &element=elements[idx];
 					stats.Intersection(packetSize);
 
-					IsctOptions<f32x4,packetSize,addFlags> opts(options,0);
-
-					Isct<f32x4,packetSize,Element::isctFlags|addFlags>
-						tOut=element.Collide(rays,opts);
+					Isct<f32x4,packetSize,Element::isctFlags|flags> tOut=element.Collide(rays);
 
 					i32x4b fullMask(i32x4(0xffffffff).m);
 					for(int q=0;q<packetSize;q++) {
 						i32x4b test=tOut.Distance(q)<out.Distance(q);
 						out.Distance(q)=Min(out.Distance(q),tOut.Distance(q));
-						if(addFlags&isct::fShadow) fullMask=fullMask&&test;
+
+						if(flags&isct::fShadow) fullMask=fullMask&&test;
 						else {
 							out.Object(q)=Condition(test,i32x4(idx),out.Object(q));
 							if(isctFlags&isct::fElement)
 								out.Element(q)=Condition(test,tOut.Element(q),out.Element(q));
 						}
 					}
-					if(addFlags&&isct::fShadow&&ForAll(fullMask))
+					if(flags&&isct::fShadow&&ForAll(fullMask))
 						out.LastShadowTri()=idx;
 				}
 
@@ -172,7 +162,7 @@
 			f32x4b test1,test2; {
 				const floatq *inv=tinv[axis];
 
-				if(sharedOrigin) {
+				if(flags&isct::fShOrig) {
 					float tnear=node->clip[0]-sharedOrig[axis],tfar=node->clip[1]-sharedOrig[axis];
 					if(nidx) Swap(tnear,tfar);
 					

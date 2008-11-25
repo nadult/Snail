@@ -1,8 +1,8 @@
 
-	template <int addFlags> Isct<float,1,isctFlags|addFlags>
+	template <int flags> Isct<float,1,isctFlags|flags>
 		TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,float maxDist=1.0f/0.0f) const
 	{
-		Isct<float,1,isctFlags|addFlags> out;
+		Isct<float,1,isctFlags|flags> out;
 		TreeStats<1> &stats=out.Stats();
 
 		stats.TracingRay();
@@ -40,11 +40,12 @@
 				idx&=Node::idxMask;
 				{
 					stats.Intersection();
-					Isct<float,1,Element::isctFlags|addFlags>
-						tOut=elements[idx].template Collide<addFlags>(rOrigin,tDir,out.Distance(0));
+					Isct<float,1,Element::isctFlags|flags>
+						tOut=elements[idx].template Collide<flags>(rOrigin,tDir,out.Distance(0));
+
 					if(tOut.Distance(0)<out.Distance(0)) {
 						out.Distance(0)=tOut.Distance(0);
-						if(!(addFlags&isct::fShadow)) {
+						if(!(flags&isct::fShadow)) {
 							out.Object(0)=idx;
 							if(isctFlags&isct::fElement) out.Element(0)=tOut.Element(0);
 						}

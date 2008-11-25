@@ -40,13 +40,9 @@ public:
 		:rays(tRays),selector(sel) {
 	}
 
-	Vec3q &RayDir(int n)				{ return rays.Dir(n); }
-	const Vec3q &RayDir(int n) const	{ return rays.Dir(n); }
-
-	Vec3q &RayOrigin(int n)				{ return rays.Origin(n); }
-	const Vec3q &RayOrigin(int n) const	{ return rays.Origin(n); }
-
-	Vec3q RayIDir(int n) const { return rays.IDir(n); }
+	Vec3q RayDir(int n) const		{ return rays.Dir(n); }
+	Vec3q RayOrigin(int n) const	{ return rays.Origin(n); }
+	Vec3q RayIDir(int n) const		{ return rays.IDir(n); }
 
 	typedef Vec3q Vec;
 	typedef typename Vec::TScalar real;

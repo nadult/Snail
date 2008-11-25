@@ -140,7 +140,7 @@ struct GenImageTask {
 
 		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
-				Vec3q dir[NQuads],idir[NQuads];
+				Vec3q dir[NQuads];
 				rayGen.Generate(PWidth,PHeight,startX+x,startY+y,dir);
 
 				for(int n=0;n<NQuads;n++) {
@@ -151,10 +151,10 @@ struct GenImageTask {
 					dir[n].x+=floatq(0.000000000001f);
 					dir[n].y+=floatq(0.000000000001f);
 					dir[n].z+=floatq(0.000000000001f);
-					idir[n]=VInv(dir[n]);
 				}
 
-				TracingContext<RayGroup<NQuads,1,1>,RaySelector<NQuads> > context(RayGroup<NQuads,1,1>(&origin,dir,idir));
+				RayGroup<NQuads,isct::fShOrig|isct::fInvDir> rays(origin,dir);
+				TracingContext<RayGroup<NQuads,isct::fShOrig|isct::fInvDir>,FullSelector<NQuads> > context(rays);
 				Vec3q *rgb=context.color;
 
 				context.options=TracingOptions(options.reflections?1:0,options.shading,options.rdtscShader);
@@ -191,6 +191,8 @@ struct GenImageTask {
 							dst[ 3]=c[ 4]; dst[ 4]=c[ 5]; dst[ 5]=c[ 6];
 							dst[ 6]=c[ 8]; dst[ 7]=c[ 9]; dst[ 8]=c[10];
 							dst[ 9]=c[12]; dst[10]=c[13]; dst[11]=c[14];
+
+							
 
 							dst+=12;
 						}
@@ -322,6 +324,8 @@ public:
 };
 
 
+gfxlib::Texture texture;
+
 int main(int argc, char **argv) {
 	printf("Unnamed raytracer v0.08 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
@@ -353,6 +357,7 @@ int main(int argc, char **argv) {
 		else modelFile=argv[n];
 	}
 
+	Loader("data/tex2.png") & texture;
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
 	TriVector tris;
@@ -398,8 +403,10 @@ int main(int argc, char **argv) {
 	uint quadLevels=2;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
-	for(int n=0;n<4;n++)
-		gVals[n]=1;
+	for(int n=0;n<10;n++) gVals[n]=1;
+	
+	gVals[3]=0;
+	gVals[0]=0;
 
 	StaticTree staticTree(tris);
 	staticTree.PrintInfo();
@@ -461,6 +468,7 @@ int main(int argc, char **argv) {
 			if(out.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
 			if(out.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
 			if(out.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
+			if(out.KeyDown(Key_f5)) { gVals[4]^=1; printf("Val 5 %s\n",gVals[4]?"on":"off"); }
 
 
 			{

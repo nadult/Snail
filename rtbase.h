@@ -84,13 +84,14 @@ namespace isct {
 		fObject		= 0x04,
 		fStats		= 0x08,
 
-		// Isct & IsctOptions flags:
+		// Isct & RayGroup flags:
 		fPrimary	= 0x100,
 		fShadow		= 0x200,	// fObject, fElement will be excluded
 
-		// IsctOptions flags:
-		fMaxDist	= 0x010000,	// single value
-		fFullMaxDist= 0x020000, // array of values
+		// RayGroup flags:
+		fMaxDist	= 0x010000,
+		fShOrig		= 0x020000,
+		fInvDir		= 0x040000,
 	};
 
 }
@@ -122,6 +123,7 @@ public:
 	enum { flags=flags_0 };
 	typedef typename TSwitch<i32x4,u32,TIsSame<Real,f32x4>::value>::Result Int;
 	typedef typename TSwitch<Vec3q,Vec3f,TIsSame<Real,f32x4>::value>::Result Vec3;
+	typedef typename TSwitch<Vec2q,Vec2f,TIsSame<Real,f32x4>::value>::Result Vec2;
 
 private:
 	Real    distance[flags&isct::fDistance?packetSize:0];
@@ -134,6 +136,8 @@ private:
 public:
 	int lastShadowTri;
 	//Dont worry about those if's, they will be optimized out
+	
+	Isct() { }
 
 	Real &Distance(int q=0) {
 		if(!(flags&isct::fDistance)) ThrowException("Structure doesnt contain 'distance' member.");
@@ -159,6 +163,7 @@ public:
 		if(!(flags&isct::fElement)) ThrowException("Structure doesnt contain 'element' member.");
 		return element[q];
 	}
+
 	const int LastShadowTri() const { return lastShadowTri; }
 	int &LastShadowTri() { return lastShadowTri; } 
 
@@ -187,6 +192,17 @@ public:
 	}
 
 	template <int tflags>
+	Isct(const Isct<Real,packetSize,tflags> &rhs) {
+		enum { cflags=tflags&flags };
+
+		if(cflags&isct::fDistance) for(int q=0;q<packetSize;q++) distance[q]=rhs.Distance(q);
+		if(cflags&isct::fObject  ) for(int q=0;q<packetSize;q++) object  [q]=rhs.Object  (q);
+		if(cflags&isct::fElement ) for(int q=0;q<packetSize;q++) element [q]=rhs.Element (q);
+		if(cflags&isct::fStats   ) stats=rhs.Stats();
+		lastShadowTri=rhs.LastShadowTri();
+	}
+
+	template <int tflags>
 	const Isct &operator=(const Isct<Real,packetSize,tflags> &rhs) {
 		enum { cflags=tflags&flags };
 		if(cflags&isct::fDistance) for(int q=0;q<packetSize;q++) distance[q]=rhs.Distance(q);
@@ -194,9 +210,11 @@ public:
 		if(cflags&isct::fElement ) for(int q=0;q<packetSize;q++) element [q]=rhs.Element (q);
 		if(cflags&isct::fStats   ) stats=rhs.Stats();
 		lastShadowTri=rhs.LastShadowTri();
+		return *this;
 	}
 };
 
+/*
 template <class Real,int packetSize,int flags_>
 class IsctOptions {
 public:
@@ -231,7 +249,7 @@ public:
 	}
 	INLINE int &LastShadowTri() { return lastShadowTri; }
 	INLINE int  LastShadowTri() const { return lastShadowTri; }
-};
+}; */
 
 #include "bounding_box.h"
 

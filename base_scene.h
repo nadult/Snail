@@ -15,6 +15,8 @@ public:
 	BBox GetBBox() const;
 	
 	void Transform(const Matrix<Vec4f> &mat);
+	void TransformData(const Matrix<Vec4f> &mat);
+
 	void Optimize();
 
 	class Triangle {
