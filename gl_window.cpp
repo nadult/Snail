@@ -222,9 +222,9 @@ namespace
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glBegin(GL_QUADS);
-			glTexCoord2f(0.0, 0.0); glVertex3f(-1.0, 1.0, 0.0);
-			glTexCoord2f(0.0, v  ); glVertex3f(-1.0, -1.0, 0.0);
-			glTexCoord2f(u  , v  ); glVertex3f(1.0, -1.0, 0.0);
-			glTexCoord2f(u  , 0.0); glVertex3f(1.0, 1.0, 0.0);
+			glTexCoord2f(0.0, 0.0); glVertex3f(-1.0, -1.0, 0.0);
+			glTexCoord2f(0.0, v  ); glVertex3f(-1.0, 1.0, 0.0);
+			glTexCoord2f(u  , v  ); glVertex3f(1.0, 1.0, 0.0);
+			glTexCoord2f(u  , 0.0); glVertex3f(1.0, -1.0, 0.0);
 		glEnd();
 	}

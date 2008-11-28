@@ -11,7 +11,6 @@
 #include <cassert>
 
 
-
 using namespace baselib;
 using namespace veclib;
 
@@ -62,6 +61,14 @@ public:
 	}
 	i32x4 indices[size];
 	uint last;
+};
+
+template <>
+class ObjectIdxBuffer<0>
+{
+public:
+	INLINE void Insert(u32) { }
+	INLINE bool Find(u32) { return false; }
 };
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f>&);

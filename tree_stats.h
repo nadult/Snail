@@ -53,7 +53,7 @@ public:
 	inline const TreeStats &operator+=(const TreeStats &rhs) {
 		if(enabled) {
 			for(int n=0;n<dataSize;n++)
-				data[n]=rhs.data[n];
+				data[n]+=rhs.data[n];
 		}
 		return *this;
 	}
@@ -67,7 +67,10 @@ public:
 	uint GetTracedRays() const { return enabled?data[2]:0; }
 	uint GetSkips() const { return enabled?data[9]:0; }
 
-	void PrintInfo(int resx,int resy,double msRenderTime,double msBuildTime);
+	string GenInfo(int resx,int resy,double msRenderTime,double msBuildTime);
+
+	void PrintInfo(int resx,int resy,double msRenderTime,double msBuildTime)
+		{ printf("%s\n",GenInfo().c_str()); }
 
 	inline void Intersection(uint val=1) { if(enabled) data[0]+=val; }
 

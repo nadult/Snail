@@ -93,7 +93,6 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 		else if(strcmp(type,"v")==0) {
 			Vec3f vert;
 			sscanf(line,"%s %f %f %f",type,&vert.x,&vert.y,&vert.z);
-			vert.y*=-1.0f;
 			verts.push_back(vert);
 		}
 		else if(strcmp(type,"vt")==0) {

@@ -22,10 +22,11 @@ namespace bih {
 
 	}
 
-	template <class Element>
-	Tree<Element>::Tree(const ElementContainer &objs) :split(1) {
+	template <class Element,class ShElement>
+	Tree<Element,ShElement>::Tree(const ElementContainer &objs,const ShElementContainer &shElems) {
 
 		elements.resize(objs.size());
+		shElements=shElems;
 
 		if(!elements.size()) {
 			nodes.push_back(Node());
@@ -72,8 +73,8 @@ namespace bih {
 		Build(indices,parents,0,pMin,pMax,0,1);
 	}
 
-	template <class Element>
-	void Tree<Element>::PrintInfo() const {
+	template <class Element,class ShElement>
+	void Tree<Element,ShElement>::PrintInfo() const {
 		double nodeBytes=nodes.size()*sizeof(Node);
 		double objBytes=elements.size()*sizeof(Element);
 		printf("Elems:  %8d * %2d = %6.2fMB\n",elements.size(),sizeof(Element),objBytes*0.000001);
@@ -84,8 +85,8 @@ namespace bih {
 
 	// Znajduje ojca z taka sama osia podzialu i ktory ma tylko
 	// jedno dziecko (ktore spelnia ten sam warunek)
-	template <class Element>
-	uint Tree<Element>::FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const {
+	template <class Element,class ShElement>
+	uint Tree<Element,ShElement>::FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const {
 		const Node &node=nodes[nNode];
 		if(node.ClipLeft()>(&pMin.x)[node.Axis()]-5.0f&&node.ClipRight()<(&pMax.x)[node.Axis()]+5.0f) return ~0;
 		if(axis==node.Axis()) return nNode;
@@ -93,8 +94,8 @@ namespace bih {
 		return FindSimilarParent(parents,parents[nNode],axis);
 	}
 
-	template <class Element>
-	void Tree<Element>::Build(vector<Index> &indices,vector<u32> &parents,uint nNode,
+	template <class Element,class ShElement>
+	void Tree<Element,ShElement>::Build(vector<Index> &indices,vector<u32> &parents,uint nNode,
 								const Vec3f &min,const Vec3f &max,uint level,bool sah) {
 		maxLevel=Max(maxLevel,level+1);
 		

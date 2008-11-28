@@ -23,21 +23,27 @@
 	}
 
 	template <bool enabled>
-	void TreeStats<enabled>::PrintInfo(int resx,int resy,double msRenderTime,double msBuildTime) {
+	string TreeStats<enabled>::GenInfo(int resx,int resy,double msRenderTime,double msBuildTime) {
 		double raysPerSec=double(data[2])*(1000.0/msRenderTime);
 		double nPixels=double(resx*resy);
 
 		if(!enabled) {
-			printf("MSec/frame:%6.2f  MPixels/sec:%6.2f\n",msRenderTime,(resx*resy*(1000.0/msRenderTime))*0.000001);
-			return;
+			char buf[2048];
+			sprintf(buf,"MSec/frame:%6.2f  MPixels/sec:%6.2f\n",msRenderTime,
+					(resx*resy*(1000.0/msRenderTime))*0.000001);
+			return string(buf);
 		}
-		printf("isct,iter:%5.2f %5.2f  MSec/frame:%6.2f  MRays/sec:%5.2f  "
-				/*"Coh:%.2f%% " "br:%.2f%% fa:%.2f%%"*/ "%.0f R:%d Build:%6.2f\n",
+
+		char buf[2048];
+		sprintf(buf,
+				/*"isct,iter:"*/"%5.2f %5.2f  MSec/frame:%6.2f  MRays/sec:%5.2f  "
+				/*"Coh:%.2f%% " "br:%.2f%% fa:%.2f%%"*/ "%.0f R:%d Build:%6.2f",
 				double(data[0])/nPixels,double(data[1])/nPixels,
 				msRenderTime,raysPerSec*0.000001/*,GetCoherent()*100.0f*/,
 				/*GetBreaking()*100.0f,GetIntersectFail()*100.0f,*/double(data[9]),data[2],msBuildTime);
+		return string(buf);
 	}
 
-	template void TreeStats<0>::PrintInfo(int,int,double,double);
-	template void TreeStats<1>::PrintInfo(int,int,double,double);
+	template string TreeStats<0>::GenInfo(int,int,double,double);
+	template string TreeStats<1>::GenInfo(int,int,double,double);
 

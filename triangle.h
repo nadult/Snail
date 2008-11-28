@@ -5,7 +5,6 @@
 #include "ray_group.h"
 #include "context.h"
 
-
 template <class Triangle>
 class FastEdgeNormals
 {
@@ -48,7 +47,7 @@ public:
 	enum { isctFlags=isct::fDistance };
 
 	typedef TTriangle BaseElement;
-	enum { complexity=0 }; //used in bih::Tree
+	enum { isComplex=0 }; // doesn't contain any hierarchy of objects
 	typedef TEdgeNormals< TTriangle<TEdgeNormals> > EdgeNormals;
 
 	const TTriangle &GetElement(int) const { return *this; }
@@ -115,7 +114,7 @@ public:
 		Collide(const RayGroup<packetSize,flags> &rays) const NOINLINE;
 
 	template <class Vec0,class Vec>
-	Vec2<typename Vec::TScalar> Barycentric(const Vec0 &rOrig,const Vec &rDir,int) const;
+	Vec3<typename Vec::TScalar> Barycentric(const Vec0 &rOrig,const Vec &rDir,int) const;
 
 	int PrimaryBeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const;
 	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const;
@@ -191,15 +190,16 @@ Isct<f32x4,packetSize,isct::fDistance|flags> TTriangle<EN>::Collide(const RayGro
 }
 
 template <template <class> class EN> template <class VecO,class Vec>
-Vec2<typename Vec::TScalar> TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,int) const {
+Vec3<typename Vec::TScalar> TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,int) const {
 	typedef typename Vec::TBool Bool;
-	Vec2<typename Vec::TScalar> out;
+	Vec3<typename Vec::TScalar> out;
 
 	typename Vec::TScalar det = (rDir|Nrm())*ca.t0;
 	VecO tvec = rOrig-VecO(a);
 	typename Vec::TScalar idet=Inv(det);
-	out.x = (rDir|(VecO(ba)^tvec))*idet;
+	out.z = (rDir|(VecO(ba)^tvec))*idet;
 	out.y = (rDir|(tvec^VecO(ca)))*idet;
+	out.x=(typename Vec::TScalar)(1.0f)-out.y-out.z;
 
 	return out;
 }
@@ -228,6 +228,50 @@ int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) co
 typedef TTriangle<SlowEdgeNormals> Triangle;
 
 typedef vector<Triangle,AlignedAllocator<Triangle> > TriVector;
+
+
+class ShTriangle {
+public:
+	Vec2p uv[3];
+	Vec3p pos[3],nrm[3];
+	Vec3p normal,tangent,binormal;
+
+	ShTriangle(const Vec3f &p1,const Vec3p &p2,const Vec3f &p3,const Vec2f &uv1,const Vec2f &uv2,const Vec2f &uv3,
+				const Vec3f &nrm1,const Vec3f &nrm2,const Vec3f &nrm3) {
+		pos[0]=p1; pos[1]=p2; pos[2]=p3;
+		uv[0]=uv1; uv[1]=uv2; uv[2]=uv3;
+		nrm[0]=nrm1; nrm[1]=nrm2; nrm[2]=nrm3;
+		normal=(pos[1]-pos[0])^(pos[2]-pos[0]);
+		normal*=RSqrt(normal|normal);
+		
+		Vec3p side0=pos[0]-pos[1];
+		Vec3p side1=pos[2]-pos[0];
+
+		float deltaV0=uv[0].y-uv[1].y;
+		float deltaV1=uv[2].y-uv[0].y;
+		tangent=side0*deltaV1-side1*deltaV0;
+		tangent*=RSqrt(tangent|tangent);
+
+		float deltaU0 = uv[0].x-uv[1].x;
+		float deltaU1 = uv[2].x-uv[0].x;
+		binormal=side0*deltaU1-side1*deltaU0;
+		binormal*=RSqrt(binormal|binormal);
+
+		///Now, take the cross product of the tangents to get a vector which 
+		///should point in the same direction as our normal calculated above. 
+		///If it points in the opposite direction (the dot product between the normals is less than zero), 
+		///then we need to reverse the s and t tangents. 
+		///This is because the triangle has been mirrored when going from tangent space to object space.
+		///reverse tangents if necessary
+		Vec3p tangentCross=tangent^binormal;
+		if ((tangentCross|normal)<0.0f) {
+			tangent=-tangent;
+			binormal=-binormal;
+		}
+	}
+};
+
+typedef vector<ShTriangle,AlignedAllocator<ShTriangle> > ShTriVector;
 
 #endif
 

@@ -1,14 +1,16 @@
 #include <iostream>
-#include <baselib_threads.h>
-#include "ray_generator.h"
-#include "scene.h"
 #include "camera.h"
 
-#include "bih/tree.h"
 #include "gl_window.h"
 #include "formats/loader.h"
 #include "base_scene.h"
+#include "font.h"
 
+#include "render.h"
+#include "sampler.h"
+
+#include "bih/tree.h"
+#include "tree_box.h"
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 	Matrix<Vec4f> mOut;
@@ -82,165 +84,6 @@ int gVals[16]={0,};
 using std::cout;
 using std::endl;
 
-struct Options {
-	Options(ShadingMode sm,bool refl,bool rdtsc) :shading(sm),reflections(refl),rdtscShader(rdtsc) { }
-	Options() { reflections=rdtscShader=0; shading=smFlat; }
-
-	ShadingMode shading;
-	bool reflections,rdtscShader;
-};
-
-inline i32x4 ConvColor(const Vec3q &rgb) {
-	i32x4 tr=Trunc(Clamp(rgb.x*255.0f,floatq(0.0f),floatq(255.0f)));
-	i32x4 tg=Trunc(Clamp(rgb.y*255.0f,floatq(0.0f),floatq(255.0f)));
-	i32x4 tb=Trunc(Clamp(rgb.z*255.0f,floatq(0.0f),floatq(255.0f)));
-
-	__m128i c1,c2,c3,c4;
-	c1=_mm_packs_epi32(tr.m,tr.m);
-	c2=_mm_packs_epi32(tg.m,tg.m);
-	c3=_mm_packs_epi32(tb.m,tb.m);
-	c1=_mm_packus_epi16(c1,c1);
-	c2=_mm_packus_epi16(c2,c2);
-	c3=_mm_packus_epi16(c3,c3);
-
-	__m128i c12=_mm_unpacklo_epi8(c1,c2);
-	__m128i c33=_mm_unpacklo_epi8(c3,c3);
-	return _mm_unpacklo_epi16(c12,c33);
-}
-
-template <class AccStruct,int QuadLevels>
-struct GenImageTask {
-	GenImageTask(const AccStruct *tr,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,
-					uint tw,uint th,TreeStats<1> *outSt) :tree(tr),camera(cam),out(tOut),options(opt),
-					startX(tx),startY(ty),width(tw),height(th),outStats(outSt) {
-		}
-
-	uint startX,startY;
-	uint width,height;
-
-	TreeStats<1> *outStats;
-	const AccStruct *tree;
-	Camera camera;
-	Image *out;
-	Options options;
-
-	void Work() {
-		float ratio=float(out->width)/float(out->height);
-
-		enum { NQuads=1<<(QuadLevels*2), PWidth=2<<QuadLevels, PHeight=2<<QuadLevels };
-
-		Matrix<Vec4f> rotMat(Vec4f(camera.right),Vec4f(camera.up),Vec4f(camera.front),Vec4f(0,0,0,1));
-
-		Vec3q origin; Broadcast(camera.pos,origin);
-		RayGenerator rayGen(QuadLevels,out->width,out->height,camera.plane_dist);
-
-		uint pitch=out->width*3;
-		u8 *outPtr=(u8*)&out->buffer[startY*pitch+startX*3];
-		ShadowCache shadowCache;
-
-		for(int y=0;y<height;y+=PHeight) {
-			for(int x=0;x<width;x+=PWidth) {
-				Vec3q dir[NQuads];
-				rayGen.Generate(PWidth,PHeight,startX+x,startY+y,dir);
-
-				for(int n=0;n<NQuads;n++) {
-					Vec3f tmp[4]; Convert(dir[n],tmp);
-					for(int k=0;k<4;k++) tmp[k]=rotMat*tmp[k];
-					Convert(tmp,dir[n]);
-					dir[n]*=RSqrt(dir[n]|dir[n]);
-					dir[n].x+=floatq(0.000000000001f);
-					dir[n].y+=floatq(0.000000000001f);
-					dir[n].z+=floatq(0.000000000001f);
-				}
-
-				RayGroup<NQuads,isct::fShOrig|isct::fInvDir> rays(origin,dir);
-				TracingContext<RayGroup<NQuads,isct::fShOrig|isct::fInvDir>,FullSelector<NQuads> > context(rays);
-				Vec3q *rgb=context.color;
-
-				context.options=TracingOptions(options.reflections?1:0,options.shading,options.rdtscShader);
-				
-				context.shadowCache=shadowCache;
-				RayTrace(*tree,context);
-				shadowCache=context.shadowCache;
-
-				if(NQuads==1) {
-					i32x4 col=ConvColor(rgb[0]);
-					const u8 *c=(u8*)&col;
-
-					u8 *p1=outPtr+y*pitch+x*3;
-					u8 *p2=p1+pitch;
-
-					p1[ 0]=c[ 0]; p1[ 1]=c[ 1]; p1[ 2]=c[ 2];
-					p1[ 3]=c[ 4]; p1[ 4]=c[ 5]; p1[ 5]=c[ 6];
-					p2[ 0]=c[ 8]; p2[ 1]=c[ 9]; p2[ 2]=c[10];
-					p2[ 3]=c[12]; p2[ 4]=c[13]; p2[ 5]=c[14];
-				}
-				else {
-					rayGen.Decompose(rgb,rgb);
-
-					Vec3q *src=rgb;
-					u8 *dst=outPtr+x*3+y*pitch;
-					int lineDiff=pitch-PWidth*3;
-
-					for(int ty=0;ty<PHeight;ty++) {
-						for(int tx=0;tx<PWidth;tx+=4) {
-							i32x4 col=ConvColor(*src++);
-							const u8 *c=(u8*)&col;
-	
-							dst[ 0]=c[ 0]; dst[ 1]=c[ 1]; dst[ 2]=c[ 2];
-							dst[ 3]=c[ 4]; dst[ 4]=c[ 5]; dst[ 5]=c[ 6];
-							dst[ 6]=c[ 8]; dst[ 7]=c[ 9]; dst[ 8]=c[10];
-							dst[ 9]=c[12]; dst[10]=c[13]; dst[11]=c[14];
-
-							
-
-							dst+=12;
-						}
-						dst+=lineDiff;
-					}
-				}
-			}
-		}
-	}
-};
-
-template <int QuadLevels,class AccStruct>
-TreeStats<1> GenImage(const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
-	enum { taskSize=64 };
-
-	uint numTasks=(image.width+taskSize-1)*(image.height+taskSize-1)/(taskSize*taskSize);
-
-	vector<TreeStats<1> > taskStats(numTasks);
-
-	TaskSwitcher<GenImageTask<AccStruct,QuadLevels> > switcher(numTasks);
-	uint num=0;
-	for(uint y=0;y<image.height;y+=taskSize) for(uint x=0;x<image.width;x+=taskSize) {
-		switcher.AddTask(GenImageTask<AccStruct,QuadLevels> (&tree,camera,&image,options,x,y,
-					Min((int)taskSize,int(image.width-x)),Min((int)taskSize,int(image.height-y)),
-					&taskStats[num]) );
-		num++;
-	}
-
-	switcher.Work(tasks);
-
-	TreeStats<1> stats;
-	for(uint n=0;n<numTasks;n++)
-		stats+=taskStats[n];
-	return stats;
-}
-
-template <class AccStruct>
-TreeStats<1> GenImage(int quadLevels,const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
-	switch(quadLevels) {
-//	case 0: return GenImage<0>(tree,camera,image,options,tasks);
-//	case 1: return GenImage<1>(tree,camera,image,options,tasks);
-	case 2: return GenImage<2>(tree,camera,image,options,tasks);
-//	case 3: return GenImage<3>(tree,camera,image,options,tasks);
-//	case 4: return GenImage<4>(tree,camera,image,options,tasks);
-	default: throw Exception("Quad level not supported.");
-	}
-}
-
 Vec3f Center(const TriVector &tris) {
 	Vec3f center(0,0,0);
 	for(int n=0;n<tris.size();n++)
@@ -264,23 +107,14 @@ void PrintHelp() {
 	printf("esc - exit\n\n");
 }
 
-
-#include <gfxlib_font.h>
-
-class Font {
-	Font() :font("data/fonts/font1.fnt") { }
-	
-	gfxlib::Font font;
-};
-
-typedef bih::Tree<Triangle> StaticTree;
-typedef bih::Tree<bih::BIHBox<bih::Tree<Triangle> > > FullTree;
+typedef bih::Tree<Triangle,ShTriangle> StaticTree;
+typedef bih::Tree<TreeBox<StaticTree>,ShTriangle> FullTree;
 
 class SceneBuilder {
 public:
 	struct Object {
 		Matrix<Vec4f> preTrans;
-		bih::Tree<Triangle> *tree;
+		StaticTree *tree;
 		BBox bBox;
 	};
 	
@@ -290,7 +124,7 @@ public:
 	};
 
 	// box includes preTrans (it can be more optimized than just tree->BBox()*preTrans)
-	void AddObject(bih::Tree<Triangle> *tree,const Matrix<Vec4f> &preTrans,const BBox &box) {
+	void AddObject(StaticTree *tree,const Matrix<Vec4f> &preTrans,const BBox &box) {
 		Object newObj;
 		newObj.tree=tree;
 		newObj.bBox=box;
@@ -305,7 +139,7 @@ public:
 		instances.push_back(newInst);
 	}
 
-	typedef bih::BIHBox<bih::Tree<Triangle> > Elem;
+	typedef TreeBox<StaticTree> Elem;
 
 	vector<Elem,AlignedAllocator<Elem> > ExtractElements() const {
 		vector<Elem,AlignedAllocator<Elem> > elements;
@@ -323,8 +157,33 @@ public:
 	vector<Instance> instances;
 };
 
+class FrameCounter
+{
+public:
+	FrameCounter() :time(GetTime()),fps(0),frames(0) { }
 
-gfxlib::Texture texture;
+	void NextFrame() {
+		double tTime=GetTime();
+		double interval=0.5f;
+
+		frames++;
+		if(tTime-time>interval) {
+			fps=double(frames)/interval;
+			time+=interval;
+			frames=0;
+		}
+	}
+
+	double FPS() const {
+		return fps;
+	}
+
+private:
+	uint frames;
+	double time,fps;
+};
+
+Sampler texSampler;
 
 int main(int argc, char **argv) {
 	printf("Unnamed raytracer v0.08 by nadult\n");
@@ -343,9 +202,10 @@ int main(int argc, char **argv) {
 #endif
 	bool fullscreen=0,nonInteractive=0;
 	int threads=4;
-	const char *modelFile="abrams.obj";
+	const char *modelFile="barracks.obj";
 	Options options;
 	bool treeVisMode=0;
+	bool flipNormals=1;
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
@@ -354,18 +214,30 @@ int main(int argc, char **argv) {
 		else if(string("-toFile")==argv[n]) { nonInteractive=1; }
 		else if(string("-shading")==argv[n]&&n<argc-1) { options.shading=string("gouraud")==argv[n+1]?smGouraud:smFlat; n+=1; }
 		else if(string("-treevis")==argv[n]) treeVisMode=1;
+		else if(string("+flipNormals")==argv[n]) flipNormals=1;
+		else if(string("-flipNormals")==argv[n]) flipNormals=0;
 		else modelFile=argv[n];
 	}
 
-	Loader("data/tex2.png") & texture;
+	{
+		gfxlib::Texture tex;
+		Loader("data/1669.png") & tex;
+		texSampler=Sampler(tex);
+	}
+
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
 	TriVector tris;
-	ShadingDataVec shadingData;
+	ShTriVector shTris;
+
 	printf("Loading...\n");
 	BaseScene baseScene; {
 		baseScene.LoadWavefrontObj(string("scenes/")+modelFile);
+		if(flipNormals) baseScene.FlipNormals();
+
 		tris=baseScene.ToTriVector();
+		shTris=baseScene.ToShTriVector();
+
 		for(int n=0;n<tris.size();n++)
 			if(!tris[n].Test()) {
 				tris[n]=tris.back();
@@ -390,7 +262,7 @@ int main(int argc, char **argv) {
 	SceneBuilder builder;
 	for(int n=0;n<baseScene.objects.size();n++) {
 		const BaseScene::Object &obj=baseScene.objects[n];
-		builder.AddObject(new StaticTree(obj.ToTriVector()),obj.GetTrans(),obj.GetBBox());
+		builder.AddObject(new StaticTree(obj.ToTriVector(),obj.ToShTriVector()),obj.GetTrans(),obj.GetBBox());
 		builder.AddInstance(n,Identity<>());
 	}
 	printf("Done building\n");
@@ -404,29 +276,34 @@ int main(int argc, char **argv) {
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
 	for(int n=0;n<10;n++) gVals[n]=1;
+	gVals[0]=0; gVals[2]=0;
 	
-	gVals[3]=0;
-	gVals[0]=0;
-
-	StaticTree staticTree(tris);
+	StaticTree staticTree(tris,shTris);
 	staticTree.PrintInfo();
 
 	if(nonInteractive) {
 		double time=GetTime();
-		GenImage(quadLevels,staticTree,cam,img,options,threads);
+		Render(quadLevels,staticTree,cam,img,options,threads);
 		time=GetTime()-time;
 		minTime=maxTime=time;
 		img.SaveToFile("out/output.tga");
 	}
 	else {
 		GLWindow out(resx,resy,fullscreen);
+		Font font;
+
 		bool lightsAnim=0;
 		float speed; {
 			Vec3p size=baseScene.GetBBox().Size();
 			speed=(size.x+size.y+size.z)*0.005f;
 		}
 
+		FrameCounter frmCounter;
+
 		while(out.PollEvents()) {
+			frmCounter.NextFrame();
+			gVals[5]++;
+
 			if(out.KeyUp(Key_esc)) break;
 			if(out.KeyDown('K')) img.SaveToFile("out/output.tga");
 			if(out.KeyDown('O')) options.reflections^=1;
@@ -446,8 +323,8 @@ int main(int argc, char **argv) {
 				if(out.Key('S')) cam.pos-=cam.front*tspeed;
 				if(out.Key('A')) cam.pos-=cam.right*tspeed;
 				if(out.Key('D')) cam.pos+=cam.right*tspeed;
-				if(out.Key('R')) cam.pos-=cam.up*tspeed;
-				if(out.Key('F')) cam.pos+=cam.up*tspeed;
+				if(out.Key('R')) cam.pos+=cam.up*tspeed;
+				if(out.Key('F')) cam.pos-=cam.up*tspeed;
 			}
 
 		//	if(out.KeyDown('Y')) { printf("splitting %s\n",scene.tree.split?"off":"on"); scene.tree.split^=1; }
@@ -496,16 +373,22 @@ int main(int argc, char **argv) {
 			buildTime=GetTime()-buildTime;
 			
 			TreeStats<1> stats;
-			if(gVals[0]) stats=GenImage(quadLevels,staticTree,cam,img,options,threads);
-			else stats=GenImage(quadLevels,tree,cam,img,options,threads);
+			if(!gVals[0]) stats=Render(quadLevels,staticTree,cam,img,options,threads);
+			else stats=Render(quadLevels,tree,cam,img,options,threads);
 
 			out.RenderImage(img);
-			out.SwapBuffers();
 
 			time=GetTime()-time; minTime=Min(minTime,time);
 			maxTime=Max(time,maxTime);
 
-			stats.PrintInfo(resx,resy,time*1000.0,buildTime*1000.0);
+			font.BeginDrawing(resx,resy);
+			font.SetSize(Vec2f(30,20));
+				font.PrintAt(Vec2f(0,0),stats.GenInfo(resx,resy,time*1000.0,buildTime*1000.0));
+				font.PrintAt(Vec2f(0,20),"FPS: ",int(frmCounter.FPS()));
+			font.FinishDrawing();
+
+			out.SwapBuffers();
+
 
 		//	if(lightsAnim) scene.Animate();
 		}
@@ -516,3 +399,4 @@ int main(int argc, char **argv) {
 
 	return 0;
 }
+

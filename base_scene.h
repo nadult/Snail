@@ -12,23 +12,31 @@ public:
 	void SaveWavefrontObj(const string &fileName) const;
 	
 	TriVector ToTriVector() const;
+	ShTriVector ToShTriVector() const;
+
 	BBox GetBBox() const;
 	
 	void Transform(const Matrix<Vec4f> &mat);
 	void TransformData(const Matrix<Vec4f> &mat);
+	void FlipNormals();
 
 	void Optimize();
 
 	class Triangle {
 	public:
-		operator ::Triangle() const { return ::Triangle(pos[0],pos[1],pos[2]); }
+		operator ::Triangle() const {
+			return ::Triangle(pos[0],pos[1],pos[2]);
+		}
+		operator ::ShTriangle() const {
+			return ::ShTriangle(pos[0],pos[1],pos[2],uv[0],uv[1],uv[2],nrm[0],nrm[1],nrm[2]);
+		}
 		
 		Vec3f pos[3],nrm[3],fnrm;
 		Vec2f uv[3];
 	};
 	
 	struct IndexedTri {
-		u32 v[3];
+		i32 v[3];
 		i32 vt[3],vn[3]; // if <0 then not used
 	};
 	
@@ -41,7 +49,11 @@ public:
 		void Repair();
 
 		Triangle GetTriangle(uint n) const;
+
 		TriVector ToTriVector() const;
+		ShTriVector ToShTriVector() const;
+
+		void FlipNormals();
 		
 		void TransformData(const Matrix<Vec4f> &mat);
 		void Transform(const Matrix<Vec4f> &mat);

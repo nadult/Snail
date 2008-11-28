@@ -16,6 +16,22 @@ TriVector BaseScene::ToTriVector() const {
 	return out;
 }
 
+ShTriVector BaseScene::ToShTriVector() const {
+	ShTriVector out;
+
+	for(int o=0;o<objects.size();o++) {
+		ShTriVector t=objects[o].ToShTriVector();
+		for(int n=0;n<t.size();n++) out.push_back(t[n]);
+	}
+
+	return out;
+}
+
+void BaseScene::FlipNormals() {
+	for(int o=0;o<objects.size();o++)
+		objects[o].FlipNormals();
+}
+
 BBox BaseScene::GetBBox() const {
 	if(objects.size()==0)
 		ThrowException("Trying to compute bounding box of empty scene");
@@ -254,12 +270,29 @@ BaseScene::Triangle BaseScene::Object::GetTriangle(uint n) const {
 	return out;
 }
 
+
+void BaseScene::Object::FlipNormals() {
+	for(int t=0;t<tris.size();t++) {
+		IndexedTri &tri=tris[t];
+		Swap(tri.v[0],tri.v[1]);
+		Swap(tri.vt[0],tri.vt[1]);
+		Swap(tri.vn[0],tri.vn[1]);
+	}
+	for(int n=0;n<normals.size();n++)
+		normals[n]=-normals[n];
+}
+
 TriVector BaseScene::Object::ToTriVector() const {
 	TriVector out;
-	
 	for(int t=0;t<tris.size();t++)
 		out.push_back(GetTriangle(t));
-	
+	return out;
+}
+
+ShTriVector BaseScene::Object::ToShTriVector() const {
+	ShTriVector out;
+	for(int t=0;t<tris.size();t++)
+		out.push_back(GetTriangle(t));
 	return out;
 }
 
