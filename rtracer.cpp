@@ -183,7 +183,7 @@ private:
 	double time,fps;
 };
 
-Sampler texSampler;
+SATSampler texSampler;
 
 int main(int argc, char **argv) {
 	printf("Unnamed raytracer v0.08 by nadult\n");
@@ -222,7 +222,7 @@ int main(int argc, char **argv) {
 	{
 		gfxlib::Texture tex;
 		Loader("data/1669.png") & tex;
-		texSampler=Sampler(tex);
+		texSampler=SATSampler(tex);
 	}
 
 	printf("Threads/cores: %d/%d\n\n",threads,4);

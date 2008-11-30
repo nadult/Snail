@@ -101,7 +101,7 @@ Result<packetSize> TraceLight(const AccStruct &tree,const Selector &inputSel,con
 	return out;
 }
 
-extern Sampler texSampler;
+extern SATSampler texSampler;
 
 template <class AccStruct,int flags,int packetSize,class Selector>
 Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flags> &rays,
@@ -145,6 +145,8 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 		Vec3f rayOrig[4],rayDir[4];
 		Convert(rays.Origin(q),rayOrig);
 		Convert(rays.Dir(q),rayDir);
+		Vec2q texCoord;
+		Vec2q differentials(0.0f,0.0f);
 
 		for(int k=0;k<4;k++) {
 			if(!((i32x4)imask)[k]) continue;
@@ -152,11 +154,16 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 
 			const ShTriangle &shTri=tree.GetShElement(obj,elem);
 
-			Vec3f bar=tree.Barycentric(rayOrig[k],rayDir[k],hit.Object(q)[k],element[k]);
+			Vec3q bar=tree.Barycentric(rays.Origin(q),rays.Dir(q),hit.Object(q)[k],element[k]);
 
-			Vec2f tex=shTri.uv[0]*bar.x+shTri.uv[1]*bar.y+shTri.uv[2]*bar.z;
-		//	tex=Vec2f(position[q].x[k],position[q].y[k]+position[q].z[k])*4.0f;
-			Vec3f nrm=shTri.nrm[0]*bar.x+shTri.nrm[1]*bar.y+shTri.nrm[2]*bar.z;
+			Vec2q tex=Vec2q(shTri.uv[0].x,shTri.uv[0].y)*bar.x+
+					  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+
+					  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.z;
+			Vec2f diff=SATSampler::ComputeDiff(tex);
+			differentials.x[k]=diff.x; differentials.y[k]=diff.y;
+
+			texCoord.x[k]=tex.x[k]; texCoord.y[k]=tex.y[k];
+			Vec3f nrm=shTri.nrm[0]*bar.x[k]+shTri.nrm[1]*bar.y[k]+shTri.nrm[2]*bar.z[k];
 			
 		/*	Vec3f normalMap=texNSampler(tex)*2.0f-Vec3f(1.0f,1.0f,1.0f);
 			nrm=Vec3f(
@@ -166,11 +173,14 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 			
 			normal[q].x[k]=nrm.x; normal[q].y[k]=nrm.y; normal[q].z[k]=nrm.z;
 			
-			Vec3f col=texSampler(tex);
-			result.color[q].x[k]=col.x; result.color[q].y[k]=col.y; result.color[q].z[k]=col.z;
+		//	Vec3f col=texSampler(tex);
+		//	result.color[q].x[k]=col.x; result.color[q].y[k]=col.y; result.color[q].z[k]=col.z;
 		}
 		
-		result.color[q]*=normal[q]|rays.Dir(q);
+		for(int i=0;i<1;i++) result.color[q]+=texSampler(texCoord,differentials);
+	//	result.color[q]*=floatq(1.0f/16.0f);
+
+	//	result.color[q]*=normal[q]|rays.Dir(q);
 	}
 
 	enum { lightsEnabled=0 };

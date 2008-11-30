@@ -34,6 +34,8 @@ Vec Reflect(const Vec &ray,const Vec &nrm) {
 
 inline float Maximize(const floatq &t) { return Max(Max(t[0],t[1]),Max(t[2],t[3])); }
 inline float Minimize(const floatq &t) { return Min(Min(t[0],t[1]),Min(t[2],t[3])); }
+inline Vec2p Maximize(const Vec2q &v) { return Vec2p(Maximize(v.x),Maximize(v.y)); }
+inline Vec2p Minimize(const Vec2q &v) { return Vec2p(Minimize(v.x),Minimize(v.y)); }
 inline Vec3p Maximize(const Vec3q &v) { return Vec3p(Maximize(v.x),Maximize(v.y),Maximize(v.z)); }
 inline Vec3p Minimize(const Vec3q &v) { return Vec3p(Minimize(v.x),Minimize(v.y),Minimize(v.z)); }
 
