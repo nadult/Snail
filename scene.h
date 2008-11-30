@@ -6,7 +6,6 @@
 #include "shading.h"
 #include "context.h"
 #include "formats/loader.h"
-#include "sampler.h"
 
 template <int size_>
 class Result {
@@ -101,7 +100,13 @@ Result<packetSize> TraceLight(const AccStruct &tree,const Selector &inputSel,con
 	return out;
 }
 
-extern SATSampler texSampler;
+#include "sampling/sat_sampler.h"
+#include "sampling/bilinear_sampler.h"
+#include "sampling/point_sampler.h"
+
+extern sampling::SATSampler satSampler;
+extern sampling::BilinearSampler bSampler;
+extern sampling::PointSampler pSampler;
 
 template <class AccStruct,int flags,int packetSize,class Selector>
 Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flags> &rays,
@@ -159,8 +164,11 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 			Vec2q tex=Vec2q(shTri.uv[0].x,shTri.uv[0].y)*bar.x+
 					  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+
 					  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.z;
-			Vec2f diff=SATSampler::ComputeDiff(tex);
-			differentials.x[k]=diff.x; differentials.y[k]=diff.y;
+
+			if(!gVals[4]) {
+				Vec2f diff=sampling::SATSampler::ComputeDiff(tex);
+				differentials.x[k]=diff.x; differentials.y[k]=diff.y;
+			}
 
 			texCoord.x[k]=tex.x[k]; texCoord.y[k]=tex.y[k];
 			Vec3f nrm=shTri.nrm[0]*bar.x[k]+shTri.nrm[1]*bar.y[k]+shTri.nrm[2]*bar.z[k];
@@ -172,15 +180,14 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 				normalMap.x*shTri.tangent.z+normalMap.y*shTri.binormal.z+normalMap.z*nrm.z ); */
 			
 			normal[q].x[k]=nrm.x; normal[q].y[k]=nrm.y; normal[q].z[k]=nrm.z;
-			
-		//	Vec3f col=texSampler(tex);
-		//	result.color[q].x[k]=col.x; result.color[q].y[k]=col.y; result.color[q].z[k]=col.z;
 		}
-		
-		for(int i=0;i<1;i++) result.color[q]+=texSampler(texCoord,differentials);
-	//	result.color[q]*=floatq(1.0f/16.0f);
 
-	//	result.color[q]*=normal[q]|rays.Dir(q);
+		if(gVals[5]) {
+			if(gVals[4]) for(int i=0;i<1;i++) result.color[q]+=pSampler(texCoord);
+			else 		 for(int i=0;i<1;i++) result.color[q]+=satSampler(texCoord,differentials);
+	//		result.color[q]*=floatq(1.0f/16.0f);
+		}
+		else result.color[q]=normal[q]|rays.Dir(q);
 	}
 
 	enum { lightsEnabled=0 };

@@ -7,7 +7,9 @@
 #include "font.h"
 
 #include "render.h"
-#include "sampler.h"
+#include "sampling/sat_sampler.h"
+#include "sampling/bilinear_sampler.h"
+#include "sampling/point_sampler.h"
 
 #include "bih/tree.h"
 #include "tree_box.h"
@@ -183,7 +185,9 @@ private:
 	double time,fps;
 };
 
-SATSampler texSampler;
+sampling::SATSampler satSampler;
+sampling::BilinearSampler bSampler;
+sampling::PointSampler pSampler;
 
 int main(int argc, char **argv) {
 	printf("Unnamed raytracer v0.08 by nadult\n");
@@ -221,8 +225,10 @@ int main(int argc, char **argv) {
 
 	{
 		gfxlib::Texture tex;
-		Loader("data/1669.png") & tex;
-		texSampler=SATSampler(tex);
+		Loader("data/ultra.dds") & tex;
+		satSampler=sampling::SATSampler(tex);
+		bSampler=sampling::BilinearSampler(tex);
+		pSampler=sampling::PointSampler(tex);
 	}
 
 	printf("Threads/cores: %d/%d\n\n",threads,4);
@@ -295,14 +301,13 @@ int main(int argc, char **argv) {
 		bool lightsAnim=0;
 		float speed; {
 			Vec3p size=baseScene.GetBBox().Size();
-			speed=(size.x+size.y+size.z)*0.005f;
+			speed=(size.x+size.y+size.z)*0.001f;
 		}
 
 		FrameCounter frmCounter;
 
 		while(out.PollEvents()) {
 			frmCounter.NextFrame();
-			gVals[5]++;
 
 			if(out.KeyUp(Key_esc)) break;
 			if(out.KeyDown('K')) img.SaveToFile("out/output.tga");
@@ -346,6 +351,7 @@ int main(int argc, char **argv) {
 			if(out.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
 			if(out.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
 			if(out.KeyDown(Key_f5)) { gVals[4]^=1; printf("Val 5 %s\n",gVals[4]?"on":"off"); }
+			if(out.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 6 %s\n",gVals[5]?"on":"off"); }
 
 
 			{

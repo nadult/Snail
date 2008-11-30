@@ -60,7 +60,8 @@ def Build( env, progName ):
 	baseObjects = BuildObjects( env, ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
 	formatsObjects = BuildObjects( env, ListCppFiles('formats/'), 'formats/')
 	bihObjects = BuildObjects( env, ListCppFiles('bih/'), 'bih/')
-	env.Program(progName, baseObjects+formatsObjects+bihObjects, LIBS=libs )
+	samplingObjects = BuildObjects( env, ListCppFiles('sampling/'), 'sampling/')
+	env.Program(progName, baseObjects+formatsObjects+bihObjects+samplingObjects, LIBS=libs )
 
 Build( release, 'rtracer' )
 Build( debug, 'rtracerd' )
