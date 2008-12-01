@@ -232,16 +232,20 @@ typedef vector<Triangle,AlignedAllocator<Triangle> > TriVector;
 
 class ShTriangle {
 public:
-	Vec2p uv[3];
-	Vec3p pos[3],nrm[3];
-	Vec3p normal,tangent,binormal;
+	Vec2f uv[3];
+	Vec3f nrm[3];
+	int dummy;
+
+//	Vec3p normal,tangent,binormal;
 
 	ShTriangle(const Vec3f &p1,const Vec3p &p2,const Vec3f &p3,const Vec2f &uv1,const Vec2f &uv2,const Vec2f &uv3,
 				const Vec3f &nrm1,const Vec3f &nrm2,const Vec3f &nrm3) {
+		Vec3p pos[3];
+
 		pos[0]=p1; pos[1]=p2; pos[2]=p3;
 		uv[0]=uv1; uv[1]=uv2; uv[2]=uv3;
 		nrm[0]=nrm1; nrm[1]=nrm2; nrm[2]=nrm3;
-		normal=(pos[1]-pos[0])^(pos[2]-pos[0]);
+/*		normal=(pos[1]-pos[0])^(pos[2]-pos[0]);
 		normal*=RSqrt(normal|normal);
 		
 		Vec3p side0=pos[0]-pos[1];
@@ -267,9 +271,11 @@ public:
 		if ((tangentCross|normal)<0.0f) {
 			tangent=-tangent;
 			binormal=-binormal;
-		}
+		} */
 	}
 };
+
+static_assert(sizeof(ShTriangle)==64,"sizeof(ShTriangle)!=64");
 
 typedef vector<ShTriangle,AlignedAllocator<ShTriangle> > ShTriVector;
 

@@ -125,7 +125,7 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 	RaySelector<size> selector=inputSelector;
 	Result<size> result;
 	Vec3q position[size];
-	Vec3q normal[size];
+	Vec3q normals[size];
 	Vec3q light[size];
 	result.stats=hit.Stats();
 
@@ -134,32 +134,39 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 		selector[q]=ForWhich(mask);
 		i32x4b imask(mask);
 
-		hit.Object(q)=Condition(imask,hit.Object(q),i32x4(0));
-		i32x4 element;
-		if(AccStruct::isctFlags&isct::fElement) {
-			hit.Element(q)=Condition(imask,hit.Element(q),i32x4(0));
-			element=hit.Element(q);
-		}
-		else element=i32x4(0);
+		i32x4 object=Condition(imask,hit.Object(q),i32x4(0));
+		i32x4 element=AccStruct::isctFlags&isct::fElement?Condition(imask,hit.Element(q),i32x4(0)):i32x4(0);
 		
 		result.color[q]=Vec3q(0.0f,0.0f,0.0f);
 		if(!selector[q]) continue;
 
 		position[q]=rays.Dir(q)*hit.Distance(q)+rays.Origin(q);
 
-		Vec3f rayOrig[4],rayDir[4];
-		Convert(rays.Origin(q),rayOrig);
-		Convert(rays.Dir(q),rayDir);
-		Vec2q texCoord;
-		Vec2q differentials(0.0f,0.0f);
+		Vec2q texCoord,differentials;
+		Vec3q normal;
 
-		for(int k=0;k<4;k++) {
+		int obj0=object[0],elem0=element[0];
+		if(i32x4(imask)[0]) {
+			const ShTriangle &shTri=tree.GetShElement(obj0,elem0);
+			Vec3q bar=tree.Barycentric(rays.Origin(q),rays.Dir(q),obj0,elem0);
+
+			texCoord= Vec2q(shTri.uv[0].x,shTri.uv[0].y)*bar.x+
+					  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+
+					  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.z;
+
+			if(!gVals[4]) Broadcast(sampling::SATSampler::ComputeDiff(texCoord),differentials);
+
+			normal=Vec3q(shTri.nrm[0])*bar.x+Vec3q(shTri.nrm[1])*bar.y+Vec3q(shTri.nrm[2])*bar.z;
+		}
+
+		for(int k=1;k<4;k++) {
 			if(!((i32x4)imask)[k]) continue;
-			int obj=hit.Object(q)[k],elem=element[k];
+			int obj=object[k],elem=element[k];
+			if(obj==obj0&&elem==elem0) continue;
 
 			const ShTriangle &shTri=tree.GetShElement(obj,elem);
 
-			Vec3q bar=tree.Barycentric(rays.Origin(q),rays.Dir(q),hit.Object(q)[k],element[k]);
+			Vec3q bar=tree.Barycentric(rays.Origin(q),rays.Dir(q),obj,elem);
 
 			Vec2q tex=Vec2q(shTri.uv[0].x,shTri.uv[0].y)*bar.x+
 					  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+
@@ -169,47 +176,41 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 				Vec2f diff=sampling::SATSampler::ComputeDiff(tex);
 				differentials.x[k]=diff.x; differentials.y[k]=diff.y;
 			}
-
 			texCoord.x[k]=tex.x[k]; texCoord.y[k]=tex.y[k];
 			Vec3f nrm=shTri.nrm[0]*bar.x[k]+shTri.nrm[1]*bar.y[k]+shTri.nrm[2]*bar.z[k];
 			
-		/*	Vec3f normalMap=texNSampler(tex)*2.0f-Vec3f(1.0f,1.0f,1.0f);
-			nrm=Vec3f(
-				normalMap.x*shTri.tangent.x+normalMap.y*shTri.binormal.x+normalMap.z*nrm.x,
-				normalMap.x*shTri.tangent.y+normalMap.y*shTri.binormal.y+normalMap.z*nrm.y,
-				normalMap.x*shTri.tangent.z+normalMap.y*shTri.binormal.z+normalMap.z*nrm.z ); */
-			
-			normal[q].x[k]=nrm.x; normal[q].y[k]=nrm.y; normal[q].z[k]=nrm.z;
+			normal.x[k]=nrm.x; normal.y[k]=nrm.y; normal.z[k]=nrm.z;
 		}
 
 		if(gVals[5]) {
-			if(gVals[4]) for(int i=0;i<1;i++) result.color[q]+=pSampler(texCoord);
-			else 		 for(int i=0;i<1;i++) result.color[q]+=satSampler(texCoord,differentials);
-	//		result.color[q]*=floatq(1.0f/16.0f);
+			if(gVals[4]) result.color[q]+=pSampler(texCoord);
+			else 		 result.color[q]+=satSampler(texCoord,differentials);
+			result.color[q]*=normal|rays.Dir(q);
 		}
-		else result.color[q]=normal[q]|rays.Dir(q);
+		else result.color[q]=normal|rays.Dir(q);
+		normals[q]=normal;
 	}
 
-	enum { lightsEnabled=0 };
+	enum { lightsEnabled=1 };
 
 	if(lightsEnabled) {
 		float pos=float(gVals[5])*0.01f;
 		Light lights[]={
-			Light(RotateY(pos)*Vec3f(0,1.5f,0),Vec3f(5,5,3)*0.5f),
-			Light(RotateY(pos*0.7f)*Vec3f(1,1.5f,0),Vec3f(1,5,2)*0.5f),
+			Light(RotateY(pos)*Vec3f(0,1.5f,0),Vec3f(5,5,3)*20.5f),
+		/*	Light(RotateY(pos*0.7f)*Vec3f(1,1.5f,0),Vec3f(1,5,2)*20.5f), */
 		/*	Light(Vec3f(0,1.5f,1),Vec3f(5,1,1)*0.5f),*/ };
 
 		for(int q=0;q<size;q++) light[q]=Vec3q(0.2f,0.2f,0.2f);
 
 		for(int n=0;n<sizeof(lights)/sizeof(Light);n++) {
-			Result<size> lightResult=TraceLight<size>(tree,selector,position,normal,lights[n],n);
+			Result<size> lightResult=TraceLight<size>(tree,selector,position,normals,lights[n],n);
 			for(int q=0;q<size;q++) light[q]+=lightResult.color[q];
 			result.stats+=lightResult.stats;
 		}
 	}
 
 	if(gVals[2]&&flags&isct::fPrimary) {
-		Result<size> refl=TraceReflection(tree,rays,selector,position,normal);
+		Result<size> refl=TraceReflection(tree,rays,selector,position,normals);
 		result.stats+=refl.stats;
 
 		for(int q=0;q<size;q++) {

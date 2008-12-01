@@ -179,7 +179,9 @@ namespace bih {
 			Isct<f32x4,packetSize,isctFlags|flags> out;	
 			bool split=1;
 
-			bool selectorsFiltered=packetSize<=16;
+			enum { reflected=!(flags&(isct::fPrimary|isct::fShadow)) };
+
+			bool selectorsFiltered=packetSize<=(reflected?4:16);
 			if(!Selector<packetSize>::full)
 				for(int n=0;n<packetSize/4;n++)
 					if(selector.Mask4(n)!=0x0f0f0f0f) {
@@ -187,7 +189,7 @@ namespace bih {
 						break;
 					}
 
-			if((Selector<packetSize>::full||selectorsFiltered)&&packetSize<=16) {
+			if((Selector<packetSize>::full||selectorsFiltered)&&packetSize<=(reflected?4:16)) {
 				const Vec3q &dir=rays.Dir(0);
 				bool signsFiltered=1;
 				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;

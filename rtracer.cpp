@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
 
 	{
 		gfxlib::Texture tex;
-		Loader("data/ultra.dds") & tex;
+		Loader("data/tex3.png") & tex;
 		satSampler=sampling::SATSampler(tex);
 		bSampler=sampling::BilinearSampler(tex);
 		pSampler=sampling::PointSampler(tex);
@@ -301,7 +301,7 @@ int main(int argc, char **argv) {
 		bool lightsAnim=0;
 		float speed; {
 			Vec3p size=baseScene.GetBBox().Size();
-			speed=(size.x+size.y+size.z)*0.001f;
+			speed=(size.x+size.y+size.z)*0.005f;
 		}
 
 		FrameCounter frmCounter;

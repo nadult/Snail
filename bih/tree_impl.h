@@ -77,9 +77,12 @@ namespace bih {
 	void Tree<Element,ShElement>::PrintInfo() const {
 		double nodeBytes=nodes.size()*sizeof(Node);
 		double objBytes=elements.size()*sizeof(Element);
+		double shBytes=shElements.size()*sizeof(ShElement);
+
 		printf("Elems:  %8d * %2d = %6.2fMB\n",elements.size(),sizeof(Element),objBytes*0.000001);
+		printf("ShElems:%8d * %2d = %6.2fMB\n",shElements.size(),sizeof(ShElement),shBytes*0.000001);
 		printf("Nodes: %8d * %2d = %6.2fMB\n",nodes.size(),sizeof(Node),nodeBytes*0.000001);
-		printf("~ %.0f bytes per triangle\n",(nodeBytes+objBytes)/double(elements.size()));
+		printf("~ %.0f bytes per triangle\n",(nodeBytes+objBytes+shBytes)/double(elements.size()));
 		printf("Levels: %d\n\n",maxLevel);
 	}
 

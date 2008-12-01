@@ -33,8 +33,7 @@ namespace sampling {
 		const u8 *data=(u8*)tex.DataPointer();
 		int pitch=tex.Pitch();
 
-		assert(x1<w&&y1<h);
-	//	x1&=wMask; y1&=hMask;
+		x1&=wMask; y1&=hMask; //in case of NANs etc
 		x2&=wMask; y2&=hMask;
 		x1*=3; x2*=3;
 		y1*=pitch; y2*=pitch;
@@ -60,9 +59,7 @@ namespace sampling {
 		const u8 *data=(u8*)tex.DataPointer();
 		int pitch=tex.Pitch();
 
-	//	x1&=i32x4(wMask); y1&=i32x4(hMask);
-		assert(ForAll(x1<i32x4(w)&&y1<i32x4(h)));
-
+		x1&=i32x4(wMask); y1&=i32x4(hMask); //in case of NANs etc
 		x2&=i32x4(wMask); y2&=i32x4(hMask);
 		x1=x1+x1+x1; x2=x2+x2+x2;
 

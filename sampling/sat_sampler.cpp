@@ -74,8 +74,8 @@ namespace sampling {
 		a*=Vec2f(w,h); b*=Vec2f(w,h);
 		uint ax=a.x,ay=a.y;
 		uint bx=b.x,by=b.y;
-		assert(ax<w&&bx<w);
-		assert(ay<h&&by<h);
+		ax&=wMask; ay&=hMask;
+		bx&=wMask; by&=hMask;
 
 		uint count;
 		Sample sum;
@@ -131,8 +131,8 @@ namespace sampling {
 
 		i32x4 ax(a.x),ay(a.y);
 		i32x4 bx(b.x),by(b.y);
-		assert(ForAll(ax<w&&bx<w));
-		assert(ForAll(ay<h&&by<h));
+		ax&=wMask; ay&=hMask;
+		bx&=wMask; by&=hMask;
 
 		f32x4 count;
 		Sample sum[4];

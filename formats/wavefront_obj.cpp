@@ -77,8 +77,8 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 	vector<BaseScene::IndexedTri> tris;
 
 	for(;;) {
-		char line[4000],type[100],a[100],b[100],c[100],d[100],e[100],f[100];
-		if(!is.getline(line,4000))
+		char line[2000],type[2000],a[2000],b[2000],c[2000],d[2000],e[2000],f[2000];
+		if(!is.getline(line,2000))
 			break;
 
 		sscanf(line,"%s",type);
@@ -107,14 +107,15 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 		}
 		else if(strcmp(type,"f")==0) {
 			char *p[3];
-			p[0]=strchr(line,' ')+1;
+			p[0]=strchr(line,' ')+1; while(p[0][0]==' ') p[0]++;
 			p[1]=strchr(p[0],' ')+1; p[1][-1]=0;
 			p[2]=strchr(p[1],' ')+1; p[2][-1]=0;
 
 			BaseScene::IndexedTri tri;
 			for(int k=0;k<3;k++) {
 				tri.v[k] = atoi(p[k]);
-				if(tri.v[k]<0) tri.v[k]=verts.size()+tri.v[k];
+
+				if(tri.v[k]<0) tri.v[k]=verts.size()+tri.v[k]+1;
 				tri.vt[k]=tri.vn[k]=0;
 				
 				char *puv=strchr(p[k],'/');
@@ -135,7 +136,7 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 				tri.vt[k]--;
 				tri.vn[k]--;
 				
-				if(tri.v[k]>=int(verts.size()))
+				if(tri.v[k]>=int(verts.size())||tri.v[k]<0)
 					ThrowException("Wrong vertex index: ",tri.v[k],"/",int(verts.size()));
 				if(tri.vt[k]>=int(uvs.size()))
 					ThrowException("Wrong tex-coord index: ",tri.vt[k],"/",int(uvs.size()));
