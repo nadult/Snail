@@ -10,6 +10,7 @@
 #include "sampling/sat_sampler.h"
 #include "sampling/bilinear_sampler.h"
 #include "sampling/point_sampler.h"
+#include "sampling/point_sampler16bit.h"
 
 #include "bih/tree.h"
 #include "tree_box.h"
@@ -188,6 +189,7 @@ private:
 sampling::SATSampler satSampler;
 sampling::BilinearSampler bSampler;
 sampling::PointSampler pSampler;
+sampling::PointSampler16bit pSampler16bit;
 
 int main(int argc, char **argv) {
 	printf("Unnamed raytracer v0.08 by nadult\n");
@@ -226,9 +228,17 @@ int main(int argc, char **argv) {
 	{
 		gfxlib::Texture tex;
 		Loader("data/tex3.png") & tex;
+		if(tex.Mips()==1) {
+			tex.ReallocMips(0);
+			tex.GenMips();
+		}
+
 		satSampler=sampling::SATSampler(tex);
 		bSampler=sampling::BilinearSampler(tex);
 		pSampler=sampling::PointSampler(tex);
+
+		Loader("data/tex316bit.dds")&tex;
+		pSampler16bit=sampling::PointSampler16bit(tex);
 	}
 
 	printf("Threads/cores: %d/%d\n\n",threads,4);
@@ -278,11 +288,11 @@ int main(int argc, char **argv) {
 	if(!camConfigs.GetConfig(string(modelFile),cam))
 		cam.pos=Center(tris);
 
-	uint quadLevels=2;
+	uint quadLevels=3;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
 	for(int n=0;n<10;n++) gVals[n]=1;
-	gVals[0]=0; gVals[2]=0;
+	gVals[0]=0; gVals[2]=0; gVals[4]=0;
 	
 	StaticTree staticTree(tris,shTris);
 	staticTree.PrintInfo();
@@ -329,6 +339,8 @@ int main(int argc, char **argv) {
 				if(out.Key('A')) cam.pos-=cam.right*tspeed;
 				if(out.Key('D')) cam.pos+=cam.right*tspeed;
 				if(out.Key('R')) cam.pos+=cam.up*tspeed;
+				if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
+				if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 				if(out.Key('F')) cam.pos-=cam.up*tspeed;
 			}
 
@@ -342,16 +354,21 @@ int main(int argc, char **argv) {
 			else {
 			//	if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
 			//	if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
-				if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
-		//		if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
+			//	if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
+				if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
+			//	if(out.KeyDown('4')) { printf("tracing 256x4\n"); quadLevels=4; }
 			}
 
 			if(out.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 1 %s\n",gVals[0]?"on":"off"); }
 			if(out.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
 			if(out.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
 			if(out.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
-			if(out.KeyDown(Key_f5)) { gVals[4]^=1; printf("Val 5 %s\n",gVals[4]?"on":"off"); }
-			if(out.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 6 %s\n",gVals[5]?"on":"off"); }
+
+			if(out.KeyDown(Key_f5)) { gVals[4]=0; printf("point sampling\n"); }
+			if(out.KeyDown(Key_f6)) { gVals[4]=1; printf("point sampling (16bit)\n"); }
+			if(out.KeyDown(Key_f7)) { gVals[4]=2; printf("point sampling with mips\n"); }
+			if(out.KeyDown(Key_f8)) { gVals[4]=3; printf("bilinear sampling\n"); }
+			if(out.KeyDown(Key_f9)) { gVals[4]=4; printf("SAT sampling\n"); }
 
 
 			{

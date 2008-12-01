@@ -10,14 +10,14 @@ namespace sampling {
 
 		w=tex.Width(); h=tex.Height();
 		wMask=w-1; hMask=h-1;
-		invW=1.0f/float(w); invH=1.0f/float(h);
 		wShift=1; while((1<<wShift)<w) wShift++;
 
 
 		const u8 *data=(u8*)tex.DataPointer();
 		int pitch=tex.Pitch();
 
-		vector<Sample,AlignedAllocator<Sample> > hSum(w*h),tsamples(w*h);
+		vector<Sample,AlignedAllocator<Sample> > hSum(w*h);
+		samples.resize(w*(h+1));
 
 		for(int y=0;y<h;y++) {
 			hSum[y*w]=Sample(data[2+y*pitch],data[1+y*pitch],data[0+y*pitch]);
@@ -27,49 +27,28 @@ namespace sampling {
 				hSum[x+y*w]=hSum[x-1+y*w]+Sample(src[2],src[1],src[0]);
 			}
 		}
+
+		for(int x=0;x<w;x++) samples[x]=Sample(0,0,0);
 		for(int x=0;x<w;x++) {
-			tsamples[x]=hSum[x];
+			samples[x+w]=hSum[x];
 			for(int y=1;y<h;y++)
-				tsamples[x+y*w]=tsamples[x+(y-1)*w]+hSum[x+y*w];
+				samples[x+(y+1)*w]=samples[x+y*w]+hSum[x+y*w];
 		}
 
-		samples=Store128bit(tsamples,w,h);
-
-		const Sample &last=samples(w-1,h-1);
+		const Sample &last=Get(w-1,h-1);
 		avg=Vec3f(last.R(),last.G(),last.B())*(1.0f/float(w*h*255));
-	}
-
-	SATSampler::Store128bit::Store128bit(const vector<Sample,AlignedAllocator<Sample> > &samples,uint tw,uint th) 
-	 :w(tw),h(th) {
-		data.resize(samples.size()+w);
-		for(int x=0;x<w;x++) data[x]=Sample(0,0,0);
-		for(int n=0;n<samples.size();n++) data[w+n]=samples[n];
-		ptr=&data[w];
-
-		wShift=1; while((1<<wShift)<w) wShift++;
 	}
 
 	INLINE SATSampler::Sample SATSampler::ComputeRect(uint ax,uint ay,uint bx,uint by) const {
 		Sample out;
-		out=samples(bx,by)-samples(bx,ay-1);
-		if(ax) out+=samples(ax-1,ay-1)-samples(ax-1,by);
+		out=Get(bx,by)-Get(bx,ay-1);
+		if(ax) out+=Get(ax-1,ay-1)-Get(ax-1,by);
 		return out;
 	}
 
 	Vec3f SATSampler::operator()(const Vec2f &uv,const Vec2f &size) const {
-		Vec2f shift=Vec2f(invW,invH);
-		Vec2f a=uv+(shift-size)*0.5f,b=uv+(shift+size)*0.5f;
-
-		if(b.x-a.x>=0.5f||b.y-a.y>=0.5f) return avg;
-
-		int fax=a.x,fay=a.y;
-		int fbx=b.x,fby=b.y;
-
-		a-=Vec2f(fax,fay);
-		b-=Vec2f(fbx,fby);
-
-		a.x=Condition(a.x<0.0f,a.x+1.0f,a.x); a.y=Condition(a.y<0.0f,a.y+1.0f,a.y);
-		b.x=Condition(b.x<0.0f,b.x+1.0f,b.x); b.y=Condition(b.y<0.0f,b.y+1.0f,b.y);
+		if(size.x>=0.5f||size.y>=0.5f) return avg;
+		Vec2f a=uv+size*0.5f,b=uv+size*0.5f;
 
 		a*=Vec2f(w,h); b*=Vec2f(w,h);
 		uint ax=a.x,ay=a.y;
@@ -105,29 +84,19 @@ namespace sampling {
 
 	INLINE void SATSampler::ComputeRect(i32x4 ax,i32x4 ay,i32x4 bx,i32x4 by,Sample out[4]) const {
 		for(int k=0;k<4;k++) {
-			out[k]=samples(bx[k],by[k])-samples(bx[k],ay[k]-1);
-			if(ax[k]) out[k]+=samples(ax[k]-1,ay[k]-1)-samples(ax[k]-1,by[k]);
+			out[k]=Get(bx[k],by[k])-Get(bx[k],ay[k]-1);
+			if(ax[k]) out[k]+=Get(ax[k]-1,ay[k]-1)-Get(ax[k]-1,by[k]);
 		}
 	}
 
 	Vec3q SATSampler::operator()(const Vec2q &uv,const Vec2q &diff) const {
-		Vec2q shift=Vec2q(invW,invH);
-		Vec2q a=uv+(shift-diff)*floatq(0.5f),b=uv+(shift+diff)*floatq(0.5f);
-
-		f32x4b fullMask=b.x-a.x>=0.5f||b.y-a.y>= 0.5f;
-
+		f32x4b fullMask=diff.x>=0.5f||diff.x>= 0.5f;
 		if(ForAll(fullMask)) return Vec3q(avg.x,avg.y,avg.z);
 
-		i32x4 fax(a.x),fay(a.y);
-		i32x4 fbx(b.x),fby(b.y);
-		a-=Vec2q(fax,fay);
-		b-=Vec2q(fbx,fby);
-
-		a.x=Condition(a.x<0.0f,a.x+1.0f,a.x); a.y=Condition(a.y<0.0f,a.y+1.0f,a.y);
-		b.x=Condition(b.x<0.0f,b.x+1.0f,b.x); b.y=Condition(b.y<0.0f,b.y+1.0f,b.y);
-
-		a*=Vec2q(float(w),float(h));
-		b*=Vec2q(float(w),float(h));
+		Vec2q tDiff=diff*floatq(0.5f);
+		Vec2q a=(uv-tDiff),b=(uv+tDiff);
+		a*=Vec2q(floatq(w),floatq(h));
+		b*=Vec2q(floatq(w),floatq(h));
 
 		i32x4 ax(a.x),ay(a.y);
 		i32x4 bx(b.x),by(b.y);

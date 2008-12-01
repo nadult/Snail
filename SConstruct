@@ -19,8 +19,7 @@ if int(ARGUMENTS.get('-m32',0)):
 	default=default.Clone( CXX='g++ -m32')
 
 release = default.Clone(
-	CXXFLAGS='-O3 -mtune=core2 -mssse3 -mfpmath=sse -fvariable-expansion-in-unroller -fprefetch-loop-arrays \
-				-funroll-all-loops -fpeel-loops -g -DNDEBUG -Wstrict-aliasing=2 -Wno-unused -Wno-conversion',
+	CXXFLAGS='-O3 -mtune=core2 -mssse3 -mfpmath=sse -g -DNDEBUG -Wstrict-aliasing=2 -Wno-unused -Wno-conversion',
 	BUILDDIR='build/release/'
 )
 debug = default.Clone(

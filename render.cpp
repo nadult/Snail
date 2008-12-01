@@ -156,8 +156,8 @@ TreeStats<1> Render(int quadLevels,const AccStruct &tree,const Camera &camera,Im
 	switch(quadLevels) {
 //	case 0: return Render<0>(tree,camera,image,options,tasks);
 //	case 1: return Render<1>(tree,camera,image,options,tasks);
-	case 2: return Render<2>(tree,camera,image,options,tasks);
-//	case 3: return Render<3>(tree,camera,image,options,tasks);
+//	case 2: return Render<2>(tree,camera,image,options,tasks);
+	case 3: return Render<3>(tree,camera,image,options,tasks);
 //	case 4: return Render<4>(tree,camera,image,options,tasks);
 	default: throw Exception("Quad level not supported.");
 	}

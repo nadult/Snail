@@ -103,10 +103,12 @@ Result<packetSize> TraceLight(const AccStruct &tree,const Selector &inputSel,con
 #include "sampling/sat_sampler.h"
 #include "sampling/bilinear_sampler.h"
 #include "sampling/point_sampler.h"
+#include "sampling/point_sampler16bit.h"
 
 extern sampling::SATSampler satSampler;
 extern sampling::BilinearSampler bSampler;
 extern sampling::PointSampler pSampler;
+extern sampling::PointSampler16bit pSampler16bit;
 
 template <class AccStruct,int flags,int packetSize,class Selector>
 Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flags> &rays,
@@ -145,6 +147,8 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 		Vec2q texCoord,differentials;
 		Vec3q normal;
 
+		bool diffsNeeded=gVals[4]==2||gVals[4]==4;
+
 		int obj0=object[0],elem0=element[0];
 		if(i32x4(imask)[0]) {
 			const ShTriangle &shTri=tree.GetShElement(obj0,elem0);
@@ -154,7 +158,8 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 					  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+
 					  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.z;
 
-			if(!gVals[4]) Broadcast(sampling::SATSampler::ComputeDiff(texCoord),differentials);
+			if(diffsNeeded)
+				Broadcast(sampling::SATSampler::ComputeDiff(texCoord),differentials);
 
 			normal=Vec3q(shTri.nrm[0])*bar.x+Vec3q(shTri.nrm[1])*bar.y+Vec3q(shTri.nrm[2])*bar.z;
 		}
@@ -172,7 +177,7 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 					  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+
 					  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.z;
 
-			if(!gVals[4]) {
+			if(diffsNeeded) {
 				Vec2f diff=sampling::SATSampler::ComputeDiff(tex);
 				differentials.x[k]=diff.x; differentials.y[k]=diff.y;
 			}
@@ -183,9 +188,14 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 		}
 
 		if(gVals[5]) {
-			if(gVals[4]) result.color[q]+=pSampler(texCoord);
-			else 		 result.color[q]+=satSampler(texCoord,differentials);
-			result.color[q]*=normal|rays.Dir(q);
+			 switch(gVals[4]) {
+				case 0: result.color[q]+=pSampler(texCoord); break;
+				case 1: result.color[q]+=pSampler16bit(texCoord); break;
+				case 2: result.color[q]+=pSampler(texCoord,differentials); break;
+				case 3: result.color[q]+=bSampler(texCoord); break;
+				case 4: result.color[q]+=satSampler(texCoord,differentials); break;
+			};
+			result.color[q]*=(normal|rays.Dir(q));
 		}
 		else result.color[q]=normal|rays.Dir(q);
 		normals[q]=normal;

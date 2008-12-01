@@ -35,21 +35,12 @@ namespace sampling {
 			INLINE Sample operator-(const Sample &s) const { return Sample(sum-s.sum); }
 		};
 
-		struct Store128bit {
-			vector<Sample,AlignedAllocator<Sample> > data;
-			Sample *ptr;
-			uint w,h,wShift;
-
-			Store128bit() { ptr=0; }
-			Store128bit(const vector<Sample,AlignedAllocator<Sample> > &samples,uint w,uint h);
-			INLINE const Sample &operator()(uint x,uint y) const { return data[w+x+(y<<wShift)]; }
-		};
+		INLINE const Sample &Get(uint x,uint y) const { return samples[w+x+(y<<wShift)]; }
 
 		Sample ComputeRect(uint ax,uint ay,uint bx,uint by) const;
 		void ComputeRect(i32x4 ax,i32x4 ay,i32x4 bx,i32x4 by,Sample out[4]) const;
 
-		Store128bit samples;
-		float invW,invH;
+		vector<Sample,AlignedAllocator<Sample> > samples;
 		uint w,h,wMask,hMask,wShift;
 		Vec3f avg;
 	};

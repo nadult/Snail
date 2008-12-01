@@ -1,15 +1,15 @@
-#ifndef RTRACER_SAMPLING_POINT_SAMPLER_H
-#define RTRACER_SAMPLING_POINT_SAMPLER_H
+#ifndef RTRACER_SAMPLING_POINT_SAMPLER_16BIT_H
+#define RTRACER_SAMPLING_POINT_SAMPLER_16BIT_H
 
 #include "rtbase.h"
 #include <gfxlib_texture.h>
 
 namespace sampling {
 
-	class PointSampler {
+	class PointSampler16bit {
 	public:
-		PointSampler(const gfxlib::Texture&);
-		PointSampler() { }
+		PointSampler16bit(const gfxlib::Texture&);
+		PointSampler16bit() { }
 
 	//	template<class Vec2>
 	//	Vec3<typename Vec2::TScalar> operator[](const Vec2 &uv) const {
@@ -21,8 +21,10 @@ namespace sampling {
 		Vec3q operator()(const Vec2q &uv,const Vec2q &diff) const;
 
 	protected:
+		void Init(const gfxlib::Texture&);
+
 		gfxlib::Texture tex;
-		uint wMask,hMask,mips,w,h,wShift;
+		uint wMask,hMask,mips,w,h,wShift,wShift1;
 		float hMul,wMul;
 	};
 

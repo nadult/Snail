@@ -13,18 +13,8 @@ namespace sampling {
 		wMul=tex.Width(); hMul=tex.Height();
 	}
 
-	template <class Int,class Vec2>
-	INLINE Vec2 ClampTexCoord(const Vec2 &coord) {
-		Vec2 uv=coord-Vec2(Int(coord.x),Int(coord.y));
-		uv.x=Condition(uv.x<0.0f,uv.x+1.0f,uv.x);
-		uv.y=Condition(uv.y<0.0f,uv.y+1.0f,uv.y);
-		return uv;
-	}
-
-	Vec3f BilinearSampler::operator()(const Vec2f &coord) const {
-		Vec2f uv=ClampTexCoord<int>(coord);
+	Vec3f BilinearSampler::operator()(const Vec2f &uv) const {
 		Vec2f pos=uv*Vec2f(wMul,hMul);
-
 		int x1(pos.x),y1(pos.y);
 		int x2=x1+1,y2=y1+1;
 
@@ -33,7 +23,7 @@ namespace sampling {
 		const u8 *data=(u8*)tex.DataPointer();
 		int pitch=tex.Pitch();
 
-		x1&=wMask; y1&=hMask; //in case of NANs etc
+		x1&=wMask; y1&=hMask;
 		x2&=wMask; y2&=hMask;
 		x1*=3; x2*=3;
 		y1*=pitch; y2*=pitch;
@@ -47,8 +37,7 @@ namespace sampling {
 		return Lerp(Lerp(c[0],c[1],dx),Lerp(c[2],c[3],dx),dy)*(1.0f/255.0f);
 	}
 
-	Vec3q BilinearSampler::operator()(const Vec2q &coord) const {
-		Vec2q uv=ClampTexCoord<i32x4>(coord);
+	Vec3q BilinearSampler::operator()(const Vec2q &uv) const {
 		Vec2q pos=uv*Vec2q(wMul,hMul);
 
 		i32x4 x1(pos.x),y1(pos.y);
@@ -59,7 +48,7 @@ namespace sampling {
 		const u8 *data=(u8*)tex.DataPointer();
 		int pitch=tex.Pitch();
 
-		x1&=i32x4(wMask); y1&=i32x4(hMask); //in case of NANs etc
+		x1&=i32x4(wMask); y1&=i32x4(hMask);
 		x2&=i32x4(wMask); y2&=i32x4(hMask);
 		x1=x1+x1+x1; x2=x2+x2+x2;
 
