@@ -7,9 +7,8 @@
 #include "font.h"
 
 #include "render.h"
-#include "sampling/sat_sampler.h"
-#include "sampling/bilinear_sampler.h"
 #include "sampling/point_sampler.h"
+#include "sampling/point_sampler_dxt.h"
 #include "sampling/point_sampler16bit.h"
 
 #include "bih/tree.h"
@@ -186,10 +185,8 @@ private:
 	double time,fps;
 };
 
-sampling::SATSampler satSampler;
-sampling::BilinearSampler bSampler;
 sampling::PointSampler pSampler;
-sampling::PointSampler16bit pSampler16bit;
+sampling::PointSamplerDXT dxtSampler;
 
 int main(int argc, char **argv) {
 	printf("Unnamed raytracer v0.08 by nadult\n");
@@ -228,17 +225,12 @@ int main(int argc, char **argv) {
 	{
 		gfxlib::Texture tex;
 		Loader("data/tex3.png") & tex;
-		if(tex.Mips()==1) {
-			tex.ReallocMips(0);
-			tex.GenMips();
-		}
+		if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
 
-		satSampler=sampling::SATSampler(tex);
-		bSampler=sampling::BilinearSampler(tex);
 		pSampler=sampling::PointSampler(tex);
-
-		Loader("data/tex316bit.dds")&tex;
-		pSampler16bit=sampling::PointSampler16bit(tex);
+		
+		Loader("data/tex3dxt1.dds")&tex;
+		dxtSampler=sampling::PointSamplerDXT(tex);
 	}
 
 	printf("Threads/cores: %d/%d\n\n",threads,4);
@@ -365,10 +357,11 @@ int main(int argc, char **argv) {
 			if(out.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
 
 			if(out.KeyDown(Key_f5)) { gVals[4]=0; printf("point sampling\n"); }
-			if(out.KeyDown(Key_f6)) { gVals[4]=1; printf("point sampling (16bit)\n"); }
+			if(out.KeyDown(Key_f6)) { gVals[4]=1; printf("point sampling (dxt)\n"); }
 			if(out.KeyDown(Key_f7)) { gVals[4]=2; printf("point sampling with mips\n"); }
-			if(out.KeyDown(Key_f8)) { gVals[4]=3; printf("bilinear sampling\n"); }
-			if(out.KeyDown(Key_f9)) { gVals[4]=4; printf("SAT sampling\n"); }
+			if(out.KeyDown(Key_f8)) { gVals[4]=3; printf("point sampling with mips (dxt)\n"); }
+
+			if(out.KeyDown(Key_f9)) { gVals[5]^=1; printf("Toggled texturing\n"); }
 
 
 			{

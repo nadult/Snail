@@ -100,15 +100,11 @@ Result<packetSize> TraceLight(const AccStruct &tree,const Selector &inputSel,con
 	return out;
 }
 
-#include "sampling/sat_sampler.h"
-#include "sampling/bilinear_sampler.h"
 #include "sampling/point_sampler.h"
-#include "sampling/point_sampler16bit.h"
+#include "sampling/point_sampler_dxt.h"
 
-extern sampling::SATSampler satSampler;
-extern sampling::BilinearSampler bSampler;
 extern sampling::PointSampler pSampler;
-extern sampling::PointSampler16bit pSampler16bit;
+extern sampling::PointSamplerDXT dxtSampler;
 
 template <class AccStruct,int flags,int packetSize,class Selector>
 Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flags> &rays,
@@ -147,7 +143,7 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 		Vec2q texCoord,differentials;
 		Vec3q normal;
 
-		bool diffsNeeded=gVals[4]==2||gVals[4]==4;
+		bool diffsNeeded=gVals[4]==2||gVals[4]==3;
 
 		int obj0=object[0],elem0=element[0];
 		if(i32x4(imask)[0]) {
@@ -159,7 +155,7 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 					  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.z;
 
 			if(diffsNeeded)
-				Broadcast(sampling::SATSampler::ComputeDiff(texCoord),differentials);
+				Broadcast(Maximize(texCoord)-Minimize(texCoord),differentials);
 
 			normal=Vec3q(shTri.nrm[0])*bar.x+Vec3q(shTri.nrm[1])*bar.y+Vec3q(shTri.nrm[2])*bar.z;
 		}
@@ -178,7 +174,7 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 					  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.z;
 
 			if(diffsNeeded) {
-				Vec2f diff=sampling::SATSampler::ComputeDiff(tex);
+				Vec2f diff=Maximize(tex)-Minimize(tex);
 				differentials.x[k]=diff.x; differentials.y[k]=diff.y;
 			}
 			texCoord.x[k]=tex.x[k]; texCoord.y[k]=tex.y[k];
@@ -189,13 +185,12 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 
 		if(gVals[5]) {
 			 switch(gVals[4]) {
-				case 0: result.color[q]+=pSampler(texCoord); break;
-				case 1: result.color[q]+=pSampler16bit(texCoord); break;
-				case 2: result.color[q]+=pSampler(texCoord,differentials); break;
-				case 3: result.color[q]+=bSampler(texCoord); break;
-				case 4: result.color[q]+=satSampler(texCoord,differentials); break;
+				case 0: /*for(int n=0;n<16;n++)*/ result.color[q]+=pSampler(texCoord); break;
+				case 1: /*for(int n=0;n<16;n++)*/ result.color[q]+=dxtSampler(texCoord); break;
+				case 2: /*for(int n=0;n<16;n++)*/ result.color[q]+=pSampler(texCoord,differentials); break;
+				case 3: /*for(int n=0;n<16;n++)*/ result.color[q]+=dxtSampler(texCoord,differentials); break;
 			};
-			result.color[q]*=(normal|rays.Dir(q));
+			result.color[q]*=floatq(1.0f/1.0f)*(normal|rays.Dir(q));
 		}
 		else result.color[q]=normal|rays.Dir(q);
 		normals[q]=normal;
