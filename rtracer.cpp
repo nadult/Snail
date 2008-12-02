@@ -188,6 +188,13 @@ private:
 sampling::PointSampler pSampler;
 sampling::PointSamplerDXT dxtSampler;
 
+template <class Dst,class Src>
+Dst BitCast(const Src &src) {
+	union { Dst d; Src s; } u;
+	u.s=src;
+	return u.d;
+}
+
 int main(int argc, char **argv) {
 	printf("Unnamed raytracer v0.08 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {

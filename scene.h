@@ -185,18 +185,18 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 
 		if(gVals[5]) {
 			 switch(gVals[4]) {
-				case 0: /*for(int n=0;n<16;n++)*/ result.color[q]+=pSampler(texCoord); break;
-				case 1: /*for(int n=0;n<16;n++)*/ result.color[q]+=dxtSampler(texCoord); break;
-				case 2: /*for(int n=0;n<16;n++)*/ result.color[q]+=pSampler(texCoord,differentials); break;
-				case 3: /*for(int n=0;n<16;n++)*/ result.color[q]+=dxtSampler(texCoord,differentials); break;
+				case 0: result.color[q]+=pSampler(texCoord); break;
+				case 1: result.color[q]+=dxtSampler(texCoord); break;
+				case 2: result.color[q]+=pSampler(texCoord,differentials); break;
+				case 3: result.color[q]+=dxtSampler(texCoord,differentials); break;
 			};
-			result.color[q]*=floatq(1.0f/1.0f)*(normal|rays.Dir(q));
+			result.color[q]*=(normal|rays.Dir(q));
 		}
 		else result.color[q]=normal|rays.Dir(q);
 		normals[q]=normal;
 	}
 
-	enum { lightsEnabled=1 };
+	enum { lightsEnabled=0 };
 
 	if(lightsEnabled) {
 		float pos=float(gVals[5])*0.01f;
