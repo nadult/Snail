@@ -102,9 +102,9 @@ Result<packetSize> TraceLight(const AccStruct &tree,const Selector &inputSel,con
 
 #include "sampling/point_sampler.h"
 #include "sampling/point_sampler_dxt.h"
+#include "material.h"
 
-extern sampling::PointSampler pSampler;
-extern sampling::PointSamplerDXT dxtSampler;
+extern shading::SimpleMaterial<sampling::PointSampler> material[8];
 
 template <class AccStruct,int flags,int packetSize,class Selector>
 Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flags> &rays,
@@ -115,55 +115,55 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 	typedef typename Vec3q::TBool boolean;
 	const floatq maxDist=100000.0f;
 
-//	for(int q=0;q<size;q++)
-//		InitializationShader(c,q,maxDist);
-
 	Isct<f32x4,size,AccStruct::isctFlags> hit=tree.TraversePacket(rays,inputSelector);
-
 	RaySelector<size> selector=inputSelector;
-	Result<size> result;
-	Vec3q position[size];
-	Vec3q normals[size];
-	Vec3q light[size];
-	result.stats=hit.Stats();
+
+	shading::Sample samples[size];
+
+	if(gVals[4]) { //no shading
+		Result<size> result;
+		result.stats=hit.Stats();
+		for(int q=0;q<size;q++)
+			result.color[q]=Vec3q((Condition(hit.Distance(q)>maxDist,0.0f,hit.Distance(q)))*0.03f,0.0f,0.0f);
+		return result;
+	}
 
 	for(int q=0;q<size;q++) {
+		shading::Sample &s=samples[q];
+
 		f32x4b mask=hit.Distance(q)<maxDist&&selector.SSEMask(q);
 		selector[q]=ForWhich(mask);
+		s.mask=mask;
+
 		i32x4b imask(mask);
+		int invBitMask=~ForWhich(imask);
 
 		i32x4 object=Condition(imask,hit.Object(q),i32x4(0));
 		i32x4 element=AccStruct::isctFlags&isct::fElement?Condition(imask,hit.Element(q),i32x4(0)):i32x4(0);
-		
-		result.color[q]=Vec3q(0.0f,0.0f,0.0f);
+
+		s.matId=Condition(imask,(object&7)+i32x4(1));
+		s.color=Vec3q(0.0f,0.0f,0.0f);
+
 		if(!selector[q]) continue;
 
-		position[q]=rays.Dir(q)*hit.Distance(q)+rays.Origin(q);
-
-		Vec2q texCoord,differentials;
-		Vec3q normal;
-
-		bool diffsNeeded=gVals[4]==2||gVals[4]==3;
+		s.position=rays.Dir(q)*hit.Distance(q)+rays.Origin(q);
 
 		int obj0=object[0],elem0=element[0];
 		if(i32x4(imask)[0]) {
 			const ShTriangle &shTri=tree.GetShElement(obj0,elem0);
 			Vec3q bar=tree.Barycentric(rays.Origin(q),rays.Dir(q),obj0,elem0);
 
-			texCoord= Vec2q(shTri.uv[0].x,shTri.uv[0].y)*bar.x+
-					  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+
-					  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.z;
+			s.texCoord=	Vec2q(shTri.uv[0].x,shTri.uv[0].y)*bar.x+
+						Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+
+						Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.z;
+			Broadcast(Maximize(s.texCoord)-Minimize(s.texCoord),s.texDiff);
 
-			if(diffsNeeded)
-				Broadcast(Maximize(texCoord)-Minimize(texCoord),differentials);
-
-			normal=Vec3q(shTri.nrm[0])*bar.x+Vec3q(shTri.nrm[1])*bar.y+Vec3q(shTri.nrm[2])*bar.z;
+			s.normal=Vec3q(shTri.nrm[0])*bar.x+Vec3q(shTri.nrm[1])*bar.y+Vec3q(shTri.nrm[2])*bar.z;
 		}
 
 		for(int k=1;k<4;k++) {
-			if(!((i32x4)imask)[k]) continue;
 			int obj=object[k],elem=element[k];
-			if(obj==obj0&&elem==elem0) continue;
+			if(invBitMask&(1<<k)||(obj==obj0&&elem==elem0)) continue;
 
 			const ShTriangle &shTri=tree.GetShElement(obj,elem);
 
@@ -173,37 +173,56 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 					  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+
 					  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.z;
 
-			if(diffsNeeded) {
-				Vec2f diff=Maximize(tex)-Minimize(tex);
-				differentials.x[k]=diff.x; differentials.y[k]=diff.y;
-			}
-			texCoord.x[k]=tex.x[k]; texCoord.y[k]=tex.y[k];
+			Vec2f diff=Maximize(tex)-Minimize(tex);
+			s.texDiff.x[k]=diff.x; s.texDiff.y[k]=diff.y;
+			s.texCoord.x[k]=tex.x[k]; s.texCoord.y[k]=tex.y[k];
 			Vec3f nrm=shTri.nrm[0]*bar.x[k]+shTri.nrm[1]*bar.y[k]+shTri.nrm[2]*bar.z[k];
 			
-			normal.x[k]=nrm.x; normal.y[k]=nrm.y; normal.z[k]=nrm.z;
+			s.normal.x[k]=nrm.x; s.normal.y[k]=nrm.y; s.normal.z[k]=nrm.z;
 		}
-
-		if(gVals[5]) {
-			 switch(gVals[4]) {
-				case 0: result.color[q]+=pSampler(texCoord); break;
-				case 1: result.color[q]+=dxtSampler(texCoord); break;
-				case 2: result.color[q]+=pSampler(texCoord,differentials); break;
-				case 3: result.color[q]+=dxtSampler(texCoord,differentials); break;
-			};
-			result.color[q]*=(normal|rays.Dir(q));
-		}
-		else result.color[q]=normal|rays.Dir(q);
-		normals[q]=normal;
 	}
 
-	enum { lightsEnabled=0 };
+	enum { matBlock=4 };
+	for(int b=0;b<size;b+=matBlock) {
+		const int endB=b+matBlock;
+
+		i32x4 matIds[matBlock]={i32x4(0),i32x4(0),i32x4(0),i32x4(0)};
+		uint matIdCount=0;
+
+		for(int q=b;q<endB;q++) {
+			int invBitMask=~ForWhich(samples[q].mask);
+			const i32x4 &matId=samples[q].matId;
+
+			for(int k=0;k<4;k++) {
+				if(invBitMask&(1<<k)) continue;
+
+				int id=matId[k];
+				i32x4 kMatId(id);
+				if(ForAll(matIds[0]!=kMatId&&matIds[1]!=kMatId&&matIds[2]!=kMatId&&matIds[3]!=kMatId)) {
+					matIds[matIdCount/4][matIdCount&3]=id;
+					matIdCount++;
+				}
+			}
+		}
+
+		for(int n=0;n<matIdCount;n++) {
+			uint id=matIds[n/4][n&3];
+			i32x4 id4(id);
+
+			const shading::SimpleMaterial<sampling::PointSampler> &mat=material[id-1];
+			mat.PreShade(samples,rays,b,matBlock);
+		}
+	}
+
+/*	enum { lightsEnabled=0 };
 
 	if(lightsEnabled) {
 		float pos=float(gVals[5])*0.01f;
 		Light lights[]={
 			Light(RotateY(pos)*Vec3f(0,1.5f,0),Vec3f(5,5,3)*20.5f),
-		/*	Light(RotateY(pos*0.7f)*Vec3f(1,1.5f,0),Vec3f(1,5,2)*20.5f), */
-		/*	Light(Vec3f(0,1.5f,1),Vec3f(5,1,1)*0.5f),*/ };
+		//	Light(RotateY(pos*0.7f)*Vec3f(1,1.5f,0),Vec3f(1,5,2)*20.5f),
+		//	Light(Vec3f(0,1.5f,1),Vec3f(5,1,1)*0.5f),
+					};
 
 		for(int q=0;q<size;q++) light[q]=Vec3q(0.2f,0.2f,0.2f);
 
@@ -212,9 +231,18 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 			for(int q=0;q<size;q++) light[q]+=lightResult.color[q];
 			result.stats+=lightResult.stats;
 		}
+	}*/
+	
+	Result<size> result;
+	result.stats=hit.Stats();
+	
+	for(int q=0;q<size;q++) {
+	//	material.PostShade(samples[q]);
+		result.color[q]=samples[q].color;
 	}
 
-	if(gVals[2]&&flags&isct::fPrimary) {
+
+/*	if(gVals[2]&&flags&isct::fPrimary) {
 		Result<size> refl=TraceReflection(tree,rays,selector,position,normals);
 		result.stats+=refl.stats;
 
@@ -223,17 +251,7 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 			result.color[q]=Condition(selector.SSEMask(q),
 					result.color[q]*(floatq(1.0f)-str)+refl.color[q]*str,result.color[q]);
 		}
-	}
-
-	if(lightsEnabled) for(int q=0;q<size;q++) {
-		result.color[q]=Condition(selector.SSEMask(q),result.color[q]*light[q]);
-	}
-	else for(int q=0;q<size;q++) {
-		result.color[q]=Condition(selector.SSEMask(q),result.color[q]);
-	}
-
-	if(!gVals[3]&&flags&isct::fPrimary)
-		Shade<size>(StatsShader<size>(result.stats),result.color);
+	}*/
 
 	return result;
 }

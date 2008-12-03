@@ -119,9 +119,12 @@ public:
 	int PrimaryBeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const;
 	int BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const;
 
+private:
 	void SetFlag1(uint value) { a.t0=UValue(value).f; }
-	void SetFlag2(uint value) { ba.t0=UValue(value).f; }
 	uint GetFlag1() const { return UValue(a.t0).i; }
+
+public:
+	void SetFlag2(uint value) { ba.t0=UValue(value).f; }
 	uint GetFlag2() const { return UValue(ba.t0).i; }
 
 private:
@@ -131,6 +134,11 @@ private:
 		nrm/=e1ce2Len;
 		ca.t0=e1ce2Len;
 		plane=Vec4p(nrm.x,nrm.y,nrm.z,nrm|a);
+
+		union { int flag; struct { short y,z; }; } u;
+		u.y=short(int(nrm.y*32765.0f));
+		u.z=short(int(nrm.z*32765.0f));
+		SetFlag1(u.flag);
 
 		EdgeNormals::ComputeEdgeNormals(this);
 	}
@@ -147,6 +155,7 @@ Isct<typename Vec::TScalar,1,isct::fDistance|flags> TTriangle<EN>::Collide(const
 	typedef typename Vec::TBool Bool;
 
 	Isct<typename Vec::TScalar,1,isct::fDistance|flags> out;
+
 
 	real det = rDir|Nrm();
 	VecO tvec = rOrig-VecO(a);
@@ -165,7 +174,15 @@ Isct<typename Vec::TScalar,1,isct::fDistance|flags> TTriangle<EN>::Collide(const
 template<template<class> class EN> template <int flags,int packetSize>
 Isct<f32x4,packetSize,isct::fDistance|flags> TTriangle<EN>::Collide(const RayGroup<packetSize,flags> &rays) const {
 	Isct<f32x4,packetSize,isct::fDistance|flags> out;
-	Vec3p nrm=Nrm();
+	Vec3p nrm;
+//	if(gVals[5]) {
+		union { int flag; struct { short y,z; }; } u; u.flag=GetFlag1();
+		nrm=Vec3p(plane.x,float(int(u.y))*(1.0f/32765.0f),float(int(u.z))*(1.0f/32765.0f));
+//		printf("err: %f %f\n",Abs(nrm.y-Nrm().y),Abs(nrm.z-Nrm().z));
+	//	printf("%f %f(%d) %f(%d) | %f %f %f\n",nrm.x,nrm.y,int(u.y),nrm.z,int(u.z),Nrm().x,Nrm().y,Nrm().z);
+	//	throw 0;
+//	}
+//	else nrm=Nrm();
 	Vec3q ta(a);
 
 	Vec3q sharedTVec;

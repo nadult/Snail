@@ -63,17 +63,6 @@ void RayDirectionShader(Context &c,uint i) {
 	c.color[i].z=Condition(dir.z<Const<floatq,0>(),Const<floatq,1,2>(),Const<floatq,1>());
 }
 
-template <class Vec,class real>
-Vec ShadeLight(const Vec &lightColor,const real &dot,const real &lightDist) {
-	Vec out;
-	real mul=Inv(lightDist*lightDist);
-//	real spec=dot*dot; spec=spec*spec;// spec*=spec; spec*=spec;
-	out = ( 
-			 lightColor*dot
-	//		+Vec3q(lightColor.x,0.0f,0.0f)*spec
-			)*mul;
-	return out;
-}
 
 template <int size>
 struct StatsShader {

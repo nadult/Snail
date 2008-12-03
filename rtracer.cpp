@@ -10,6 +10,7 @@
 #include "sampling/point_sampler.h"
 #include "sampling/point_sampler_dxt.h"
 #include "sampling/point_sampler16bit.h"
+#include "material.h"
 
 #include "bih/tree.h"
 #include "tree_box.h"
@@ -185,8 +186,7 @@ private:
 	double time,fps;
 };
 
-sampling::PointSampler pSampler;
-sampling::PointSamplerDXT dxtSampler;
+shading::SimpleMaterial<sampling::PointSampler> material[8];
 
 template <class Dst,class Src>
 Dst BitCast(const Src &src) {
@@ -230,14 +230,32 @@ int main(int argc, char **argv) {
 	}
 
 	{
+		using sampling::PointSampler;
 		gfxlib::Texture tex;
-		Loader("data/tex3.png") & tex;
-		if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
 
-		pSampler=sampling::PointSampler(tex);
+		Loader("data/1669.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
+		material[0]=shading::SimpleMaterial<PointSampler>(0,PointSampler(tex));
 		
-		Loader("data/tex3dxt1.dds")&tex;
-		dxtSampler=sampling::PointSamplerDXT(tex);
+		Loader("data/tex2.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
+		material[1]=shading::SimpleMaterial<PointSampler>(1,PointSampler(tex));
+		
+		Loader("data/tex3.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
+		material[2]=shading::SimpleMaterial<PointSampler>(2,PointSampler(tex));
+		
+		Loader("data/347.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
+		material[3]=shading::SimpleMaterial<PointSampler>(3,PointSampler(tex));
+
+		Loader("data/checkerboard.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
+		material[4]=shading::SimpleMaterial<PointSampler>(4,PointSampler(tex));
+		
+		Loader("data/checkerboard.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
+		material[5]=shading::SimpleMaterial<PointSampler>(5,PointSampler(tex));
+		
+		Loader("data/checkerboard.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
+		material[6]=shading::SimpleMaterial<PointSampler>(6,PointSampler(tex));
+		
+		Loader("data/checkerboard.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
+		material[7]=shading::SimpleMaterial<PointSampler>(7,PointSampler(tex));
 	}
 
 	printf("Threads/cores: %d/%d\n\n",threads,4);
@@ -362,13 +380,8 @@ int main(int argc, char **argv) {
 			if(out.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
 			if(out.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
 			if(out.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
-
-			if(out.KeyDown(Key_f5)) { gVals[4]=0; printf("point sampling\n"); }
-			if(out.KeyDown(Key_f6)) { gVals[4]=1; printf("point sampling (dxt)\n"); }
-			if(out.KeyDown(Key_f7)) { gVals[4]=2; printf("point sampling with mips\n"); }
-			if(out.KeyDown(Key_f8)) { gVals[4]=3; printf("point sampling with mips (dxt)\n"); }
-
-			if(out.KeyDown(Key_f9)) { gVals[5]^=1; printf("Toggled texturing\n"); }
+			if(out.KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
+			if(out.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"on":"off"); }
 
 
 			{
