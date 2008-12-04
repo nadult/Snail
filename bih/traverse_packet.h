@@ -18,10 +18,10 @@
 		//	stats.Skip();
 			f32x4b mask[packetSize];
 			
-			const Element &element=elements[rays.lastShadowTri];
+			const CElement &element=elements[rays.lastShadowTri];
 
 			//TODO: if all rays hit, lastShadowTri=idx
-			Isct<f32x4,packetSize,Element::isctFlags|flags>
+			Isct<f32x4,packetSize,CElement::isctFlags|flags>
 				tOut=element.Collide(rays);
 
 			for(int q=0;q<packetSize;q++) {
@@ -121,8 +121,8 @@
 					mailbox.Insert(idx);
 
 					stats.Intersection(packetSize);
-					const Element &element=elements[idx];
-					Isct<f32x4,packetSize,Element::isctFlags|flags> tOut=element.Collide(rays);
+					const CElement &element=elements[idx];
+					Isct<f32x4,packetSize,CElement::isctFlags|flags> tOut=element.Collide(rays);
 
 					i32x4b fullMask(i32x4(0xffffffff).m);
 					for(int q=0;q<packetSize;q++) {

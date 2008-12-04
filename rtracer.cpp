@@ -15,6 +15,7 @@
 #include "bih/tree.h"
 #include "tree_box.h"
 
+
 Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 	Matrix<Vec4f> mOut;
 	
@@ -110,8 +111,8 @@ void PrintHelp() {
 	printf("esc - exit\n\n");
 }
 
-typedef bih::Tree<Triangle,ShTriangle> StaticTree;
-typedef bih::Tree<TreeBox<StaticTree>,ShTriangle> FullTree;
+typedef bih::Tree<TriangleVector> StaticTree;
+typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
 
 class SceneBuilder {
 public:
@@ -144,7 +145,7 @@ public:
 
 	typedef TreeBox<StaticTree> Elem;
 
-	vector<Elem,AlignedAllocator<Elem> > ExtractElements() const {
+	TreeBoxVector<StaticTree> ExtractElements() const {
 		vector<Elem,AlignedAllocator<Elem> > elements;
 
 		for(int n=0;n<instances.size();n++) {
@@ -153,7 +154,7 @@ public:
 			elements.push_back(Elem(obj.tree,obj.preTrans*inst.trans,obj.bBox));
 		}
 
-		return elements;
+		return TreeBoxVector<StaticTree>(elements);
 	}
 	
 	vector<Object> objects;
@@ -196,7 +197,7 @@ Dst BitCast(const Src &src) {
 }
 
 int main(int argc, char **argv) {
-	printf("Unnamed raytracer v0.08 by nadult\n");
+	printf("Snail v0.1 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
 		PrintHelp();
 		return 0;
@@ -295,7 +296,8 @@ int main(int argc, char **argv) {
 	SceneBuilder builder;
 	for(int n=0;n<baseScene.objects.size();n++) {
 		const BaseScene::Object &obj=baseScene.objects[n];
-		builder.AddObject(new StaticTree(obj.ToTriVector(),obj.ToShTriVector()),obj.GetTrans(),obj.GetBBox());
+		builder.AddObject(new StaticTree(TriangleVector(obj.ToTriVector(),obj.ToShTriVector())),
+							obj.GetTrans(),obj.GetBBox());
 		builder.AddInstance(n,Identity<>());
 	}
 	printf("Done building\n");
@@ -311,7 +313,7 @@ int main(int argc, char **argv) {
 	for(int n=0;n<10;n++) gVals[n]=1;
 	gVals[0]=0; gVals[2]=0; gVals[4]=0;
 	
-	StaticTree staticTree(tris,shTris);
+	StaticTree staticTree(TriangleVector(tris,shTris));
 	staticTree.PrintInfo();
 
 	if(nonInteractive) {
@@ -381,7 +383,7 @@ int main(int argc, char **argv) {
 			if(out.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
 			if(out.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
 			if(out.KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
-			if(out.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"on":"off"); }
+			if(out.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"old":"new"); }
 
 
 			{

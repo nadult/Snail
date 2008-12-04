@@ -106,6 +106,7 @@ Result<packetSize> TraceLight(const AccStruct &tree,const Selector &inputSel,con
 
 extern shading::SimpleMaterial<sampling::PointSampler> material[8];
 
+
 template <class AccStruct,int flags,int packetSize,class Selector>
 Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flags> &rays,
 							const Selector &inputSelector) {
@@ -141,7 +142,7 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 		i32x4 object=Condition(imask,hit.Object(q),i32x4(0));
 		i32x4 element=AccStruct::isctFlags&isct::fElement?Condition(imask,hit.Element(q),i32x4(0)):i32x4(0);
 
-		s.matId=Condition(imask,(object&7)+i32x4(1));
+		s.matId=Condition(imask,((object+element)&7)+i32x4(1));
 		s.color=Vec3q(0.0f,0.0f,0.0f);
 
 		if(!selector[q]) continue;
@@ -150,7 +151,7 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 
 		int obj0=object[0],elem0=element[0];
 		if(i32x4(imask)[0]) {
-			const ShTriangle &shTri=tree.GetShElement(obj0,elem0);
+			const ShTriangle &shTri=tree.GetSElement(obj0,elem0);
 			Vec3q bar=tree.Barycentric(rays.Origin(q),rays.Dir(q),obj0,elem0);
 
 			s.texCoord=	Vec2q(shTri.uv[0].x,shTri.uv[0].y)*bar.x+
@@ -165,7 +166,7 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 			int obj=object[k],elem=element[k];
 			if(invBitMask&(1<<k)||(obj==obj0&&elem==elem0)) continue;
 
-			const ShTriangle &shTri=tree.GetShElement(obj,elem);
+			const ShTriangle &shTri=tree.GetSElement(obj,elem);
 
 			Vec3q bar=tree.Barycentric(rays.Origin(q),rays.Dir(q),obj,elem);
 

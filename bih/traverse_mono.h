@@ -40,7 +40,7 @@
 				idx&=Node::idxMask;
 				{
 					stats.Intersection();
-					Isct<float,1,Element::isctFlags|flags>
+					Isct<float,1,CElement::isctFlags|flags>
 						tOut=elements[idx].template Collide<flags>(rOrigin,tDir,out.Distance(0));
 
 					if(tOut.Distance(0)<out.Distance(0)) {

@@ -6,12 +6,12 @@
 #include "context.h"
 #include "triangle.h"
 
+	template <class BaseTree> class TreeBoxVector;
+
 	template <class BaseTree_>
 	class TreeBox {
 	public:
 		typedef BaseTree_ BaseTree;
-		typedef typename BaseTree::Element BaseElement;
-		typedef typename BaseTree::ShElement ShElement;
 
 		enum { isComplex=1 }; // contains hierarchy
 		enum { isctFlags=BaseTree::isctFlags|isct::fElement };
@@ -35,11 +35,6 @@
 
 			return tree->Barycentric(tOrig,tDir,subElementId,0);
 		}
-		const typename BaseTree::Element &GetElement(int elem) const {
-			return tree->GetElement(elem,0);
-		}
-
-		const ShElement &GetShElement(int id) const { return tree->GetShElement(id,0); }
 
 		Vec3f BoundMin() const { return bBox.min; }
 		Vec3f BoundMax() const { return bBox.max; }
@@ -92,9 +87,32 @@
 		}
 
 	private:
+		friend class TreeBoxVector<BaseTree>;
 		Matrix<Vec4f> trans,invTrans;
 		BBox bBox;
 		const BaseTree_ *tree;
+	};
+
+
+	template <class BaseTree_>
+	class TreeBoxVector {
+	public:
+		typedef BaseTree_ BaseTree;
+
+		typedef TreeBox<BaseTree> CElement;
+		typedef typename BaseTree::SElement SElement;
+
+		TreeBoxVector(const vector<CElement,AlignedAllocator<CElement> > &e) :elems(e) { }
+
+		INLINE const CElement &operator[](int elem) const { return elems[elem]; }
+		INLINE const CElement &GetCElement(int elem) const { return elems[elem]; }
+
+		INLINE const SElement &GetSElement(int elem,int subElem) const {
+			return elems[elem].tree->GetSElement(subElem,0);
+		}
+		size_t size() const { return elems.size(); }
+
+		vector<CElement,AlignedAllocator<CElement> > elems;
 	};
 
 

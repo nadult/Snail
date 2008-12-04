@@ -5,70 +5,116 @@
 #include "ray_group.h"
 #include "context.h"
 
-template <class Triangle>
-class FastEdgeNormals
+class TriAccel
 {
 public:
-	inline const Vec3p &Edge1Normal(const Triangle *base) const { return e1n; }
-	inline const Vec3p &Edge2Normal(const Triangle *base) const { return e2n; }
-	inline const Vec3p &Edge3Normal(const Triangle *base) const { return e3n; }
+	TriAccel() { }
+	TriAccel(const Vec3f &p0,const Vec3f &p1,const Vec3f &p2) {
+		Vec3f a=p0,b=p1,c=p2;
+		Vec3f nrm=(b-a)^(c-a);
 
-protected:
-	void ComputeEdgeNormals(Triangle *base) {
-		Vec3p nrm=base->Nrm();
-		e1n=nrm^base->Edge1();
-		e2n=nrm^base->Edge2();
-		e3n=nrm^base->Edge3();
-		e1n*=RSqrt(e1n|e1n);
-		e2n*=RSqrt(e2n|e2n);
-		e3n*=RSqrt(e3n|e3n);
+		float inv_nw;
+		bool sign=0;
+		{
+			float a[3]={Abs(nrm.x),Abs(nrm.y),Abs(nrm.z)};
+
+			iw=a[0]>a[1]?0:1;
+			iw=a[2]>a[iw]?2:iw;
+
+			if((&nrm.x)[iw]<0.0f) { Swap(b,c); nrm=-nrm; sign=1; }
+
+			inv_nw=1.0f/(&nrm.x)[iw];
+
+			if(iw==0) { iu=1; iv=2; }
+			else if(iw==1) { iu=0; iv=2; }
+			else { iu=0; iv=1; }
+
+			nu=(&nrm.x)[iu]*inv_nw;
+			nv=(&nrm.x)[iv]*inv_nw;
+		}
+		{
+			pu=(&a.x)[iu];
+			pv=(&a.x)[iv];
+			np=nu*pu+nv*pv+(&p0.x)[iw];
+		}
+		{
+			Vec3f edge0=b-a,edge1=c-a;
+			float sign=iw==1?-1.0f:1.0f;
+			float mul=sign*inv_nw;
+
+			e0u=(&edge0.x)[iu]*mul;
+			e0v=(&edge0.x)[iv]*mul;
+			e1u=(&edge1.x)[iu]*mul;
+			e1v=(&edge1.x)[iv]*mul;
+		}
+		flags=0;
+		flags|=sign?1:0;
 	}
 
-	Vec3p e1n,e2n,e3n;
-	Vec3p dummy;
+	template <int w,int tflags,int size>
+	Isct<f32x4,size,tflags|isct::fDistance> Collide(const RayGroup<size,tflags> &rays) const {
+		Isct<f32x4,size,tflags|isct::fDistance> out;
+
+		floatq tdett,ppu,ppv;
+		if(tflags&isct::fShOrig) {
+			Vec3q orig=rays.Origin(0);
+			tdett=np-((&orig.x)[iu][0]*nu+(&orig.x)[iv][0]*nv+(&orig.x)[w][0]);
+			ppu=floatq(pu)-(&orig.x)[iu];
+			ppv=floatq(pv)-(&orig.x)[iv];
+		}
+
+		bool sign=flags&1;
+		for(int q=0;q<size;q++) {
+			const Vec3q dir=rays.Dir(q);
+			const Vec3q origin=rays.Origin(q);
+
+			floatq dirW=w==0?dir.x:w==1?dir.y:dir.z,origW=w==0?origin.x:w==1?origin.y:origin.z;
+			floatq dirU=w==0?dir.y:w==1?dir.x:dir.x,origU=w==0?origin.y:w==1?origin.x:origin.x;
+			floatq dirV=w==0?dir.z:w==1?dir.z:dir.y,origV=w==0?origin.z:w==1?origin.z:origin.y;
+
+			floatq det=dirU*nu+dirV*nv+dirW;
+			floatq dett=tflags&isct::fShOrig?tdett:floatq(np)-(origU*nu+origV*nv+origW);
+			floatq dist=dett/det;
+
+			floatq Du=dirU*dett-det*(tflags&isct::fShOrig?ppu:floatq(pu)-origU);
+			floatq Dv=dirV*dett-det*(tflags&isct::fShOrig?ppv:floatq(pv)-origV);
+			floatq detu=Du*e1v-Dv*e1u;
+			floatq detv=Dv*e0u-Du*e0v;
+
+			floatq tmp=detu+detv;
+			f32x4b mask=sign?detu<=0.0f&&detv<=0.0f&&det<=tmp:detu>=0.0f&&detv>=0.0f&&det>=tmp;
+	
+			out.Distance(q)=Condition(mask&&dist>0.0f,dist,f32x4(1.0f/0.0f));
+		}
+
+		return out;
+	}
+
+//private:
+	float nu,nv;   // normal
+	float np,pu,pv;// vertex
+	float e0u,e0v; // edge 0
+	float e1u,e1v; // edge 1
+	char iw,iu,iv; // indices
+	char flags;	   // 1: sign
 };
 
-template <class Triangle>
-class SlowEdgeNormals
-{
-public:
-	inline Vec3p Edge1Normal(const Triangle *base) const { Vec3p tmp=base->Nrm()^base->Edge1(); return tmp*RSqrt(tmp|tmp); }
-	inline Vec3p Edge2Normal(const Triangle *base) const { Vec3p tmp=base->Nrm()^base->Edge2(); return tmp*RSqrt(tmp|tmp); }
-	inline Vec3p Edge3Normal(const Triangle *base) const { Vec3p tmp=base->Nrm()^base->Edge3(); return tmp*RSqrt(tmp|tmp); }
+extern TriAccel triAccelCache[128];
+extern const void *triAccelId[128];
 
-protected:
-	void ComputeEdgeNormals(Triangle *base) { }
-};
-
-template <template <class> class TEdgeNormals>
-class TTriangle: public TEdgeNormals < TTriangle <TEdgeNormals> >
+class Triangle
 {
 public:
 	enum { isctFlags=isct::fDistance };
-
-	typedef TTriangle BaseElement;
 	enum { isComplex=0 }; // doesn't contain any hierarchy of objects
-	typedef TEdgeNormals< TTriangle<TEdgeNormals> > EdgeNormals;
 
-	const TTriangle &GetElement(int) const { return *this; }
-
-	TTriangle(const Vec3f &ta,const Vec3f &tb,const Vec3f &tc) {
+	Triangle(const Vec3f &ta,const Vec3f &tb,const Vec3f &tc) {
 		Vec3p b,c;
 		Convert(ta,a); Convert(tb,b); Convert(tc,c);
 		ba=b-a; ca=c-a;
 		ComputeData();
 	}
-	template <template <class> class T1>
-	TTriangle(const TTriangle<T1> &other) {
-		a=other.P1(); Vec3p b=other.P2(),c=other.P3();
-		ba=b-a; ca=c-a;
-
-		SetFlag1(other.GetFlag1());
-		SetFlag2(other.GetFlag2());
-		ComputeData();
-	}
-	TTriangle() {
-	}
+	Triangle() { }
 
 	bool Test() const {
 		bool nan=isnan(a.x)||isnan(a.y)||isnan(a.z);
@@ -79,17 +125,17 @@ public:
 		return !nan;
 	}
 
-	inline Vec3p P1() const { return a; }
-	inline Vec3p P2() const { return ba+a; }
-	inline Vec3p P3() const { return ca+a; }
+	INLINE Vec3p P1() const { return a; }
+	INLINE Vec3p P2() const { return ba+a; }
+	INLINE Vec3p P3() const { return ca+a; }
 
-	inline Vec3p Edge1() const { return ba; }
-	inline Vec3p Edge2() const { return ca-ba; }
-	inline Vec3p Edge3() const { return -ca; }
+	INLINE Vec3p Edge1() const { return ba; }
+	INLINE Vec3p Edge2() const { return ca-ba; }
+	INLINE Vec3p Edge3() const { return -ca; }
 
-	inline Vec3p Edge1Normal() const { return EdgeNormals::Edge1Normal(this); }
-	inline Vec3p Edge2Normal() const { return EdgeNormals::Edge2Normal(this); }
-	inline Vec3p Edge3Normal() const { return EdgeNormals::Edge3Normal(this); }
+	inline Vec3p Edge1Normal() const { Vec3p tmp=Nrm()^Edge1(); return tmp*RSqrt(tmp|tmp); }
+	inline Vec3p Edge2Normal() const { Vec3p tmp=Nrm()^Edge2(); return tmp*RSqrt(tmp|tmp); }
+	inline Vec3p Edge3Normal() const { Vec3p tmp=Nrm()^Edge3(); return tmp*RSqrt(tmp|tmp); }
 
 	inline Vec3p Nrm() const { return Vec3p(plane); }
 	INLINE Vec3p Nrm(int) const { return Nrm(); }
@@ -134,55 +180,45 @@ private:
 		nrm/=e1ce2Len;
 		ca.t0=e1ce2Len;
 		plane=Vec4p(nrm.x,nrm.y,nrm.z,nrm|a);
-
-		union { int flag; struct { short y,z; }; } u;
-		u.y=short(int(nrm.y*32765.0f));
-		u.z=short(int(nrm.z*32765.0f));
-		SetFlag1(u.flag);
-
-		EdgeNormals::ComputeEdgeNormals(this);
 	}
 
-// BUT DONT EVEN THINK ABOUT MODIFYING IT :)
-public:
+private:
 	Vec3p a,ba,ca;
 	Vec4p plane;
 };
 
-template <template <class> class EN> template <int flags,class VecO,class Vec>
-Isct<typename Vec::TScalar,1,isct::fDistance|flags> TTriangle<EN>::Collide(const VecO &rOrig,const Vec &rDir) const {
+template <int flags,class VecO,class Vec>
+Isct<typename Vec::TScalar,1,isct::fDistance|flags> Triangle::Collide(const VecO &rOrig,const Vec &rDir) const {
 	typedef typename Vec::TScalar real;
 	typedef typename Vec::TBool Bool;
 
 	Isct<typename Vec::TScalar,1,isct::fDistance|flags> out;
 
+	Vec3f ba=P2()-P1();
+	Vec3f ca=P3()-P1();
+	Vec3f nrm=ba^ca;
+	float t0=Length(nrm);
+	nrm/=t0;
 
-	real det = rDir|Nrm();
+	real det = rDir|nrm;
 	VecO tvec = rOrig-VecO(a);
 	real u = rDir|(VecO(ba)^tvec);
 	real v = rDir|(tvec^VecO(ca));
-	Bool test=Min(u,v)>=0.0f&&u+v<=det*real(ca.t0);
+	Bool test=Min(u,v)>=0.0f&&u+v<=det*real(t0);
 
 //	if (ForAny(test)) {
-		real dist=-(tvec|Nrm())/det;
+		real dist=-(tvec|nrm)/det;
 		out.Distance()=Condition(test,dist,real(1.0f/0.0f));
 //	}
 
 	return out;
 }
 
-template<template<class> class EN> template <int flags,int packetSize>
-Isct<f32x4,packetSize,isct::fDistance|flags> TTriangle<EN>::Collide(const RayGroup<packetSize,flags> &rays) const {
+template <int flags,int packetSize>
+Isct<f32x4,packetSize,isct::fDistance|flags> Triangle::Collide(const RayGroup<packetSize,flags> &rays) const {
 	Isct<f32x4,packetSize,isct::fDistance|flags> out;
-	Vec3p nrm;
-//	if(gVals[5]) {
-		union { int flag; struct { short y,z; }; } u; u.flag=GetFlag1();
-		nrm=Vec3p(plane.x,float(int(u.y))*(1.0f/32765.0f),float(int(u.z))*(1.0f/32765.0f));
-//		printf("err: %f %f\n",Abs(nrm.y-Nrm().y),Abs(nrm.z-Nrm().z));
-	//	printf("%f %f(%d) %f(%d) | %f %f %f\n",nrm.x,nrm.y,int(u.y),nrm.z,int(u.z),Nrm().x,Nrm().y,Nrm().z);
-	//	throw 0;
-//	}
-//	else nrm=Nrm();
+/*	if(gVals[5]) {
+	Vec3p nrm=Nrm();
 	Vec3q ta(a);
 
 	Vec3q sharedTVec;
@@ -203,11 +239,28 @@ Isct<f32x4,packetSize,isct::fDistance|flags> TTriangle<EN>::Collide(const RayGro
 	//	}
 	}
 
+	} else {*/
+
+		/*
+		u32 cid=u64(this)&127;
+		TriAccel &accel=triAccelCache[cid];
+
+		if(triAccelId[cid]!=this) {
+			triAccelId[cid]=this;
+			accel=TriAccel(a,Vec3f(ba)+a,Vec3f(ca)+a);
+		}*/
+	
+		TriAccel accel(a,Vec3f(ba)+a,Vec3f(ca)+a);
+
+		out=accel.iw==0?accel.Collide<0>(rays):accel.iw==1?accel.Collide<1>(rays):accel.Collide<2>(rays);
+
+//	}
+
 	return out;
 }
 
-template <template <class> class EN> template <class VecO,class Vec>
-Vec3<typename Vec::TScalar> TTriangle<EN>::Barycentric(const VecO &rOrig,const Vec &rDir,int) const {
+template <class VecO,class Vec>
+Vec3<typename Vec::TScalar> Triangle::Barycentric(const VecO &rOrig,const Vec &rDir,int) const {
 	typedef typename Vec::TBool Bool;
 	Vec3<typename Vec::TScalar> out;
 
@@ -221,8 +274,8 @@ Vec3<typename Vec::TScalar> TTriangle<EN>::Barycentric(const VecO &rOrig,const V
 	return out;
 }
 
-template <template <class> class EN>
-int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const {
+/*
+int Triangle::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) const {
 	float dot=dir|Nrm();
 
 	float t=((orig-a)|Nrm());
@@ -240,9 +293,7 @@ int TTriangle<EN>::BeamCollide(const Vec3p &orig,const Vec3p &dir,float epsL) co
 	float min=Min(distA,Min(distB,distC));
 
 	return min<-epsilon?0:(min>epsilon?2:1);
-}
-
-typedef TTriangle<SlowEdgeNormals> Triangle;
+}*/
 
 typedef vector<Triangle,AlignedAllocator<Triangle> > TriVector;
 
@@ -295,6 +346,60 @@ public:
 static_assert(sizeof(ShTriangle)==64,"sizeof(ShTriangle)!=64");
 
 typedef vector<ShTriangle,AlignedAllocator<ShTriangle> > ShTriVector;
+
+class TriangleVector {
+public:
+	typedef Triangle CElement;
+	typedef ShTriangle SElement;
+
+	TriangleVector(const TriVector &tr,const ShTriVector &shTr) :tris(tr),shTris(shTr) { }
+
+	INLINE const CElement &operator[](int elem) const { return tris[elem]; }
+	INLINE const CElement &GetCElement(int elem) const { return tris[elem]; }
+	INLINE const SElement &GetSElement(int elem,int subElem) const { return shTris[elem]; }
+
+	size_t size() const { return tris.size(); }
+
+private:
+	TriVector tris;
+	ShTriVector shTris;
+};
+
+class TriangleIdx {
+public:
+	TriangleIdx(u16 a,u16 b,u16 c,u16 base,const Vec3f &normal) {
+		nrmX=normal.x;
+		nrmY=int(normal.y*32000.0f);
+		nrmZ=int(normal.z*32000.0f);
+	}
+
+	INLINE u32 Idx(int i) const {
+		return u32(idx[i])+u32(base<<16);
+	}
+
+	INLINE Vec3f Nrm() const {
+		Vec3f out;
+		float mul=1.0f/32000.0f;
+		out.x=nrmX;
+		out.y=float(nrmY)*mul;
+		out.z=float(nrmZ)*mul;
+		return out;
+	}
+
+private:
+	u16 idx[3];
+	u16 base;
+	float nrmX;
+	i16 nrmY,nrmZ;
+};
+
+static_assert(sizeof(TriangleIdx)==16,"sizeof(TriangleIdx)!=16");
+
+class ShTriCVector {
+public:
+	ShTriCVector() { }
+
+};
 
 #endif
 

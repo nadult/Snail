@@ -22,11 +22,8 @@ namespace bih {
 
 	}
 
-	template <class Element,class ShElement>
-	Tree<Element,ShElement>::Tree(const ElementContainer &objs,const ShElementContainer &shElems) {
-
-		elements.resize(objs.size());
-		shElements=shElems;
+	template <class ElementContainer>
+	Tree<ElementContainer>::Tree(const ElementContainer &objs) :elements(objs) {
 
 		if(!elements.size()) {
 			nodes.push_back(Node());
@@ -35,12 +32,6 @@ namespace bih {
 			nodes[0].val[0]=nodes[0].val[1]=0;
 			return;
 		}
-	/*	for(int n=0;n<objs.size();n++) {
-			elements[n]=objs[n];
-			Vec3p nrm=elements[n].Nrm();
-			elements[n].SetFlag2((nrm.x<0?1:0)+(nrm.y<0?1:0)+(nrm.z<0?1:0));
-		} */
-		std::copy(objs.begin(),objs.end(),elements.begin());
 
 		pMin=elements[0].BoundMin();
 		pMax=elements[0].BoundMax();
@@ -48,7 +39,7 @@ namespace bih {
 
 		Vec3p sumSize(0,0,0);
 		for(uint n=1;n<elements.size();n++) {
-			const Element &elem=elements[n];
+			const CElement &elem=elements[n];
 			Vec3p min=elem.BoundMin(),max=elem.BoundMax();
 			sumSize+=max-min;
 
@@ -64,7 +55,7 @@ namespace bih {
 		vector<Index> indices; indices.reserve(elements.size()*16);
 
 		for(int n=0;n<elements.size();n++) {
-			const Element &elem=elements[n];
+			const CElement &elem=elements[n];
 			indices.push_back(Index(n,elem.BoundMin(),elem.BoundMax(),1.0f));
 		}
 
@@ -73,23 +64,21 @@ namespace bih {
 		Build(indices,parents,0,pMin,pMax,0,1);
 	}
 
-	template <class Element,class ShElement>
-	void Tree<Element,ShElement>::PrintInfo() const {
+	template <class ElementContainer>
+	void Tree<ElementContainer>::PrintInfo() const {
 		double nodeBytes=nodes.size()*sizeof(Node);
-		double objBytes=elements.size()*sizeof(Element);
-		double shBytes=shElements.size()*sizeof(ShElement);
+		double objBytes=elements.size()*(sizeof(CElement)+sizeof(SElement));
 
-		printf("Elems:  %8d * %2d = %6.2fMB\n",elements.size(),sizeof(Element),objBytes*0.000001);
-		printf("ShElems:%8d * %2d = %6.2fMB\n",shElements.size(),sizeof(ShElement),shBytes*0.000001);
+		printf("Elems:  %8d * %2d = %6.2fMB\n",elements.size(),sizeof(CElement)+sizeof(SElement),objBytes*0.000001);
 		printf("Nodes: %8d * %2d = %6.2fMB\n",nodes.size(),sizeof(Node),nodeBytes*0.000001);
-		printf("~ %.0f bytes per triangle\n",(nodeBytes+objBytes+shBytes)/double(elements.size()));
+		printf("~ %.0f bytes per triangle\n",(nodeBytes+objBytes)/double(elements.size()));
 		printf("Levels: %d\n\n",maxLevel);
 	}
 
 	// Znajduje ojca z taka sama osia podzialu i ktory ma tylko
 	// jedno dziecko (ktore spelnia ten sam warunek)
-	template <class Element,class ShElement>
-	uint Tree<Element,ShElement>::FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const {
+	template <class ElementContainer>
+	uint Tree<ElementContainer>::FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const {
 		const Node &node=nodes[nNode];
 		if(node.ClipLeft()>(&pMin.x)[node.Axis()]-5.0f&&node.ClipRight()<(&pMax.x)[node.Axis()]+5.0f) return ~0;
 		if(axis==node.Axis()) return nNode;
@@ -97,8 +86,8 @@ namespace bih {
 		return FindSimilarParent(parents,parents[nNode],axis);
 	}
 
-	template <class Element,class ShElement>
-	void Tree<Element,ShElement>::Build(vector<Index> &indices,vector<u32> &parents,uint nNode,
+	template <class ElementContainer>
+	void Tree<ElementContainer>::Build(vector<Index> &indices,vector<u32> &parents,uint nNode,
 								const Vec3f &min,const Vec3f &max,uint level,bool sah) {
 		maxLevel=Max(maxLevel,level+1);
 		
@@ -116,7 +105,7 @@ namespace bih {
 			}
 		} */
 
-//		if(sizeof(Element)!=64) sah=0;
+//		if(sizeoi(CElement)!=64) sah=0;
 		/*{
 			float sSize; { Vec3p s=pMax-pMin; sSize=s.x*(s.y+s.z)+s.y*s.z; }
 			Vec3p size=max-min;
@@ -124,7 +113,7 @@ namespace bih {
 			float density=float(indices.size())/nodeSize;
 			nodes[nNode].density=density*0.5f;
 		}*/
-		if(level>Max(0,desiredMaxLevel-10)||sizeof(Element)!=64) sah=0;
+		if(level>Max(0,desiredMaxLevel-10)||sizeof(CElement)!=64) sah=0;
 
 		float split; int axis;
 		FindSplit(indices,min,max,axis,split);

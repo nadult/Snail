@@ -37,6 +37,9 @@ inline i32x4 ConvColor(const Vec3q &rgb) {
 	return _mm_unpacklo_epi16(c12,c33);
 }
 
+TriAccel triAccelCache[128];
+const void *triAccelId[128];
+
 template <class AccStruct,int QuadLevels>
 struct RenderTask {
 	RenderTask(const AccStruct *tr,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,
@@ -66,6 +69,8 @@ struct RenderTask {
 		uint pitch=out->width*3;
 		u8 *outPtr=(u8*)&out->buffer[startY*pitch+startX*3];
 		ShadowCache shadowCache;
+
+		for(int id=0;id<128;id++) triAccelId[id]=0;
 
 		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
@@ -114,8 +119,6 @@ struct RenderTask {
 							dst[ 6]=c[ 8]; dst[ 7]=c[ 9]; dst[ 8]=c[10];
 							dst[ 9]=c[12]; dst[10]=c[13]; dst[11]=c[14];
 
-							
-
 							dst+=12;
 						}
 						dst+=lineDiff;
@@ -123,6 +126,7 @@ struct RenderTask {
 				}
 			}
 		}
+
 	}
 };
 
@@ -163,8 +167,8 @@ TreeStats<1> Render(int quadLevels,const AccStruct &tree,const Camera &camera,Im
 	}
 }
 
-typedef bih::Tree<Triangle,ShTriangle> StaticTree;
-typedef bih::Tree<TreeBox<StaticTree>,ShTriangle> FullTree;
+typedef bih::Tree<TriangleVector> StaticTree;
+typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
 
 template TreeStats<1> Render<StaticTree>(int,const StaticTree&,const Camera&,Image&,const Options,uint);
 template TreeStats<1> Render<FullTree  >(int,const FullTree  &,const Camera&,Image&,const Options,uint);

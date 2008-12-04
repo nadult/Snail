@@ -150,7 +150,7 @@ namespace bih {
 		std::sort(out.begin(),out.end(),SortByIdx());
 	 }*/
 	 
-	void SplitIndices(const TriVector &tris,vector<Index> &inds,int axis,float pos,float maxSize) {
+	void SplitIndices(const TriangleVector &tris,vector<Index> &inds,int axis,float pos,float maxSize) {
 	//	if(inds.size()<=(maxSize>0.0f?16:64)) return;
 		if(inds.size()<=12) return;
 		maxSize*=2.25f;

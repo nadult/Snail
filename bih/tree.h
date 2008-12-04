@@ -6,6 +6,8 @@
 #include "context.h"
 #include "triangle.h"
 
+extern int idCache[128];
+
 namespace bih {
 
 	// Liscie nie sa przechowywane w drzewie
@@ -51,9 +53,9 @@ namespace bih {
 	void FindSplit(const vector<Index> &indices,const Vec3f &min,const Vec3f &max,int &outAxis,float &outSplit);
 	bool SAH(const vector<Index> &indices,const Vec3f &min,const Vec3f &max,int &outAxis,float &outSplit);
 	
-	template <class Element>
-	void SplitIndices(const vector<Element,AlignedAllocator<Element> > &elements,
-						vector<Index> &inds,int axis,float pos,float maxSize) {
+	template <class ElemContainer>
+	void SplitIndices(const ElemContainer &elements,vector<Index> &inds,int axis,float pos,float maxSize) {
+		typedef typename ElemContainer::CElement Element;
 	//	if(inds.size()<=(maxSize>0.0f?16:64)) return;
 		if(inds.size()<=2) return;
 		maxSize*=1.5f;
@@ -73,20 +75,18 @@ namespace bih {
 		}
 	}
 
-	void SplitIndices(const TriVector &tris,vector<Index> &inds,int axis,float pos,float maxSize);
+	void SplitIndices(const TriangleVector &tris,vector<Index> &inds,int axis,float pos,float maxSize);
 //	void OptimizeIndices(vector<Index> &indices);
 
-	template <class Element_,class ShElement_>
+	template <class ElementContainer_>
 	class Tree: public RefCounter {
 	public:
-		typedef Element_ Element;
-		typedef ShElement_ ShElement;
+		typedef ElementContainer_ ElementContainer;
+		typedef typename ElementContainer::CElement CElement;
+		typedef typename ElementContainer::SElement SElement;
 
-		typedef vector<Element,AlignedAllocator<Element> > ElementContainer;
-		typedef vector<ShElement,AlignedAllocator<ShElement> > ShElementContainer;
-
-		enum { elementIsComplex=Element::isComplex };
-		enum { isctFlags=Element::isctFlags|isct::fObject|isct::fStats };
+		enum { elementIsComplex=CElement::isComplex };
+		enum { isctFlags=CElement::isctFlags|isct::fObject|isct::fStats };
 		enum { filterSigns=1 };
 		enum { desiredMaxLevel=60 }; // Can be more, depends on the scene
 		
@@ -103,22 +103,12 @@ namespace bih {
 		Vec3q Barycentric(const Vec3q &orig,const Vec3q &dir,int elementId,int subElementId) const {
 			return elements[elementId].Barycentric(orig,dir,subElementId);
 		}
-		const typename Element::BaseElement &GetElement(int elem,int subElem) const {
-			return elements[elem].GetElement(subElem);
+
+		const SElement &GetSElement(int elem,int subElem) const {
+			return elements.GetSElement(elem,subElem);
 		}
 
-	private:
-		struct GetShSimple  { INLINE static const ShElement &Get(const Tree *ptr,int elem,int subElem)
-			{ return ptr->shElements[elem]; } };
-		struct GetShComplex { INLINE static const ShElement &Get(const Tree *ptr,int elem,int subElem)
-			{ return ptr->elements[elem].GetShElement(subElem); } };
-
-	public:
-		const ShElement &GetShElement(int elem,int subElem) const {
-			return TSwitch<GetShComplex,GetShSimple,elementIsComplex>::Result::Get(this,elem,subElem);
-		}
-
-		Tree(const ElementContainer &elements,const ShElementContainer &shElements=ShElementContainer());
+		Tree(const ElementContainer &elements);
 
 		void PrintInfo() const;
 		uint FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const;
@@ -246,7 +236,6 @@ namespace bih {
 		Vec3f pMin,pMax;
 		vector<Node> nodes;
 		ElementContainer elements;
-		ShElementContainer shElements;
 
 		int objectId,maxLevel;
 		float maxDensity;
