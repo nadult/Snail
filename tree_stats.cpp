@@ -15,9 +15,8 @@
 			for(int n=0;n<width;n++) {
 				int color=data[n];
 				int r=Clamp(color/255,0,255),g=Clamp(color,0,255),b=0;
-				img.Pixel(n,0,r,g,b);
-				img.Pixel(n,1,r,g,b);
-				img.Pixel(n,2,r,g,b);
+				img.Pixel(n,0,r,g,b); img.Pixel(n,1,r,g,b); img.Pixel(n,2,r,g,b);
+				img.Pixel(n,img.height-1-0,r,g,b); img.Pixel(n,img.height-1-1,r,g,b); img.Pixel(n,img.height-1-2,r,g,b);
 			}
 		}
 	}

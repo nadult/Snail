@@ -6,7 +6,6 @@
 #include "context.h"
 #include "triangle.h"
 
-extern int idCache[128];
 
 namespace bih {
 
@@ -92,21 +91,14 @@ namespace bih {
 		
 		Tree() { }
 
+
 		BBox GetBBox() const { return BBox(pMin,pMax); }
 
 		Vec3f FlatNormals(u32 elementId,u32 subElementId) const {
 			return elements[elementId].Nrm(subElementId);
 		}
-		Vec3f Barycentric(const Vec3f &orig,const Vec3f &dir,int elementId,int subElementId) const {
-			return elements[elementId].Barycentric(orig,dir,subElementId);
-		}
-		Vec3q Barycentric(const Vec3q &orig,const Vec3q &dir,int elementId,int subElementId) const {
-			return elements[elementId].Barycentric(orig,dir,subElementId);
-		}
 
-		const SElement &GetSElement(int elem,int subElem) const {
-			return elements.GetSElement(elem,subElem);
-		}
+		const SElement GetSElement(int elem,int subElem) const { return elements.GetSElement(elem,subElem); }
 
 		Tree(const ElementContainer &elements);
 

@@ -62,3 +62,4 @@ void Image::Pixel(int x,int y,char r,char g,char b) {
 	char *p=&buffer[(x+y*width)*3];
 	p[0]=r; p[1]=g; p[2]=b;
 }
+

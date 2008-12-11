@@ -23,18 +23,6 @@
 		Vec3f Nrm(int subElementId) const {
 			return trans&tree->FlatNormals(subElementId,0);
 		}
-		Vec3f Barycentric(const Vec3f &orig,const Vec3f &dir,int subElementId) const {
-			const Vec3f tDir=invTrans&dir;
-			const Vec3f tOrig=invTrans*orig;
-
-			return tree->Barycentric(tOrig,tDir,subElementId,0);
-		}
-		Vec3q Barycentric(const Vec3q &orig,const Vec3q &dir,int subElementId) const {
-			const Vec3q tDir=invTrans&dir;
-			const Vec3q tOrig=invTrans*orig;
-
-			return tree->Barycentric(tOrig,tDir,subElementId,0);
-		}
 
 		Vec3f BoundMin() const { return bBox.min; }
 		Vec3f BoundMax() const { return bBox.max; }
@@ -107,10 +95,13 @@
 		INLINE const CElement &operator[](int elem) const { return elems[elem]; }
 		INLINE const CElement &GetCElement(int elem) const { return elems[elem]; }
 
-		INLINE const SElement &GetSElement(int elem,int subElem) const {
+		INLINE const SElement GetSElement(int elem,int subElem) const {
 			return elems[elem].tree->GetSElement(subElem,0);
 		}
 		size_t size() const { return elems.size(); }
+
+		Vec3f BoundMin(int n) const { return elems[n].BoundMin(); }
+		Vec3f BoundMax(int n) const { return elems[n].BoundMax(); }
 
 		vector<CElement,AlignedAllocator<CElement> > elems;
 	};

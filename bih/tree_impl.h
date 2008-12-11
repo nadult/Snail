@@ -33,14 +33,13 @@ namespace bih {
 			return;
 		}
 
-		pMin=elements[0].BoundMin();
-		pMax=elements[0].BoundMax();
+		pMin=elements.BoundMin(0);
+		pMax=elements.BoundMax(0);
 		maxLevel=0;
 
 		Vec3p sumSize(0,0,0);
 		for(uint n=1;n<elements.size();n++) {
-			const CElement &elem=elements[n];
-			Vec3p min=elem.BoundMin(),max=elem.BoundMax();
+			Vec3p min=elements.BoundMin(n),max=elements.BoundMax(n);
 			sumSize+=max-min;
 
 			pMin=VMin(pMin,min);
@@ -54,10 +53,8 @@ namespace bih {
 	//	printf("."); fflush(stdout);
 		vector<Index> indices; indices.reserve(elements.size()*16);
 
-		for(int n=0;n<elements.size();n++) {
-			const CElement &elem=elements[n];
-			indices.push_back(Index(n,elem.BoundMin(),elem.BoundMax(),1.0f));
-		}
+		for(int n=0;n<elements.size();n++)
+			indices.push_back(Index(n,elements.BoundMin(n),elements.BoundMax(n),1.0f));
 
 		vector<u32> parents; parents.push_back(0);
 
@@ -67,11 +64,11 @@ namespace bih {
 	template <class ElementContainer>
 	void Tree<ElementContainer>::PrintInfo() const {
 		double nodeBytes=nodes.size()*sizeof(Node);
-		double objBytes=elements.size()*(sizeof(CElement)+sizeof(SElement));
+		double objBytes=elements.mem_size();
 
-		printf("Elems:  %8d * %2d = %6.2fMB\n",elements.size(),sizeof(CElement)+sizeof(SElement),objBytes*0.000001);
+		printf("Elems:  %6.2fMB\n",objBytes*0.000001);
 		printf("Nodes: %8d * %2d = %6.2fMB\n",nodes.size(),sizeof(Node),nodeBytes*0.000001);
-		printf("~ %.0f bytes per triangle\n",(nodeBytes+objBytes)/double(elements.size()));
+		printf("~ %.0f bytes per triangle\n",double(nodeBytes+objBytes)/double(elements.size()));
 		printf("Levels: %d\n\n",maxLevel);
 	}
 

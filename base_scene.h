@@ -11,6 +11,7 @@ public:
 	void LoadWavefrontObj(const string &fileName);
 	void SaveWavefrontObj(const string &fileName) const;
 	
+	TriangleVector ToTriangleVector() const;
 	TriVector ToTriVector() const;
 	ShTriVector ToShTriVector() const;
 
@@ -50,6 +51,7 @@ public:
 
 		Triangle GetTriangle(uint n) const;
 
+		TriangleVector ToTriangleVector() const;
 		TriVector ToTriVector() const;
 		ShTriVector ToShTriVector() const;
 

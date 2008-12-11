@@ -37,9 +37,6 @@ inline i32x4 ConvColor(const Vec3q &rgb) {
 	return _mm_unpacklo_epi16(c12,c33);
 }
 
-TriAccel triAccelCache[128];
-const void *triAccelId[128];
-
 template <class AccStruct,int QuadLevels>
 struct RenderTask {
 	RenderTask(const AccStruct *tr,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,
@@ -68,9 +65,8 @@ struct RenderTask {
 
 		uint pitch=out->width*3;
 		u8 *outPtr=(u8*)&out->buffer[startY*pitch+startX*3];
-		ShadowCache shadowCache;
 
-		for(int id=0;id<128;id++) triAccelId[id]=0;
+		Cache cache;
 
 		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
@@ -86,7 +82,7 @@ struct RenderTask {
 				}
 
 				RayGroup<NQuads,isct::fShOrig|isct::fInvDir|isct::fPrimary> rays(origin,dir);
-				Result<NQuads> result=RayTrace(*tree,rays,FullSelector<NQuads>());
+				Result<NQuads> result=RayTrace(*tree,rays,FullSelector<NQuads>(),cache);
 				Vec3q *rgb=result.color;
 				*outStats += result.stats;
 

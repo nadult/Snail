@@ -15,33 +15,6 @@ public:
 	TreeStats<1> stats;
 };
 
-template <class Container,class integer,class Vec>
-Vec GouraudNormals(const Container &objects,const ShadingDataVec &shadingData,const integer &objId,const Vec &rayOrig,const Vec &rayDir)  {
-	typedef typename Vec::TScalar real;
-	typedef typename Container::value_type Element;
-
-	const Element *obj0=&objects[objId[0]];
-	Vec nrm; {
-		real u,v; obj0->Barycentric(rayOrig,rayDir,u,v);
-		const ShadingData &data=shadingData[objId[0]];
-		nrm=Vec(data.nrm[0])*(real(1.0f)-u-v)+Vec(data.nrm[2])*u+Vec(data.nrm[1])*v;
-	}
-
-	if(ForAny(integer(objId[0])!=objId)) for(int n=1;n<ScalarInfo<real>::multiplicity;n++) {
-		const Element *objN=&objects[objId[n]];
-		if(objN!=obj0) {
-			Vec newNrm; {
-				real u,v; objN->Barycentric(rayOrig,rayDir,u,v);
-				const ShadingData &data=shadingData[objId[n]];
-				newNrm=Vec(data.nrm[0])*(real(1.0f)-u-v)+Vec(data.nrm[2])*u+Vec(data.nrm[1])*v;
-			}
-			nrm=Condition(ScalarInfo<real>::ElementMask(n),newNrm,nrm);
-		}
-	}
-
-	return nrm;
-}
-
 template <int packetSize,class AccStruct,class Selector>
 Result<packetSize> TraceLight(const AccStruct &tree,const Selector &inputSel,const Vec3q *position,
 								const Vec3q *normal,const Light &light,int idx) {
@@ -106,10 +79,9 @@ Result<packetSize> TraceLight(const AccStruct &tree,const Selector &inputSel,con
 
 extern shading::SimpleMaterial<sampling::PointSampler> material[8];
 
-
 template <class AccStruct,int flags,int packetSize,class Selector>
 Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flags> &rays,
-							const Selector &inputSelector) {
+							const Selector &inputSelector,Cache &cache) {
 	enum { primary=0, size=Selector::size };
 	
 	typedef typename Vec3q::TScalar real;
@@ -129,6 +101,8 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 		return result;
 	}
 
+	TCache<ShTriangle,64> &shTriCache=cache.shTriCache;
+
 	for(int q=0;q<size;q++) {
 		shading::Sample &s=samples[q];
 
@@ -142,7 +116,7 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 		i32x4 object=Condition(imask,hit.Object(q),i32x4(0));
 		i32x4 element=AccStruct::isctFlags&isct::fElement?Condition(imask,hit.Element(q),i32x4(0)):i32x4(0);
 
-		s.matId=Condition(imask,((object+element)&7)+i32x4(1));
+		s.matId=Condition(imask,3);//((object+element)&7)+i32x4(1));
 		s.color=Vec3q(0.0f,0.0f,0.0f);
 
 		if(!selector[q]) continue;
@@ -151,8 +125,14 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 
 		int obj0=object[0],elem0=element[0];
 		if(i32x4(imask)[0]) {
-			const ShTriangle &shTri=tree.GetSElement(obj0,elem0);
-			Vec3q bar=tree.Barycentric(rays.Origin(q),rays.Dir(q),obj0,elem0);
+			uint hash=shTriCache.Hash(obj0,elem0);
+			ShTriangle &shTri=shTriCache[hash];
+			if(__builtin_expect(!shTriCache.SameId(hash,obj0,elem0),0)) {
+				shTri=tree.GetSElement(obj0,elem0);
+				shTriCache.SetId(hash,obj0,elem0);
+			}
+
+			Vec3q bar=shTri.Barycentric(rays.Origin(q),rays.Dir(q),hit.Distance(q));
 
 			s.texCoord=	Vec2q(shTri.uv[0].x,shTri.uv[0].y)*bar.x+
 						Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+
@@ -166,9 +146,14 @@ Result<packetSize> RayTrace(const AccStruct &tree,const RayGroup<packetSize,flag
 			int obj=object[k],elem=element[k];
 			if(invBitMask&(1<<k)||(obj==obj0&&elem==elem0)) continue;
 
-			const ShTriangle &shTri=tree.GetSElement(obj,elem);
+			uint hash=shTriCache.Hash(obj,elem);
+			ShTriangle &shTri=shTriCache[hash];
+			if(__builtin_expect(!shTriCache.SameId(hash,obj,elem),0)) {
+				shTri=tree.GetSElement(obj,elem);
+				shTriCache.SetId(hash,obj,elem);
+			}
 
-			Vec3q bar=tree.Barycentric(rays.Origin(q),rays.Dir(q),obj,elem);
+			Vec3q bar=shTri.Barycentric(rays.Origin(q),rays.Dir(q),hit.Distance(q));
 
 			Vec2q tex=Vec2q(shTri.uv[0].x,shTri.uv[0].y)*bar.x+
 					  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.y+

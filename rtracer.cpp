@@ -15,7 +15,6 @@
 #include "bih/tree.h"
 #include "tree_box.h"
 
-
 Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 	Matrix<Vec4f> mOut;
 	
@@ -296,7 +295,7 @@ int main(int argc, char **argv) {
 	SceneBuilder builder;
 	for(int n=0;n<baseScene.objects.size();n++) {
 		const BaseScene::Object &obj=baseScene.objects[n];
-		builder.AddObject(new StaticTree(TriangleVector(obj.ToTriVector(),obj.ToShTriVector())),
+		builder.AddObject(new StaticTree(obj.ToTriangleVector()),
 							obj.GetTrans(),obj.GetBBox());
 		builder.AddInstance(n,Identity<>());
 	}
@@ -313,7 +312,7 @@ int main(int argc, char **argv) {
 	for(int n=0;n<10;n++) gVals[n]=1;
 	gVals[0]=0; gVals[2]=0; gVals[4]=0;
 	
-	StaticTree staticTree(TriangleVector(tris,shTris));
+	StaticTree staticTree(baseScene.ToTriangleVector());
 	staticTree.PrintInfo();
 
 	if(nonInteractive) {

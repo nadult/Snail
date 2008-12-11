@@ -223,43 +223,6 @@ public:
 	}
 };
 
-/*
-template <class Real,int packetSize,int flags_>
-class IsctOptions {
-public:
-	enum { flags=flags_&0xffff00 };
-
-private:
-	Real *maxDist;
-
-public:
-	int lastShadowTri;
-
-	IsctOptions() { lastShadowTri=-1; maxDist=0; }
-	template <int pSize,int tflags>
-	IsctOptions(const IsctOptions<Real,pSize,tflags> &opts,int shift) {
-		SetMaxDist(opts.MaxDistPtr()+(tflags&isct::fFullMaxDist?shift:0));
-		lastShadowTri=opts.LastShadowTri();
-	}
-	IsctOptions(Real *maxDist_,int lastShadowTri_=-1) {
-		SetMaxDist(maxDist_);
-		lastShadowTri=lastShadowTri_;
-	}
-	void SetMaxDist(Real *ptr) {
-		if(flags&(isct::fFullMaxDist|isct::fMaxDist)) {
-			assert(ptr);
-			maxDist=ptr;
-		}
-	}
-	INLINE Real *MaxDistPtr() const { return maxDist; }
-
-	INLINE Real MaxDist(int q) const {
-		return flags&(isct::fMaxDist|isct::fFullMaxDist)?maxDist[flags&isct::fFullMaxDist?q:0]:Real(1.0f/0.0f);
-	}
-	INLINE int &LastShadowTri() { return lastShadowTri; }
-	INLINE int  LastShadowTri() const { return lastShadowTri; }
-}; */
-
 #include "bounding_box.h"
 
 

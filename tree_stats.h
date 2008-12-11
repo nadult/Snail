@@ -19,7 +19,7 @@ class Image;
 // It slows down computation up to 20% (or even more) so
 // it should be disabled in release version
 struct MemPattern {
-	enum { enabled=0 };
+	enum { enabled=stats::memPatternEnabled };
 
 	void Init(int size,int r=256);
 	inline void Touch(int pos,int count=1) {

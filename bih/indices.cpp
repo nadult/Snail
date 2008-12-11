@@ -160,7 +160,7 @@ namespace bih {
 			if(idx.size<maxSize) continue;
 			if((&idx.min.x)[axis]>=pos||(&idx.max.x)[axis]<=pos) continue;
 
-			const Triangle &tri=tris[idx.idx];
+			const Triangle tri=tris.ToTriangle(idx.idx);
 
 			Vec3f min1=idx.min,min2=idx.min,max1=idx.max,max2=idx.max;
 			Vec3f p1,p2,p3;	Convert(tri.P1(),p1); Convert(tri.P2(),p2); Convert(tri.P3(),p3);

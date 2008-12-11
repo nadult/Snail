@@ -3,6 +3,45 @@
 #include <algorithm>
 
 
+TriangleVector BaseScene::ToTriangleVector() const {
+	TriangleVector out;
+
+	for(int o=0;o<objects.size();o++) {
+		int verts=out.pos.size();
+		int inds=out.indices.size();
+		
+		TriangleVector obj=objects[o].ToTriangleVector();
+		int newVerts=verts+obj.pos.size();
+
+		out.pos.resize(newVerts);
+		out.uv.resize(newVerts);
+		out.nrm.resize(newVerts);
+
+		for(int n=0;n<obj.pos.size();n++) {
+			out.pos[n+verts]=obj.pos[n];
+			out.uv[n+verts]=obj.uv[n];
+			out.nrm[n+verts]=obj.nrm[n];
+		}
+
+		out.indices.resize(out.indices.size()+obj.indices.size());
+		for(int n=0;n<obj.indices.size();n++) {
+			TriangleVector::TriIdx &idx=out.indices[n+inds];
+			idx=obj.indices[n];
+
+			idx.v1+=verts;
+			idx.v2+=verts;
+			idx.v3+=verts;
+		}
+	}
+
+	out.triAccels.resize(out.indices.size());
+	for(int n=0;n<out.indices.size();n++) {
+		const TriangleVector::TriIdx &idx=out.indices[n];
+		out.triAccels[n]=TriAccel(out.pos[idx.v1],out.pos[idx.v2],out.pos[idx.v3]);
+	}
+	return out;
+}
+
 TriVector BaseScene::ToTriVector() const {
 	TriVector out;
 	
@@ -286,6 +325,80 @@ TriVector BaseScene::Object::ToTriVector() const {
 	TriVector out;
 	for(int t=0;t<tris.size();t++)
 		out.push_back(GetTriangle(t));
+	return out;
+}
+
+namespace {
+
+	struct Idx {
+		int v,u,n,dstIdx;
+		Idx() { }
+		Idx(int vv,int uu,int nn) :v(vv),u(uu),n(nn) { }
+		bool operator<(const Idx &rhs) const { return v==rhs.v?u==rhs.u?n<rhs.n:u<rhs.u:v<rhs.v; }
+		bool operator==(const Idx &rhs) const { return v==rhs.v&&u==rhs.u&&n==rhs.n; }
+	};
+
+	struct SortByPos {
+		SortByPos(const vector<Vec3f> &v) :verts(v) { }
+		bool operator()(const Idx &a,const Idx &b) { return verts[a.v].x<verts[b.v].x; }
+		const vector<Vec3f> &verts;
+	};
+}
+
+TriangleVector BaseScene::Object::ToTriangleVector() const {
+	TriangleVector out;
+	vector<Idx> inds;
+	inds.reserve(tris.size()*3);
+
+	Vec2f defaultUv(0.0f,0.0f);
+	Vec3f defaultNrm(0.0f,0.0f,0.0f);
+
+	for(int n=0;n<tris.size();n++) {
+		const IndexedTri &tri=tris[n];
+		for(int k=0;k<3;k++) inds.push_back(Idx(tri.v[k],tri.vt[k],tri.vn[k]));
+	}
+
+	{
+		std::sort(inds.begin(),inds.end());
+		vector<Idx>::iterator end=std::unique(inds.begin(),inds.end());
+		inds.resize(end-inds.begin());
+	}
+
+	out.pos.resize(inds.size());
+	out.uv.resize(inds.size());
+	out.nrm.resize(inds.size());
+	out.indices.resize(tris.size());
+
+//	std::sort(inds.begin(),inds.end(),SortByPos(verts));
+
+	for(int n=0;n<inds.size();n++) {
+		out.pos[n]=verts[inds[n].v];
+		out.uv[n]=inds[n].u==-1?defaultUv:uvs[inds[n].u];
+		out.nrm[n]=inds[n].n==-1?defaultNrm:normals[inds[n].n];
+	}
+
+	for(int n=0;n<inds.size();n++) inds[n].dstIdx=n;
+	std::sort(inds.begin(),inds.end());
+	for(int n=0;n<tris.size();n++) {
+		const IndexedTri &src=tris[n];
+		TriangleVector::TriIdx &dst=out.indices[n];
+
+		u32 idx[3];
+		for(int k=0;k<3;k++)
+			idx[k]=std::lower_bound(inds.begin(),inds.end(),Idx(src.v[k],src.vt[k],src.vn[k]))-inds.begin();
+
+		dst.v1=inds[idx[0]].dstIdx;
+		dst.v2=inds[idx[1]].dstIdx;
+		dst.v3=inds[idx[2]].dstIdx;
+		dst.mat=0;
+	}
+
+	out.triAccels.resize(out.indices.size());
+	for(int n=0;n<out.indices.size();n++) {
+		const TriangleVector::TriIdx &idx=out.indices[n];
+		out.triAccels[n]=TriAccel(out.pos[idx.v1],out.pos[idx.v2],out.pos[idx.v3]);
+	}
+	
 	return out;
 }
 

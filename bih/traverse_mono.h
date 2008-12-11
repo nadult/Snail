@@ -1,6 +1,6 @@
 
 	template <int flags> Isct<float,1,isctFlags|flags>
-		TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,float maxDist=1.0f/0.0f) const
+		TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,float maxDist) const
 	{
 		Isct<float,1,isctFlags|flags> out;
 		TreeStats<1> &stats=out.Stats();
