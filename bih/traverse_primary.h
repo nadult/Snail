@@ -1,6 +1,7 @@
 
-	template <int flags,int packetSize> Isct<f32x4,packetSize,isctFlags|flags>
-		TraversePrimary(const RayGroup<packetSize,flags> &rays) const
+	template <class ElementContainer> template <int flags,int size>
+		Isct<f32x4,size,Tree<ElementContainer>::isctFlags|flags>
+		Tree<ElementContainer>::TraversePrimary(const RayGroup<size,flags> &rays) const
 	{
 		if(!(flags&isct::fInvDir)) ThrowException("BIH::TraversePrimary: dir inverses must be avaliable");
 		if(!(flags&isct::fShOrig)) ThrowException("BIH::TraversePrimary: origin must be shared");
@@ -8,29 +9,29 @@
 		int dirMask=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(rays.Dir(0).x.m,rays.Dir(0).y.m,0),
 																	rays.Dir(0).z.m,0+(2<<2)))&7;
 	
-		Isct<f32x4,packetSize,isctFlags|flags> out;
+		Isct<f32x4,size,isctFlags|flags> out;
 
-		for(int q=0;q<packetSize;q++)
+		for(int q=0;q<size;q++)
 			out.Distance(q)=rays.MaxDist(q);
 
 		TreeStats<1> &stats=out.Stats();
-		stats.TracingPacket(4*packetSize);
+		stats.TracingPacket(4*size);
 
 		if(flags&isct::fShadow&&rays.lastShadowTri!=-1&&rays.lastShadowTri<elements.size()) {
 		//	stats.Skip();
-			f32x4b mask[packetSize];
+			f32x4b mask[size];
 			
 			//TODO: if all rays hit, lastShadowTri=idx
-			Isct<f32x4,packetSize,CElement::isctFlags|flags>
+			Isct<f32x4,size,CElement::isctFlags|flags>
 				tOut=elements[rays.lastShadowTri].Collide(rays);
 
-			for(int q=0;q<packetSize;q++) {
+			for(int q=0;q<size;q++) {
 				mask[q]=tOut.Distance(q)<out.Distance(q);
 				out.Distance(q)=Condition(mask[q],floatq(0.0001f),out.Distance(q));
 			}
 
 			f32x4b test=mask[0];
-			for(int q=1;q<packetSize;q++) test=test&&mask[q];
+			for(int q=1;q<size;q++) test=test&&mask[q];
 			
 			if(ForAll(test)) {
 				out.LastShadowTri()=rays.lastShadowTri;
@@ -43,7 +44,7 @@
 			floatq min[3]={1.0f/0.0f,1.0f/0.0f,1.0f/0.0f};
 			floatq max[3]={-1.0f/0.0f,-1.0f/0.0f,-1.0f/0.0f};
 
-			for(int q=0;q<packetSize;q++) {
+			for(int q=0;q<size;q++) {
 				Vec3q inv=rays.IDir(q);
 				min[0]=Min(min[0],inv.x); max[0]=Max(max[0],inv.x);
 				min[1]=Min(min[1],inv.y); max[1]=Max(max[1],inv.y);
@@ -93,13 +94,13 @@
 
 				if(!mailbox.Find(idx)) {
 					mailbox.Insert(idx);
-					stats.Intersection(packetSize);
+					stats.Intersection(size);
 
-					Isct<f32x4,packetSize,CElement::isctFlags|flags> tOut=elements[idx].Collide(rays);
+					Isct<f32x4,size,CElement::isctFlags|flags> tOut=elements[idx].Collide(rays);
 
 					i32x4b fullMask(i32x4(0xffffffff).m);
-					for(int q=0;q<packetSize;q++) {
-						i32x4b test=tOut.Distance(q)<out.Distance(q);
+					for(int q=0;q<size;q++) {
+						i32x4b test=tOut.Distance(q)<(flags&isct::fShadow?rays.MaxDist(q):out.Distance(q));
 						out.Distance(q)=Min(out.Distance(q),tOut.Distance(q));
 
 						if(flags&isct::fShadow) fullMask=fullMask&&test;
@@ -109,8 +110,10 @@
 								out.Element(q)=Condition(test,tOut.Element(q),out.Element(q));
 						}
 					}
-					if(flags&&isct::fShadow&&ForAll(fullMask))
+					if((flags&isct::fShadow)&&ForAll(fullMask)) {
 						out.LastShadowTri()=idx;
+						break;
+					}
 				}
 
 			POP_STACK:
@@ -119,7 +122,7 @@
 				fStack-=2;
 				tMin=fStack[0];
 				f32x4 tMin=out.Distance(0);
-				for(int q=1;q<packetSize;q++) tMin=Max(tMin,out.Distance(q));
+				for(int q=1;q<size;q++) tMin=Max(tMin,out.Distance(q));
 				tMax=Min(Maximize(tMin),fStack[1]);
 				
 				--nStack;

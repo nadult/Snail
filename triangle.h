@@ -15,7 +15,7 @@ public:
 	TriAccel() { }
 	TriAccel(const Vec3f &p0,const Vec3f &p1,const Vec3f &p2) {
 		Vec3f a=p0,b=p1,c=p2;
-		Vec3f nrm=(b-a)^(c-a);
+		nrm=(b-a)^(c-a);
 
 		float inv_nw;
 		bool sign=0;
@@ -53,6 +53,8 @@ public:
 		}
 		flags=0;
 		flags|=sign?1:0;
+		flags|=Abs(nu)==0.0f&&Abs(nv)==0.0f?2:0;
+		nrm*=RSqrt(nrm|nrm);
 	}
 
 	template <int tflags>
@@ -94,7 +96,29 @@ public:
 		}
 
 		bool sign=flags&1;
-		for(int q=0;q<size;q++) {
+		if(__builtin_expect(flags&2,0)) for(int q=0;q<size;q++) {
+			const Vec3q dir=rays.Dir(q);
+			const Vec3q origin=rays.Origin(q);
+
+			floatq dirW=w==0?dir.x:w==1?dir.y:dir.z,origW=w==0?origin.x:w==1?origin.y:origin.z;
+			floatq dirU=w==0?dir.y:w==1?dir.x:dir.x,origU=w==0?origin.y:w==1?origin.x:origin.x;
+			floatq dirV=w==0?dir.z:w==1?dir.z:dir.y,origV=w==0?origin.z:w==1?origin.z:origin.y;
+
+			floatq det=dirW;
+			floatq dett=tflags&isct::fShOrig?tdett:floatq(np)-origW;
+			floatq dist=dett/det;
+
+			floatq Du=dirU*dett-det*(tflags&isct::fShOrig?ppu:floatq(pu)-origU);
+			floatq Dv=dirV*dett-det*(tflags&isct::fShOrig?ppv:floatq(pv)-origV);
+			floatq detu=Du*e1v-Dv*e1u;
+			floatq detv=Dv*e0u-Du*e0v;
+
+			floatq tmp=detu+detv;
+			f32x4b mask=sign?detu<=0.0f&&detv<=0.0f&&det<=tmp:detu>=0.0f&&detv>=0.0f&&det>=tmp;
+	
+			out.Distance(q)=Condition(mask&&dist>0.0f,dist,f32x4(1.0f/0.0f));
+		}
+		else for(int q=0;q<size;q++) {
 			const Vec3q dir=rays.Dir(q);
 			const Vec3q origin=rays.Origin(q);
 
@@ -117,6 +141,7 @@ public:
 			out.Distance(q)=Condition(mask&&dist>0.0f,dist,f32x4(1.0f/0.0f));
 		}
 
+
 		return out;
 	}
 	
@@ -134,8 +159,9 @@ private:
 	float e1u,e1v; // edge 1
 	char iw,iu,iv; // indices
 	char flags;	   // 1: sign
-	int t1,t2;
-	int t3[4];
+	Vec3f nrm;
+
+	int temp[3];
 };
 
 static_assert(sizeof(TriAccel)==64,"bah");
@@ -301,16 +327,18 @@ class ShTriangle {
 public:
 	Vec2f uv[3];
 	Vec3f nrm[3];
+	int matId;
 
 	float t0;
 	Vec3f ba,ca,a;
 	Vec3f normal;
+	int tmp[3];
 
 //	Vec3p normal,tangent,binormal;
 
 	ShTriangle() { }
 	ShTriangle(const Vec3f &p1,const Vec3p &p2,const Vec3f &p3,const Vec2f &uv1,const Vec2f &uv2,const Vec2f &uv3,
-				const Vec3f &nrm1,const Vec3f &nrm2,const Vec3f &nrm3) {
+				const Vec3f &nrm1,const Vec3f &nrm2,const Vec3f &nrm3,int tMatId) {
 		Vec3f pos[3];
 
 		pos[0]=p1; pos[1]=p2; pos[2]=p3;
@@ -324,6 +352,13 @@ public:
 		a=pos[0];
 		ba=pos[1]-a;
 		ca=pos[2]-a;
+		matId=tMatId;
+
+		uv[1]-=uv[0];
+		uv[2]-=uv[0];
+
+		nrm[1]-=nrm[0];
+		nrm[2]-=nrm[0];
 
 		/*
 		Vec3p side0=pos[0]-pos[1];
@@ -353,21 +388,22 @@ public:
 	}
 
 
-	template <class Vec0,class Vec,class Real>
-	Vec Barycentric(const Vec0 &origin,const Vec &dir,const Real &dist) const {
-		Vec out;
+	template <class Vec0,class Vec>
+	Vec2<typename Vec::TScalar> Barycentric(const Vec0 &origin,const Vec &dir) const {
+		typedef typename Vec::TScalar Real;
+		Vec2<Real> out;
 
 		Real det = (dir|normal)*Real(t0);
 		Real idet=Inv(det);
 		Vec0 tvec=origin-Vec0(a);
-		out.z = (dir|(Vec0(ba)^tvec))*idet;
-		out.y = (dir|(tvec^Vec0(ca)))*idet;
-		out.x=Real(1.0f)-out.y-out.z;
+		out.x = (dir|(tvec^Vec0(ca)))*idet;
+		out.y = (dir|(Vec0(ba)^tvec))*idet;
 
 		return out;
 	}
 };
 
+static_assert(sizeof(ShTriangle)==128,"blah");
 typedef vector<ShTriangle,AlignedAllocator<ShTriangle> > ShTriVector;
 
 class BaseScene;
@@ -377,6 +413,11 @@ public:
 	typedef TriAccel CElement;
 	typedef ShTriangle SElement;
 
+	void Serialize(Serializer &sr) {
+		sr&pos&nrm&uv;
+		sr&indices&triAccels;
+	}
+
 	INLINE const CElement &GetCElement(int elem) const { return triAccels[elem]; }
 	INLINE const CElement &operator[](int elem) const { return GetCElement(elem); }
 
@@ -384,7 +425,7 @@ public:
 		const TriIdx &idx=indices[elem];
 		return ShTriangle(	pos[idx.v1],pos[idx.v2],pos[idx.v3],
 							uv[idx.v1], uv[idx.v2], uv[idx.v3],
-							nrm[idx.v1], nrm[idx.v2],nrm[idx.v3]);
+							nrm[idx.v1], nrm[idx.v2],nrm[idx.v3],idx.mat);
 	}
 	Vec3f BoundMin(int n) const {
 		const TriIdx &idx=indices[n];
@@ -420,6 +461,11 @@ private:
 
 	friend class BaseScene;
 };
+
+namespace baselib {
+	template<> struct SerializeAsPOD<TriangleVector::TriIdx> { enum { value=1 }; };
+	template<> struct SerializeAsPOD<TriAccel> { enum { value=1 }; };
+}
 
 	template <class Element,int size_>
 	class TCache {

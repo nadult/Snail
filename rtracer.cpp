@@ -7,13 +7,11 @@
 #include "font.h"
 
 #include "render.h"
-#include "sampling/point_sampler.h"
-#include "sampling/point_sampler_dxt.h"
-#include "sampling/point_sampler16bit.h"
 #include "material.h"
 
 #include "bih/tree.h"
 #include "tree_box.h"
+#include "scene.h"
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 	Matrix<Vec4f> mOut;
@@ -80,20 +78,12 @@ Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 	return mOut;   
 }
 
-int TreeVisMain(TriVector &tris);
+int TreeVisMain(const TriVector&);
 
 int gVals[16]={0,};
 
 using std::cout;
 using std::endl;
-
-Vec3f Center(const TriVector &tris) {
-	Vec3f center(0,0,0);
-	for(int n=0;n<tris.size();n++)
-		center+=tris[n].P1()+tris[n].P2()+tris[n].P3();
-	center/=float(tris.size()*3);
-	return center;
-}
 
 void PrintHelp() {
 	printf("Synopsis:    rtracer model_file [options]\nOptions:\n\t-res x y   - set rendering resolution [512 512]\n\t");
@@ -186,14 +176,77 @@ private:
 	double time,fps;
 };
 
-shading::SimpleMaterial<sampling::PointSampler> material[8];
-
 template <class Dst,class Src>
 Dst BitCast(const Src &src) {
 	union { Dst d; Src s; } u;
 	u.s=src;
 	return u.d;
 }
+
+template <class Scene>
+void SetMaterials(Scene &scene) {
+	scene.materials.clear();
+
+	/*
+	string names[]={ 	"data/tex316bit.dds",		"data/347.dds",
+						"data/1669.dds", 			"data/tex1.png",
+						"data/tex2.png",			"data/tex3dxt1.dds",
+						"data/ultradxt1.dds",		"", };
+	string tnames[]={
+		"",
+		"scenes/Toasters/Jaw.dds",
+		"scenes/Toasters/Head.dds",
+		"",
+		"scenes/Toasters/Pin.dds",
+		"scenes/Toasters/Key.dds",
+		"scenes/Toasters/Feet.dds",
+		"scenes/Toasters/Stone.dds" };
+	for(int n=0;n<sizeof(tnames)/sizeof(string);n++)
+		scene.materials.push_back(shading::NewMaterial(tnames[n])); */
+
+	string pre="scenes/sponza/";
+	string snames[]={
+		"",
+		"00_skap.dds",
+		"01_S_ba.dds",
+		"01_S_kap.dds",
+		"01_St_kp.dds",
+		"01_STUB.dds",
+		"KAMEN.dds",
+		"KAMEN-stup.dds",
+		"prozor1.dds",
+		"reljef.dds",
+		"sky.dds",
+		"sp_luk.dds",
+		"vrata_ko.dds",
+		"vrata_kr.dds",
+		"x01_st.dds",
+		};
+	
+	vector<Ptr<shading::BaseMaterial>> mats;
+	for(int n=0;n<sizeof(snames)/sizeof(string);n++)
+		mats.push_back(shading::NewMaterial(snames[n]==""?"":pre+snames[n]));
+//	int matid[]={ 0,11,1,0,5,5,2,4,5,14,1,6,0,9,11,6,2,6,8,12,13 };
+//	for(int n=0;n<sizeof(matid)/sizeof(int);n++)
+//		scene.materials.push_back(mats[matid[n]]);
+	scene.materials.push_back(mats[0]);
+	scene.materials.push_back(mats[6]);
+
+
+}
+
+template <class Scene>
+void SetLights(Scene &scene,int max) {
+	scene.lights.clear();
+
+	float pos=float(gVals[5])*0.01f;
+
+	if(max>0) scene.lights.push_back(
+		/*Toasters*/ //Light(RotateY(pos)*Vec3f(0,400.5f,0),Vec3f(8,8,5)*10000.5f)
+		/*sponza*/   Light(Vec3f(0,2,0),Vec3f(8,8,5)*20.0f)
+	);
+}
+
 
 int main(int argc, char **argv) {
 	printf("Snail v0.1 by nadult\n");
@@ -206,12 +259,12 @@ int main(int argc, char **argv) {
 	CameraConfigs camConfigs;
 	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
 
-	int resx=800,resy=600;
+	int resx=1024,resy=1024;
 #ifndef NDEBUG
 	resx/=2; resy/=2;
 #endif
 	bool fullscreen=0,nonInteractive=0;
-	int threads=4;
+	int threads=4,maxLights=1;
 	const char *modelFile="barracks.obj";
 	Options options;
 	bool treeVisMode=0;
@@ -229,95 +282,52 @@ int main(int argc, char **argv) {
 		else modelFile=argv[n];
 	}
 
-	{
-		using sampling::PointSampler;
-		gfxlib::Texture tex;
-
-		Loader("data/1669.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
-		material[0]=shading::SimpleMaterial<PointSampler>(0,PointSampler(tex));
-		
-		Loader("data/tex2.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
-		material[1]=shading::SimpleMaterial<PointSampler>(1,PointSampler(tex));
-		
-		Loader("data/tex3.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
-		material[2]=shading::SimpleMaterial<PointSampler>(2,PointSampler(tex));
-		
-		Loader("data/347.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
-		material[3]=shading::SimpleMaterial<PointSampler>(3,PointSampler(tex));
-
-		Loader("data/checkerboard.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
-		material[4]=shading::SimpleMaterial<PointSampler>(4,PointSampler(tex));
-		
-		Loader("data/checkerboard.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
-		material[5]=shading::SimpleMaterial<PointSampler>(5,PointSampler(tex));
-		
-		Loader("data/checkerboard.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
-		material[6]=shading::SimpleMaterial<PointSampler>(6,PointSampler(tex));
-		
-		Loader("data/checkerboard.png") & tex; if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
-		material[7]=shading::SimpleMaterial<PointSampler>(7,PointSampler(tex));
-	}
-
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
-	TriVector tris;
-	ShTriVector shTris;
-
 	printf("Loading...\n");
-	BaseScene baseScene; {
+/*!	BaseScene baseScene; {
 		baseScene.LoadWavefrontObj(string("scenes/")+modelFile);
 		if(flipNormals) baseScene.FlipNormals();
-
-		tris=baseScene.ToTriVector();
-		shTris=baseScene.ToShTriVector();
-
-		for(int n=0;n<tris.size();n++)
-			if(!tris[n].Test()) {
-				tris[n]=tris.back();
-				tris.pop_back();
-				n--;
-			}
-	/*	if(baseScene.objects.size()==1) {
-			BaseScene::Object obj=baseScene.objects[0];
-			baseScene.objects[0]=baseScene.objects.back();
-			baseScene.objects.pop_back();
-				
-			cout << "Splitting..." << '\n';
-			obj.BreakToElements(baseScene.objects);
-		} */
-	//	baseScene.SaveWavefrontObj("out/splitted.obj");
+		baseScene.GenNormals();
 		baseScene.Optimize();
-	}
+	}*/
 
-	if(treeVisMode) { TreeVisMain(tris); return 0; }
-
-	printf("Building..\n");
-	SceneBuilder builder;
+/*!	SceneBuilder builder;
 	for(int n=0;n<baseScene.objects.size();n++) {
 		const BaseScene::Object &obj=baseScene.objects[n];
 		builder.AddObject(new StaticTree(obj.ToTriangleVector()),
 							obj.GetTrans(),obj.GetBBox());
 		builder.AddInstance(n,Identity<>());
-	}
-	printf("Done building\n");
+	} */
 
 	Image img(resx,resy,16);
-	Camera cam;
-	if(!camConfigs.GetConfig(string(modelFile),cam))
-		cam.pos=Center(tris);
 
-	uint quadLevels=3;
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
 	for(int n=0;n<10;n++) gVals[n]=1;
 	gVals[0]=0; gVals[2]=0; gVals[4]=0;
-	
-	StaticTree staticTree(baseScene.ToTriangleVector());
-	staticTree.PrintInfo();
+
+	Scene<StaticTree> staticScene;
+//!	staticScene.geometry.Construct(baseScene.ToTriangleVector());
+//!	staticScene.geometry.PrintInfo();
+//!	Saver(string("dump/")+modelFile) & staticScene.geometry;
+	Loader(string("dump/")+modelFile) & staticScene.geometry;
+
+	SetMaterials(staticScene);
+	SetLights(staticScene,maxLights*0);
+
+	Scene<FullTree> scene;
+	SetMaterials(scene);
+	SetLights(scene,maxLights*0);
+
+	Camera cam;
+	if(!camConfigs.GetConfig(string(modelFile),cam))
+		cam.pos=staticScene.geometry.GetBBox().Center();
 
 	if(nonInteractive) {
 		double time=GetTime();
-		Render(quadLevels,staticTree,cam,img,options,threads);
+		Render(staticScene,cam,img,options,threads);
+
 		time=GetTime()-time;
 		minTime=maxTime=time;
 		img.SaveToFile("out/output.tga");
@@ -326,9 +336,9 @@ int main(int argc, char **argv) {
 		GLWindow out(resx,resy,fullscreen);
 		Font font;
 
-		bool lightsAnim=0;
+		bool lightsAnim=0,lightsEnabled=0;
 		float speed; {
-			Vec3p size=baseScene.GetBBox().Size();
+			Vec3p size=staticScene.geometry.GetBBox().Size();
 			speed=(size.x+size.y+size.z)*0.005f;
 		}
 
@@ -341,13 +351,18 @@ int main(int argc, char **argv) {
 			if(out.KeyDown('K')) img.SaveToFile("out/output.tga");
 			if(out.KeyDown('O')) options.reflections^=1;
 			if(out.KeyDown('I')) options.rdtscShader^=1;
-			if(out.KeyDown('C')) cam.pos=Center(tris);
+			if(out.KeyDown('C')) cam.pos=staticScene.geometry.GetBBox().Center();
 			if(out.KeyDown('P')) {
 				camConfigs.AddConfig(string(modelFile),cam);
 				Saver("scenes/cameras.dat") & camConfigs;
 				cam.Print();
 			}
-		//	if(out.KeyDown('L')) { printf("Lights %s\n",scene.lightsEnabled?"disabled":"enabled"); scene.lightsEnabled^=1; }
+			if(out.KeyDown('L')) {
+				printf("Lights %s\n",lightsEnabled?"disabled":"enabled");
+				lightsEnabled^=1;
+				SetLights(staticScene,lightsEnabled?maxLights:0);
+				SetLights(scene,lightsEnabled?maxLights:0);
+			}
 			if(out.KeyDown('J')) { printf("Lights animation %s\n",lightsAnim?"disabled":"enabled"); lightsAnim^=1; }
 
 			{
@@ -357,8 +372,6 @@ int main(int argc, char **argv) {
 				if(out.Key('A')) cam.pos-=cam.right*tspeed;
 				if(out.Key('D')) cam.pos+=cam.right*tspeed;
 				if(out.Key('R')) cam.pos+=cam.up*tspeed;
-				if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
-				if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
 				if(out.Key('F')) cam.pos-=cam.up*tspeed;
 			}
 
@@ -369,13 +382,6 @@ int main(int argc, char **argv) {
 		//		if(out.KeyDown('2')&&scene.lights.size()>=2) scene.lights[1].pos=cam.pos;
 		//		if(out.KeyDown('3')&&scene.lights.size()>=3) scene.lights[2].pos=cam.pos;
 			}
-			else {
-			//	if(out.KeyDown('0')) { printf("tracing 2x2\n"); quadLevels=0; }
-			//	if(out.KeyDown('1')) { printf("tracing 4x4\n"); quadLevels=1; }
-			//	if(out.KeyDown('2')) { printf("tracing 16x4\n"); quadLevels=2; }
-				if(out.KeyDown('3')) { printf("tracing 64x4\n"); quadLevels=3; }
-			//	if(out.KeyDown('4')) { printf("tracing 256x4\n"); quadLevels=4; }
-			}
 
 			if(out.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 1 %s\n",gVals[0]?"on":"off"); }
 			if(out.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
@@ -384,6 +390,8 @@ int main(int argc, char **argv) {
 			if(out.KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
 			if(out.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"old":"new"); }
 
+			if(out.KeyDown('U'))
+				Swap(staticScene.materials[0],staticScene.materials[staticScene.materials.size()==2?1:17]);
 
 			{
 				int dx=out.Key(Key_space)?out.MouseMove().x:0,dy=0;
@@ -401,17 +409,17 @@ int main(int argc, char **argv) {
 			//	}
 			}
 	
-			double time=GetTime();
-		
 			double buildTime=GetTime();
-
-			FullTree tree(builder.ExtractElements());
-
+	//			scene.geometry.Construct(builder.ExtractElements());
 			buildTime=GetTime()-buildTime;
+
+			staticScene.Update();
 			
+			double time=GetTime();
 			TreeStats<1> stats;
-			if(!gVals[0]) stats=Render(quadLevels,staticTree,cam,img,options,threads);
-			else stats=Render(quadLevels,tree,cam,img,options,threads);
+		//	if(!gVals[0])
+				stats=Render(staticScene,cam,img,options,threads);
+		//	else stats=Render(scene,cam,img,options,threads);
 
 			out.RenderImage(img);
 
@@ -420,7 +428,7 @@ int main(int argc, char **argv) {
 
 			font.BeginDrawing(resx,resy);
 			font.SetSize(Vec2f(30,20));
-				font.PrintAt(Vec2f(0,0),stats.GenInfo(resx,resy,time*1000.0,buildTime*1000.0));
+				font.PrintAt(Vec2f(0,0),stats.GenInfo(resx,resy,time*1000.0,buildTime));
 				font.PrintAt(Vec2f(0,20),"FPS: ",int(frmCounter.FPS()));
 			font.FinishDrawing();
 

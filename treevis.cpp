@@ -1070,7 +1070,9 @@ struct SortByX1 {
 	bool operator()(const Triangle &a,const Triangle &b) { return a.P1().x<b.P1().x; }
 };
 
-int TreeVisMain(TriVector &tris) {
+int TreeVisMain(const TriVector &tTris) {
+	TriVector tris=tTris;
+
 	for(int n=0;n<tris.size();n++) {
 		Vec3f p1=tris[n].P1()*Vec3p(1.0f,-1.0f,1.0f);
 		Vec3f p2=tris[n].P2()*Vec3p(1.0f,-1.0f,1.0f); 

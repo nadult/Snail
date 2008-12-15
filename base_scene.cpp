@@ -35,6 +35,7 @@ TriangleVector BaseScene::ToTriangleVector() const {
 	}
 
 	out.triAccels.resize(out.indices.size());
+
 	for(int n=0;n<out.indices.size();n++) {
 		const TriangleVector::TriIdx &idx=out.indices[n];
 		out.triAccels[n]=TriAccel(out.pos[idx.v1],out.pos[idx.v2],out.pos[idx.v3]);
@@ -138,6 +139,7 @@ BaseScene::Object::Object(const vector<Vec3f> &tverts,const vector<Vec2f> &tuvs,
 			dst.vt[k]=src.vt[k]>=0?uvIMap[src.vt[k]]:-1;
 			dst.vn[k]=src.vn[k]>=0?nrmIMap[src.vn[k]]:-1;
 		}
+		dst.matId=src.matId;
 	}
 	
 	trans=Identity<>();
@@ -305,6 +307,7 @@ BaseScene::Triangle BaseScene::Object::GetTriangle(uint n) const {
 		out.uv[k]=src.vt[k]>=0?uvs[src.vt[k]]:Vec2f(0,0);
 		out.nrm[k]=src.vn[k]>=0?normals[src.vn[k]]:out.fnrm;
 	}
+	out.matId=src.matId;
 	
 	return out;
 }
@@ -372,9 +375,9 @@ TriangleVector BaseScene::Object::ToTriangleVector() const {
 //	std::sort(inds.begin(),inds.end(),SortByPos(verts));
 
 	for(int n=0;n<inds.size();n++) {
-		out.pos[n]=verts[inds[n].v];
+		out.pos[n]=trans*verts[inds[n].v];
 		out.uv[n]=inds[n].u==-1?defaultUv:uvs[inds[n].u];
-		out.nrm[n]=inds[n].n==-1?defaultNrm:normals[inds[n].n];
+		out.nrm[n]=inds[n].n==-1?defaultNrm:trans&normals[inds[n].n];
 	}
 
 	for(int n=0;n<inds.size();n++) inds[n].dstIdx=n;
@@ -390,7 +393,7 @@ TriangleVector BaseScene::Object::ToTriangleVector() const {
 		dst.v1=inds[idx[0]].dstIdx;
 		dst.v2=inds[idx[1]].dstIdx;
 		dst.v3=inds[idx[2]].dstIdx;
-		dst.mat=0;
+		dst.mat=src.matId;
 	}
 
 	out.triAccels.resize(out.indices.size());
@@ -407,6 +410,18 @@ ShTriVector BaseScene::Object::ToShTriVector() const {
 	for(int t=0;t<tris.size();t++)
 		out.push_back(GetTriangle(t));
 	return out;
+}
+void BaseScene::GenNormals() {
+	for(int n=0;n<objects.size();n++)
+		objects[n].GenNormals();
+}
+
+Vec3f BaseScene::Center() const {
+	if(!objects.size()) return Vec3f(0,0,0);
+	Vec3f out=objects[0].Center();
+	for(int n=1;n<objects.size();n++)
+		out+=objects[n].Center();
+	return out/float(objects.size());
 }
 
 void BaseScene::Object::FindOptimalTrans() {
@@ -448,3 +463,25 @@ void BaseScene::Object::FindOptimalTrans() {
 	for(int n=0;n<normals.size();n++) normals[n]=inv&normals[n];
 }
 
+void BaseScene::Object::GenNormals() {
+	for(int n=0;n<tris.size();n++) {
+		IndexedTri &tri=tris[n];
+		Vec3f nrm=(verts[tri.v[1]]-verts[tri.v[0]])^(verts[tri.v[2]]-verts[tri.v[0]]);
+		nrm*=RSqrt(nrm|nrm);
+		if(tri.vn[0]<0||tri.vn[1]<0||tri.vn[2]<0) {
+			if(tri.vn[0]<0) tri.vn[0]=normals.size();
+			if(tri.vn[1]<0) tri.vn[1]=normals.size();
+			if(tri.vn[2]<0) tri.vn[2]=normals.size();
+			normals.push_back(nrm);
+		}
+	}
+}
+
+Vec3f BaseScene::Object::Center() const {
+	Vec3f out(0,0,0);
+	if(verts.size()) {
+		for(int n=0;n<verts.size();n++) out+=verts[n];
+		out/=float(verts.size());
+	}
+	return out;
+}

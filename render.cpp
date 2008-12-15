@@ -1,7 +1,7 @@
 #include <iostream>
 #include <baselib_threads.h>
 #include "ray_generator.h"
-#include "scene.h"
+#include "scene_inl.h"
 #include "camera.h"
 
 #include "bih/tree.h"
@@ -39,8 +39,8 @@ inline i32x4 ConvColor(const Vec3q &rgb) {
 
 template <class AccStruct,int QuadLevels>
 struct RenderTask {
-	RenderTask(const AccStruct *tr,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,
-					uint tw,uint th,TreeStats<1> *outSt) :tree(tr),camera(cam),out(tOut),options(opt),
+	RenderTask(const Scene<AccStruct> *sc,const Camera &cam,Image *tOut,const Options &opt,uint tx,uint ty,
+					uint tw,uint th,TreeStats<1> *outSt) :scene(sc),camera(cam),out(tOut),options(opt),
 					startX(tx),startY(ty),width(tw),height(th),outStats(outSt) {
 		}
 
@@ -48,7 +48,7 @@ struct RenderTask {
 	uint width,height;
 
 	TreeStats<1> *outStats;
-	const AccStruct *tree;
+	const Scene<AccStruct> *scene;
 	Camera camera;
 	Image *out;
 	Options options;
@@ -82,7 +82,7 @@ struct RenderTask {
 				}
 
 				RayGroup<NQuads,isct::fShOrig|isct::fInvDir|isct::fPrimary> rays(origin,dir);
-				Result<NQuads> result=RayTrace(*tree,rays,FullSelector<NQuads>(),cache);
+				Result<NQuads> result=scene->RayTrace(rays,FullSelector<NQuads>(),cache);
 				Vec3q *rgb=result.color;
 				*outStats += result.stats;
 
@@ -127,7 +127,7 @@ struct RenderTask {
 };
 
 template <int QuadLevels,class AccStruct>
-TreeStats<1> Render(const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
+TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	enum { taskSize=64 };
 
 	uint numTasks=(image.width+taskSize-1)*(image.height+taskSize-1)/(taskSize*taskSize);
@@ -137,7 +137,7 @@ TreeStats<1> Render(const AccStruct &tree,const Camera &camera,Image &image,cons
 	TaskSwitcher<RenderTask<AccStruct,QuadLevels> > switcher(numTasks);
 	uint num=0;
 	for(uint y=0;y<image.height;y+=taskSize) for(uint x=0;x<image.width;x+=taskSize) {
-		switcher.AddTask(RenderTask<AccStruct,QuadLevels> (&tree,camera,&image,options,x,y,
+		switcher.AddTask(RenderTask<AccStruct,QuadLevels> (&scene,camera,&image,options,x,y,
 					Min((int)taskSize,int(image.width-x)),Min((int)taskSize,int(image.height-y)),
 					&taskStats[num]) );
 		num++;
@@ -152,20 +152,13 @@ TreeStats<1> Render(const AccStruct &tree,const Camera &camera,Image &image,cons
 }
 
 template <class AccStruct>
-TreeStats<1> Render(int quadLevels,const AccStruct &tree,const Camera &camera,Image &image,const Options options,uint tasks) {
-	switch(quadLevels) {
-//	case 0: return Render<0>(tree,camera,image,options,tasks);
-//	case 1: return Render<1>(tree,camera,image,options,tasks);
-//	case 2: return Render<2>(tree,camera,image,options,tasks);
-	case 3: return Render<3>(tree,camera,image,options,tasks);
-//	case 4: return Render<4>(tree,camera,image,options,tasks);
-	default: throw Exception("Quad level not supported.");
-	}
+TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
+	return Render<3>(scene,camera,image,options,tasks);
 }
 
 typedef bih::Tree<TriangleVector> StaticTree;
 typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
 
-template TreeStats<1> Render<StaticTree>(int,const StaticTree&,const Camera&,Image&,const Options,uint);
-template TreeStats<1> Render<FullTree  >(int,const FullTree  &,const Camera&,Image&,const Options,uint);
+template TreeStats<1> Render<StaticTree>(const Scene<StaticTree>&,const Camera&,Image&,const Options,uint);
+template TreeStats<1> Render<FullTree  >(const Scene<FullTree>  &,const Camera&,Image&,const Options,uint);
 	

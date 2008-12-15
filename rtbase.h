@@ -11,6 +11,9 @@
 #include <cassert>
 
 
+#define EXPECT_TAKEN(a)         __builtin_expect(!!(a), 1)
+#define EXPECT_NOT_TAKEN(a)   	__builtin_expect(!!(a), 0)
+
 using namespace baselib;
 using namespace veclib;
 

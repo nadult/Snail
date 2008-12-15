@@ -73,6 +73,9 @@
 
 			return out;
 		}
+		void Serialize(const Serializer &sr) {
+			ThrowException("TODO: TreeBox Serializer not avaliable");
+		}
 
 	private:
 		friend class TreeBoxVector<BaseTree>;
@@ -90,7 +93,10 @@
 		typedef TreeBox<BaseTree> CElement;
 		typedef typename BaseTree::SElement SElement;
 
+		TreeBoxVector() { }
 		TreeBoxVector(const vector<CElement,AlignedAllocator<CElement> > &e) :elems(e) { }
+
+		void Serialize(Serializer &sr) { sr&elems; }
 
 		INLINE const CElement &operator[](int elem) const { return elems[elem]; }
 		INLINE const CElement &GetCElement(int elem) const { return elems[elem]; }
@@ -99,6 +105,7 @@
 			return elems[elem].tree->GetSElement(subElem,0);
 		}
 		size_t size() const { return elems.size(); }
+		int mem_size() const { /*TODO*/ return elems.size(); }
 
 		Vec3f BoundMin(int n) const { return elems[n].BoundMin(); }
 		Vec3f BoundMax(int n) const { return elems[n].BoundMax(); }

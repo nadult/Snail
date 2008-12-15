@@ -7,8 +7,8 @@ namespace sampling {
 			ThrowException("Texture width & height must be a power of 2");
 		if(tex.GetFormat().GetIdent()!=gfxlib::TI_DXT1)
 			ThrowException("DXT sampler requires DXT1 texture");
-		if(tex.Mips()>1&&tex.Width()!=tex.Height())
-			ThrowException("Mipmapped textures must have width same as height");
+//		if(tex.Mips()>1&&tex.Width()!=tex.Height())
+//			ThrowException("Mipmapped textures must have width same as height");
 
 		wMask=tex.Width()-1;
 		hMask=tex.Height()-1;

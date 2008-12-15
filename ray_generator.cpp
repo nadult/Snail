@@ -15,7 +15,7 @@ void RayGenerator::Generate(int level,int pw,int ph,int x,int y,Vec3q *out) {
 	if(level==0) {
 		Vec3f points[4];
 
-	/*	if(gVals[4]) {
+	/*	if(gVals[3]) {
 			BestCandidateSampler sampler;
 			points[0]=(Vec3f)sampler(x,y);
 			points[1]=(Vec3f)sampler(x+1,y);

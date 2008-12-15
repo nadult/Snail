@@ -306,5 +306,23 @@ public:
 	int lastShadowTri;
 };
 
+template <int size_,int flags_>
+class PRayGroup {
+public:
+	enum { size=size_, flags=flags_, sharedOrigin=flags&isct::fShOrig?1:0,
+			inverses=flags&isct::fInvDir?1:0, hasMaxDist=flags&isct::fMaxDist?1:0 };
+
+	PRayGroup(const RayGroup<size,flags> &group,int off) :ref(group),offset(off) { }
+
+	INLINE Vec3q Origin(int q) const { return ref.Origin(q+offset); }
+	INLINE Vec3q Dir(int q) const { return ref.Dir(q+offset); }
+	INLINE Vec3q IDir(int q) const { return ref.IDir(q+offset); }
+	INLINE floatq MaxDist(int q) const { return ref.MaxDist(q+offset); }
+
+private:
+	int offset;
+	const RayGroup<size,flags> &ref;
+};
+
 #endif
 

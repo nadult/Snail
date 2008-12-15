@@ -76,6 +76,10 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 	vector<Vec3f> normals;
 	vector<BaseScene::IndexedTri> tris;
 
+	matNames.clear();
+	matNames[""]=0;
+	int lastMatId=0;
+
 	for(;;) {
 		char line[2000],type[2000],a[2000],b[2000],c[2000],d[2000],e[2000],f[2000];
 		if(!is.getline(line,2000))
@@ -112,6 +116,8 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 			p[2]=strchr(p[1],' ')+1; p[2][-1]=0;
 
 			BaseScene::IndexedTri tri;
+			tri.matId=lastMatId;
+
 			for(int k=0;k<3;k++) {
 				tri.v[k] = atoi(p[k]);
 
@@ -145,6 +151,16 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 			}
 			
 			tris.push_back(tri);
+		}
+		else if(strcmp(type,"usemtl")==0) {
+			sscanf(line,"%s %s",type,a);
+			string matName=a;
+			std::map<string,int>::iterator it=matNames.find(matName);
+			if(it==matNames.end()) {
+				lastMatId=matNames.size();
+				matNames[matName]=lastMatId;
+			}
+			else lastMatId=it->second;
 		}
 
 /*		else if(strcmp(type,"swap")==0) swap=1;

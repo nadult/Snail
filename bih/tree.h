@@ -15,9 +15,9 @@ namespace bih {
 	public:
 		enum { leafMask=1<<29, idxMask=0x1fffffff };
 
-		inline i32 Child1() const { return val[0]&0x1fffffff; }
-		inline i32 Child2() const { return val[1]&0x1fffffff; }
-		inline i32 Child(uint idx) const { return val[idx]&0x1fffffff; }
+		inline i32 Child1() const { return val[0]&idxMask; }
+		inline i32 Child2() const { return val[1]&idxMask; }
+		inline i32 Child(uint idx) const { return val[idx]&idxMask; }
 
 		inline bool Child1IsLeaf() const { return val[0]&leafMask; }
 		inline bool Child2IsLeaf() const { return val[1]&leafMask; }
@@ -32,6 +32,12 @@ namespace bih {
 		float clip[2];
 		u32 val[2];
 	};
+
+}
+
+namespace baselib { template<> struct SerializeAsPOD<bih::Node> { enum { value=1 }; }; }
+
+namespace bih {
 
 	class Index {
 	public:
@@ -77,6 +83,9 @@ namespace bih {
 	void SplitIndices(const TriangleVector &tris,vector<Index> &inds,int axis,float pos,float maxSize);
 //	void OptimizeIndices(vector<Index> &indices);
 
+	template <class Tree,int flags>
+	struct TreeFlags { enum { value=Tree::isctFlags|flags }; };
+
 	template <class ElementContainer_>
 	class Tree: public RefCounter {
 	public:
@@ -91,60 +100,41 @@ namespace bih {
 		
 		Tree() { }
 
+		void Serialize(Serializer&);
 
 		BBox GetBBox() const { return BBox(pMin,pMax); }
 
-		Vec3f FlatNormals(u32 elementId,u32 subElementId) const {
-			return elements[elementId].Nrm(subElementId);
-		}
+	//	Vec3f FlatNormals(u32 elementId,u32 subElementId) const {
+	//		return elements[elementId].Nrm(subElementId);
+	//	}
 
 		const SElement GetSElement(int elem,int subElem) const { return elements.GetSElement(elem,subElem); }
 
 		Tree(const ElementContainer &elements);
-
 		void PrintInfo() const;
+
+		void Construct(const ElementContainer &elements);
+
+	private:
 		uint FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const;
-		void Build(vector<Index> &indices,vector<u32> &parents,uint nNode,const Vec3f &min,const Vec3f &max,uint level,bool);
+		void Build(vector<Index> &indices,vector<u32> &parents,uint nNode,Vec3f min,Vec3f max,uint level,bool);
+		void OptimizeBFS();
+	
+		template <int flags,int size> Isct<f32x4,size,Tree::isctFlags|flags>
+		TraversePacket0(const RayGroup<size,flags> &rays) const;
+	
+		template <int flags,int size> Isct<f32x4,size,Tree::isctFlags|flags>
+		TraversePrimary(const RayGroup<size,flags> &rays) const;
 
 	public:	
-		template <int flags,template <int> class Selector>
-		Isct<f32x4,1,isctFlags|flags>
-			TraversePacket(const RayGroup<1,flags> &rays,const Selector<1> &selector) const
-		{
-			static_assert(flags&isct::fInvDir,"");
+		template <int flags> Isct<float,1,Tree::isctFlags|flags>
+		TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,float maxDist) const;
 
-			int bitMask=selector[0];
-			const Vec3q &dir=rays.Dir(0);
-			Isct<f32x4,1,isctFlags|flags> out;
+		template <int flags,template <int> class Selector> Isct<f32x4,1,TreeFlags<Tree,flags>::value>
+			TraversePacket(const RayGroup<1,flags> &rays,const Selector<1> &selector) const;
 
-			bool split=1;
-
-			if(Selector<1>::full||bitMask==0x0f) {	
-				if(!filterSigns||GetVecSign(rays.Dir(0))!=8) {
-					out=TraversePacket0(rays);
-					split=0;
-				}
-			}
-
-			if(split) {
-				if(bitMask==0) return out;
-
-				const Vec3q &orig=rays.Origin(0);
-				for(int q=0;q<4;q++) {	
-					int o=flags&isct::fShOrig?0:q;
-					if(!(bitMask&(1<<q))) continue;
-					f32x4 maxDist=rays.MaxDist(0);
-					float tMaxDist=maxDist[q];
-
-					Isct<float,1,isctFlags|flags> tOut=	
-						TraverseMono<flags>
-						(Vec3p(orig.x[o],orig.y[o],orig.z[o]),Vec3p(dir.x[q],dir.y[q],dir.z[q]),tMaxDist);
-					out.Insert(tOut,q);
-				}
-			}
-
-			return out;
-		}
+		template <int flags,int size,template <int> class Selector> Isct<f32x4,size,TreeFlags<Tree,flags>::value>
+			TraversePacket(const RayGroup<size,flags> &rays,const Selector<size> &selector) const;
 
 		template <int flags>
 		INLINE Isct<f32x4,1,isctFlags|flags>
@@ -152,91 +142,21 @@ namespace bih {
 			return TraversePacket(rays,FullSelector<1>());
 		}
 
-		template <int flags,int packetSize,template <int> class Selector>
-		Isct<f32x4,packetSize,isctFlags|flags>
-			TraversePacket(const RayGroup<packetSize,flags> &rays,const Selector<packetSize> &selector) const
-		{
-			static_assert(flags&isct::fInvDir,"");
-
-			Isct<f32x4,packetSize,isctFlags|flags> out;	
-			bool split=1;
-
-			enum { reflected=!(flags&(isct::fPrimary|isct::fShadow)) };
-
-			bool selectorsFiltered=packetSize<=(reflected?4:16);
-			if(!Selector<packetSize>::full)
-				for(int n=0;n<packetSize/4;n++)
-					if(selector.Mask4(n)!=0x0f0f0f0f) {
-						selectorsFiltered=0;
-						break;
-					}
-
-			if((Selector<packetSize>::full||selectorsFiltered)&&packetSize<=(reflected?4:16)) {
-				const Vec3q &dir=rays.Dir(0);
-				bool signsFiltered=1;
-				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
-
-				if(filterSigns) {					
-					for(int n=0;n<packetSize;n++) if(GetVecSign(rays.Dir(n))!=msk) {
-						signsFiltered=0;
-						break;
-					}
-				}
-
-				if(signsFiltered) {
-					bool primary=flags&(isct::fPrimary|isct::fShadow)&&gVals[1];
-
-					if(flags&isct::fShadow) {
-						floatq dot=1.0f;
-						for(int q=1;q<packetSize;q++) dot=Min(dot,rays.Dir(0)|rays.Dir(q));
-						if(ForAny(dot<0.9998f)) primary=0;
-					}
-					out=primary?TraversePrimary(rays):TraversePacket0(rays);
-
-					if(primary&&(flags&isct::fShadow)) out.Stats().Skip();
-					split=0;
-				}
-			}
-
-			if(split) {
-				RayGroup<packetSize/4,flags> subGroups[4];
-				rays.Split(subGroups);
-				subGroups[0].lastShadowTri=rays.lastShadowTri;
-
-				for(int q=0;q<4;q++) {
-					Isct<f32x4,packetSize/4,isctFlags|flags> tOut=
-						TraversePacket(subGroups[q],selector.SubSelector(q));
-					if(q!=3) subGroups[q+1].lastShadowTri=tOut.LastShadowTri();
-					out.Insert(tOut,q);
-				}
-
-			}
-
-			return out;
+		template <int flags,int size> INLINE Isct<f32x4,size,isctFlags|flags>
+			TraversePacket(const RayGroup<size,flags> &rays) const {
+			return TraversePacket(rays,FullSelector<size>());
 		}
 
-		template <int flags,int packetSize> INLINE Isct<f32x4,packetSize,isctFlags|flags>
-			TraversePacket(const RayGroup<packetSize,flags> &rays) const {
-			return TraversePacket(rays,FullSelector<packetSize>());
-		}
-	
-		#include "bih/traverse_mono.h"
-		#include "bih/traverse_packet.h"	
-		#include "bih/traverse_primary.h"
+		vector<Node,AlignedAllocator<Node> > nodes;
+		ElementContainer elements;
 
 		float avgSize;
 		Vec3f pMin,pMax;
-		vector<Node> nodes;
-		ElementContainer elements;
 
 		int objectId,maxLevel;
-		float maxDensity;
 	};
 
 }
-
-#include "bih/tree_impl.h"
-
 
 #endif
 
