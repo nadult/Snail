@@ -7,6 +7,7 @@ TriangleVector BaseScene::ToTriangleVector() const {
 	TriangleVector out;
 
 	for(int o=0;o<objects.size();o++) {
+		const Matrix<Vec4f> &trans=objects[o].trans;
 		int verts=out.pos.size();
 		int inds=out.indices.size();
 		
@@ -18,9 +19,9 @@ TriangleVector BaseScene::ToTriangleVector() const {
 		out.nrm.resize(newVerts);
 
 		for(int n=0;n<obj.pos.size();n++) {
-			out.pos[n+verts]=obj.pos[n];
+			out.pos[n+verts]=trans*obj.pos[n];
 			out.uv[n+verts]=obj.uv[n];
-			out.nrm[n+verts]=obj.nrm[n];
+			out.nrm[n+verts]=trans&obj.nrm[n];
 		}
 
 		out.indices.resize(out.indices.size()+obj.indices.size());
@@ -346,7 +347,15 @@ namespace {
 		bool operator()(const Idx &a,const Idx &b) { return verts[a.v].x<verts[b.v].x; }
 		const vector<Vec3f> &verts;
 	};
+
+	bool Same(const Vec3f &a,const Vec3f &b) {
+	//	Vec3f epsilon=VMax(VAbs(a),VAbs(b))*0.0001f;
+		Vec3f epsilon(0.00001f,0.00001f,0.00001f);
+		return Abs(a.x-b.x)<epsilon.x&&Abs(a.y-b.y)<epsilon.y&&Abs(a.z-b.z)<epsilon.z;
+	}
 }
+
+
 
 TriangleVector BaseScene::Object::ToTriangleVector() const {
 	TriangleVector out;
@@ -375,9 +384,9 @@ TriangleVector BaseScene::Object::ToTriangleVector() const {
 //	std::sort(inds.begin(),inds.end(),SortByPos(verts));
 
 	for(int n=0;n<inds.size();n++) {
-		out.pos[n]=trans*verts[inds[n].v];
+		out.pos[n]=verts[inds[n].v];
 		out.uv[n]=inds[n].u==-1?defaultUv:uvs[inds[n].u];
-		out.nrm[n]=inds[n].n==-1?defaultNrm:trans&normals[inds[n].n];
+		out.nrm[n]=inds[n].n==-1?defaultNrm:normals[inds[n].n];
 	}
 
 	for(int n=0;n<inds.size();n++) inds[n].dstIdx=n;
@@ -393,7 +402,8 @@ TriangleVector BaseScene::Object::ToTriangleVector() const {
 		dst.v1=inds[idx[0]].dstIdx;
 		dst.v2=inds[idx[1]].dstIdx;
 		dst.v3=inds[idx[2]].dstIdx;
-		dst.mat=src.matId;
+		bool flatNrm=Same(out.nrm[dst.v1],out.nrm[dst.v2])&&Same(out.nrm[dst.v1],out.nrm[dst.v3]);
+		dst.mat=(src.matId&0x7fffffff)+(flatNrm?0x80000000:0);
 	}
 
 	out.triAccels.resize(out.indices.size());

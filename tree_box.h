@@ -101,8 +101,11 @@
 		INLINE const CElement &operator[](int elem) const { return elems[elem]; }
 		INLINE const CElement &GetCElement(int elem) const { return elems[elem]; }
 
-		INLINE const SElement GetSElement(int elem,int subElem) const {
-			return elems[elem].tree->GetSElement(subElem,0);
+		INLINE const SElement GetSElement(int obj,int subElem) const {
+			const CElement &elem=elems[obj];
+			SElement out=elem.tree->GetSElement(subElem,0);
+			out *= elem.trans;
+			return out;
 		}
 		size_t size() const { return elems.size(); }
 		int mem_size() const { /*TODO*/ return elems.size(); }

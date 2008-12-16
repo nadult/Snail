@@ -5,6 +5,8 @@
 #include "ray_group.h"
 #include "light.h"
 
+namespace sampling { struct Cache; }
+
 namespace shading {
 
 	struct Sample {
@@ -36,18 +38,20 @@ namespace shading {
 		BaseMaterial(int f) :flags(f) { }
 		virtual ~BaseMaterial();
 
+		typedef sampling::Cache SCache;
+
 		enum { primaryFlags=isct::fShOrig|isct::fInvDir|isct::fPrimary };
 		typedef PRayGroup<64,primaryFlags> PRays;
 
-		virtual void Shade64(Sample *__restrict__,const PRays&) const=0;
-		virtual void Shade64(Sample *__restrict__,const f32x4b*__restrict_,const PRays&) const=0;
+		virtual void Shade64(Sample *__restrict__,const PRays&,SCache&) const=0;
+		virtual void Shade64(Sample *__restrict__,const f32x4b*__restrict_,const PRays&,SCache&) const=0;
 
 		template <int size,int flags>
-		void Shade(Sample *__restrict__,const PRayGroup<size,flags>&) const
+		void Shade(Sample *__restrict__,const PRayGroup<size,flags>&,SCache&) const
 			{ ThrowException("Shade<",size,",",flags,"> not implemented"); }
 
 		template <int size,int flags>
-		void Shade(Sample *__restrict__,const f32x4b*__restrict__,const PRayGroup<size,flags>&) const
+		void Shade(Sample *__restrict__,const f32x4b*__restrict__,const PRayGroup<size,flags>&,SCache&) const
 			{ ThrowException("Shade<",size,",",flags,"> not implemented"); }
 
 		char flags;	
@@ -57,13 +61,13 @@ namespace shading {
 
 	template <>
 	INLINE void BaseMaterial::Shade<64,BaseMaterial::primaryFlags>
-		(Sample *__restrict__ samples,const BaseMaterial::PRays &rays) const
-		{ Shade64(samples,rays); }
+		(Sample *__restrict__ samples,const BaseMaterial::PRays &rays,SCache&sc) const
+		{ Shade64(samples,rays,sc); }
 
 	template <>
 	INLINE void BaseMaterial::Shade<64,BaseMaterial::primaryFlags>
-		(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const BaseMaterial::PRays &rays) const
-		{ Shade64(samples,mask,rays); }
+		(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const BaseMaterial::PRays &rays,SCache& sc) const
+		{ Shade64(samples,mask,rays,sc); }
 
 	template <bool NDotR=true>
 	class SimpleMaterial: public BaseMaterial {
@@ -72,7 +76,7 @@ namespace shading {
 		SimpleMaterial() { }
 
 		template <int size,int flags>
-		void TShade(Sample *__restrict__ samples,const PRayGroup<size,flags> &rays) const {
+		void TShade(Sample *__restrict__ samples,const PRayGroup<size,flags> &rays,SCache &sc) const {
 			for(int q=0;q<blockSize;q++) {
 				Sample &s=samples[q];
 
@@ -84,7 +88,7 @@ namespace shading {
 			}
 		}
 		template <int size,int flags>
-		void TShade(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const PRayGroup<size,flags> &rays) const {
+		void TShade(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const PRayGroup<size,flags> &rays,SCache &sc) const {
 			for(int q=0;q<blockSize;q++) {
 				Sample &s=samples[q];
 
@@ -96,10 +100,10 @@ namespace shading {
 			}
 		}
 
-		void Shade64(Sample *__restrict__ samples,const PRays &rays) const
-			{ TShade(samples,rays); }
-		void Shade64(Sample *__restrict__ samples,const f32x4b *__restrict__ mask,const PRays &rays) const
-			{ TShade(samples,mask,rays); }
+		void Shade64(Sample *__restrict__ samples,const PRays &rays,SCache &sc) const
+			{ TShade(samples,rays,sc); }
+		void Shade64(Sample *__restrict__ samples,const f32x4b *__restrict__ mask,const PRays &rays,SCache &sc) const
+			{ TShade(samples,mask,rays,sc); }
 
 	private:
 		Vec3f color;
@@ -112,12 +116,12 @@ namespace shading {
 		TexMaterial() { }
 
 		template <int size,int flags>
-		void TShade(Sample *__restrict__ samples,const PRayGroup<size,flags> &rays) const {
+		void TShade(Sample *__restrict__ samples,const PRayGroup<size,flags> &rays,SCache &sc) const {
 
 			for(int q=0;q<blockSize;q++) {
 				Sample &s=samples[q];
 
-				Vec3q diffuse=sampler(s.texCoord,s.texDiff);
+				Vec3q diffuse=sampler(s.texCoord,s.texDiff,sc);
 				Vec3q specular(0.0f,0.0f,0.0f);
 				if(NDotR) diffuse*=rays.Dir(q)|s.normal;
 
@@ -126,13 +130,13 @@ namespace shading {
 			}
 		}
 		template <int size,int flags>
-		void TShade(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const PRayGroup<size,flags> &rays) const {
+		void TShade(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const PRayGroup<size,flags> &rays,SCache &sc) const {
 
 			for(int q=0;q<blockSize;q++) {
 				if(!ForAny(mask[q])) continue;
 				Sample &s=samples[q];
 
-				Vec3q diffuse=sampler(s.texCoord,s.texDiff);
+				Vec3q diffuse=sampler(s.texCoord,s.texDiff,sc);
 				Vec3q specular(0.0f,0.0f,0.0f);
 				if(NDotR) diffuse*=rays.Dir(q)|s.normal;
 
@@ -141,10 +145,10 @@ namespace shading {
 			}
 		}
 
-		void Shade64(Sample *__restrict__ samples,const PRays &rays) const
-			{ TShade(samples,rays); }
-		void Shade64(Sample *__restrict__ samples,const f32x4b *__restrict__ mask,const PRays &rays) const
-			{ TShade(samples,mask,rays); }
+		void Shade64(Sample *__restrict__ samples,const PRays &rays,SCache &sc) const
+			{ TShade(samples,rays,sc); }
+		void Shade64(Sample *__restrict__ samples,const f32x4b *__restrict__ mask,const PRays &rays,SCache &sc) const
+			{ TShade(samples,mask,rays,sc); }
 
 	private:
 		Sampler sampler;

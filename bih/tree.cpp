@@ -114,6 +114,7 @@ namespace bih {
 	template <class ElementContainer>
 	void Tree<ElementContainer>::Construct(const ElementContainer &objs) {
 		elements=objs;
+		nodes.clear();
 
 		if(!elements.size()) {
 			nodes.push_back(Node());
@@ -201,13 +202,6 @@ namespace bih {
 		} */
 
 //		if(sizeoi(CElement)!=64) sah=0;
-		/*{
-			float sSize; { Vec3p s=pMax-pMin; sSize=s.x*(s.y+s.z)+s.y*s.z; }
-			Vec3p size=max-min;
-			float nodeSize=((size.x*(size.y+size.z)+size.y*size.z) / sSize);
-			float density=float(indices.size())/nodeSize;
-			nodes[nNode].density=density*0.5f;
-		}*/
 		if(level>Max(0,desiredMaxLevel-10)||sizeof(CElement)!=64) sah=0;
 
 		float split; int axis;
@@ -306,6 +300,7 @@ namespace bih {
 				uint rightIdx=nodes.size();
 				nodes[nNode].val[1]|=rightIdx;
 				parents.push_back(nNode);
+
 				nodes.push_back(Node());
 				if(numLeft) {
 					std::copy(indices.begin()+numLeft,indices.end(),indices.begin());

@@ -6,6 +6,8 @@
 
 namespace sampling {
 
+	class Cache;
+
 	class SATSampler {
 	public:
 		SATSampler(const gfxlib::Texture&);
@@ -13,6 +15,7 @@ namespace sampling {
 
 		Vec3f operator()(const Vec2f &uv,const Vec2f &diff) const;
 		Vec3q operator()(const Vec2q &uv,const Vec2q &diff) const;
+		INLINE Vec3q operator()(const Vec2q &uv,const Vec2q &diff,Cache&) const { return operator()(uv,diff); }
 
 		// It has to be full, otherwise ray differentials will be wrong
 		static Vec2f ComputeDiff(const Vec2q &uv) { return Maximize(uv)-Minimize(uv); }

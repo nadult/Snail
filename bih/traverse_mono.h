@@ -46,10 +46,12 @@
 
 					if(tOut.Distance(0)<out.Distance(0)) {
 						out.Distance(0)=tOut.Distance(0);
-						if(!(flags&isct::fShadow)) {
+						if(flags&isct::fShadow) break;
+						else {
 							out.Object(0)=idx;
 							if(isctFlags&isct::fElement) out.Element(0)=tOut.Element(0);
 						}
+
 					}
 				}
 POP_STACK:

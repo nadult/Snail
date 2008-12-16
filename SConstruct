@@ -11,7 +11,7 @@ else: libs += libsWin32
 default = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
-		CXX = '/usr/local/gcc-4.3.2/bin/g++ -std=c++0x',
+		CXX = 'ccache /usr/local/gcc-4.3.2/bin/g++ -std=c++0x',
 		CPPPATH = '.'
 	)
 
@@ -19,7 +19,7 @@ if int(ARGUMENTS.get('-m32',0)):
 	default=default.Clone( CXX='g++ -m32')
 
 release = default.Clone(
-	CXXFLAGS='-O3 -mssse3 -march=core2 -mfpmath=sse -g -DNDEBUG -Wstrict-aliasing=2 -Wno-unused -Wno-conversion',
+	CXXFLAGS='-O3 -msse2 -march=core2 -mfpmath=sse -g -DNDEBUG -Wstrict-aliasing=2 -Wno-unused -Wno-conversion',
 	BUILDDIR='build/release/'
 )
 debug = default.Clone(

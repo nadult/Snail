@@ -15,6 +15,14 @@ public:
 	TreeStats<1> stats;
 };
 
+#include "sampling.h"
+
+class Cache {
+public:
+	ShTriCache shTriCache;
+	sampling::Cache samplingCache;
+};
+
 #include "material.h"
 
 template <class AccStruct>

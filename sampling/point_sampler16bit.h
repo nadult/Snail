@@ -6,6 +6,8 @@
 
 namespace sampling {
 
+	struct Cache;
+
 	class PointSampler16bit {
 	public:
 		PointSampler16bit(const gfxlib::Texture&);
@@ -18,7 +20,9 @@ namespace sampling {
 
 		Vec3f operator()(const Vec2f &uv) const; // biggest mipmap will be used
 		Vec3q operator()(const Vec2q &uv) const; // biggest mipmap will be used
+
 		Vec3q operator()(const Vec2q &uv,const Vec2q &diff) const;
+		INLINE Vec3q operator()(const Vec2q &uv,const Vec2q &diff,Cache&) const { return operator()(uv,diff); }
 
 	protected:
 		void Init(const gfxlib::Texture&);

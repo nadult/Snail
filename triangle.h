@@ -329,21 +329,27 @@ public:
 	Vec3f nrm[3];
 	int matId;
 
+	enum {
+		fFlatNormals = 1,
+	};
+
 	float t0;
 	Vec3f ba,ca,a;
 	Vec3f normal;
-	int tmp[3];
+	int flags;
+	u32 temp[2];
 
-//	Vec3p normal,tangent,binormal;
+//	Vec3f tangent,binormal;
 
 	ShTriangle() { }
 	ShTriangle(const Vec3f &p1,const Vec3p &p2,const Vec3f &p3,const Vec2f &uv1,const Vec2f &uv2,const Vec2f &uv3,
-				const Vec3f &nrm1,const Vec3f &nrm2,const Vec3f &nrm3,int tMatId) {
+				const Vec3f &nrm1,const Vec3f &nrm2,const Vec3f &nrm3,int tMatId,bool flatNrm=0) {
 		Vec3f pos[3];
 
 		pos[0]=p1; pos[1]=p2; pos[2]=p3;
 		uv[0]=uv1; uv[1]=uv2; uv[2]=uv3;
 		nrm[0]=nrm1; nrm[1]=nrm2; nrm[2]=nrm3;
+		flags=flatNrm?fFlatNormals:0;
 	
 		normal=(pos[1]-pos[0])^(pos[2]-pos[0]);
 		t0=Length(normal);
@@ -386,6 +392,18 @@ public:
 			binormal=-binormal;
 		} */
 	}
+	void operator*=(const Matrix<Vec4f> &trans) {
+		nrm[0]=trans&nrm[0];
+		nrm[1]=trans&nrm[1];
+		nrm[2]=trans&nrm[2];
+		normal=trans&normal;
+		Vec3f c=ca+a,b=ba+a;
+		a=trans*a;
+		b=trans*b;
+		c=trans*c;
+		ba=b-a; ca=c-a;
+	}
+	bool FlatNormals() const { return flags&fFlatNormals; }
 
 
 	template <class Vec0,class Vec>
@@ -425,7 +443,7 @@ public:
 		const TriIdx &idx=indices[elem];
 		return ShTriangle(	pos[idx.v1],pos[idx.v2],pos[idx.v3],
 							uv[idx.v1], uv[idx.v2], uv[idx.v3],
-							nrm[idx.v1], nrm[idx.v2],nrm[idx.v3],idx.mat);
+							nrm[idx.v1], nrm[idx.v2],nrm[idx.v3],idx.mat&0x7ffffff,idx.mat&0x80000000?1:0);
 	}
 	Vec3f BoundMin(int n) const {
 		const TriIdx &idx=indices[n];
@@ -467,43 +485,35 @@ namespace baselib {
 	template<> struct SerializeAsPOD<TriAccel> { enum { value=1 }; };
 }
 
-	template <class Element,int size_>
-	class TCache {
+	// After changing the element, you have to set the id because it will be trashed
+	class ShTriCache {
 	public:
-		enum { size=size_ };
-		static_assert(!(size&(size-1)),"Size of cache must be a power of 2");
+		enum { size=64 };
 
-		TCache() {
+		ShTriCache() {
 			for(int n=0;n<size;n++) {
-				data[n].objId=~0;
-				data[n].elemId=~0;
+				data[n].temp[0]=~0;
+				data[n].temp[1]=~0;
 			}
 		}
 
 		INLINE uint Hash(u32 objId,u32 elemId) const { return (objId+elemId)&(size-1); }
 
-		INLINE Element &operator[](uint idx) { return data[idx].elem; }
-		INLINE const Element &operator[](uint idx) const { return data[idx].elem; }
+		INLINE ShTriangle &operator[](uint idx) { return data[idx]; }
+		INLINE const ShTriangle &operator[](uint idx) const { return data[idx]; }
 
 		INLINE bool SameId(uint idx,u32 objId,u32 elemId) const {
-			const Data &d=data[idx];
-			return d.objId==objId&&d.elemId==elemId;
+			const ShTriangle &d=data[idx];
+			return d.temp[0]==objId&&d.temp[1]==elemId;
 		}
 		INLINE void SetId(uint idx,u32 objId,u32 elemId) {
-			Data &d=data[idx];
-			d.objId=objId;
-			d.elemId=elemId;
+			ShTriangle &d=data[idx];
+			d.temp[0]=objId;
+			d.temp[1]=elemId;
 		}
 
 	private:
-		struct Data { u32 objId,elemId; Element elem; };
-
-		Data data[size];
-	};
-
-	class Cache {
-	public:
-		TCache<ShTriangle,64> shTriCache;
+		ShTriangle data[size];
 	};
 
 #endif

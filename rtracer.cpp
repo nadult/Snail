@@ -225,12 +225,12 @@ void SetMaterials(Scene &scene) {
 	
 	vector<Ptr<shading::BaseMaterial>> mats;
 	for(int n=0;n<sizeof(snames)/sizeof(string);n++)
-		mats.push_back(shading::NewMaterial(snames[n]==""?"":pre+snames[n]));
+		mats.push_back(shading::NewMaterial(n==0?snames[n]:pre+snames[n]));
 //	int matid[]={ 0,11,1,0,5,5,2,4,5,14,1,6,0,9,11,6,2,6,8,12,13 };
 //	for(int n=0;n<sizeof(matid)/sizeof(int);n++)
 //		scene.materials.push_back(mats[matid[n]]);
 	scene.materials.push_back(mats[0]);
-	scene.materials.push_back(mats[6]);
+//	scene.materials.push_back(mats[6]);
 
 
 }
@@ -249,7 +249,7 @@ void SetLights(Scene &scene,int max) {
 
 
 int main(int argc, char **argv) {
-	printf("Snail v0.1 by nadult\n");
+	printf("Snail v0.11 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
 		PrintHelp();
 		return 0;
@@ -285,20 +285,20 @@ int main(int argc, char **argv) {
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
 	printf("Loading...\n");
-/*!	BaseScene baseScene; {
+	BaseScene baseScene; {
 		baseScene.LoadWavefrontObj(string("scenes/")+modelFile);
 		if(flipNormals) baseScene.FlipNormals();
 		baseScene.GenNormals();
 		baseScene.Optimize();
-	}*/
+	}
 
-/*!	SceneBuilder builder;
+	SceneBuilder builder;
 	for(int n=0;n<baseScene.objects.size();n++) {
 		const BaseScene::Object &obj=baseScene.objects[n];
 		builder.AddObject(new StaticTree(obj.ToTriangleVector()),
 							obj.GetTrans(),obj.GetBBox());
 		builder.AddInstance(n,Identity<>());
-	} */
+	}
 
 	Image img(resx,resy,16);
 
@@ -308,10 +308,10 @@ int main(int argc, char **argv) {
 	gVals[0]=0; gVals[2]=0; gVals[4]=0;
 
 	Scene<StaticTree> staticScene;
-//!	staticScene.geometry.Construct(baseScene.ToTriangleVector());
-//!	staticScene.geometry.PrintInfo();
-//!	Saver(string("dump/")+modelFile) & staticScene.geometry;
-	Loader(string("dump/")+modelFile) & staticScene.geometry;
+	staticScene.geometry.Construct(baseScene.ToTriangleVector());
+	staticScene.geometry.PrintInfo();
+//	Saver(string("dump/")+modelFile) & staticScene.geometry;
+//	Loader(string("dump/")+modelFile) & staticScene.geometry;
 
 	SetMaterials(staticScene);
 	SetLights(staticScene,maxLights*0);
@@ -390,8 +390,8 @@ int main(int argc, char **argv) {
 			if(out.KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
 			if(out.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"old":"new"); }
 
-			if(out.KeyDown('U'))
-				Swap(staticScene.materials[0],staticScene.materials[staticScene.materials.size()==2?1:17]);
+		//	if(out.KeyDown('U'))
+		//		Swap(staticScene.materials[0],staticScene.materials[staticScene.materials.size()==2?1:17]);
 
 			{
 				int dx=out.Key(Key_space)?out.MouseMove().x:0,dy=0;
@@ -410,16 +410,16 @@ int main(int argc, char **argv) {
 			}
 	
 			double buildTime=GetTime();
-	//			scene.geometry.Construct(builder.ExtractElements());
+				scene.geometry.Construct(builder.ExtractElements());
 			buildTime=GetTime()-buildTime;
 
 			staticScene.Update();
+			scene.Update();
 			
 			double time=GetTime();
 			TreeStats<1> stats;
-		//	if(!gVals[0])
-				stats=Render(staticScene,cam,img,options,threads);
-		//	else stats=Render(scene,cam,img,options,threads);
+			if(!gVals[0]) stats=Render(staticScene,cam,img,options,threads);
+			else stats=Render(scene,cam,img,options,threads);
 
 			out.RenderImage(img);
 
