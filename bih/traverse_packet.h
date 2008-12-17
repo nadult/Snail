@@ -1,7 +1,7 @@
 
-	template <class ElementContainer> template <int flags,int size>
+	template <class ElementContainer> template <template<int,int> class Rays,int flags,int size>
 		Isct<f32x4,size,Tree<ElementContainer>::isctFlags|flags>
-		Tree<ElementContainer>::TraversePacket0(const RayGroup<size,flags> &rays) const
+		Tree<ElementContainer>::TraversePacket0(const Rays<size,flags> &rays) const
 	{
 		static_assert(flags&isct::fInvDir,"");
 

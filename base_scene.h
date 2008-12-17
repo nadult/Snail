@@ -10,6 +10,7 @@
 class BaseScene {
 public:
 	void LoadWavefrontObj(const string &fileName);
+	void LoadDoom3Proc(const string &fileName);
 	void SaveWavefrontObj(const string &fileName) const;
 	
 	TriangleVector ToTriangleVector() const;
@@ -80,6 +81,7 @@ public:
 		inline Matrix<Vec4f> GetTrans() const { return trans; }
 		
 		const string &GetName() const { return name; }
+		void SetName(const string &str) { name=str; }
 		
 	protected:
 		vector<IndexedTri> tris;

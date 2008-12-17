@@ -7,13 +7,14 @@ class Light
 {
 public:
 	Light() { }
-	Light(Vec3f p,Vec3f c) {
+	Light(Vec3f p,Vec3f c,float rad) {
 		Convert(p,pos); Convert(c,color);
-		zeroDist=Sqrt(Max(color.x,Max(color.y,color.z)))*256.0f;
+		radius=rad; iRadius=1.0f/radius;
+		radSq=rad*rad;
 	}
 
 	Vec3p pos,color;
-	float zeroDist;
+	float radius,radSq,iRadius;
 };
 
 #endif

@@ -10,8 +10,6 @@ namespace sampling { struct Cache; }
 namespace shading {
 
 	struct Sample {
-		enum { maxLightSamples=4 };
-
 		floatq distance;
 
 		Vec3q position;
@@ -28,7 +26,7 @@ namespace shading {
 
 	class BaseMaterial: public RefCounter {
 	public:
-		enum { blockSize=4 };
+		enum { blockSize=4, rayBlockSize=64 };
 
 		enum {
 			fTexCoords = 1,
@@ -41,10 +39,10 @@ namespace shading {
 		typedef sampling::Cache SCache;
 
 		enum { primaryFlags=isct::fShOrig|isct::fInvDir|isct::fPrimary };
-		typedef PRayGroup<64,primaryFlags> PRays;
+		typedef PRayGroup<rayBlockSize,primaryFlags> PRays;
 
-		virtual void Shade64(Sample *__restrict__,const PRays&,SCache&) const=0;
-		virtual void Shade64(Sample *__restrict__,const f32x4b*__restrict_,const PRays&,SCache&) const=0;
+		virtual void Shade(Sample *__restrict__,const PRays&,SCache&) const=0;
+		virtual void Shade(Sample *__restrict__,const f32x4b*__restrict_,const PRays&,SCache&) const=0;
 
 		template <int size,int flags>
 		void Shade(Sample *__restrict__,const PRayGroup<size,flags>&,SCache&) const
@@ -60,14 +58,14 @@ namespace shading {
 	BaseMaterial *NewMaterial(const string &texName);
 
 	template <>
-	INLINE void BaseMaterial::Shade<64,BaseMaterial::primaryFlags>
+	INLINE void BaseMaterial::Shade<BaseMaterial::rayBlockSize,BaseMaterial::primaryFlags>
 		(Sample *__restrict__ samples,const BaseMaterial::PRays &rays,SCache&sc) const
-		{ Shade64(samples,rays,sc); }
+		{ Shade(samples,rays,sc); }
 
 	template <>
-	INLINE void BaseMaterial::Shade<64,BaseMaterial::primaryFlags>
+	INLINE void BaseMaterial::Shade<BaseMaterial::rayBlockSize,BaseMaterial::primaryFlags>
 		(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const BaseMaterial::PRays &rays,SCache& sc) const
-		{ Shade64(samples,mask,rays,sc); }
+		{ Shade(samples,mask,rays,sc); }
 
 	template <bool NDotR=true>
 	class SimpleMaterial: public BaseMaterial {
@@ -100,9 +98,9 @@ namespace shading {
 			}
 		}
 
-		void Shade64(Sample *__restrict__ samples,const PRays &rays,SCache &sc) const
+		void Shade(Sample *__restrict__ samples,const PRays &rays,SCache &sc) const
 			{ TShade(samples,rays,sc); }
-		void Shade64(Sample *__restrict__ samples,const f32x4b *__restrict__ mask,const PRays &rays,SCache &sc) const
+		void Shade(Sample *__restrict__ samples,const f32x4b *__restrict__ mask,const PRays &rays,SCache &sc) const
 			{ TShade(samples,mask,rays,sc); }
 
 	private:
@@ -145,9 +143,9 @@ namespace shading {
 			}
 		}
 
-		void Shade64(Sample *__restrict__ samples,const PRays &rays,SCache &sc) const
+		void Shade(Sample *__restrict__ samples,const PRays &rays,SCache &sc) const
 			{ TShade(samples,rays,sc); }
-		void Shade64(Sample *__restrict__ samples,const f32x4b *__restrict__ mask,const PRays &rays,SCache &sc) const
+		void Shade(Sample *__restrict__ samples,const f32x4b *__restrict__ mask,const PRays &rays,SCache &sc) const
 			{ TShade(samples,mask,rays,sc); }
 
 	private:

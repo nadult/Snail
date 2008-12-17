@@ -32,7 +32,7 @@ public:
 		
 	Scene() {
 		materials.push_back(new shading::SimpleMaterial<1>(Vec3f(1.0f,1.0f,1.0f)));
-		ambientLight=Vec3f(0.2f,0.2f,0.2f);
+		ambientLight=Vec3f(0.1f,0.1f,0.1f);
 	}
 
 	// Call this after changes made to any of the attributes

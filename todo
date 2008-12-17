@@ -1,4 +1,5 @@
 BIH:
+- problem z pustymi drzewami (segfault)
 - problem w kolejnosci mnozenia macierzy
 - przyspieszyc budowe eliminujac zbedne wywolania rekurencyjne
 - przyspieszyc budowe; optymalizacje boxow otaczajacych robic na krawedziach a nie trojkatach

@@ -45,13 +45,13 @@
 			assert(tree);
 
 			Isct<f32x4,packetSize,isctFlags|flags> out;
-			bool test=0;
+			bool test=1;
 
 		//	if(gVals[2]) {
 			//	if(sharedOrigin) test=bBox.TestIP<packetSize>(rays.Origin(0),precompInv?rays.idir:tinv,maxDist);
 			//	else
-					for(int q=0;q<packetSize&&!test;q++)
-					test|=bBox.TestI(rays.Origin(q),rays.IDir(q),f32x4(1.0f/0.0f));
+	//				for(int q=0;q<packetSize&&!test;q++)
+	//				test|=bBox.TestI(rays.Origin(q),rays.IDir(q),f32x4(1.0f/0.0f));
 		//	} else test=1;
 
 			if(test) {
@@ -61,6 +61,7 @@
 				Isct<f32x4,packetSize,BaseTree::isctFlags|flags> tOut=tree->TraversePacket(trays);
 
 				for(int q=0;q<packetSize;q++) out.Distance(q)=tOut.Distance(q);
+
 				if(!(flags&isct::fShadow)) {
 					for(int q=0;q<packetSize;q++) out.Element(q)=tOut.Object(q);
 				//	for(int q=0;q<packetSize;q++) out.object[q]=0;
@@ -77,7 +78,7 @@
 			ThrowException("TODO: TreeBox Serializer not avaliable");
 		}
 
-	private:
+//	private:
 		friend class TreeBoxVector<BaseTree>;
 		Matrix<Vec4f> trans,invTrans;
 		BBox bBox;

@@ -15,6 +15,7 @@
 		floatq dot[size];
 		f32x4b mask[size];
 
+
 		RaySelector<size> sel=inputSel;
 
 		for(int q=0;q<size;q++) {
@@ -51,10 +52,12 @@
 				f32x4 dist=distance[q];
 				f32x4b msk=mask[q]&&dist-hit.Distance(q)<=dist*0.0001f;
 
-				f32x4 iDistSq=Inv(dist*dist);
-				f32x4 diffMul=dot[q]*iDistSq;
+				f32x4 atten=dist*light.iRadius;
+				atten=Max(f32x4(0.0f),((floatq(1.0f)-atten)*0.2f+FastInv(f32x4(16.0f)*atten*atten))-f32x4(0.0625f));
+
+				f32x4 diffMul=dot[q]*atten;
 				f32x4 specMul=dot[q]; specMul*=specMul; specMul*=specMul; specMul*=specMul; specMul*=specMul;
-				specMul*=iDistSq;
+				specMul*=atten;
 		
 				diffuse [q]+=Condition(msk,lColor*diffMul);
 				specular[q]+=Condition(msk,lColor*specMul);
@@ -67,10 +70,12 @@
 
 				f32x4 dist=distance[q];
 
-				f32x4 iDistSq=Inv(dist*dist);
-				f32x4 diffMul=dot[q]*iDistSq;
-				f32x4 specMul=dot[q]; specMul*=specMul; specMul*=specMul;
-				specMul*=iDistSq;
+				f32x4 atten=dist*light.iRadius;
+				atten=Max(f32x4(0.0f),((floatq(1.0f)-atten)*0.2f+FastInv(f32x4(16.0f)*atten*atten))-f32x4(0.0625f));
+
+				f32x4 diffMul=dot[q]*atten;
+				f32x4 specMul=dot[q]; specMul*=specMul; specMul*=specMul; specMul*=specMul; specMul*=specMul;
+				specMul*=atten;
 		
 				diffuse [q]+=Condition(mask[q],lColor*diffMul);
 				specular[q]+=Condition(mask[q],lColor*specMul);
@@ -103,6 +108,9 @@
 			}
 			return result;
 		}
+		
+		Vec3q minPos( 1.0f/0.0f, 1.0f/0.0f, 1.0f/0.0f);
+		Vec3q maxPos(-1.0f/0.0f,-1.0f/0.0f,-1.0f/0.0f);
 
 		ShTriCache &shTriCache=cache.shTriCache;
 		shading::Sample samples[size];
@@ -126,6 +134,8 @@
 				object[q]=Condition(imask,hit.Object(tq),i32x4(0));
 				element[q]=AccStruct::isctFlags&isct::fElement?Condition(imask,hit.Element(tq),i32x4(0)):i32x4(0);
 				s.position=rays.Dir(tq)*hit.Distance(tq)+rays.Origin(tq);
+				minPos=Condition(mask[q],VMin(minPos,s.position),minPos);
+				maxPos=Condition(mask[q],VMax(maxPos,s.position),maxPos);
 	
 				s.diffuse=s.specular=Vec3q(0.0f,0.0f,0.0f);
 				matId[q]=0;
@@ -302,17 +312,33 @@
 				lSpecular[q]=spec;
 			}
 		}
-		int nLights=Min(int(shading::Sample::maxLightSamples),lights.size());
+		{
+			int nLights=lights.size();
+			Vec3f tMinPos(Minimize(minPos)),tMaxPos(Maximize(maxPos));
+			for(int n=0;n<nLights;n++) {
+				const Light &light=lights[n];
+				float distSq=Min(LengthSq(tMinPos-light.pos),LengthSq(tMaxPos-light.pos));
+				if(distSq>light.radSq) continue;
 
-		for(int n=0;n<nLights;n++)
-			result.stats+=TraceLight<size>(selector,samples,lDiffuse,lSpecular,n);
+				result.stats+=TraceLight<size>(selector,samples,lDiffuse,lSpecular,n);
+			}
+		}
 
-		if(lights.size())
-			for(int q=0;q<size;q++)
+		if(lights.size()) {
+			Vec3q zero(0.0f,0.0f,0.0f),one(1.0f,1.0f,1.0f);
+			for(int q=0;q<size;q++) {
 				result.color[q]=samples[q].diffuse*lDiffuse[q]+samples[q].specular*lSpecular[q];
+			}
+		}
 		else
 			for(int q=0;q<size;q++)
 				result.color[q]=samples[q].diffuse;
+
+		if(gVals[2]&&flags&isct::fPrimary) {
+			Vec3q col=StatsShader<size>(result.stats)[0];
+			for(int q=0;q<size;q++)
+				result.color[q]=col;
+		}
 
 	/*	if(gVals[2]&&flags&isct::fPrimary) {
 			Result<size> refl=TraceReflection(tree,rays,selector,position,normals);

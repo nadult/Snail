@@ -2,115 +2,158 @@
 #include <iostream>
 #include <fstream>
 #include <string.h>
-
-using std::cout;
-using std::endl;
+#include <algorithm>
+#include "base_scene.h"
 
 namespace {
 
-	struct Vert {
-		Vert(const Vec3f &tv) :v(tv),nrm(0,0,0) { }
+	std::map<string,string> LoadMat2TextureMap() {
+		std::filebuf fb;
+		if(!fb.open("scenes/doom3/materials.mtr",std::ios::in))
+			ThrowException("Error while opening file: scenes/doom3/materials.mtr");
+		std::istream in(&fb);
 
-		Vec3f v,nrm;
-	};
-	struct Tri {
-		Tri(int a,int b,int c,int ta,int tb,int tc,vector<Vert> &verts,bool generate,bool neg=0) {
-			i[0]=a; i[1]=b; i[2]=c;
-			t[0]=ta; t[1]=tb; t[2]=tc;
-			nrm=(verts[b].v-verts[a].v)^(verts[c].v-verts[a].v);
-			nrm*=RSqrt(nrm|nrm);
-			if(neg) nrm=-nrm;
+		std::map<string,string> out;
 
-			if(generate) {
-				verts[a].nrm+=nrm;
-				verts[b].nrm+=nrm;
-				verts[c].nrm+=nrm;
+		while(!in.eof()) {
+			string mat,tex="",token;
+			in >> mat;
+
+			if(mat=="table") {
+				in >> token;
+				in >> token; //assert(token=="{");
+				int pCount=1;
+				while(pCount&&!in.eof()) {
+					in >> token;
+					if(token=="}") pCount--;
+					else if(token=="{") pCount++;
+				}
+				continue;
 			}
-		}
 
-		int i[3],t[3];
-		Vec3f nrm;
-	};
-
-	struct Mat {
-		Mat(const string &n,const string &t,bool ts) :name(n),texture(t),twoSided(ts) { }
-
-		bool twoSided;
-		string name,texture;
-	};
-
-	void GenShadingData(vector<Vert> &verts,vector<Vec2f> &coords,vector<Tri> &tris,
-						ShadingDataVec &shadingData,bool generate) {
-		shadingData.resize(tris.size());
-
-		for(int n=0;n<verts.size();n++)
-			verts[n].nrm*=RSqrt(verts[n].nrm|verts[n].nrm);
-
-		for(int n=0;n<tris.size();n++) {
-			Tri &tri=tris[n];
-			for(int k=0;k<3;k++) {
-				if((verts[tri.i[k]].nrm|tris[n].nrm)<0.5f||!generate) Convert(tris[n].nrm,shadingData[n].nrm[k]);
-				else Convert(verts[tri.i[k]].nrm,shadingData[n].nrm[k]);
-				shadingData[n].uv[k]=coords.size()>tri.t[k]?coords[tri.t[k]]:Vec2f(0.0f,0.0f);
+			in >> token; //assert(token=="{");
+			int pCount=1;
+			while(pCount&&!in.eof()) {
+				in >> token;
+				if(token=="}") pCount--;
+				else if(token=="{") pCount++;
+				else if(token=="diffusemap") { in >> tex; if(tex=="map") in >> tex; }
 			}
+					
+			if(tex.substr(tex.size()>=4?tex.size()-4:0,string::npos)!=".tga"&&tex!="")
+				tex=tex+".tga";
+			out[mat]=tex;
 		}
+		return out;
 	}
 
-	int atoi(const string &str) { return ::atoi(str.c_str()); }
-	float atof(const string &str) { return ::atof(str.c_str()); }
+	BaseScene::Object ReadModel(std::istream &in,std::map<string,int> &matNames,
+								const std::map<string,string> &mat2tex) {
+		vector<Vec3f> verts;
+		vector<Vec2f> uvs;
+		vector<Vec3f> normals;
+		vector<BaseScene::IndexedTri> tris;
+
+		string name;
+		int nSurfaces;
+
+		{ string token; in >> token; assert(token=="{"); }
+		in >> name >> nSurfaces;
+		name=name.substr(1,name.size()-2);
+
+		for(int n=0;n<nSurfaces;n++) {
+			int lastTris=tris.size(),lastVerts=verts.size();
+			int nVerts,nInds,nTris;
+			string matName;
+
+			{ string token; in >> token; assert(token=="{"); }
+
+			in >> matName >> nVerts >> nInds;
+			matName=matName.substr(1,matName.size()-2);
+			nTris=nInds/3;
+
+			if(matName.find("decals/")!=string::npos||matName.find("sfx/")!=string::npos) {
+				string token;
+				while(token!="}") in >> token;
+				continue;
+			}
+
+			string texName="";
+			if(mat2tex.find(matName)==mat2tex.end()) {
+			//	std::cout << "Material not found: " << matName << '\n';
+			}
+			else texName=mat2tex.find(matName)->second;
+
+			int matId;
+			if(matNames.find(texName)!=matNames.end())
+				matId=matNames[texName];
+			else {
+				matId=matNames.size();
+				matNames[texName]=matId;
+			}
+
+			tris.resize(lastTris+nTris);
+			verts.resize(lastVerts+nVerts);
+			uvs.resize(lastVerts+nVerts);
+			normals.resize(lastVerts+nVerts);
+
+			for(int v=0;v<nVerts;v++) {
+				Vec3f &pos=verts[lastVerts+v];
+				Vec2f &uv=uvs[lastVerts+v];
+				Vec3f &nrm=normals[lastVerts+v];
+				char t1,t2;
+
+				in >> t1 >> pos.x >> pos.z >> pos.y;
+				in >> uv.x >> uv.y >> nrm.x >> nrm.z >> nrm.y >> t2;
+				assert(t1=='('&&t2==')');
+			}
+
+			for(int t=0;t<nTris;t++) {
+				int idx[3];
+				BaseScene::IndexedTri &tri=tris[lastTris+t];
+				in >> idx[0] >> idx[2] >> idx[1];
+	
+				tri.v[0]=tri.vt[0]=tri.vn[0]=idx[0]+lastVerts;
+				tri.v[1]=tri.vt[1]=tri.vn[1]=idx[2]+lastVerts;
+				tri.v[2]=tri.vt[2]=tri.vn[2]=idx[1]+lastVerts;
+				tri.matId=matId;
+			}
+
+			{ string token; in >> token; assert(token=="}"); }
+		}
+
+		{ char token; in >> token; assert(token=='}'); }
+		BaseScene::Object out(verts,uvs,normals,tris);
+		out.SetName(name);
+		return out;
+	}
 
 }
 
-struct TVert { Vec3f pos,nrm; Vec2f uv; };
+void BaseScene::LoadDoom3Proc(const string &fileName) {
+	objects.clear();
+	matNames.clear();
+	matNames[""]=0;
 
-void LoadProc(const string &fileName,TriVector &out,ShadingDataVec &shData,float scale,uint maxTris) {
-	FILE *f=fopen(fileName.c_str(),"rb");
+	std::filebuf fb;
+	if(!fb.open (fileName.c_str(),std::ios::in))
+		ThrowException("Error while opening file: ",fileName);
 
-	vector<TVert> verts;
+	std::istream is(&fb);
+
 	bool model=0,shape=0;
+	int pCount=0;
 
-	while(!feof(f)) {
-		char token[128];
-		fscanf(f,"%s ",token);
+	std::map<string,string> mat2tex=LoadMat2TextureMap();
 
-		if(strcmp(token,"{")==0&&!model) {
-			int nVerts,nInds;
-			char tex[256];
-			fscanf(f,"%s %d %d ",token,&nVerts,&nInds);
-			strcpy(tex,token+1); tex[strlen(tex)-1]=0;
+	while(!is.eof()) {
+		string token;
+		is >> token;
 
-			if(verts.size()<nVerts) verts.resize(nVerts);		
-			for(int v=0;v<nVerts;v++) {
-				TVert vert; char t1,t2;
-				fscanf(f,"%c %f %f %f %f %f %f %f %f %c ",&t1,
-						&vert.pos.x,&vert.pos.z,&vert.pos.y,&vert.uv.x,&vert.uv.y,
-						&vert.nrm.x,&vert.nrm.z,&vert.nrm.y,&t2);
-				verts[v]=vert;
-			}
+		if(token=="model") 	objects.push_back(ReadModel(is,matNames,mat2tex));
 
-			int nTris=nInds/3;
-			for(int t=0;t<nTris;t++) {
-				int idx[3];
-				fscanf(f,"%d %d %d ",&idx[0],&idx[2],&idx[1]);
-
-				out.push_back(Triangle(verts[idx[0]].pos,verts[idx[1]].pos,verts[idx[2]].pos));
-				shData.push_back(ShadingData());
-				shData.back().nrm[0]=-verts[idx[0]].nrm;
-				shData.back().nrm[1]=-verts[idx[1]].nrm;
-				shData.back().nrm[2]=-verts[idx[2]].nrm;
-				shData.back().uv[0]=verts[idx[0]].uv;
-				shData.back().uv[1]=verts[idx[1]].uv;
-				shData.back().uv[2]=verts[idx[2]].uv;
-			}
-		}
-		if(strcmp(token,"model")==0) model=1; else model=0;
-		if(strcmp(token,"}")==0) shape=0;
-
-		if(strcmp(token,"shadowModel")==0) {
-			while(strcmp(token,"}")!=0) fscanf(f,"%s ",token);
-		}
+		if(token=="{") pCount++;
+		if(token=="}") pCount--;
 	}
-
-	fclose(f);
 }
 

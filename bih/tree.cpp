@@ -121,6 +121,9 @@ namespace bih {
 			nodes[0].clip[0]=-1.0f/0.0f;
 			nodes[0].clip[1]=1.0f/0.0f;
 			nodes[0].val[0]=nodes[0].val[1]=0;
+			pMin=pMax=Vec3p(0.0f,0.0f,0.0f);
+			avgSize=0.0f;
+			maxLevel=1;
 			return;
 		}
 
@@ -157,7 +160,7 @@ namespace bih {
 	void Tree<ElementContainer>::Serialize(Serializer &sr) {
 		sr & nodes & elements;
 		sr & avgSize & pMin & pMax;
-		sr & objectId & maxLevel;
+		sr & maxLevel;
 	}
 
 	template <class ElementContainer>

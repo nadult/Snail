@@ -1,7 +1,7 @@
 
-	template <class ElementContainer> template <int flags,int size>
+	template <class ElementContainer> template <template<int,int> class Rays,int flags,int size>
 		Isct<f32x4,size,Tree<ElementContainer>::isctFlags|flags>
-		Tree<ElementContainer>::TraversePrimary(const RayGroup<size,flags> &rays) const
+		Tree<ElementContainer>::TraversePrimary(const Rays<size,flags> &rays) const
 	{
 		if(!(flags&isct::fInvDir)) ThrowException("BIH::TraversePrimary: dir inverses must be avaliable");
 		if(!(flags&isct::fShOrig)) ThrowException("BIH::TraversePrimary: origin must be shared");

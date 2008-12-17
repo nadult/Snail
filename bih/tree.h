@@ -120,11 +120,11 @@ namespace bih {
 		void Build(vector<Index> &indices,vector<u32> &parents,uint nNode,Vec3f min,Vec3f max,uint level,bool);
 		void OptimizeBFS();
 	
-		template <int flags,int size> Isct<f32x4,size,Tree::isctFlags|flags>
-		TraversePacket0(const RayGroup<size,flags> &rays) const;
+		template <template<int,int> class Rays,int flags,int size> Isct<f32x4,size,Tree::isctFlags|flags>
+		TraversePacket0(const Rays<size,flags> &rays) const;
 	
-		template <int flags,int size> Isct<f32x4,size,Tree::isctFlags|flags>
-		TraversePrimary(const RayGroup<size,flags> &rays) const;
+		template <template<int,int> class Rays,int flags,int size> Isct<f32x4,size,Tree::isctFlags|flags>
+		TraversePrimary(const Rays<size,flags> &rays) const;
 
 	public:	
 		template <int flags> Isct<float,1,Tree::isctFlags|flags>
@@ -152,8 +152,7 @@ namespace bih {
 
 		float avgSize;
 		Vec3f pMin,pMax;
-
-		int objectId,maxLevel;
+		int maxLevel;
 	};
 
 }

@@ -440,6 +440,8 @@ void BaseScene::Object::FindOptimalTrans() {
 		float minSum=1.0f/0.0f;
 		
 		enum { dx=4,dy=4,dz=4 };
+		vector<Vec3f> normals(tris.size());
+		for(int n=0;n<tris.size();n++) normals[n]=GetTriangle(n).fnrm;
 		
 		for(int x=0;x<dx;x++) for(int y=0;y<dy;y++) for(int z=0;z<dz;z++) {
 			float ax=dx==1?0.0f:ConstPI<float>()*0.5f*float(x)/float(dx-1);
@@ -448,25 +450,30 @@ void BaseScene::Object::FindOptimalTrans() {
 			
 			trans=Rotate(ax,ay,az);
 			
-			Vec3f planes[6];
+			Vec3f planes[3];
 			planes[0]=Vec3f(trans.x.x,trans.x.y,trans.x.z);
 			planes[1]=Vec3f(trans.y.x,trans.y.y,trans.y.z);
 			planes[2]=Vec3f(trans.z.x,trans.z.y,trans.z.z);
-			planes[3]=-planes[0];
-			planes[4]=-planes[1];
-			planes[5]=-planes[2];
 			
 			float sum=0.0f;
 			for(int n=0;n<tris.size();n++) {
-				Vec3f nrm=GetTriangle(n).fnrm;
+				const Vec3f &nrm=normals[n];
 				float m=1.0f/0.0f;
-				for(int k=0;k<6;k++) m=Min(m,planes[k]|nrm);
+				m=Min(m,Min(planes[0]|nrm,-planes[0]|nrm));
+				m=Min(m,Min(planes[1]|nrm,-planes[1]|nrm));
+				m=Min(m,Min(planes[2]|nrm,-planes[2]|nrm));
 				sum+=m;
 			}
 			if(sum<minSum) { minSum=sum; min=trans; }
 		}
 		trans=min;
 	}
+
+	Vec3f center(0.0f,0.0f,0.0f);
+	for(int n=0;n<verts.size();n++) center+=verts[n];
+	center/=float(verts.size());
+
+	trans.w+=Vec4f(center.x,center.y,center.z,0.0f);
 
 	Matrix<Vec4f> inv=Inverse(trans);
 	for(int n=0;n<verts.size();n++) verts[n]=inv*verts[n];

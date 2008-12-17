@@ -140,7 +140,9 @@ public:
 		for(int n=0;n<instances.size();n++) {
 			const Instance &inst=instances[n];
 			const Object &obj=objects[inst.objId];
-			elements.push_back(Elem(obj.tree,obj.preTrans*inst.trans,obj.bBox));
+			Matrix<Vec4f> mat=obj.preTrans*inst.trans;
+			BBox box=obj.bBox*inst.trans;
+			elements.push_back(Elem(obj.tree,mat,box));
 		}
 
 		return TreeBoxVector<StaticTree>(elements);
@@ -184,7 +186,7 @@ Dst BitCast(const Src &src) {
 }
 
 template <class Scene>
-void SetMaterials(Scene &scene) {
+void SetMaterials(Scene &scene,const BaseScene &base) {
 	scene.materials.clear();
 
 	/*
@@ -229,22 +231,36 @@ void SetMaterials(Scene &scene) {
 //	int matid[]={ 0,11,1,0,5,5,2,4,5,14,1,6,0,9,11,6,2,6,8,12,13 };
 //	for(int n=0;n<sizeof(matid)/sizeof(int);n++)
 //		scene.materials.push_back(mats[matid[n]]);
-	scene.materials.push_back(mats[0]);
+//	scene.materials.push_back(mats[0]);
 //	scene.materials.push_back(mats[6]);
 
+	scene.materials.resize(base.matNames.size());
+	for(std::map<string,int>::const_iterator it=base.matNames.begin();it!=base.matNames.end();++it) {
+		string name=it->first==""?"":"/mnt/Data/data/doom3/"+it->first;
 
+		try {
+		 	scene.materials[it->second]=typename Scene::PMaterial(shading::NewMaterial(name));
+		}
+		catch(const Exception &ex) {
+			std::cout << ex.what() << '\n';
+			scene.materials[it->second]=scene.materials.front();
+		}
+	}
 }
 
-template <class Scene>
-void SetLights(Scene &scene,int max) {
-	scene.lights.clear();
+vector<Light> GenLights() {
+	vector<Light> out;
 
 	float pos=float(gVals[5])*0.01f;
 
-	if(max>0) scene.lights.push_back(
-		/*Toasters*/ //Light(RotateY(pos)*Vec3f(0,400.5f,0),Vec3f(8,8,5)*10000.5f)
-		/*sponza*/   Light(Vec3f(0,2,0),Vec3f(8,8,5)*20.0f)
+	out.push_back(
+		/*Toasters*/ //Light(RotateY(pos)*Vec3f(0,400.5f,0),Vec3f(8,8,5),10000.f)
+		/*sponza*/  // Light(Vec3f(0,2,0),Vec3f(8,8,5),20.0f)
+		/*admin*/   Light(Vec3f(-78.0f,110.0f,-531.0f),Vec3f(1,1,0.7),1000.0f)
 	);
+	out.push_back(Light(Vec3f(-600.0f,144.0f,-341.0f),Vec3f(0.3,0.6,1.0),800.0f));
+
+	return out;
 }
 
 
@@ -264,8 +280,8 @@ int main(int argc, char **argv) {
 	resx/=2; resy/=2;
 #endif
 	bool fullscreen=0,nonInteractive=0;
-	int threads=4,maxLights=1;
-	const char *modelFile="barracks.obj";
+	int threads=4;
+	const char *modelFile="doom3/admin.proc";
 	Options options;
 	bool treeVisMode=0;
 	bool flipNormals=1;
@@ -286,18 +302,29 @@ int main(int argc, char **argv) {
 
 	printf("Loading...\n");
 	BaseScene baseScene; {
-		baseScene.LoadWavefrontObj(string("scenes/")+modelFile);
+		string fileName=string("scenes/")+modelFile;
+		if(fileName.find(".proc")!=string::npos)
+			baseScene.LoadDoom3Proc(fileName);
+		else if(fileName.find(".obj")!=string::npos)
+			baseScene.LoadWavefrontObj(fileName);
+
 		if(flipNormals) baseScene.FlipNormals();
+		for(int n=0;n<baseScene.objects.size();n++)
+			baseScene.objects[n].Repair();
 		baseScene.GenNormals();
 		baseScene.Optimize();
 	}
 
-	SceneBuilder builder;
-	for(int n=0;n<baseScene.objects.size();n++) {
-		const BaseScene::Object &obj=baseScene.objects[n];
-		builder.AddObject(new StaticTree(obj.ToTriangleVector()),
-							obj.GetTrans(),obj.GetBBox());
-		builder.AddInstance(n,Identity<>());
+	SceneBuilder builder; {
+		int count=0;
+		for(int n=0;n<baseScene.objects.size();n++) {
+			const BaseScene::Object &obj=baseScene.objects[n];
+			TriangleVector vec=obj.ToTriangleVector();
+			if(vec.size()) {
+				builder.AddObject(new StaticTree(vec),obj.GetTrans(),obj.GetBBox());
+				builder.AddInstance(count++,Identity<>());
+			}
+		}
 	}
 
 	Image img(resx,resy,16);
@@ -305,7 +332,7 @@ int main(int argc, char **argv) {
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
 	for(int n=0;n<10;n++) gVals[n]=1;
-	gVals[0]=0; gVals[2]=0; gVals[4]=0;
+	gVals[2]=0; gVals[4]=0;
 
 	Scene<StaticTree> staticScene;
 	staticScene.geometry.Construct(baseScene.ToTriangleVector());
@@ -313,20 +340,21 @@ int main(int argc, char **argv) {
 //	Saver(string("dump/")+modelFile) & staticScene.geometry;
 //	Loader(string("dump/")+modelFile) & staticScene.geometry;
 
-	SetMaterials(staticScene);
-	SetLights(staticScene,maxLights*0);
+	SetMaterials(staticScene,baseScene);
 
 	Scene<FullTree> scene;
-	SetMaterials(scene);
-	SetLights(scene,maxLights*0);
+	SetMaterials(scene,baseScene);
+
+	vector<Light> lights=GenLights();
 
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
-		cam.pos=staticScene.geometry.GetBBox().Center();
+		cam.pos=scene.geometry.GetBBox().Center();
 
 	if(nonInteractive) {
 		double time=GetTime();
-		Render(staticScene,cam,img,options,threads);
+		ThrowException("Rendering to file disabled");
+//		Render(staticScene,cam,img,options,threads);
 
 		time=GetTime()-time;
 		minTime=maxTime=time;
@@ -337,9 +365,11 @@ int main(int argc, char **argv) {
 		Font font;
 
 		bool lightsAnim=0,lightsEnabled=0;
+		bool staticEnabled=1;
 		float speed; {
-			Vec3p size=staticScene.geometry.GetBBox().Size();
-			speed=(size.x+size.y+size.z)*0.005f;
+			scene.geometry.Construct(builder.ExtractElements());
+			Vec3p size=scene.geometry.GetBBox().Size();
+			speed=(size.x+size.y+size.z)*0.0025f;
 		}
 
 		FrameCounter frmCounter;
@@ -351,7 +381,7 @@ int main(int argc, char **argv) {
 			if(out.KeyDown('K')) img.SaveToFile("out/output.tga");
 			if(out.KeyDown('O')) options.reflections^=1;
 			if(out.KeyDown('I')) options.rdtscShader^=1;
-			if(out.KeyDown('C')) cam.pos=staticScene.geometry.GetBBox().Center();
+			if(out.KeyDown('C')) cam.pos=scene.geometry.GetBBox().Center();
 			if(out.KeyDown('P')) {
 				camConfigs.AddConfig(string(modelFile),cam);
 				Saver("scenes/cameras.dat") & camConfigs;
@@ -360,13 +390,17 @@ int main(int argc, char **argv) {
 			if(out.KeyDown('L')) {
 				printf("Lights %s\n",lightsEnabled?"disabled":"enabled");
 				lightsEnabled^=1;
-				SetLights(staticScene,lightsEnabled?maxLights:0);
-				SetLights(scene,lightsEnabled?maxLights:0);
 			}
-			if(out.KeyDown('J')) { printf("Lights animation %s\n",lightsAnim?"disabled":"enabled"); lightsAnim^=1; }
+			if(out.KeyDown('J')) {
+				Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
+
+				lights.push_back(Light(cam.pos,colors[rand()&3],800.0f));
+			//	printf("Lights animation %s\n",lightsAnim?"disabled":"enabled");
+			//	lightsAnim^=1;
+			}
 
 			{
-				float tspeed=speed*(out.Key(Key_lshift)?3.0f:1.0f);
+				float tspeed=speed*(out.Key(Key_lshift)?5.0f:1.0f);
 				if(out.Key('W')) cam.pos+=cam.front*tspeed;
 				if(out.Key('S')) cam.pos-=cam.front*tspeed;
 				if(out.Key('A')) cam.pos-=cam.right*tspeed;
@@ -383,15 +417,17 @@ int main(int argc, char **argv) {
 		//		if(out.KeyDown('3')&&scene.lights.size()>=3) scene.lights[2].pos=cam.pos;
 			}
 
-			if(out.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 1 %s\n",gVals[0]?"on":"off"); }
+			if(out.KeyDown(Key_f1)) staticEnabled^=1;
 			if(out.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
 			if(out.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
 			if(out.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
 			if(out.KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
 			if(out.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"old":"new"); }
 
-		//	if(out.KeyDown('U'))
-		//		Swap(staticScene.materials[0],staticScene.materials[staticScene.materials.size()==2?1:17]);
+			if(out.KeyDown('U')) {
+				Swap(staticScene.materials[0],staticScene.materials[staticScene.materials.size()==2?1:17]);
+				Swap(scene.materials[0],scene.materials[scene.materials.size()==2?1:17]);
+			}
 
 			{
 				int dx=out.Key(Key_space)?out.MouseMove().x:0,dy=0;
@@ -409,16 +445,28 @@ int main(int argc, char **argv) {
 			//	}
 			}
 	
-			double buildTime=GetTime();
-				scene.geometry.Construct(builder.ExtractElements());
-			buildTime=GetTime()-buildTime;
+			double buildTime=GetTime(); {
+				static float pos=0.0f; if(out.Key(Key_space)) pos+=0.02f;
+				SceneBuilder temp=builder;
+			//	for(int n=0;n<temp.instances.size();n++) {
+			//		SceneBuilder::Instance &inst=temp.instances[n];
+			//		inst.trans.w=inst.trans.w+Vec4f(0.0f,sin(pos+n*n)*5.0f*speed,0.0f,0.0f);
+			//	}
+				scene.geometry.Construct(temp.ExtractElements());
+
+				vector<Light> tLights=lightsEnabled?lights:vector<Light>();
+				for(int n=0;n<tLights.size();n++) {
+					tLights[n].pos += Vec3f(sin(pos+n*n),cos(pos+n*n),sin(pos-n*n)*cos(pos+n*n))*speed;
+				}
+				staticScene.lights=scene.lights=tLights;
+			buildTime=GetTime()-buildTime; }
 
 			staticScene.Update();
 			scene.Update();
 			
 			double time=GetTime();
 			TreeStats<1> stats;
-			if(!gVals[0]) stats=Render(staticScene,cam,img,options,threads);
+			if(staticEnabled) stats=Render(staticScene,cam,img,options,threads);
 			else stats=Render(scene,cam,img,options,threads);
 
 			out.RenderImage(img);
@@ -429,7 +477,9 @@ int main(int argc, char **argv) {
 			font.BeginDrawing(resx,resy);
 			font.SetSize(Vec2f(30,20));
 				font.PrintAt(Vec2f(0,0),stats.GenInfo(resx,resy,time*1000.0,buildTime));
-				font.PrintAt(Vec2f(0,20),"FPS: ",int(frmCounter.FPS()));
+				font.PrintAt(Vec2f(0,20),"FPS (",staticEnabled?"static":"dynamic","): ",int(frmCounter.FPS()));
+				font.PrintAt(Vec2f(0,40),"Lights: ",lightsEnabled?int(lights.size()):0);
+
 			font.FinishDrawing();
 
 			out.SwapBuffers();
