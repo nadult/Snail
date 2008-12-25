@@ -1,19 +1,14 @@
 BIH:
 - problem z pustymi drzewami (segfault)
+- poprawic mipmapy w prostokatnych teksturkach
+- jakis dziwny bug ktory moze powodowac zapetlenie sie algorytmu trawersowania ;/
+- zamienic wierzcholki dummy ktore wskazuja na 0, na ostatni node ...
+- przyspieszyc mono tracing
+
 - problem w kolejnosci mnozenia macierzy
 - przyspieszyc budowe eliminujac zbedne wywolania rekurencyjne
 - przyspieszyc budowe; optymalizacje boxow otaczajacych robic na krawedziach a nie trojkatach
 - uzyc RayGroup::IDir
 
 - Zapamietac: Bindy sie hujowo rozwijaja :(((
-
-Kdtree: ( olac :) )
-- Poprawnie wyliczyc epsilon w Triangle::BeamCollide
-- Obsluzyc beamCollision == 2
-
-- bug na abramsie w strukturce bih< bihbox < bih < tri > > >
-
-------------
-- zrobic procedurke RepairRays ktora zabezpiecza przed dzieleniem przed zero dodajac 0.00000001 
-   (a moze zrobic tak jak w travmono ? )
 

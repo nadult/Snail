@@ -66,9 +66,10 @@ public:
 		
 		void TransformData(const Matrix<Vec4f> &mat);
 		void Transform(const Matrix<Vec4f> &mat);
-		void BreakToElements(vector<Object> &output);
+		void BreakToElements(vector<Object> &output) const;
 		void GenNormals();
 		void Optimize();
+		void Join(const Object&);
 
 		Vec3f Center() const;
 		

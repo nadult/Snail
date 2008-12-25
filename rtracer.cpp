@@ -12,71 +12,7 @@
 #include "bih/tree.h"
 #include "tree_box.h"
 #include "scene.h"
-
-Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
-	Matrix<Vec4f> mOut;
-	
-	const float *M=&mat.x.x;
-	float *out=&mOut.x.x;
-	
-	float t[12],m[16];
-	for(int n=0;n<4;n++) {
-      m[n+ 0]=M[n*4+0]; m[n+ 4]=M[n*4+1];
-      m[n+ 8]=M[n*4+2]; m[n+12]=M[n*4+3];
-   }
-	t[0 ]=m[10]*m[15]; t[1 ]=m[11]*m[14];
-	t[2 ]=m[9 ]*m[15]; t[3 ]=m[11]*m[13];
-	t[4 ]=m[9 ]*m[14]; t[5 ]=m[10]*m[13];
-	t[6 ]=m[8 ]*m[15]; t[7 ]=m[11]*m[12];
-	t[8 ]=m[8 ]*m[14]; t[9 ]=m[10]*m[12];
-	t[10]=m[8 ]*m[13]; t[11]=m[9 ]*m[12];
-
-	out[0 ] = t[0 ]*m[5 ]+t[3 ]*m[6 ]+t[4 ]*m[7 ];
-	out[0 ]-= t[1 ]*m[5 ]+t[2 ]*m[6 ]+t[5 ]*m[7 ];
-	out[1 ] = t[1 ]*m[4 ]+t[6 ]*m[6 ]+t[9 ]*m[7 ];
-	out[1 ]-= t[0 ]*m[4 ]+t[7 ]*m[6 ]+t[8 ]*m[7 ];
-	out[2 ] = t[2 ]*m[4 ]+t[7 ]*m[5 ]+t[10]*m[7 ];
-	out[2 ]-= t[3 ]*m[4 ]+t[6 ]*m[5 ]+t[11]*m[7 ];
-	out[3 ] = t[5 ]*m[4 ]+t[8 ]*m[5 ]+t[11]*m[6 ];
-	out[3 ]-= t[4 ]*m[4 ]+t[9 ]*m[5 ]+t[10]*m[6 ];
-	out[4 ] = t[1 ]*m[1 ]+t[2 ]*m[2 ]+t[5 ]*m[3 ];
-	out[4 ]-= t[0 ]*m[1 ]+t[3 ]*m[2 ]+t[4 ]*m[3 ];
-	out[5 ] = t[0 ]*m[0 ]+t[7 ]*m[2 ]+t[8 ]*m[3 ];
-	out[5 ]-= t[1 ]*m[0 ]+t[6 ]*m[2 ]+t[9 ]*m[3 ];
-	out[6 ] = t[3 ]*m[0 ]+t[6 ]*m[1 ]+t[11]*m[3 ];
-	out[6 ]-= t[2 ]*m[0 ]+t[7 ]*m[1 ]+t[10]*m[3 ];
-	out[7 ] = t[4 ]*m[0 ]+t[9 ]*m[1 ]+t[10]*m[2 ];
-	out[7 ]-= t[5 ]*m[0 ]+t[8 ]*m[1 ]+t[11]*m[2 ];
-
-	t[0 ]=m[2 ]*m[7 ]; t[1 ]=m[3 ]*m[6 ];
-	t[2 ]=m[1 ]*m[7 ]; t[3 ]=m[3 ]*m[5 ];
-	t[4 ]=m[1 ]*m[6 ]; t[5 ]=m[2 ]*m[5 ];
-	t[6 ]=m[0 ]*m[7 ]; t[7 ]=m[3 ]*m[4 ];
-	t[8 ]=m[0 ]*m[6 ]; t[9 ]=m[2 ]*m[4 ];
-	t[10]=m[0 ]*m[5 ]; t[11]=m[1 ]*m[4 ];
-
-	out[8 ] = t[0 ]*m[13]+t[3 ]*m[14]+t[4 ]*m[15];
-	out[8 ]-= t[1 ]*m[13]+t[2 ]*m[14]+t[5 ]*m[15];
-	out[9 ] = t[1 ]*m[12]+t[6 ]*m[14]+t[9 ]*m[15];
-	out[9 ]-= t[0 ]*m[12]+t[7 ]*m[14]+t[8 ]*m[15];
-	out[10] = t[2 ]*m[12]+t[7 ]*m[13]+t[10]*m[15];
-	out[10]-= t[3 ]*m[12]+t[6 ]*m[13]+t[11]*m[15];
-	out[11] = t[5 ]*m[12]+t[8 ]*m[13]+t[11]*m[14];
-	out[11]-= t[4 ]*m[12]+t[9 ]*m[13]+t[10]*m[14];
-	out[12] = t[2 ]*m[10]+t[5 ]*m[11]+t[1 ]*m[9 ];
-	out[12]-= t[4 ]*m[11]+t[0 ]*m[9 ]+t[3 ]*m[10];
-	out[13] = t[8 ]*m[11]+t[0 ]*m[8 ]+t[7 ]*m[10];
-	out[13]-= t[6 ]*m[10]+t[9 ]*m[11]+t[1 ]*m[8 ];
-	out[14] = t[6 ]*m[9 ]+t[11]*m[11]+t[3 ]*m[8 ];
-	out[14]-= t[10]*m[11]+t[2 ]*m[8 ]+t[7 ]*m[9 ];
-	out[15] = t[10]*m[10]+t[4 ]*m[8 ]+t[9 ]*m[9 ];
-	out[15]-= t[8 ]*m[9 ]+t[11]*m[10]+t[5 ]*m[8 ];
-
-	float det=1.0f/(m[0]*out[0]+m[1]*out[1]+m[2]*out[2]+m[3]*out[3]);
-	for(int n=0;n<16;n++) out[n]*=det;
-   
-	return mOut;   
-}
+#include "mesh.h"
 
 int TreeVisMain(const TriVector&);
 
@@ -234,7 +170,7 @@ void SetMaterials(Scene &scene,const BaseScene &base) {
 //	scene.materials.push_back(mats[0]);
 //	scene.materials.push_back(mats[6]);
 
-	scene.materials.resize(base.matNames.size());
+	scene.materials.resize(base.matNames.size()+1);
 	for(std::map<string,int>::const_iterator it=base.matNames.begin();it!=base.matNames.end();++it) {
 		string name=it->first==""?"":"/mnt/Data/data/doom3/"+it->first;
 
@@ -246,6 +182,10 @@ void SetMaterials(Scene &scene,const BaseScene &base) {
 			scene.materials[it->second]=scene.materials.front();
 		}
 	}
+	scene.materials.back()=typename Scene::PMaterial(shading::NewMaterial("scenes/doom3/imp/texture.tga"));
+
+	scene.materials[126]->flags|=shading::BaseMaterial::fReflection;
+	scene.materials[ 70]->flags|=shading::BaseMaterial::fRefraction;
 }
 
 vector<Light> GenLights() {
@@ -258,11 +198,11 @@ vector<Light> GenLights() {
 		/*sponza*/  // Light(Vec3f(0,2,0),Vec3f(8,8,5),20.0f)
 		/*admin*/   Light(Vec3f(-78.0f,110.0f,-531.0f),Vec3f(1,1,0.7),1000.0f)
 	);
-	out.push_back(Light(Vec3f(-600.0f,144.0f,-341.0f),Vec3f(0.3,0.6,1.0),800.0f));
+//	out.push_back(Light(Vec3f(-600.0f,144.0f,-341.0f),Vec3f(0.3,0.6,1.0),800.0f));
+//	out.push_back(Light(Vec3f(407.0f,209.64f,1634.0f),Vec3f(1,1,1),1000.0f));
 
 	return out;
 }
-
 
 int main(int argc, char **argv) {
 	printf("Snail v0.11 by nadult\n");
@@ -275,7 +215,14 @@ int main(int argc, char **argv) {
 	CameraConfigs camConfigs;
 	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
 
-	int resx=1024,resy=1024;
+	Mesh mesh;
+	MeshAnim meshAnim;
+	mesh.Load("scenes/doom3/imp/imp.md5mesh");
+	meshAnim.Load("scenes/doom3/imp/walk1.md5anim");
+
+	StaticTree meshTree;
+
+	int resx=800,resy=600;
 #ifndef NDEBUG
 	resx/=2; resy/=2;
 #endif
@@ -291,7 +238,6 @@ int main(int argc, char **argv) {
 		else if(string("-threads")==argv[n]&&n<argc-1) { threads=atoi(argv[n+1]); n+=1; }
 		else if(string("-fullscreen")==argv[n]) { fullscreen=1; }
 		else if(string("-toFile")==argv[n]) { nonInteractive=1; }
-		else if(string("-shading")==argv[n]&&n<argc-1) { options.shading=string("gouraud")==argv[n+1]?smGouraud:smFlat; n+=1; }
 		else if(string("-treevis")==argv[n]) treeVisMode=1;
 		else if(string("+flipNormals")==argv[n]) flipNormals=1;
 		else if(string("-flipNormals")==argv[n]) flipNormals=0;
@@ -311,14 +257,32 @@ int main(int argc, char **argv) {
 		if(flipNormals) baseScene.FlipNormals();
 		for(int n=0;n<baseScene.objects.size();n++)
 			baseScene.objects[n].Repair();
-		baseScene.GenNormals();
-		baseScene.Optimize();
+	//	baseScene.GenNormals();
+	//	baseScene.Optimize();
 	}
 
 	SceneBuilder builder; {
-		int count=0;
+		vector<BaseScene::Object> objects;
+
 		for(int n=0;n<baseScene.objects.size();n++) {
 			const BaseScene::Object &obj=baseScene.objects[n];
+			bool contained=0;
+			for(int k=0;k<objects.size();k++) {
+				BaseScene::Object &tObj=objects[k];
+				if(1||obj.GetBBox().Contains(tObj.GetBBox(),1.5f)||tObj.GetBBox().Contains(obj.GetBBox(),1.5f)) {
+					contained=1;
+					tObj.Join(obj);
+					break;
+				}
+			}
+			if(!contained) objects.push_back(baseScene.objects[n]);
+
+		}
+
+		int count=0;	
+		for(int o=0;o<objects.size();o++) {
+			BaseScene::Object &obj=objects[o];
+		//	obj.Optimize();
 			TriangleVector vec=obj.ToTriangleVector();
 			if(vec.size()) {
 				builder.AddObject(new StaticTree(vec),obj.GetTrans(),obj.GetBBox());
@@ -332,18 +296,19 @@ int main(int argc, char **argv) {
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
 	for(int n=0;n<10;n++) gVals[n]=1;
-	gVals[2]=0; gVals[4]=0;
+	gVals[2]=0; gVals[4]=0; gVals[3]=0;
 
 	Scene<StaticTree> staticScene;
 	staticScene.geometry.Construct(baseScene.ToTriangleVector());
 	staticScene.geometry.PrintInfo();
-//	Saver(string("dump/")+modelFile) & staticScene.geometry;
+	Saver(string("dump/")+modelFile) & staticScene.geometry;
 //	Loader(string("dump/")+modelFile) & staticScene.geometry;
 
 	SetMaterials(staticScene,baseScene);
 
 	Scene<FullTree> scene;
 	SetMaterials(scene,baseScene);
+	mesh.SetMaterial(scene.materials.size()-1);
 
 	vector<Light> lights=GenLights();
 
@@ -364,11 +329,11 @@ int main(int argc, char **argv) {
 		GLWindow out(resx,resy,fullscreen);
 		Font font;
 
-		bool lightsAnim=0,lightsEnabled=0;
-		bool staticEnabled=1;
+		bool lightsEnabled=1;
+		bool staticEnabled=0;
 		float speed; {
 			scene.geometry.Construct(builder.ExtractElements());
-			Vec3p size=scene.geometry.GetBBox().Size();
+			Vec3p size=staticScene.geometry.GetBBox().Size();
 			speed=(size.x+size.y+size.z)*0.0025f;
 		}
 
@@ -395,8 +360,6 @@ int main(int argc, char **argv) {
 				Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
 
 				lights.push_back(Light(cam.pos,colors[rand()&3],800.0f));
-			//	printf("Lights animation %s\n",lightsAnim?"disabled":"enabled");
-			//	lightsAnim^=1;
 			}
 
 			{
@@ -422,12 +385,15 @@ int main(int argc, char **argv) {
 			if(out.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
 			if(out.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
 			if(out.KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
-			if(out.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"old":"new"); }
+			if(out.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"on":"off"); }
 
-			if(out.KeyDown('U')) {
-				Swap(staticScene.materials[0],staticScene.materials[staticScene.materials.size()==2?1:17]);
-				Swap(scene.materials[0],scene.materials[scene.materials.size()==2?1:17]);
-			}
+		/*	if(out.KeyDown('U')) {
+				static int n=1;
+				Swap(staticScene.materials[0],staticScene.materials[n]);
+				Swap(scene.materials[0],scene.materials[n]);
+				printf("%d toggled\n",n);
+				n++;
+			} */
 
 			{
 				int dx=out.Key(Key_space)?out.MouseMove().x:0,dy=0;
@@ -446,13 +412,22 @@ int main(int argc, char **argv) {
 			}
 	
 			double buildTime=GetTime(); {
-				static float pos=0.0f; if(out.Key(Key_space)) pos+=0.02f;
+				static float pos=0.0f; if(out.Key(Key_space)) pos+=0.025f;
 				SceneBuilder temp=builder;
 			//	for(int n=0;n<temp.instances.size();n++) {
 			//		SceneBuilder::Instance &inst=temp.instances[n];
 			//		inst.trans.w=inst.trans.w+Vec4f(0.0f,sin(pos+n*n)*5.0f*speed,0.0f,0.0f);
 			//	}
-				scene.geometry.Construct(temp.ExtractElements());
+				mesh.Animate(meshAnim,pos);
+				meshTree.Construct(mesh.triVec,1);
+			//	staticScene.geometry=meshTree;
+
+				temp.AddObject(&meshTree,Identity<>(),meshTree.GetBBox());
+				for(int x=-1;x<2;x++) for(int z=-1;z<2;z++)
+					temp.AddInstance(temp.objects.size()-1,
+							RotateY(3.1415f)*Translate(Vec3f(132+x*50,0,z*50-346)));
+				scene.geometry.Construct(temp.ExtractElements(),1);
+				BBox box=meshTree.GetBBox();
 
 				vector<Light> tLights=lightsEnabled?lights:vector<Light>();
 				for(int n=0;n<tLights.size();n++) {
@@ -476,16 +451,13 @@ int main(int argc, char **argv) {
 
 			font.BeginDrawing(resx,resy);
 			font.SetSize(Vec2f(30,20));
-				font.PrintAt(Vec2f(0,0),stats.GenInfo(resx,resy,time*1000.0,buildTime));
+				font.PrintAt(Vec2f(0,0),stats.GenInfo(resx,resy,time*1000.0,buildTime*1000.0));
 				font.PrintAt(Vec2f(0,20),"FPS (",staticEnabled?"static":"dynamic","): ",int(frmCounter.FPS()));
 				font.PrintAt(Vec2f(0,40),"Lights: ",lightsEnabled?int(lights.size()):0);
 
 			font.FinishDrawing();
 
 			out.SwapBuffers();
-
-
-		//	if(lightsAnim) scene.Animate();
 		}
 	}
 

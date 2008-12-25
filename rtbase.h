@@ -1,9 +1,7 @@
 #ifndef RTBASE_H
 #define RTBASE_H
 
-#ifdef _WIN32
-	#define VECLIB_SSE_VER 0x20
-#endif
+#define VECLIB_SSE_VER 0x20
 
 #include <baselib.h>
 #include <veclib.h>
@@ -41,6 +39,41 @@ inline Vec2p Maximize(const Vec2q &v) { return Vec2p(Maximize(v.x),Maximize(v.y)
 inline Vec2p Minimize(const Vec2q &v) { return Vec2p(Minimize(v.x),Minimize(v.y)); }
 inline Vec3p Maximize(const Vec3q &v) { return Vec3p(Maximize(v.x),Maximize(v.y),Maximize(v.z)); }
 inline Vec3p Minimize(const Vec3q &v) { return Vec3p(Minimize(v.x),Minimize(v.y),Minimize(v.z)); }
+
+INLINE bool IsNan(const Vec3f &f) { return isnan(f.x)||isnan(f.y)||isnan(f.z); }
+INLINE bool IsNan(const Vec4f &f) { return isnan(f.x)||isnan(f.y)||isnan(f.z)||isnan(f.w); }
+
+INLINE Vec3q SafeInv(const Vec3q &v) {
+	const float epsilon=0.0000001f,inf=1.0f/0.0f;
+	return Vec3q(
+		Condition(Abs(v.x)<floatq(epsilon),floatq(inf),Inv(v.x)),
+		Condition(Abs(v.y)<floatq(epsilon),floatq(inf),Inv(v.y)),
+		Condition(Abs(v.z)<floatq(epsilon),floatq(inf),Inv(v.z)));
+}
+
+INLINE Vec3f SafeInv(const Vec3f &v) {
+	const float epsilon=0.0000001f,inf=1.0f/0.0f;
+	return Vec3f(
+		Condition(Abs(v.x)<epsilon,inf,Inv(v.x)),
+		Condition(Abs(v.y)<epsilon,inf,Inv(v.y)),
+		Condition(Abs(v.z)<epsilon,inf,Inv(v.z)));
+}
+
+template <int size>
+void ComputeMinMax(const Vec3q *vec,float *__restrict__ min,float *__restrict__ max) {
+	floatq tMin[3]={1.0f/0.0f,1.0f/0.0f,1.0f/0.0f};
+	floatq tMax[3]={-1.0f/0.0f,-1.0f/0.0f,-1.0f/0.0f};
+
+	for(int q=0;q<size;q++) {
+		const Vec3q &v=vec[q];
+		tMin[0]=Min(tMin[0],v.x); tMax[0]=Max(tMax[0],v.x);
+		tMin[1]=Min(tMin[1],v.y); tMax[1]=Max(tMax[1],v.y);
+		tMin[2]=Min(tMin[2],v.z); tMax[2]=Max(tMax[2],v.z);
+	}
+	
+	min[0]=Minimize(tMin[0]); min[1]=Minimize(tMin[1]); min[2]=Minimize(tMin[2]);
+	max[0]=Maximize(tMax[0]); max[1]=Maximize(tMax[1]); max[2]=Maximize(tMax[2]);
+}
 
 extern int gVals[16];
 
@@ -103,7 +136,6 @@ namespace isct {
 		// RayGroup flags:
 		fMaxDist	= 0x010000,
 		fShOrig		= 0x020000,
-		fInvDir		= 0x040000,
 	};
 
 }
@@ -225,6 +257,7 @@ public:
 		return *this;
 	}
 };
+
 
 #include "bounding_box.h"
 

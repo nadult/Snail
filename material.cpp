@@ -8,7 +8,7 @@ namespace shading {
 
 	BaseMaterial::~BaseMaterial() { }
 
-	BaseMaterial *NewMaterial(const string &texName) {
+	BaseMaterial *NewMaterial(const string &texName,bool NDotL) {
 		if(texName=="") return new SimpleMaterial<1>(Vec3f(1.0f,1.0f,1.0f));
 		gfxlib::Texture tex;
 		Loader(texName) & tex;
@@ -29,16 +29,22 @@ namespace shading {
 					}
 				}
 			 	tmp.GenMips();
-				return new TexMaterial<PointSampler,1>(tmp);
+				return NDotL?	(BaseMaterial*)new TexMaterial<PointSampler,1>(tmp):
+								(BaseMaterial*)new TexMaterial<PointSampler,0>(tmp);
 				}
 			case gfxlib::TI_R8G8B8:
 				if(tex.Mips()==1) {
 					tex.ReallocMips(0);
 					tex.GenMips();
 				}
-				return new TexMaterial<PointSampler,1>(tex);
-			case gfxlib::TI_R5G6B5: return new TexMaterial<PointSampler16bit,1>(tex);
-			case gfxlib::TI_DXT1: return new TexMaterial<PointSamplerDXT,1>(tex);
+				return NDotL?	(BaseMaterial*)new TexMaterial<PointSampler,1>(tex):
+								(BaseMaterial*)new TexMaterial<PointSampler,0>(tex);
+			case gfxlib::TI_R5G6B5:
+				return NDotL?	(BaseMaterial*)new TexMaterial<PointSampler16bit,1>(tex):
+								(BaseMaterial*)new TexMaterial<PointSampler16bit,0>(tex);
+			case gfxlib::TI_DXT1:
+				return NDotL?	(BaseMaterial*)new TexMaterial<PointSamplerDXT,1>(tex):
+								(BaseMaterial*)new TexMaterial<PointSamplerDXT,0>(tex);
 		}
 
 		ThrowException("Cannot create a material with texture ",texName,": format is not supported");

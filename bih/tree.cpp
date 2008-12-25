@@ -31,26 +31,27 @@ namespace bih {
 
 	}
 
-	void FindSplit(const vector<Index> &indices,const Vec3f &min,const Vec3f &max,int &outAxis,float &outSplit) {
-		int axis=MaxAxis(max-min);
-		float cmin=(&min.x)[axis],cmax=(&max.x)[axis];
+	void FindSplit(const vector<Index> &indices,const BBox &box,int &outAxis,float &outSplit) {
+		int axis=MaxAxis(box.Size());
+		float cmin=(&box.min.x)[axis],cmax=(&box.max.x)[axis];
 		float split=Lerp(cmin,cmax,0.5f);
 		outAxis=axis;
 		outSplit=split;
 	}
 
-	bool SAH(const vector<Index> &indices,const Vec3f &min,const Vec3f &max,int &outAxis,float &outSplit) {
+	bool SAH(const vector<Index> &indices,const BBox &box,int &outAxis,float &outSplit) {
 		enum { pickLongestAxis=0 };
-		int axis=MaxAxis(max-min);
+		int axis=MaxAxis(box.max-box.min);
 
 		const float travCost=0.1;
 		const float hitTestCost=1.0;
 		const float noSplitCost=hitTestCost*indices.size();
 
 		float minCost[3],dividers[3];
-		const float sub[3]={min.x,min.y,min.z},mul[3]={1.0f/(max.x-min.x),1.0f/(max.y-min.y),1.0f/(max.z-min.z)};
+		const float sub[3]={box.min.x,box.min.y,box.min.z};
+		const float mul[3]={Inv(box.max.x-box.min.x),Inv(box.max.y-box.min.y),Inv(box.max.z-box.min.z)};
 
-		const float nodeSize[3]={max.x-min.x,max.y-min.y,max.z-min.z};
+		const float nodeSize[3]={box.Width(),box.Height(),box.Depth()};
 		const float iNodeSize=1.0/(nodeSize[0]*nodeSize[1]+nodeSize[0]*nodeSize[2]+nodeSize[1]*nodeSize[2]);
 
 		int startS=pickLongestAxis?axis:0,endS=pickLongestAxis?axis+1:3; {
@@ -112,7 +113,7 @@ namespace bih {
 	Tree<ElementContainer>::Tree(const ElementContainer &objs) { Construct(objs); }
 
 	template <class ElementContainer>
-	void Tree<ElementContainer>::Construct(const ElementContainer &objs) {
+	void Tree<ElementContainer>::Construct(const ElementContainer &objs,bool fast) {
 		elements=objs;
 		nodes.clear();
 
@@ -121,14 +122,13 @@ namespace bih {
 			nodes[0].clip[0]=-1.0f/0.0f;
 			nodes[0].clip[1]=1.0f/0.0f;
 			nodes[0].val[0]=nodes[0].val[1]=0;
-			pMin=pMax=Vec3p(0.0f,0.0f,0.0f);
+			bBox=BBox(Vec3f(0.0f,0.0f,0.0f),Vec3f(0.0f,0.0f,0.0f));
 			avgSize=0.0f;
 			maxLevel=1;
 			return;
 		}
 
-		pMin=elements.BoundMin(0);
-		pMax=elements.BoundMax(0);
+		bBox=elements.GetBBox(0);
 		maxLevel=0;
 
 		Vec3p sumSize(0,0,0);
@@ -136,8 +136,8 @@ namespace bih {
 			Vec3p min=elements.BoundMin(n),max=elements.BoundMax(n);
 			sumSize+=max-min;
 
-			pMin=VMin(pMin,min);
-			pMax=VMax(pMax,max);
+			bBox.min=VMin(bBox.min,min);
+			bBox.max=VMax(bBox.max,max);
 		}
 		nodes.push_back(Node());
 		
@@ -152,14 +152,14 @@ namespace bih {
 
 		vector<u32> parents; parents.push_back(0);
 
-		Build(indices,parents,0,pMin,pMax,0,1);
+		Build(indices,parents,0,bBox,0,1,fast);
 	//	OptimizeBFS();
 	}
 
 	template <class ElementContainer>
 	void Tree<ElementContainer>::Serialize(Serializer &sr) {
 		sr & nodes & elements;
-		sr & avgSize & pMin & pMax;
+		sr & avgSize & bBox;
 		sr & maxLevel;
 	}
 
@@ -179,15 +179,16 @@ namespace bih {
 	template <class ElementContainer>
 	uint Tree<ElementContainer>::FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const {
 		const Node &node=nodes[nNode];
-		if(node.ClipLeft()>(&pMin.x)[node.Axis()]-5.0f&&node.ClipRight()<(&pMax.x)[node.Axis()]+5.0f) return ~0;
+		if(node.ClipLeft()>(&bBox.min.x)[node.Axis()]-5.0f&&node.ClipRight()<(&bBox.max.x)[node.Axis()]+5.0f)
+			return ~0;
 		if(axis==node.Axis()) return nNode;
 		if(nNode==0) return ~0;
 		return FindSimilarParent(parents,parents[nNode],axis);
 	}
 
 	template <class ElementContainer>
-	void Tree<ElementContainer>::Build(vector<Index> &indices,vector<u32> &parents,uint nNode,
-								Vec3f min,Vec3f max,uint level,bool sah) {
+	void Tree<ElementContainer>::Build(vector<Index> &indices,vector<u32> &parents,uint nNode,BBox box,
+										uint level,bool sah,bool fast) {
 		maxLevel=Max(maxLevel,level+1);
 		
 /*		{ // eliminating duplicates
@@ -205,14 +206,14 @@ namespace bih {
 		} */
 
 //		if(sizeoi(CElement)!=64) sah=0;
-		if(level>Max(0,desiredMaxLevel-10)||sizeof(CElement)!=64) sah=0;
+		if(level>Max(0,desiredMaxLevel-10)||fast) sah=0;
 
 		float split; int axis;
-		FindSplit(indices,min,max,axis,split);
-		if(sah) if(!SAH(indices,min,max,axis,split)) sah=0;
+		FindSplit(indices,box,axis,split);
+		if(sah) if(!SAH(indices,box,axis,split)) sah=0;
 
 		float leftMax=-1.0f/0.0f,rightMin=1.0f/0.0f;
-		SplitIndices(elements,indices,axis,split,sah?0.0f:avgSize);
+		if(!fast) SplitIndices(elements,indices,axis,split,sah?0.0f:avgSize);
 
 		int right=indices.size()-1;
 		if(level>=desiredMaxLevel) {
@@ -225,8 +226,8 @@ namespace bih {
 			sum/=double(indices.size());
 			split=sum;
 			right=indices.size()/2-1;
-			leftMax=(&pMin.x)[axis];
-			rightMin=(&pMax.x)[axis];
+			leftMax=(&bBox.min.x)[axis];
+			rightMin=(&bBox.max.x)[axis];
 			for(int n=0;n<indices.size();n++) {
 				float min=(&indices[n].min.x)[axis];
 				float max=(&indices[n].max.x)[axis];
@@ -253,14 +254,14 @@ namespace bih {
 		int numLeft=right+1;
 		int numRight=indices.size()-numLeft;
 
-		Vec3p maxL=max; (&maxL.x)[axis]=split;
-		Vec3p minR=min; (&minR.x)[axis]=split;
+		Vec3f maxL=box.max; (&maxL.x)[axis]=split;
+		Vec3f minR=box.min; (&minR.x)[axis]=split;
 
 		if((numLeft==0||numRight==0)) {
 			uint sameAxisParent=FindSimilarParent(parents,parents[nNode],axis);
 			if(sameAxisParent!=~0) {
-				if(numLeft==0) Build(indices,parents,nNode,minR,max,level+1,1);
-				if(numRight==0) Build(indices,parents,nNode,min,maxL,level+1,1);
+				if(numLeft==0) Build(indices,parents,nNode,BBox(minR,box.max),level+1,1,fast);
+				if(numRight==0) Build(indices,parents,nNode,BBox(box.min,maxL),level+1,1,fast);
 				return;
 			}
 		}
@@ -288,9 +289,9 @@ namespace bih {
 				if(numRight) {
 					vector<Index> inds(numLeft);
 					std::copy(indices.begin(),indices.begin()+numLeft,inds.begin());
-					Build(inds,parents,leftIdx,min,maxL,level+1,1);
+					Build(inds,parents,leftIdx,BBox(box.min,maxL),level+1,1,fast);
 				}
-				else Build(indices,parents,leftIdx,min,maxL,level+1,1);
+				else Build(indices,parents,leftIdx,BBox(box.min,maxL),level+1,1,fast);
 			}
 		}
 		if(numRight) {
@@ -309,7 +310,7 @@ namespace bih {
 					std::copy(indices.begin()+numLeft,indices.end(),indices.begin());
 					indices.resize(numRight);
 				}
-				Build(indices,parents,rightIdx,minR,max,level+1,1);
+				Build(indices,parents,rightIdx,BBox(minR,box.max),level+1,1,fast);
 			}
 		}
 	}

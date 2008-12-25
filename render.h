@@ -5,10 +5,9 @@
 template <class AccStruct> class Scene;
 
 struct Options {
-	Options(ShadingMode sm,bool refl,bool rdtsc) :shading(sm),reflections(refl),rdtscShader(rdtsc) { }
-	Options() { reflections=rdtscShader=0; shading=smFlat; }
+	Options(bool refl,bool rdtsc) :reflections(refl),rdtscShader(rdtsc) { }
+	Options() { reflections=rdtscShader=0; }
 
-	ShadingMode shading;
 	bool reflections,rdtscShader;
 };
 

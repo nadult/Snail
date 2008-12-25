@@ -10,14 +10,7 @@
 #include "base_scene.h"
 #include "tree_box.h"
 #include "font.h"
-
-struct Options {
-	Options(ShadingMode sm,bool refl,bool rdtsc) :shading(sm),reflections(refl),rdtscShader(rdtsc) { }
-	Options() { reflections=rdtscShader=0; shading=smFlat; }
-
-	ShadingMode shading;
-	bool reflections,rdtscShader;
-};
+#include "render.h"
 
 inline i32x4 ConvColor(const Vec3q &rgb) {
 	i32x4 tr=Trunc(Clamp(rgb.x*255.0f,floatq(0.0f),floatq(255.0f)));
@@ -70,19 +63,17 @@ struct RenderTask {
 
 		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
-				Vec3q dir[NQuads];
+				Vec3q dir[NQuads],idir[NQuads];
 				rayGen.Generate(PWidth,PHeight,startX+x,startY+y,dir);
 
 				for(int n=0;n<NQuads;n++) {
 					dir[n]=rotMat*dir[n];
 					dir[n]*=RSqrt(dir[n]|dir[n]);
-					dir[n].x+=floatq(0.000000000001f);
-					dir[n].y+=floatq(0.000000000001f);
-					dir[n].z+=floatq(0.000000000001f);
+					idir[n]=SafeInv(dir[n]);
 				}
-
-				RayGroup<NQuads,isct::fShOrig|isct::fInvDir|isct::fPrimary> rays(origin,dir);
-				Result<NQuads> result=scene->RayTrace(rays,FullSelector<NQuads>(),cache);
+				
+				Result<NQuads> result=
+					scene->RayTrace(RayGroup<NQuads,1>(&origin,dir,idir),FullSelector<NQuads>(),cache);
 				Vec3q *rgb=result.color;
 				*outStats += result.stats;
 
@@ -153,7 +144,7 @@ TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &im
 
 template <class AccStruct>
 TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
-	return Render<3>(scene,camera,image,options,tasks);
+	return gVals[3]?Render<2>(scene,camera,image,options,tasks):Render<3>(scene,camera,image,options,tasks);
 }
 
 typedef bih::Tree<TriangleVector> StaticTree;

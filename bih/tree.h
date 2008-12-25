@@ -3,7 +3,6 @@
 
 #include "ray_group.h"
 #include "tree_stats.h"
-#include "context.h"
 #include "triangle.h"
 
 
@@ -55,8 +54,8 @@ namespace bih {
 
 //	void GenBIHIndices(const TriVector &tris,vector<Index> &out,float maxSize,uint maxSplits);
 
-	void FindSplit(const vector<Index> &indices,const Vec3f &min,const Vec3f &max,int &outAxis,float &outSplit);
-	bool SAH(const vector<Index> &indices,const Vec3f &min,const Vec3f &max,int &outAxis,float &outSplit);
+	void FindSplit(const vector<Index> &indices,const BBox &box,int &outAxis,float &outSplit);
+	bool SAH(const vector<Index> &indices,const BBox &box,int &outAxis,float &outSplit);
 	
 	template <class ElemContainer>
 	void SplitIndices(const ElemContainer &elements,vector<Index> &inds,int axis,float pos,float maxSize) {
@@ -83,9 +82,6 @@ namespace bih {
 	void SplitIndices(const TriangleVector &tris,vector<Index> &inds,int axis,float pos,float maxSize);
 //	void OptimizeIndices(vector<Index> &indices);
 
-	template <class Tree,int flags>
-	struct TreeFlags { enum { value=Tree::isctFlags|flags }; };
-
 	template <class ElementContainer_>
 	class Tree: public RefCounter {
 	public:
@@ -93,7 +89,7 @@ namespace bih {
 		typedef typename ElementContainer::CElement CElement;
 		typedef typename ElementContainer::SElement SElement;
 
-		enum { elementIsComplex=CElement::isComplex };
+		enum { isComplex=CElement::isComplex };
 		enum { isctFlags=CElement::isctFlags|isct::fObject|isct::fStats };
 		enum { filterSigns=1 };
 		enum { desiredMaxLevel=60 }; // Can be more, depends on the scene
@@ -102,7 +98,7 @@ namespace bih {
 
 		void Serialize(Serializer&);
 
-		BBox GetBBox() const { return BBox(pMin,pMax); }
+		BBox GetBBox() const { return bBox; }
 
 	//	Vec3f FlatNormals(u32 elementId,u32 subElementId) const {
 	//		return elements[elementId].Nrm(subElementId);
@@ -113,47 +109,42 @@ namespace bih {
 		Tree(const ElementContainer &elements);
 		void PrintInfo() const;
 
-		void Construct(const ElementContainer &elements);
+		void Construct(const ElementContainer &elements,bool fast=0);
 
 	private:
 		uint FindSimilarParent(vector<u32> &parents,uint nNode,uint axis) const;
-		void Build(vector<Index> &indices,vector<u32> &parents,uint nNode,Vec3f min,Vec3f max,uint level,bool);
+		void Build(vector<Index> &indices,vector<u32> &parents,uint nNode,BBox box,uint level,bool,bool);
 		void OptimizeBFS();
 	
-		template <template<int,int> class Rays,int flags,int size> Isct<f32x4,size,Tree::isctFlags|flags>
-		TraversePacket0(const Rays<size,flags> &rays) const;
-	
-		template <template<int,int> class Rays,int flags,int size> Isct<f32x4,size,Tree::isctFlags|flags>
-		TraversePrimary(const Rays<size,flags> &rays) const;
+		template <int flags,int size> void TraversePacket0(Context<size,flags>&) const;
+		template <int flags,int size> void TraversePrimary(Context<size,flags>&) const;
 
 	public:	
-		template <int flags> Isct<float,1,Tree::isctFlags|flags>
-		TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,float maxDist) const;
+		template <int flags> void TraverseMono(FContext<flags>&) const;
 
-		template <int flags,template <int> class Selector> Isct<f32x4,1,TreeFlags<Tree,flags>::value>
-			TraversePacket(const RayGroup<1,flags> &rays,const Selector<1> &selector) const;
+		template <int flags,template <int> class Selector> void
+			TraversePacket(Context<1,flags>&,const Selector<1>&) const;
 
-		template <int flags,int size,template <int> class Selector> Isct<f32x4,size,TreeFlags<Tree,flags>::value>
-			TraversePacket(const RayGroup<size,flags> &rays,const Selector<size> &selector) const;
+		template <int flags,int size,template <int> class Selector> void
+			TraversePacket(Context<size,flags>&,const Selector<size>&) const;
 
 		template <int flags>
-		INLINE Isct<f32x4,1,isctFlags|flags>
-			TraversePacket(const RayGroup<1,flags> &rays) const {
-			return TraversePacket(rays,FullSelector<1>());
+		INLINE void TraversePacket(Context<1,flags> &c) const {
+			TraversePacket(c,FullSelector<1>());
 		}
 
-		template <int flags,int size> INLINE Isct<f32x4,size,isctFlags|flags>
-			TraversePacket(const RayGroup<size,flags> &rays) const {
-			return TraversePacket(rays,FullSelector<size>());
+		template <int flags,int size> INLINE void TraversePacket(Context<size,flags> &c) const {
+			TraversePacket(c,FullSelector<size>());
 		}
 
 		vector<Node,AlignedAllocator<Node> > nodes;
 		ElementContainer elements;
 
+		BBox bBox;
 		float avgSize;
-		Vec3f pMin,pMax;
 		int maxLevel;
 	};
+
 
 }
 

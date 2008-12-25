@@ -8,13 +8,14 @@
 												Vec3q *__restrict__ diffuse,Vec3q *__restrict__ specular,int idx) const {
 		enum { shadows=1 };
 
+		TreeStats<1> stats;
+
 		const Light &light=lights[idx];
 		Vec3p lightPos=light.pos;
-		Vec3q fromLight[size];
+		Vec3q fromLight[size],idir[size];
 		floatq distance[size];
 		floatq dot[size];
 		f32x4b mask[size];
-
 
 		RaySelector<size> sel=inputSel;
 
@@ -28,6 +29,7 @@
 
 			distance[q]=Sqrt(lightVec|lightVec);
 			fromLight[q]=lightVec*Inv(distance[q]);
+			idir[q]=SafeInv(fromLight[q]);
 			
 			dot[q]=s.normal|fromLight[q];
 			mask[q]=dot[q]>0.0f;
@@ -35,22 +37,19 @@
 			sel[q]&=ForWhich(mask[q]);
 		}
 
-		Isct<f32x4,size,AccStruct::isctFlags|isct::fShadow|isct::fMaxDist> hit;
-
 		if(shadows) {
 			Vec3q lPos(lightPos.x,lightPos.y,lightPos.z);
 			Vec3q lColor(light.color.x,light.color.y,light.color.z);
+			floatq tDistance[size]; for(int q=0;q<size;q++) tDistance[q]=distance[q]*0.99999f;
 
-			RayGroup<size,isct::fShOrig|isct::fInvDir|isct::fMaxDist|isct::fShadow> rays(&lPos,fromLight);
-
-			for(int q=0;q<size;q++) rays.maxDist.Set(q,distance[q]*0.99999f);
-			hit=geometry.TraversePacket(rays,sel);
+			Context<size,isct::fShOrig|isct::fShadow> c(&lPos,fromLight,idir,tDistance,0,0,&stats);
+			geometry.TraversePacket(c,sel);
 
 			for(int q=0;q<size;q++) {
 				if(!sel[q]) continue;
 
 				f32x4 dist=distance[q];
-				f32x4b msk=mask[q]&&dist-hit.Distance(q)<=dist*0.0001f;
+				f32x4b msk=mask[q]&&dist-tDistance[q]<=dist*0.0001f;
 
 				f32x4 atten=dist*light.iRadius;
 				atten=Max(f32x4(0.0f),((floatq(1.0f)-atten)*0.2f+FastInv(f32x4(16.0f)*atten*atten))-f32x4(0.0625f));
@@ -82,25 +81,35 @@
 			}
 		}
 
-		return hit.Stats();
+		return stats;
 	}
 
-	template <class AccStruct> template <int flags,int size,class Selector>
-	Result<size> Scene<AccStruct>::RayTrace(const RayGroup<size,flags> &rays,
+	template <class AccStruct> template <int size,bool sharedOrigin,class Selector>
+	Result<size> Scene<AccStruct>::RayTrace(const RayGroup<size,sharedOrigin> &rays,
 													const Selector &inputSelector,Cache &cache) const {
+		enum { flags=sharedOrigin?isct::fShOrig|isct::fPrimary:0 };
+		Result<size> result;
+
 		enum { primary=0, blockSize=4 };
 		static_assert(int(blockSize)==int(shading::BaseMaterial::blockSize),"Block sizes should be equal");
 
-		const floatq maxDist=100000.0f;
+		const floatq maxDist=1.0f/0.0f;
 
-		Isct<f32x4,size,AccStruct::isctFlags> hit=geometry.TraversePacket(rays,inputSelector);
+		floatq tDistance[size];
+		i32x4 tObject[size],tElement[size];
+
+		for(int q=0;q<size;q++) tDistance[q]=maxDist;
+		Context<size,flags> tc(rays,tDistance,tObject,tElement,&result.stats);
+
+		geometry.TraversePacket(tc,inputSelector);
 		RaySelector<size> selector=inputSelector;
+		RaySelector<size> reflSel; reflSel.Clear();
+		RaySelector<size> refrSel; refrSel.Clear();
+
 
 		if(gVals[4]) { //no shading
-			Result<size> result;
-			result.stats=hit.Stats();
 			for(int q=0;q<size;q++) {
-				floatq dist=(Condition(hit.Distance(q)>maxDist,0.0f,Inv(hit.Distance(q))));
+				floatq dist=(Condition(tDistance[q]>maxDist,0.0f,Inv(tDistance[q])));
 				floatq dist2=dist*250.0f;
 				floatq dist1=dist*20.0f;
 				floatq dist3=dist*2.0f;
@@ -127,13 +136,13 @@
 
 				shading::Sample &s=samples[tq];
 
-				mask[q]=hit.Distance(tq)<maxDist&&selector.SSEMask(tq);
+				mask[q]=tDistance[tq]<maxDist&&selector.SSEMask(tq);
 				selector[tq]=ForWhich(mask[q]);
 				i32x4b imask(mask[q]);
 
-				object[q]=Condition(imask,hit.Object(tq),i32x4(0));
-				element[q]=AccStruct::isctFlags&isct::fElement?Condition(imask,hit.Element(tq),i32x4(0)):i32x4(0);
-				s.position=rays.Dir(tq)*hit.Distance(tq)+rays.Origin(tq);
+				object[q]=Condition(imask,tObject[tq],i32x4(0));
+				element[q]=AccStruct::isctFlags&isct::fElement?Condition(imask,tElement[tq],i32x4(0)):i32x4(0);
+				s.position=rays.Dir(tq)*tDistance[tq]+rays.Origin(tq);
 				minPos=Condition(mask[q],VMin(minPos,s.position),minPos);
 				maxPos=Condition(mask[q],VMax(maxPos,s.position),maxPos);
 	
@@ -164,6 +173,8 @@
 				int tMatId=shTri.matId>=matCount?0:shTri.matId;
 				const bool flatNormals=shTri.FlatNormals();
 				const bool computeTexCoords=materialFlags[tMatId]&shading::BaseMaterial::fTexCoords;
+				reflSel.Mask4(b)=materialFlags[tMatId]&shading::BaseMaterial::fReflection?0x0f0f0f0f:0;
+				refrSel.Mask4(b)=materialFlags[tMatId]&shading::BaseMaterial::fRefraction?0x0f0f0f0f:0;
 
 				if(!computeTexCoords) {
 					if(flatNormals) {
@@ -197,7 +208,8 @@
 					}
 				}
 				
-				materials[tMatId]->Shade(samples+b4,PRayGroup<size,flags>(rays,b4),cache.samplingCache);
+				materials[tMatId]->Shade(samples+b4,RayGroup<blockSize,sharedOrigin>(tc.rays,b4),
+											cache.samplingCache);
 			}
 			else {
 				for(uint q=0;q<4;q++) {
@@ -208,7 +220,7 @@
 
 					i32x4b imask(mask[q]);
 					int invBitMask=~ForWhich(imask);
-
+					
 					int obj0=object[q][0],elem0=element[q][0];
 					if(i32x4(imask)[0]) {
 						uint hash=shTriCache.Hash(obj0,elem0);
@@ -230,6 +242,7 @@
 
 						s.normal=Vec3q(shTri.nrm[0])+Vec3q(shTri.nrm[1])*bar.x+Vec3q(shTri.nrm[2])*bar.y;
 					}
+					
 
 					if(AccStruct::isctFlags&isct::fElement?ForAny(object[q]!=obj0||element[q]!=elem0):ForAny(object[q]!=obj0))
 					  for(int k=1;k<4;k++) {
@@ -264,8 +277,12 @@
 
 				if(ForAll(	((matId[0]==matId[1])&&(matId[2]==matId[3]))&&
 							((matId[0]==matId[2])&&(matId[1]==matId0     )) )) {
+					reflSel.Mask4(b)=materialFlags[matId0-1]&shading::BaseMaterial::fReflection?0x0f0f0f0f:0;
+					refrSel.Mask4(b)=materialFlags[matId0-1]&shading::BaseMaterial::fRefraction?0x0f0f0f0f:0;
+
 					if(EXPECT_TAKEN(matId0))
-						materials[matId0-1]->Shade(samples+b4,PRayGroup<size,flags>(rays,b4),cache.samplingCache);
+						materials[matId0-1]->Shade
+							(samples+b4,RayGroup<blockSize,sharedOrigin>(tc.rays,b4),cache.samplingCache);
 				}
 				else {	
 					static_assert(blockSize==4,"If you want some other value, you will have to modify the code here");
@@ -277,32 +294,57 @@
 					for(int q=0;q<blockSize;q++) {
 						const i32x4 &tMatId=matId[q];
 
+						u8 reflMask=0,refrMask=0;
 						for(int k=0;k<4;k++) {
 							int id=tMatId[k];
 							i32x4 kMatId(id);
+							reflMask|=id&&materialFlags[id-1]&shading::BaseMaterial::fReflection?1<<k:0;
+							refrMask|=id&&materialFlags[id-1]&shading::BaseMaterial::fRefraction?1<<k:0;
+
 							if(ForAll((matIds[0]!=kMatId&&matIds[1]!=kMatId)&&(matIds[2]!=kMatId&&matIds[3]!=kMatId))) {
-								matIds[matIdCount/4][matIdCount&3]=id;
+								matIds[matIdCount>>2][matIdCount&3]=id;
 								matIdCount++;
 							}
 						}
+						reflSel[q+b4]=reflMask;
+						refrSel[q+b4]=refrMask;
 					}
 
-					for(int n=0;n<matIdCount;n++) {
-						int id=matIds[n/4][n&3];
+					for(uint n=0;n<matIdCount;n++) {
+						uint id=matIds[n>>2][n&3];
 						i32x4 id4(id);
 						mask[0]=matId[0]==id4;
 						mask[1]=matId[1]==id4;
 						mask[2]=matId[2]==id4;
 						mask[3]=matId[3]==id4;
 
-						materials[id-1]->Shade(samples+b4,mask,PRayGroup<size,flags>(rays,b4),cache.samplingCache);
+						materials[id-1]->Shade
+							(samples+b4,mask,RayGroup<blockSize,sharedOrigin>(tc.rays,b4),cache.samplingCache);
 					}
 				}
 			}
 		}
 
-		Result<size> result;
-		result.stats=hit.Stats();
+		if(reflSel.Any()&&!gVals[5]&&flags&isct::fPrimary) {
+			Result<size> reflResult=TraceReflection(rays.DirPtr(),samples,reflSel,cache);
+			result.stats+=reflResult.stats;
+
+			for(int q=0;q<size;q++) {
+				samples[q].diffuse=Condition(reflSel.SSEMask(q),
+								samples[q].diffuse+(reflResult.color[q]-samples[q].diffuse)*floatq(0.3f),
+								samples[q].diffuse );
+			}
+		}
+		if(refrSel.Any()&&!gVals[5]&&flags&isct::fPrimary) {
+			Result<size> refrResult=TraceRefraction(rays,samples,refrSel,cache);
+			result.stats+=refrResult.stats;
+
+			for(int q=0;q<size;q++) {
+				samples[q].diffuse=Condition(refrSel.SSEMask(q),
+								samples[q].diffuse+(refrResult.color[q]-samples[q].diffuse)*floatq(0.3f),
+								samples[q].diffuse );
+			}
+		}
 
 		Vec3q lDiffuse[size],lSpecular[size];
 		if(lights.size()) {
@@ -317,8 +359,8 @@
 			Vec3f tMinPos(Minimize(minPos)),tMaxPos(Maximize(maxPos));
 			for(int n=0;n<nLights;n++) {
 				const Light &light=lights[n];
-				float distSq=Min(LengthSq(tMinPos-light.pos),LengthSq(tMaxPos-light.pos));
-				if(distSq>light.radSq) continue;
+				if(BoxPointDistanceSq(BBox(tMinPos,tMaxPos),light.pos)>light.radSq)
+					continue;
 
 				result.stats+=TraceLight<size>(selector,samples,lDiffuse,lSpecular,n);
 			}
@@ -340,30 +382,36 @@
 				result.color[q]=col;
 		}
 
-	/*	if(gVals[2]&&flags&isct::fPrimary) {
-			Result<size> refl=TraceReflection(tree,rays,selector,position,normals);
-			result.stats+=refl.stats;
-
-			for(int q=0;q<size;q++) {
-				floatq str=0.2f;
-				result.color[q]=Condition(selector.SSEMask(q),
-						result.color[q]*(floatq(1.0f)-str)+refl.color[q]*str,result.color[q]);
-			}
-		}*/
-
 		return result;
 	}
 
-	template <class AccStruct> template <int flags,int size,class Selector>
-	Result<size> Scene<AccStruct>::TraceReflection(const RayGroup<size,flags> &rays,const Selector &selector,
-								const Vec3q *position,const Vec3q *normal) const {
-		Vec3q reflDir[size];
+	template <class AccStruct> template <int size,template <int> class Selector>
+	Result<size> Scene<AccStruct>::TraceReflection(const Vec3q *__restrict__ dir,
+				const shading::Sample *__restrict__ samples,const Selector<size> &selector,Cache &cache) const {
+		Result<size> result;
+		Vec3q reflDir[size],reflOrig[size],idir[size];
+
+		for(int q=0;q<size;q++) {
+			reflDir[q]=Reflect(dir[q],samples[q].normal);
+			reflOrig[q]=samples[q].position+reflDir[q]*floatq(0.001f);
+			idir[q]=SafeInv(reflDir[q]);
+		}
+		
+		result=RayTrace(RayGroup<size,0>(reflOrig,reflDir,idir),selector,cache);
+		return result;
+	}
+
+	template <class AccStruct> template <int size,bool sharedOrigin,template <int> class Selector>
+	Result<size> Scene<AccStruct>::TraceRefraction(const RayGroup<size,sharedOrigin> &rays,
+				const shading::Sample *__restrict__ samples,const Selector<size> &selector,Cache &cache) const {
+		Result<size> result;
+		Vec3q refrOrig[size];
 
 		for(int q=0;q<size;q++)
-			reflDir[q]=Reflect(rays.Dir(q),normal[q]);
-		RayGroup<size,isct::fInvDir> tRays(position,reflDir);
-
-		return RayTrace(tRays,selector);
+			refrOrig[q]=samples[q].position+rays.Dir(q)*floatq(0.001f);
+		
+		result=RayTrace(RayGroup<size,0>(refrOrig,rays.DirPtr(),rays.IDirPtr()),selector,cache);
+		return result;
 	}
 
 #endif

@@ -1,37 +1,19 @@
 
+
 	template <class ElementContainer> template <int flags>
-	Isct<float,1,Tree<ElementContainer>::isctFlags|flags>
-		Tree<ElementContainer>::TraverseMono(const Vec3p &rOrigin,const Vec3p &tDir,float maxDist) const
+	void Tree<ElementContainer>::TraverseMono(FContext<flags> &c) const
 	{
-		Isct<float,1,isctFlags|flags> out;
-		TreeStats<1> &stats=out.Stats();
-
+		TreeStats<1> stats;
 		stats.TracingRay();
-		out.Distance(0)=maxDist;
 
-		Vec3p rDir=Vec3p(tDir.x+0.000000000001f,tDir.y+0.000000000001f,tDir.z+0.000000000001f);
-		Vec3p invDir=VInv(rDir);
-
-		int dirMask=SignMask(floatq(invDir.m))&7;
-		float tMin=0.0f,tMax=out.Distance(0);
+		int dirMask=(c.iDir.x<0.0f?1:0)+(c.iDir.y<0.0f?2:0)+(c.iDir.z<0.0f?4:0);
+		float tMin=0.0f,tMax=c.Distance(0);
+		bBox.UpdateMinMaxDist(&c.origin.x,&c.iDir.x,&c.iDir.x,dirMask,tMin,tMax);
 
 		struct Locals { float tMin,tMax; u32 idx; } stackBegin[maxLevel+2],*stack=stackBegin;
 		const Node *node,*node0=&nodes[0];
 		int idx=0;
 
-		{
-			Vec3p ttMin=(pMin-rOrigin)*invDir;
-			Vec3p ttMax=(pMax-rOrigin)*invDir;
-			if(dirMask&1) Swap(ttMin.x,ttMax.x);
-			if(dirMask&2) Swap(ttMin.y,ttMax.y);
-			if(dirMask&4) Swap(ttMin.z,ttMax.z);
-
-			tMax=Min(Min(ttMax.x,ttMax.y),tMax);
-			tMax=Min(ttMax.z,tMax);
-			
-			tMin=Max(Max(ttMin.x,ttMin.y),tMin);
-			tMin=Max(ttMin.z,tMin);
-		}
 
 		while(true) {
 			stats.LoopIteration();
@@ -39,26 +21,13 @@
 		
 			if(idx&Node::leafMask) {
 				idx&=Node::idxMask;
-				{
-					stats.Intersection();
-					Isct<float,1,CElement::isctFlags|flags>
-						tOut=elements[idx].template Collide<flags>(rOrigin,tDir,out.Distance(0));
-
-					if(tOut.Distance(0)<out.Distance(0)) {
-						out.Distance(0)=tOut.Distance(0);
-						if(flags&isct::fShadow) break;
-						else {
-							out.Object(0)=idx;
-							if(isctFlags&isct::fElement) out.Element(0)=tOut.Element(0);
-						}
-
-					}
-				}
+				stats.Intersection();
+				elements[idx].Collide(c,idx);
 POP_STACK:
 				if(stack==stackBegin) break;
 				stack--;
 				tMin=stack->tMin;
-				tMax=Min(stack->tMax,out.Distance(0));
+				tMax=Min(stack->tMax,c.Distance(0));
 				idx=stack->idx;
 				continue;
 			}
@@ -69,7 +38,7 @@ POP_STACK:
 			int nidx=dirMask&(1<<axis)?1:0,fidx=nidx^1;
 
 			float near,far; {
-				float start=(&rOrigin.x)[axis],inv=(&invDir.x)[axis];
+				float start=(&c.origin.x)[axis],inv=(&c.iDir.x)[axis];
 				near=(node->clip[nidx]-start)*inv;
 				far =(node->clip[fidx]-start)*inv;
 			}
@@ -96,7 +65,6 @@ POP_STACK:
 			idx=node->val[nidx];
 		}
 
-		return out;
+		c.UpdateStats(stats);
 	}
-
 

@@ -3,6 +3,8 @@
 
 #include "rtbase.h"
 
+template <int,bool> class RayGroup;
+
 class BBox {
 public:
 	inline BBox() { }
@@ -15,7 +17,66 @@ public:
 	
 	inline Vec3f Size() const { return max-min; }
 	inline Vec3f Center() const { return (max+min)*0.5f; }
+	INLINE float Width() const { return max.x-min.x; }
+	INLINE float Height() const { return max.y-min.y; }
+	INLINE float Depth() const { return max.z-min.z; }
 	
+	bool Contains(const BBox &rhs) const {
+		return 	min.x<=rhs.min.x&&min.y<=rhs.min.y&&min.z<=rhs.min.z&&
+				max.x>=rhs.max.x&&max.y>=rhs.max.y&&max.z>=rhs.max.z;
+	}
+	bool Contains(const BBox &rhs,float t) const {
+		return BBox(Center()-Size()*0.5f*t,Center()+Size()*0.5f*t).Contains(rhs);
+	}
+
+	INLINE void UpdateMinMaxDist(const float* __restrict__ orig,const float* minInv,const float *maxInv,
+								 int dirMask,float& __restrict__ tMin,float & __restrict__ tMax) const {
+		Vec3f origin(orig[0],orig[1],orig[2]);
+		Vec3f ttMin=(min-origin)*Vec3f(minInv[0],minInv[1],minInv[2]);
+		Vec3f ttMax=(max-origin)*Vec3f(maxInv[0],maxInv[1],maxInv[2]);
+
+		if(dirMask&1) Swap(ttMin.x,ttMax.x);
+		if(dirMask&2) Swap(ttMin.y,ttMax.y);
+		if(dirMask&4) Swap(ttMin.z,ttMax.z);
+
+		tMax=Min(Min(ttMax.x,ttMax.y),tMax);
+		tMax=Min(ttMax.z,tMax);
+			
+		tMin=Max(Max(ttMin.x,ttMin.y),tMin);
+		tMin=Max(ttMin.z,tMin);
+	}
+
+	template <int size,bool sharedOrigin>
+	void UpdateMinMaxDist(	const RayGroup<size,sharedOrigin> &rays,int dirMask,
+							floatq *__restrict__ tMin,floatq *__restrict__ tMax) const {
+		Vec3p rMin=min,rMax=max;
+
+		if(dirMask&1) Swap(rMin.x,rMax.x);
+		if(dirMask&2) Swap(rMin.y,rMax.y);
+		if(dirMask&4) Swap(rMin.z,rMax.z);
+
+		if(sharedOrigin) {
+			Vec3q rrMin=Vec3q(rMin)-rays.Origin(0),rrMax=Vec3q(rMax)-rays.Origin(0);
+
+			for(int q=0;q<size;q++) {
+				Vec3q ttMin=rrMin*rays.IDir(q);
+				Vec3q ttMax=rrMax*rays.IDir(q);
+			
+				tMax[q]=Min(Min(tMax[q],ttMax.x),Min(ttMax.y,ttMax.z));
+				tMin[q]=Max(Max(tMin[q],ttMin.x),Max(ttMin.y,ttMin.z));
+			}
+		}
+		else {
+			for(int q=0;q<size;q++) {
+				Vec3q ttMin=(Vec3q(rMin)-rays.Origin(q))*rays.IDir(q);
+				Vec3q ttMax=(Vec3q(rMax)-rays.Origin(q))*rays.IDir(q);
+				
+				tMax[q]=Min(Min(tMax[q],ttMax.x),Min(ttMax.y,ttMax.z));
+				tMin[q]=Max(Max(tMin[q],ttMin.x),Max(ttMin.y,ttMin.z));
+			}
+		}
+	}
+
 	template <class Real,class Vec>
 	INLINE bool Test(const Vec &orig,const Vec &dir,const Real &maxDist=Real(1.0f/0.0f)) const {
 		Real l1,l2,idir[3]={Inv(dir.x),Inv(dir.y),Inv(dir.z)};
@@ -39,11 +100,34 @@ public:
 	}
 
 	template <int size,class Real,class Vec>
-	INLINE bool TestIP(const Vec &orig,const Vec *idir,const Real *__restrict__ maxDist) const {
+	INLINE bool TestIP(const Vec &orig,const Vec *__restrict__ idir,const Real *__restrict__ maxDist) const {
 		Real l1,l2;
 		Real tx[2]={Real(min.x)-orig.x,Real(max.x)-orig.x};
 		Real ty[2]={Real(min.y)-orig.y,Real(max.y)-orig.y};
 		Real tz[2]={Real(min.z)-orig.z,Real(max.z)-orig.z};
+
+/*		Real l3,l4; Vec3q min=idir[0],max=idir[0];
+		for(int n=1;n<size;n++) {
+			min=VMin(min,idir[n]);
+			max=VMax(max,idir[n]);
+		}
+
+		l1=min.x*tx[0]; l3=max.x*tx[0];
+		l2=min.x*tx[1]; l4=max.x*tx[1];
+		Real lmin=Min(Min(l1,l2),Min(l3,l4));
+		Real lmax=Max(Max(l1,l2),Max(l3,l4));
+		
+		l1=min.y*ty[0]; l3=max.y*ty[0];
+		l2=min.y*ty[1]; l4=max.y*ty[1];
+		lmin=Min(lmin,Min(Min(l1,l2),Min(l3,l4)));
+		lmax=Max(lmax,Max(Max(l1,l2),Max(l3,l4)));
+		
+		l1=min.z*tz[0]; l3=max.z*tz[0];
+		l2=min.z*tz[1]; l4=max.z*tz[1];
+		lmin=Min(lmin,Min(Min(l1,l2),Min(l3,l4)));
+		lmax=Max(lmax,Max(Max(l1,l2),Max(l3,l4)));
+
+		return ForAny(lmax>=Real(0.0f)&&lmin<Min(lmax,maxDist[0])); */
 
 		l1=idir[0].x*tx[0];
 		l2=idir[0].x*tx[1];
@@ -110,6 +194,10 @@ public:
 
 	Vec3f min,max;
 };
+
+namespace baselib { template<> struct SerializeAsPOD<BBox> { enum { value=1 }; }; }
+
+float BoxPointDistanceSq(const BBox &box,const Vec3f &point);
 
 INLINE BBox operator+(const BBox &a,const BBox &b) { BBox out(a); out+=b; return out; }
 INLINE BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out*=mat; return out; }

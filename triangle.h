@@ -3,7 +3,6 @@
 
 #include "rtbase.h"
 #include "ray_group.h"
-#include "context.h"
 
 class Cache;
 
@@ -54,17 +53,19 @@ public:
 		flags=0;
 		flags|=sign?1:0;
 		flags|=Abs(nu)==0.0f&&Abs(nv)==0.0f?2:0;
+
+		if(sign) nrm=-nrm;
 		nrm*=RSqrt(nrm|nrm);
 	}
 
-	template <int tflags>
-	Isct<float,1,tflags|isct::fDistance> Collide(const Vec3f &origin,const Vec3f &dir,float) const {
-		Isct<float,1,tflags|isct::fDistance> out;
+	const Vec3f &Nrm() const { return nrm; }
 
+	template <int tflags>
+	void Collide(FContext<tflags> &c,int idx) const {
 		bool sign=flags&1;
 
-		float dirW=(&dir.x)[iw],dirU=(&dir.x)[iu],dirV=(&dir.x)[iv];
-		float origW=(&origin.x)[iw],origU=(&origin.x)[iu],origV=(&origin.x)[iv];
+		float dirW=(&c.dir.x)[iw],dirU=(&c.dir.x)[iu],dirV=(&c.dir.x)[iv];
+		float origW=(&c.origin.x)[iw],origU=(&c.origin.x)[iu],origV=(&c.origin.x)[iv];
 
 		float det=dirU*nu+dirV*nv+dirW;
 		float dett=np-(origU*nu+origV*nv+origW);
@@ -77,28 +78,28 @@ public:
 
 		float tmp=detu+detv;
 		bool mask=sign?detu<=0.0f&&detv<=0.0f&&det<=tmp:detu>=0.0f&&detv>=0.0f&&det>=tmp;
+		mask=mask&&dist>0.0f&&dist<c.distance[0];
 	
-		out.Distance(0)=Condition(mask&&dist>0.0f,dist,1.0f/0.0f);
-
-		return out;
+		c.distance[0]=Condition(mask,dist,c.distance[0]);
+		if(!(tflags&isct::fShadow)) c.object  [0]=Condition(mask,idx ,c.object  [0]);
 	}
 
 	template <int w,int tflags,int size>
-	Isct<f32x4,size,tflags|isct::fDistance> Collide(const RayGroup<size,tflags> &rays) const {
-		Isct<f32x4,size,tflags|isct::fDistance> out;
-
+	INLINE int Collide_(Context<size,tflags> &c,int idx) const {
 		floatq tdett,ppu,ppv;
 		if(tflags&isct::fShOrig) {
-			Vec3q orig=rays.Origin(0);
+			Vec3q orig=c.Origin(0);
 			tdett=np-((&orig.x)[iu][0]*nu+(&orig.x)[iv][0]*nv+(&orig.x)[w][0]);
 			ppu=floatq(pu)-(&orig.x)[iu];
 			ppv=floatq(pv)-(&orig.x)[iv];
 		}
 
 		bool sign=flags&1;
+		bool full=tflags&isct::fShadow?1:0;
+
 		if(__builtin_expect(flags&2,0)) for(int q=0;q<size;q++) {
-			const Vec3q dir=rays.Dir(q);
-			const Vec3q origin=rays.Origin(q);
+			const Vec3q dir=c.Dir(q);
+			const Vec3q origin=c.Origin(q);
 
 			floatq dirW=w==0?dir.x:w==1?dir.y:dir.z,origW=w==0?origin.x:w==1?origin.y:origin.z;
 			floatq dirU=w==0?dir.y:w==1?dir.x:dir.x,origU=w==0?origin.y:w==1?origin.x:origin.x;
@@ -115,12 +116,16 @@ public:
 
 			floatq tmp=detu+detv;
 			f32x4b mask=sign?detu<=0.0f&&detv<=0.0f&&det<=tmp:detu>=0.0f&&detv>=0.0f&&det>=tmp;
-	
-			out.Distance(q)=Condition(mask&&dist>0.0f,dist,f32x4(1.0f/0.0f));
+			mask=mask&&dist>0.0f&&dist<c.distance[q];
+
+			if(tflags&isct::fShadow) full&=ForAll(mask);
+
+			c.distance[q]=Condition(mask,dist,c.distance[q]);
+			if(!(tflags&isct::fShadow)) c.object[q]=Condition(i32x4b(mask),i32x4(idx),c.object[q]);
 		}
 		else for(int q=0;q<size;q++) {
-			const Vec3q dir=rays.Dir(q);
-			const Vec3q origin=rays.Origin(q);
+			const Vec3q dir=c.Dir(q);
+			const Vec3q origin=c.Origin(q);
 
 			floatq dirW=w==0?dir.x:w==1?dir.y:dir.z,origW=w==0?origin.x:w==1?origin.y:origin.z;
 			floatq dirU=w==0?dir.y:w==1?dir.x:dir.x,origU=w==0?origin.y:w==1?origin.x:origin.x;
@@ -137,19 +142,20 @@ public:
 
 			floatq tmp=detu+detv;
 			f32x4b mask=sign?detu<=0.0f&&detv<=0.0f&&det<=tmp:detu>=0.0f&&detv>=0.0f&&det>=tmp;
-	
-			out.Distance(q)=Condition(mask&&dist>0.0f,dist,f32x4(1.0f/0.0f));
+			mask=mask&&dist>0.0f&&dist<c.distance[q];
+
+			if(tflags&isct::fShadow) full&=ForAll(mask);
+
+			c.distance[q]=Condition(mask,dist,c.distance[q]);
+			if(!(tflags&isct::fShadow)) c.object[q]=Condition(i32x4b(mask),i32x4(idx),c.object[q]);
 		}
 
-
-		return out;
+		return full;
 	}
 	
 	template <int tflags,int size>
-	Isct<f32x4,size,tflags|isct::fDistance> Collide(const RayGroup<size,tflags> &rays) const {
-		Isct<f32x4,size,tflags|isct::fDistance> out;
-		out=iw==0?Collide<0>(rays):iw==1?Collide<1>(rays):Collide<2>(rays);
-		return out;
+	int Collide(Context<size,tflags> &c,int idx) const {
+		return iw==0?Collide_<0>(c,idx):iw==1?Collide_<1>(c,idx):Collide_<2>(c,idx);
 	}
 
 private:
@@ -159,8 +165,8 @@ private:
 	float e1u,e1v; // edge 1
 	char iw,iu,iv; // indices
 	char flags;	   // 1: sign
-	Vec3f nrm;
 
+	Vec3f nrm;
 	int temp[3];
 };
 
@@ -431,50 +437,46 @@ public:
 	typedef TriAccel CElement;
 	typedef ShTriangle SElement;
 
-	void Serialize(Serializer &sr) {
-		sr&pos&nrm&uv;
-		sr&indices&triAccels;
-	}
+	void Serialize(Serializer &sr) { sr&verts&tris&triAccels; }
 
 	INLINE const CElement &GetCElement(int elem) const { return triAccels[elem]; }
 	INLINE const CElement &operator[](int elem) const { return GetCElement(elem); }
 
 	INLINE const SElement GetSElement(int elem,int) const {
-		const TriIdx &idx=indices[elem];
-		return ShTriangle(	pos[idx.v1],pos[idx.v2],pos[idx.v3],
-							uv[idx.v1], uv[idx.v2], uv[idx.v3],
-							nrm[idx.v1], nrm[idx.v2],nrm[idx.v3],idx.mat&0x7ffffff,idx.mat&0x80000000?1:0);
+		const TriIdx &idx=tris[elem];
+		const Vert &v1=verts[idx.v1],&v2=verts[idx.v2],&v3=verts[idx.v3];
+		return ShTriangle(	v1.pos,v2.pos,v3.pos,v1.uv,v2.uv,v3.uv,v1.nrm,v2.nrm,v3.nrm,
+							idx.mat&0x7ffffff,idx.mat&0x80000000?1:0);
 	}
 	Vec3f BoundMin(int n) const {
-		const TriIdx &idx=indices[n];
-		return VMin(pos[idx.v1],VMin(pos[idx.v2],pos[idx.v3]));
+		const TriIdx &idx=tris[n];
+		return VMin(verts[idx.v1].pos,VMin(verts[idx.v2].pos,verts[idx.v3].pos));
 	}
 	Vec3f BoundMax(int n) const {
-		const TriIdx &idx=indices[n];
-		return VMax(pos[idx.v1],VMax(pos[idx.v2],pos[idx.v3]));
+		const TriIdx &idx=tris[n];
+		return VMax(verts[idx.v1].pos,VMax(verts[idx.v2].pos,verts[idx.v3].pos));
 	}
 
 	BBox GetBBox(int n) const {
-		const TriIdx &idx=indices[n];
-		Vec3f min=VMin(pos[idx.v1],VMin(pos[idx.v2],pos[idx.v3]));
-		Vec3f max=VMax(pos[idx.v1],VMax(pos[idx.v2],pos[idx.v3]));
+		const TriIdx &idx=tris[n];
+		Vec3f min=VMin(verts[idx.v1].pos,VMin(verts[idx.v2].pos,verts[idx.v3].pos));
+		Vec3f max=VMax(verts[idx.v1].pos,VMax(verts[idx.v2].pos,verts[idx.v3].pos));
 		return BBox(min,max);
 	}
 	Triangle ToTriangle(int n) const {
-		const TriIdx &idx=indices[n];
-		return Triangle(pos[idx.v1],pos[idx.v2],pos[idx.v3]);
+		const TriIdx &idx=tris[n];
+		return Triangle(verts[idx.v1].pos,verts[idx.v2].pos,verts[idx.v3].pos);
 	}
 
-	size_t size() const { return indices.size(); }
-	size_t mem_size() const { return pos.size()*(12+12+8)+indices.size()*sizeof(TriIdx); }
+	size_t size() const { return tris.size(); }
+	size_t mem_size() const { return verts.size()*(sizeof(Vert))+tris.size()*sizeof(TriIdx); }
 
-private:
-	vector<Vec3f> pos;
-	vector<Vec3f> nrm;
-	vector<Vec2f> uv;
+//private:
+	struct Vert { Vec3f pos,nrm; Vec2f uv; };
+	vector<Vert> verts;
 
 	struct TriIdx { u32 v1,v2,v3; u32 mat; };
-	vector<TriIdx> indices;
+	vector<TriIdx> tris;
 	vector<TriAccel,AlignedAllocator<TriAccel> > triAccels;
 
 	friend class BaseScene;
@@ -482,6 +484,7 @@ private:
 
 namespace baselib {
 	template<> struct SerializeAsPOD<TriangleVector::TriIdx> { enum { value=1 }; };
+	template<> struct SerializeAsPOD<TriangleVector::Vert> { enum { value=1 }; };
 	template<> struct SerializeAsPOD<TriAccel> { enum { value=1 }; };
 }
 

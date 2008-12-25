@@ -90,7 +90,7 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 		if(strcmp(type,"o")==0) {
 			if(tris.size()>0) {
 				objects.push_back(BaseScene::Object(verts,uvs,normals,tris));
-				objects.back().name=strchr(line,' ')+1;
+				objects.back().name=strpbrk(line," \t")+1;
 				tris.clear();
 			}
 		}
@@ -111,9 +111,9 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 		}
 		else if(strcmp(type,"f")==0) {
 			char *p[3];
-			p[0]=strchr(line,' ')+1; while(p[0][0]==' ') p[0]++;
-			p[1]=strchr(p[0],' ')+1; p[1][-1]=0;
-			p[2]=strchr(p[1],' ')+1; p[2][-1]=0;
+			p[0]=strpbrk(line," \t")+1; while(p[0][0]==' ') p[0]++;
+			p[1]=strpbrk(p[0]," \t")+1; p[1][-1]=0;
+			p[2]=strpbrk(p[1]," \t")+1; p[2][-1]=0;
 
 			BaseScene::IndexedTri tri;
 			tri.matId=lastMatId;

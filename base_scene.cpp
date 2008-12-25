@@ -8,26 +8,25 @@ TriangleVector BaseScene::ToTriangleVector() const {
 
 	for(int o=0;o<objects.size();o++) {
 		const Matrix<Vec4f> &trans=objects[o].trans;
-		int verts=out.pos.size();
-		int inds=out.indices.size();
+		int verts=out.verts.size();
+		int inds=out.tris.size();
 		
 		TriangleVector obj=objects[o].ToTriangleVector();
-		int newVerts=verts+obj.pos.size();
+		int newVerts=verts+obj.verts.size();
 
-		out.pos.resize(newVerts);
-		out.uv.resize(newVerts);
-		out.nrm.resize(newVerts);
+		out.verts.resize(newVerts);
 
-		for(int n=0;n<obj.pos.size();n++) {
-			out.pos[n+verts]=trans*obj.pos[n];
-			out.uv[n+verts]=obj.uv[n];
-			out.nrm[n+verts]=trans&obj.nrm[n];
+		for(int n=0;n<obj.verts.size();n++) {
+			TriangleVector::Vert &vert=out.verts[n+verts];;
+			vert.pos=trans*obj.verts[n].pos;
+			vert.uv=obj.verts[n].uv;
+			vert.nrm=trans&obj.verts[n].nrm;
 		}
 
-		out.indices.resize(out.indices.size()+obj.indices.size());
-		for(int n=0;n<obj.indices.size();n++) {
-			TriangleVector::TriIdx &idx=out.indices[n+inds];
-			idx=obj.indices[n];
+		out.tris.resize(out.tris.size()+obj.tris.size());
+		for(int n=0;n<obj.tris.size();n++) {
+			TriangleVector::TriIdx &idx=out.tris[n+inds];
+			idx=obj.tris[n];
 
 			idx.v1+=verts;
 			idx.v2+=verts;
@@ -35,11 +34,11 @@ TriangleVector BaseScene::ToTriangleVector() const {
 		}
 	}
 
-	out.triAccels.resize(out.indices.size());
+	out.triAccels.resize(out.tris.size());
 
-	for(int n=0;n<out.indices.size();n++) {
-		const TriangleVector::TriIdx &idx=out.indices[n];
-		out.triAccels[n]=TriAccel(out.pos[idx.v1],out.pos[idx.v2],out.pos[idx.v3]);
+	for(int n=0;n<out.tris.size();n++) {
+		const TriangleVector::TriIdx &idx=out.tris[n];
+		out.triAccels[n]=TriAccel(out.verts[idx.v1].pos,out.verts[idx.v2].pos,out.verts[idx.v3].pos);
 	}
 	return out;
 }
@@ -208,7 +207,9 @@ namespace {
 	
 }
 
-void BaseScene::Object::BreakToElements(vector<Object> &out) {
+void BaseScene::Object::BreakToElements(vector<Object> &out) const {
+	if(!verts.size()||!tris.size()) return;
+
 	vector<Vert> tVerts(verts.size());
 	for(int n=0;n<verts.size();n++)
 		tVerts[n]=Vert(verts[n].x,verts[n].y,verts[n].z,n);
@@ -256,7 +257,7 @@ void BaseScene::Object::BreakToElements(vector<Object> &out) {
 		vertToTri[uses[tri.v[2]]++]=n;
 	}
 	
-	vector<int> stack(verts.size());
+	vector<int> stack(verts.size()+100000);
 	int stackPos=0;
 	
 	for(int t=0;t<tTris.size();t++) {
@@ -283,7 +284,6 @@ void BaseScene::Object::BreakToElements(vector<Object> &out) {
 			}
 		}
 		
-//		static int c=0; c++;
 		printf(","); fflush(stdout);
 		out.push_back(Object(verts,uvs,normals,extraction));
 		extraction.clear();
@@ -355,6 +355,27 @@ namespace {
 	}
 }
 
+void BaseScene::Object::Join(const Object &rhs) {
+	int lastTris=tris.size(),lastV=verts.size(),lastU=uvs.size(),lastN=normals.size();
+	tris.resize(tris.size()+rhs.tris.size());
+	for(int n=0;n<rhs.tris.size();n++) {
+		IndexedTri &tri=tris[lastTris+n];
+		tri=rhs.tris[n];
+		for(int k=0;k<3;k++) {
+			tri.v[k]+=lastV;
+			tri.vt[k]+=tri.vt[k]>=0?lastU:0;
+			tri.vn[k]+=tri.vn[k]>=0?lastV:0;
+		}
+	}
+	verts.resize(lastV+rhs.verts.size());
+	uvs.resize(lastU+rhs.uvs.size());
+	normals.resize(lastN+rhs.normals.size());
+	std::copy(rhs.verts.begin(),rhs.verts.end(),verts.begin()+lastV);
+	std::copy(rhs.uvs.begin(),rhs.uvs.end(),uvs.begin()+lastU);
+	std::copy(rhs.normals.begin(),rhs.normals.end(),normals.begin()+lastN);
+	bbox=BBox(&verts[0],verts.size(),trans);
+	optBBox=OptBBox(bbox,Inverse(trans));
+}
 
 
 TriangleVector BaseScene::Object::ToTriangleVector() const {
@@ -376,24 +397,23 @@ TriangleVector BaseScene::Object::ToTriangleVector() const {
 		inds.resize(end-inds.begin());
 	}
 
-	out.pos.resize(inds.size());
-	out.uv.resize(inds.size());
-	out.nrm.resize(inds.size());
-	out.indices.resize(tris.size());
+	out.verts.resize(inds.size());
+	out.tris.resize(tris.size());
 
 //	std::sort(inds.begin(),inds.end(),SortByPos(verts));
 
 	for(int n=0;n<inds.size();n++) {
-		out.pos[n]=verts[inds[n].v];
-		out.uv[n]=inds[n].u==-1?defaultUv:uvs[inds[n].u];
-		out.nrm[n]=inds[n].n==-1?defaultNrm:normals[inds[n].n];
+		TriangleVector::Vert &vert=out.verts[n];
+		vert.pos=verts[inds[n].v];
+		vert.uv=inds[n].u==-1?defaultUv:uvs[inds[n].u];
+		vert.nrm=inds[n].n==-1?defaultNrm:normals[inds[n].n];
 	}
 
 	for(int n=0;n<inds.size();n++) inds[n].dstIdx=n;
 	std::sort(inds.begin(),inds.end());
 	for(int n=0;n<tris.size();n++) {
 		const IndexedTri &src=tris[n];
-		TriangleVector::TriIdx &dst=out.indices[n];
+		TriangleVector::TriIdx &dst=out.tris[n];
 
 		u32 idx[3];
 		for(int k=0;k<3;k++)
@@ -402,14 +422,15 @@ TriangleVector BaseScene::Object::ToTriangleVector() const {
 		dst.v1=inds[idx[0]].dstIdx;
 		dst.v2=inds[idx[1]].dstIdx;
 		dst.v3=inds[idx[2]].dstIdx;
-		bool flatNrm=Same(out.nrm[dst.v1],out.nrm[dst.v2])&&Same(out.nrm[dst.v1],out.nrm[dst.v3]);
+		bool flatNrm=	Same(out.verts[dst.v1].nrm,out.verts[dst.v2].nrm)&&
+						Same(out.verts[dst.v1].nrm,out.verts[dst.v3].nrm);
 		dst.mat=(src.matId&0x7fffffff)+(flatNrm?0x80000000:0);
 	}
 
-	out.triAccels.resize(out.indices.size());
-	for(int n=0;n<out.indices.size();n++) {
-		const TriangleVector::TriIdx &idx=out.indices[n];
-		out.triAccels[n]=TriAccel(out.pos[idx.v1],out.pos[idx.v2],out.pos[idx.v3]);
+	out.triAccels.resize(out.tris.size());
+	for(int n=0;n<out.tris.size();n++) {
+		const TriangleVector::TriIdx &idx=out.tris[n];
+		out.triAccels[n]=TriAccel(out.verts[idx.v1].pos,out.verts[idx.v2].pos,out.verts[idx.v3].pos);
 	}
 	
 	return out;
@@ -469,11 +490,12 @@ void BaseScene::Object::FindOptimalTrans() {
 		trans=min;
 	}
 
-	Vec3f center(0.0f,0.0f,0.0f);
-	for(int n=0;n<verts.size();n++) center+=verts[n];
-	center/=float(verts.size());
 
-	trans.w+=Vec4f(center.x,center.y,center.z,0.0f);
+//	Vec3f center(0.0f,0.0f,0.0f);
+//	for(int n=0;n<verts.size();n++) center+=verts[n];
+//	center/=float(verts.size());
+
+//	trans.w+=Vec4f(center.x,center.y,center.z,0.0f);
 
 	Matrix<Vec4f> inv=Inverse(trans);
 	for(int n=0;n<verts.size();n++) verts[n]=inv*verts[n];

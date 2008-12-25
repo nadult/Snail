@@ -1,8 +1,8 @@
 #ifndef GFX_TEXTURE_HANDLE_H
 #define GFX_TEXTURE_HANDLE_H
 
-#include <gfxlib_texture.h>
 #include "rtbase.h"
+#include <gfxlib_texture.h>
 
 	//! Teksturka
 	class TexHandle: public Resource
