@@ -1,6 +1,4 @@
 #include "ray_generator.h"
-#include "mtrand.h"
-
 
 RayGenerator::RayGenerator(int level,int tw,int th,float pd)
 	:invW(1.0f/float(tw)),invH(1.0f/float(th)),planeDist(pd),tLevel(level),w(tw),h(th) {
@@ -110,6 +108,7 @@ void RayGenerator::Decompose(const Vec3q *in,Vec3q *out)
 	}
 }
 
+/*
 const float bestCandidateSamples[4096][5] = {
   { 0.8147236705f, 0.1354770064f, 0.0000925521f, 0.4019474089f, 0.6087165475f, },
   { 0.9057919383f, 0.8350085616f, 0.0003553750f, 0.0861424059f, 0.0100619597f, },
@@ -4207,4 +4206,4 @@ const float bestCandidateSamples[4096][5] = {
   { 0.3875006735f, 0.8072223663f, 0.5735291839f, 0.9130150676f, 0.2748070061f, },
   { 0.2921602428f, 0.9884731770f, 0.5731204748f, 0.5407849550f, 0.3014898002f, },
   { 0.4359965920f, 0.2804161608f, 0.5733448863f, 0.9205425978f, 0.2539848983f, },
-};
+}; */

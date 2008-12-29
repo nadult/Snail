@@ -3,25 +3,21 @@
 
 #include "rtbase.h"
 #include <gfxlib_texture.h>
+#include "sampling.h"
 
 namespace sampling {
 
-	struct Cache;
-
-	class PointSampler {
+	class PointSampler: public Sampler {
 	public:
 		PointSampler(const gfxlib::Texture&);
 		PointSampler() { }
 
-	//	template<class Vec2>
-	//	Vec3<typename Vec2::TScalar> operator[](const Vec2 &uv) const {
-	//
-	//	}
-
-		Vec3f operator()(const Vec2f &uv) const; // biggest mipmap will be used
-		Vec3q operator()(const Vec2q &uv) const; // biggest mipmap will be used
+		Vec3f operator()(const Vec2f &uv) const;
+		Vec3q operator()(const Vec2q &uv) const;
 		Vec3q operator()(const Vec2q &uv,const Vec2q &diff) const;
 		INLINE Vec3q operator()(const Vec2q &uv,const Vec2q &diff,Cache&) const { return operator()(uv,diff); }
+
+		void Sample(shading::Sample*,Cache&) const;
 
 	protected:
 		gfxlib::Texture tex;

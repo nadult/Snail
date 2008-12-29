@@ -13,7 +13,7 @@ public:
 		radSq=rad*rad;
 	}
 
-	Vec3p pos,color;
+	Vec3f pos,color;
 	float radius,radSq,iRadius;
 };
 

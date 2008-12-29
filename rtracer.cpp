@@ -7,7 +7,7 @@
 #include "font.h"
 
 #include "render.h"
-#include "material.h"
+#include "shading/material.h"
 
 #include "bih/tree.h"
 #include "tree_box.h"
@@ -122,11 +122,10 @@ Dst BitCast(const Src &src) {
 }
 
 template <class Scene>
-void SetMaterials(Scene &scene,const BaseScene &base) {
+void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
 	scene.materials.clear();
 
-	/*
-	string names[]={ 	"data/tex316bit.dds",		"data/347.dds",
+/*	string names[]={ 	"data/tex316bit.dds",		"data/347.dds",
 						"data/1669.dds", 			"data/tex1.png",
 						"data/tex2.png",			"data/tex3dxt1.dds",
 						"data/ultradxt1.dds",		"", };
@@ -142,6 +141,7 @@ void SetMaterials(Scene &scene,const BaseScene &base) {
 	for(int n=0;n<sizeof(tnames)/sizeof(string);n++)
 		scene.materials.push_back(shading::NewMaterial(tnames[n])); */
 
+	/*
 	string pre="scenes/sponza/";
 	string snames[]={
 		"",
@@ -161,7 +161,7 @@ void SetMaterials(Scene &scene,const BaseScene &base) {
 		"x01_st.dds",
 		};
 	
-	vector<Ptr<shading::BaseMaterial>> mats;
+	vector<Ptr<shading::Material>> mats;
 	for(int n=0;n<sizeof(snames)/sizeof(string);n++)
 		mats.push_back(shading::NewMaterial(n==0?snames[n]:pre+snames[n]));
 //	int matid[]={ 0,11,1,0,5,5,2,4,5,14,1,6,0,9,11,6,2,6,8,12,13 };
@@ -169,10 +169,10 @@ void SetMaterials(Scene &scene,const BaseScene &base) {
 //		scene.materials.push_back(mats[matid[n]]);
 //	scene.materials.push_back(mats[0]);
 //	scene.materials.push_back(mats[6]);
-
+*/
 	scene.materials.resize(base.matNames.size()+1);
 	for(std::map<string,int>::const_iterator it=base.matNames.begin();it!=base.matNames.end();++it) {
-		string name=it->first==""?"":"/mnt/Data/data/doom3/"+it->first;
+		string name=it->first==""?"":texPath+it->first;
 
 		try {
 		 	scene.materials[it->second]=typename Scene::PMaterial(shading::NewMaterial(name));
@@ -184,8 +184,10 @@ void SetMaterials(Scene &scene,const BaseScene &base) {
 	}
 	scene.materials.back()=typename Scene::PMaterial(shading::NewMaterial("scenes/doom3/imp/texture.tga"));
 
-	scene.materials[126]->flags|=shading::BaseMaterial::fReflection;
-	scene.materials[ 70]->flags|=shading::BaseMaterial::fRefraction;
+	if(scene.materials.size()>126) {
+		scene.materials[126]->flags|=shading::Material::fReflection;
+		scene.materials[ 70]->flags|=shading::Material::fRefraction|shading::Material::fReflection;
+	}
 }
 
 vector<Light> GenLights() {
@@ -204,7 +206,8 @@ vector<Light> GenLights() {
 	return out;
 }
 
-int main(int argc, char **argv) {
+
+int safe_main(int argc, char **argv) {
 	printf("Snail v0.11 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
 		PrintHelp();
@@ -232,6 +235,7 @@ int main(int argc, char **argv) {
 	Options options;
 	bool treeVisMode=0;
 	bool flipNormals=1;
+	string texPath="/mnt/Data/data/doom3/";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
@@ -241,12 +245,14 @@ int main(int argc, char **argv) {
 		else if(string("-treevis")==argv[n]) treeVisMode=1;
 		else if(string("+flipNormals")==argv[n]) flipNormals=1;
 		else if(string("-flipNormals")==argv[n]) flipNormals=0;
+		else if(string("-texPath")==argv[n]) { texPath=argv[n+1]; n++; }
 		else modelFile=argv[n];
 	}
 
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
 	printf("Loading...\n");
+	double buildTime=GetTime();
 	BaseScene baseScene; {
 		string fileName=string("scenes/")+modelFile;
 		if(fileName.find(".proc")!=string::npos)
@@ -304,22 +310,27 @@ int main(int argc, char **argv) {
 	Saver(string("dump/")+modelFile) & staticScene.geometry;
 //	Loader(string("dump/")+modelFile) & staticScene.geometry;
 
-	SetMaterials(staticScene,baseScene);
+	SetMaterials(staticScene,baseScene,texPath);
 
 	Scene<FullTree> scene;
-	SetMaterials(scene,baseScene);
+	SetMaterials(scene,baseScene,texPath);
 	mesh.SetMaterial(scene.materials.size()-1);
 
 	vector<Light> lights=GenLights();
-
+			
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
 		cam.pos=scene.geometry.GetBBox().Center();
 
+	buildTime=GetTime()-buildTime;
+	std::cout << "Build time: " << buildTime << '\n';
+
 	if(nonInteractive) {
 		double time=GetTime();
-		ThrowException("Rendering to file disabled");
-//		Render(staticScene,cam,img,options,threads);
+	//	ThrowException("Rendering to file disabled");
+
+		staticScene.Update();
+		Render(staticScene,cam,img,options,threads);
 
 		time=GetTime()-time;
 		minTime=maxTime=time;
@@ -467,3 +478,16 @@ int main(int argc, char **argv) {
 	return 0;
 }
 
+int main(int argc,char **argv) {
+	try {
+		return safe_main(argc,argv);
+	}
+	catch(const std::exception &ex) {
+		std::cout << ex.what() << '\n';
+		return 1;
+	}
+	catch(...) {
+		std::cout << "Unknown exception thrown.\n";
+		throw;
+	}
+}

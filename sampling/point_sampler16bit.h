@@ -3,12 +3,13 @@
 
 #include "rtbase.h"
 #include <gfxlib_texture.h>
+#include "sampling.h"
 
 namespace sampling {
 
 	struct Cache;
 
-	class PointSampler16bit {
+	class PointSampler16bit: public Sampler {
 	public:
 		PointSampler16bit(const gfxlib::Texture&);
 		PointSampler16bit() { }
@@ -23,6 +24,7 @@ namespace sampling {
 
 		Vec3q operator()(const Vec2q &uv,const Vec2q &diff) const;
 		INLINE Vec3q operator()(const Vec2q &uv,const Vec2q &diff,Cache&) const { return operator()(uv,diff); }
+		void Sample(shading::Sample*,Cache&) const;
 
 	protected:
 		void Init(const gfxlib::Texture&);

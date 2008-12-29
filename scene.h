@@ -22,13 +22,14 @@ public:
 	sampling::Cache samplingCache;
 };
 
-#include "material.h"
+#include "shading/material.h"
+#include "shading/simple_material.h"
 
 template <class AccStruct>
 class Scene {
 public:
-	typedef Ptr<shading::BaseMaterial> PMaterial;
-		
+	typedef shading::PMaterial PMaterial;
+
 	Scene() {
 		materials.push_back(new shading::SimpleMaterial<1>(Vec3f(1.0f,1.0f,1.0f)));
 		ambientLight=Vec3f(0.1f,0.1f,0.1f);

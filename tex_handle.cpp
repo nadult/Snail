@@ -1,23 +1,24 @@
 #include "tex_handle.h"
-#include <squish.h>
 #include "rtbase.h"
 #include <GL/gl.h>
+#include <GL/glext.h>
 
 	namespace
 	{
-		void TestGlError(const char *msg) {
+		template <class ...Args>
+		void TestGlError(const Args&... args) {
 			int err=glGetError();
 			if(err==GL_NO_ERROR) return;
 
 			switch(err) {
-		#define CASE(e) case e: throw Exception(Stringizer() + msg + ": " #e );
+		#define CASE(e) case e: ThrowException(#e,' ',args...);
 				CASE(GL_INVALID_ENUM)
 				CASE(GL_INVALID_VALUE)
 				CASE(GL_INVALID_OPERATION)
 				CASE(GL_STACK_OVERFLOW)
 				CASE(GL_STACK_UNDERFLOW)
 				CASE(GL_OUT_OF_MEMORY)
-				default: ThrowException(msg);
+				default: ThrowException(args...);
 		#undef CASE
 			}
 		}
@@ -31,7 +32,7 @@
 			if(fmt.IsCompressed()) ThrowException("Texture compression is not supported");
 				
 			glTexImage2D(GL_TEXTURE_2D,level,fmt.GlInternal(),width,height,0,fmt.GlFormat(),fmt.GlType(),pixels);
-			TestGlError("Error while loading texture surface to the device");
+			TestGlError("Error while loading texture surface to the device (internal: ",fmt.GlInternal()," glFormat: ",fmt.GlFormat(),')');
 		}
 
 		void GetTextureData(u32 level,const Format &fmt,void *pixels) {

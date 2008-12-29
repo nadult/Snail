@@ -7,10 +7,13 @@
 #include <veclib.h>
 #include "allocator.h"
 #include <cassert>
+#include <math.h>
 
 
-#define EXPECT_TAKEN(a)         __builtin_expect(!!(a), 1)
-#define EXPECT_NOT_TAKEN(a)   	__builtin_expect(!!(a), 0)
+//#define EXPECT_TAKEN(a)         __builtin_expect(!!(a), 1)
+//#define EXPECT_NOT_TAKEN(a)   	__builtin_expect(!!(a), 0)
+#define EXPECT_TAKEN(a)			a
+#define EXPECT_NOT_TAKEN(a)		a
 
 using namespace baselib;
 using namespace veclib;
@@ -31,6 +34,11 @@ template <class Vec>
 Vec Reflect(const Vec &ray,const Vec &nrm) {
 	typename Vec::TScalar dot=(nrm|ray);
 	return ray-nrm*(dot+dot);
+}
+
+INLINE bool isnan(float t) {
+	union { float f; int i; }; f=t;
+	return (i&0x7f800000)==0x7f8 && (i&0x7fffff)!=0;
 }
 
 inline float Maximize(const floatq &t) { return Max(Max(t[0],t[1]),Max(t[2],t[3])); }

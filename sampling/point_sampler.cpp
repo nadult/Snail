@@ -87,5 +87,39 @@ namespace sampling {
 		return Vec3q(b,g,r)*f32x4(1.0f/255.0f);
 	}
 
+	void PointSampler::Sample(shading::Sample *samples,Cache&) const {
+
+		for(int k=0;k<4;k++) {
+			shading::Sample &s=samples[k];
+
+			Vec2q pos=(s.texCoord)*Vec2q(wMul,hMul);
+			i32x4 x(pos.x),y(pos.y);
+
+			uint mip; {	
+				floatq min=Min(s.texDiff.x*wMul,s.texDiff.y*hMul);
+				uint pixels=uint(Minimize(min));
+				mip=0; while(pixels) { mip++; pixels>>=1; }
+				mip=Min(mip,tex.Mips()-1);
+			}
+
+			const u8 *data=(u8*)tex.DataPointer(mip);
+			int pitch=tex.Pitch(mip);
+		
+			x>>=mip; y>>=mip;
+			x&=i32x4(wMask>>mip);
+			y&=i32x4(hMask>>mip);
+
+			x=x+x+x;
+			y[0]*=pitch; y[1]*=pitch;
+			y[2]*=pitch; y[3]*=pitch;
+
+			floatq r=floatq(data[x[0]+y[0]+0],data[x[1]+y[1]+0],data[x[2]+y[2]+0],data[x[3]+y[3]+0]);
+			floatq g=floatq(data[x[0]+y[0]+1],data[x[1]+y[1]+1],data[x[2]+y[2]+1],data[x[3]+y[3]+1]);
+			floatq b=floatq(data[x[0]+y[0]+2],data[x[1]+y[1]+2],data[x[2]+y[2]+2],data[x[3]+y[3]+2]);
+
+			s.temp1=Vec3q(b,g,r)*f32x4(1.0f/255.0f);
+		}
+	}
+
 }
 

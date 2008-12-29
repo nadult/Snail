@@ -1,32 +1,44 @@
 import os
 
+libs = [ 'baselib', 'glfw', 'gfxlib', 'png', 'pthread', 'z' ] 
+libsLinux = libs + [ 'GL', 'GLU', 'Xrandr' ]
+libsWin32 = libs + [ 'opengl32', 'glu32', 'kernel32', 'ws2_32' ]
 
-libs = [ 'baselib', 'glfw', 'pthread', 'png', 'gfxlib' ] 
-libsLinux = [ 'GL', 'GLU', 'Xrandr' ]
-libsWin32 = [ 'opengl32', 'glu32' ]
-
-if Environment()["PLATFORM"] == 'posix': libs += libsLinux
-else: libs += libsWin32
-
-default = Environment (
+envLinux32 = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
-		CXX = '/usr/local/gcc-4.3.2/bin/g++ -std=c++0x',
-		CPPPATH = '.'
+		TARGET_PLATFORM='linux32',
+	#	CXX = '/usr/local/gcc-4.4/bin/g++ -O3 -std=gnu++0x -msse2 -m32 -finline-limit=200',
+		CXX = '/usr/local/gcc-4.3.2/bin/g++ -O3 -std=gnu++0x -msse2 -m32',
+		CPPPATH = '.',
+	)
+envLinux64 = Environment (
+		ENV = os.environ,
+		PLATFORM = 'posix',
+		TARGET_PLATFORM='linux64',
+	#	CXX = '/usr/local/gcc-4.4/bin/g++ -std=gnu++0x -msse2 -ffast-math',
+		CXX = '/usr/local/gcc-4.3.2/bin/g++ -std=gnu++0x -msse2 -ffast-math',
+		CPPPATH = '.',
+	)
+envWin32 = Environment (
+		ENV = os.environ,
+		PLATFORM = 'posix',
+		TARGET_PLATFORM='win32',
+		CXX = '/usr/local/mingw32-4.3/bin/i686-mingw32-g++ -std=gnu++0x -msse2 -ffast-math -finline-limit=200 -mthreads',
+		CPPPATH = ['.', '/usr/local/mingw32-4.3/include'],
+		LIBPATH = '/usr/local/mingw32-4.3/lib',
 	)
 
-if int(ARGUMENTS.get('-m32',0)):
-	default=default.Clone( CXX='g++ -m32')
-
-release = default.Clone(
-	CXXFLAGS='-O3 -msse2 -march=core2 -mfpmath=sse -g -DNDEBUG -Wstrict-aliasing=2 -Wno-unused -Wno-conversion',
-	BUILDDIR='build/release/'
-)
-debug = default.Clone(
-	CXXFLAGS='-O0 -msse2 -g -gdwarf-2',
-	BUILDDIR='build/debug/'
-)
-
+def ReleaseEnv(env):
+	return env.Clone(
+		CXXFLAGS='-O3 -mfpmath=sse -g -DNDEBUG -Wstrict-aliasing=2 -Wno-unused -Wno-conversion',
+		BUILDDIR='build/'+env['TARGET_PLATFORM']+'_release/'
+	)
+def DebugEnv(env):
+	return env.Clone(
+		CXXFLAGS='-O0 -msse2 -g -gdwarf-2',
+		BUILDDIR='build/'+env['TARGET_PLATFORM']+'_debug/'
+	)
 
 def BuildObject(env,file,dir):
 	buildDir = env['BUILDDIR']
@@ -55,13 +67,20 @@ def ExcludeFromList(tList,tObj):
 			outList.append(obj)
 	return outList
 
-def Build( env, progName ):
+def Build( env, progName, libs ):
 	baseObjects = BuildObjects( env, ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
 	formatsObjects = BuildObjects( env, ListCppFiles('formats/'), 'formats/')
 	bihObjects = BuildObjects( env, ListCppFiles('bih/'), 'bih/')
+	shadingObjects = BuildObjects( env, ListCppFiles('shading/'), 'shading/')
 	samplingObjects = BuildObjects( env, ListCppFiles('sampling/'), 'sampling/')
-	env.Program(progName, baseObjects+formatsObjects+bihObjects+samplingObjects, LIBS=libs )
+	env.Program(progName, baseObjects+formatsObjects+bihObjects+samplingObjects+shadingObjects, LIBS=libs )
 
-Build( release, 'rtracer' )
-Build( debug, 'rtracerd' )
+Build( ReleaseEnv(envLinux64), 'rtracer' , libsLinux )
+Build( DebugEnv  (envLinux64), 'rtracerd', libsLinux )
+
+Build( ReleaseEnv(envLinux32), 'rtracer32' , libsLinux )
+Build( DebugEnv  (envLinux32), 'rtracer32d', libsLinux )
+
+Build( ReleaseEnv(envWin32), 'rtracer.exe' , libsWin32 )
+Build( DebugEnv  (envWin32), 'rtracerd.exe', libsWin32 )
 

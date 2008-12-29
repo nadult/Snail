@@ -144,7 +144,7 @@ TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &im
 
 template <class AccStruct>
 TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
-	return gVals[3]?Render<2>(scene,camera,image,options,tasks):Render<3>(scene,camera,image,options,tasks);
+	return Render<3>(scene,camera,image,options,tasks);
 }
 
 typedef bih::Tree<TriangleVector> StaticTree;

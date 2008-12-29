@@ -85,7 +85,7 @@ public:
 	}
 
 	template <int w,int tflags,int size>
-	INLINE int Collide_(Context<size,tflags> &c,int idx) const {
+	int Collide_(Context<size,tflags> &c,int idx) const {
 		floatq tdett,ppu,ppv;
 		if(tflags&isct::fShOrig) {
 			Vec3q orig=c.Origin(0);
@@ -97,7 +97,7 @@ public:
 		bool sign=flags&1;
 		bool full=tflags&isct::fShadow?1:0;
 
-		if(__builtin_expect(flags&2,0)) for(int q=0;q<size;q++) {
+		if(EXPECT_NOT_TAKEN(flags&2)) for(int q=0;q<size;q++) {
 			const Vec3q dir=c.Dir(q);
 			const Vec3q origin=c.Origin(q);
 

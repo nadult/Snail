@@ -1,5 +1,4 @@
 #include "sampling/point_sampler_dxt.h"
-#include "sampling.h"
 
 namespace sampling {
 
@@ -46,7 +45,7 @@ namespace sampling {
 				c[1]=c[1]+c[1]+c[1];
 
 				uint shift=(xbit[k]<<1)+(ybit[k]<<3);
-				out[k]=c[(block.bits>>shift)&0x3];
+				out[k]=c[(block.bits32>>shift)&0x3];
 			}
 
 
@@ -83,13 +82,11 @@ namespace sampling {
 			c[0]=c[0]+c[0]+c[0];
 			c[1]=c[1]+c[1]+c[1];
 
-			u8 bits[4]={block.bits&0xff,(block.bits>>8)&0xff,(block.bits>>16)&0xff,block.bits>>24};
-
 			for(int t=0;t<4;t++) {
-				dst[t][0]=c[bits[t]&0x3];
-				dst[t][1]=c[(bits[t]>>2)&0x3];
-				dst[t][2]=c[(bits[t]>>4)&0x3];
-				dst[t][3]=c[bits[t]>>6];
+				dst[t][0]=c[block.bits8[t]&0x3];
+				dst[t][1]=c[(block.bits8[t]>>2)&0x3];
+				dst[t][2]=c[(block.bits8[t]>>4)&0x3];
+				dst[t][3]=c[block.bits8[t]>>6];
 			}
 		}
 		
@@ -198,6 +195,13 @@ namespace sampling {
 		floatq b=pixels&0x3ff;
 
 		return Vec3q(r,g,b)*f32x4(1.0f/(255.0f*3.0f));
+	}
+	
+	void PointSamplerDXT::Sample(shading::Sample *samples,Cache &c) const {
+		for(int k=0;k<shading::blockSize;k++) {
+			shading::Sample &s=samples[k];
+			s.temp1=operator()(s.texCoord,s.texDiff,c);
+		}
 	}
 
 }
