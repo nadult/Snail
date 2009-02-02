@@ -31,7 +31,7 @@ public:
 	typedef shading::PMaterial PMaterial;
 
 	Scene() {
-		materials.push_back(new shading::SimpleMaterial<1>(Vec3f(1.0f,1.0f,1.0f)));
+		materials.push_back(new shading::MaterialWrapper<shading::SimpleMaterial<1>>(Vec3f(1.0f,1.0f,1.0f)));
 		ambientLight=Vec3f(0.1f,0.1f,0.1f);
 	}
 

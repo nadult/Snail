@@ -11,10 +11,10 @@ namespace shading {
 		PSampler sampler=sampling::NewSampler(texName);
 
 		return sampler?
-					NDotL?	(Material*)new TexMaterial<1>(sampler):
-							(Material*)new TexMaterial<0>(sampler)
-				:	NDotL?	(Material*)new SimpleMaterial<1>(Vec3f(1.0f,1.0f,1.0f)):
-							(Material*)new SimpleMaterial<0>(Vec3f(1.0f,1.0f,1.0f)) ;
+					NDotL?	(Material*)new MaterialWrapper< TexMaterial<1> >(sampler):
+							(Material*)new MaterialWrapper< TexMaterial<0> >(sampler)
+				:	NDotL?	(Material*)new MaterialWrapper< SimpleMaterial<1> >(Vec3f(1.0f,1.0f,1.0f)):
+							(Material*)new MaterialWrapper< SimpleMaterial<0> >(Vec3f(1.0f,1.0f,1.0f)) ;
 	}
 
 }

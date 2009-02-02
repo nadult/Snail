@@ -36,15 +36,6 @@ namespace shading {
 			}
 		}
 
-		void Shade(Sample *__restrict__ samples,const Rays &rays,SCache &sc) const
-			{ Shade_(samples,rays,sc); }
-		void Shade(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const Rays &rays,SCache &sc) const
-			{ Shade_(samples,mask,rays,sc); }
-		void Shade(Sample *__restrict__ samples,const RaysS &rays,SCache &sc) const
-			{ Shade_(samples,rays,sc); }
-		void Shade(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const RaysS &rays,SCache &sc) const
-			{ Shade_(samples,mask,rays,sc); }
-
 	private:
 		Vec3f color;
 	};

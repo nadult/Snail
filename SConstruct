@@ -1,6 +1,7 @@
 import os
 
-libs = [ 'baselib', 'glfw', 'gfxlib', 'png', 'pthread', 'z' ] 
+libs = [ 'baselib', 'glfw', 'gfxlib', 'png', 'pthread', 'z',
+			'bulletdynamics','bulletcollision', 'bulletmath' ] 
 libsLinux = libs + [ 'GL', 'GLU', 'Xrandr' ]
 libsWin32 = libs + [ 'opengl32', 'glu32', 'kernel32', 'ws2_32' ]
 
@@ -68,12 +69,15 @@ def ExcludeFromList(tList,tObj):
 	return outList
 
 def Build( env, progName, libs ):
-	baseObjects = BuildObjects( env, ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
-	formatsObjects = BuildObjects( env, ListCppFiles('formats/'), 'formats/')
-	bihObjects = BuildObjects( env, ListCppFiles('bih/'), 'bih/')
-	shadingObjects = BuildObjects( env, ListCppFiles('shading/'), 'shading/')
-	samplingObjects = BuildObjects( env, ListCppFiles('sampling/'), 'sampling/')
-	env.Program(progName, baseObjects+formatsObjects+bihObjects+samplingObjects+shadingObjects, LIBS=libs )
+	baseObjects		= BuildObjects( env, ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
+	formatsObjects	= BuildObjects( env, ListCppFiles('formats/'	), 'formats/')
+	bihObjects		= BuildObjects( env, ListCppFiles('bih/'		), 'bih/')
+	shadingObjects	= BuildObjects( env, ListCppFiles('shading/'	), 'shading/')
+	samplingObjects	= BuildObjects( env, ListCppFiles('sampling/'	), 'sampling/')
+	gameObjects		= BuildObjects( env, ListCppFiles('game/'		), 'game/')
+	env.Program(	progName,
+					baseObjects+formatsObjects+bihObjects+samplingObjects+shadingObjects+gameObjects,
+					LIBS=libs )
 
 Build( ReleaseEnv(envLinux64), 'rtracer' , libsLinux )
 Build( DebugEnv  (envLinux64), 'rtracerd', libsLinux )

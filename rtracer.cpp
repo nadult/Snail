@@ -13,6 +13,8 @@
 #include "tree_box.h"
 #include "scene.h"
 #include "mesh.h"
+#include "scene_builder.h"
+#include "frame_counter.h"
 
 int TreeVisMain(const TriVector&);
 
@@ -38,81 +40,6 @@ void PrintHelp() {
 
 typedef bih::Tree<TriangleVector> StaticTree;
 typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
-
-class SceneBuilder {
-public:
-	struct Object {
-		Matrix<Vec4f> preTrans;
-		StaticTree *tree;
-		BBox bBox;
-	};
-	
-	struct Instance {
-		Matrix<Vec4f> trans;
-		u32 objId;
-	};
-
-	// box includes preTrans (it can be more optimized than just tree->BBox()*preTrans)
-	void AddObject(StaticTree *tree,const Matrix<Vec4f> &preTrans,const BBox &box) {
-		Object newObj;
-		newObj.tree=tree;
-		newObj.bBox=box;
-		newObj.preTrans=preTrans;
-		objects.push_back(newObj);
-	}
-
-	void AddInstance(int objId,const Matrix<Vec4f> &trans) {
-		Instance newInst;
-		newInst.trans=trans;
-		newInst.objId=objId;
-		instances.push_back(newInst);
-	}
-
-	typedef TreeBox<StaticTree> Elem;
-
-	TreeBoxVector<StaticTree> ExtractElements() const {
-		vector<Elem,AlignedAllocator<Elem> > elements;
-
-		for(int n=0;n<instances.size();n++) {
-			const Instance &inst=instances[n];
-			const Object &obj=objects[inst.objId];
-			Matrix<Vec4f> mat=obj.preTrans*inst.trans;
-			BBox box=obj.bBox*inst.trans;
-			elements.push_back(Elem(obj.tree,mat,box));
-		}
-
-		return TreeBoxVector<StaticTree>(elements);
-	}
-	
-	vector<Object> objects;
-	vector<Instance> instances;
-};
-
-class FrameCounter
-{
-public:
-	FrameCounter() :time(GetTime()),fps(0),frames(0) { }
-
-	void NextFrame() {
-		double tTime=GetTime();
-		double interval=0.5f;
-
-		frames++;
-		if(tTime-time>interval) {
-			fps=double(frames)/interval;
-			time+=interval;
-			frames=0;
-		}
-	}
-
-	double FPS() const {
-		return fps;
-	}
-
-private:
-	uint frames;
-	double time,fps;
-};
 
 template <class Dst,class Src>
 Dst BitCast(const Src &src) {
@@ -206,6 +133,7 @@ vector<Light> GenLights() {
 	return out;
 }
 
+namespace game { int main(int argc,char **argv); }
 
 int safe_main(int argc, char **argv) {
 	printf("Snail v0.11 by nadult\n");
@@ -233,21 +161,26 @@ int safe_main(int argc, char **argv) {
 	int threads=4;
 	const char *modelFile="doom3/admin.proc";
 	Options options;
-	bool treeVisMode=0;
 	bool flipNormals=1;
+	bool gameMode=0;
 	string texPath="/mnt/Data/data/doom3/";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
+		else if(string("-game")==argv[n]) gameMode=1;
 		else if(string("-threads")==argv[n]&&n<argc-1) { threads=atoi(argv[n+1]); n+=1; }
 		else if(string("-fullscreen")==argv[n]) { fullscreen=1; }
 		else if(string("-toFile")==argv[n]) { nonInteractive=1; }
-		else if(string("-treevis")==argv[n]) treeVisMode=1;
 		else if(string("+flipNormals")==argv[n]) flipNormals=1;
 		else if(string("-flipNormals")==argv[n]) flipNormals=0;
 		else if(string("-texPath")==argv[n]) { texPath=argv[n+1]; n++; }
-		else modelFile=argv[n];
+		else {
+			if(argv[n][0]=='-') printf("Unknown option: ",argv[n]);
+			else modelFile=argv[n];
+		}
 	}
+
+	if(gameMode) return game::main(argc,argv);
 
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
@@ -267,7 +200,7 @@ int safe_main(int argc, char **argv) {
 	//	baseScene.Optimize();
 	}
 
-	SceneBuilder builder; {
+	SceneBuilder<StaticTree,FullTree> builder; {
 		vector<BaseScene::Object> objects;
 
 		for(int n=0;n<baseScene.objects.size();n++) {
@@ -424,9 +357,9 @@ int safe_main(int argc, char **argv) {
 	
 			double buildTime=GetTime(); {
 				static float pos=0.0f; if(out.Key(Key_space)) pos+=0.025f;
-				SceneBuilder temp=builder;
+				SceneBuilder<StaticTree,FullTree> temp=builder;
 			//	for(int n=0;n<temp.instances.size();n++) {
-			//		SceneBuilder::Instance &inst=temp.instances[n];
+			//		SceneBuilder<StaticTree,FullTree>::Instance &inst=temp.instances[n];
 			//		inst.trans.w=inst.trans.w+Vec4f(0.0f,sin(pos+n*n)*5.0f*speed,0.0f,0.0f);
 			//	}
 				mesh.Animate(meshAnim,pos);

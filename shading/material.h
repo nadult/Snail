@@ -31,6 +31,26 @@ namespace shading {
 		char flags;	
 	};
 
+	template <class MatClass>
+	class MaterialWrapper: public MatClass {
+	public:
+		typedef RayGroup<4,1> RaysS;
+		typedef RayGroup<4,0> Rays;
+		typedef sampling::Cache SCache;
+
+		template<class ...Args>
+		MaterialWrapper(const Args ... args) :MatClass(args...) { }
+
+		void Shade(Sample *__restrict__ samples,const Rays &rays,SCache &sc) const
+			{ MatClass::Shade_(samples,rays,sc); }
+		void Shade(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const Rays &rays,SCache &sc) const
+			{ MatClass::Shade_(samples,mask,rays,sc); }
+		void Shade(Sample *__restrict__ samples,const RaysS &rays,SCache &sc) const
+			{ MatClass::Shade_(samples,rays,sc); }
+		void Shade(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const RaysS &rays,SCache &sc) const
+			{ MatClass::Shade_(samples,mask,rays,sc); }
+	};
+
 	typedef Ptr<Material> PMaterial;
 
 	Material *NewMaterial(const string &texName,bool nDotL=1);
