@@ -16,31 +16,31 @@ namespace sampling {
 		const u8 *data=(u8*)tex.DataPointer();
 		int pitch=tex.Pitch();
 
-		vector<Sample,AlignedAllocator<Sample> > hSum(w*h);
+		vector<TSample,AlignedAllocator<TSample> > hSum(w*h);
 		samples.resize(w*(h+1));
 
 		for(int y=0;y<h;y++) {
-			hSum[y*w]=Sample(data[2+y*pitch],data[1+y*pitch],data[0+y*pitch]);
+			hSum[y*w]=TSample(data[2+y*pitch],data[1+y*pitch],data[0+y*pitch]);
 
 			for(int x=1;x<w;x++) {
 				const u8 *src=data+x*3+y*pitch;
-				hSum[x+y*w]=hSum[x-1+y*w]+Sample(src[2],src[1],src[0]);
+				hSum[x+y*w]=hSum[x-1+y*w]+TSample(src[2],src[1],src[0]);
 			}
 		}
 
-		for(int x=0;x<w;x++) samples[x]=Sample(0,0,0);
+		for(int x=0;x<w;x++) samples[x]=TSample(0,0,0);
 		for(int x=0;x<w;x++) {
 			samples[x+w]=hSum[x];
 			for(int y=1;y<h;y++)
 				samples[x+(y+1)*w]=samples[x+y*w]+hSum[x+y*w];
 		}
 
-		const Sample &last=Get(w-1,h-1);
+		const TSample &last=Get(w-1,h-1);
 		avg=Vec3f(last.R(),last.G(),last.B())*(1.0f/float(w*h*255));
 	}
 
-	INLINE SATSampler::Sample SATSampler::ComputeRect(uint ax,uint ay,uint bx,uint by) const {
-		Sample out;
+	INLINE SATSampler::TSample SATSampler::ComputeRect(uint ax,uint ay,uint bx,uint by) const {
+		TSample out;
 		out=Get(bx,by)-Get(bx,ay-1);
 		if(ax) out+=Get(ax-1,ay-1)-Get(ax-1,by);
 		return out;
@@ -57,7 +57,7 @@ namespace sampling {
 		bx&=wMask; by&=hMask;
 
 		uint count;
-		Sample sum;
+		TSample sum;
 
 		if(ax>bx) {
 			if(ay>by) {
@@ -82,7 +82,7 @@ namespace sampling {
 		return Vec3f(sum.R(),sum.G(),sum.B())*(1.0f/(255.0f*float(count)));
 	}
 
-	INLINE void SATSampler::ComputeRect(i32x4 ax,i32x4 ay,i32x4 bx,i32x4 by,Sample out[4]) const {
+	INLINE void SATSampler::ComputeRect(i32x4 ax,i32x4 ay,i32x4 bx,i32x4 by,TSample out[4]) const {
 		for(int k=0;k<4;k++) {
 			out[k]=Get(bx[k],by[k])-Get(bx[k],ay[k]-1);
 			if(ax[k]) out[k]+=Get(ax[k]-1,ay[k]-1)-Get(ax[k]-1,by[k]);
@@ -104,7 +104,7 @@ namespace sampling {
 		bx&=wMask; by&=hMask;
 
 		f32x4 count;
-		Sample sum[4];
+		TSample sum[4];
 		i32x4 one(1);
 
 		if(ForAll(ax<=bx&&ay<=by)) {

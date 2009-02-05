@@ -15,7 +15,6 @@ namespace sampling {
 
 		typedef const void* Ident;
 
-
 		INLINE uint Hash(int bx,int by,int mip) const
 			{ return (bx+by)&sizeMask; }
 		INLINE Ident GetIdent(int bx,int by,int bShift,const DXTBlock *blocks) const
