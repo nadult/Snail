@@ -18,8 +18,11 @@ public:
 
 class Cache {
 public:
+	Cache() :supersampling(0) { }
+
 	ShTriCache shTriCache;
 	sampling::Cache samplingCache;
+	bool supersampling;
 };
 
 #include "shading/material.h"

@@ -32,7 +32,7 @@ namespace bih {
 
 					FContext<flags> fc(c,q);
 					TraverseMono(fc);
-				}
+				} 
 			}
 		}
 

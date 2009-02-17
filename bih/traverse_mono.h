@@ -4,7 +4,6 @@
 	void Tree<ElementContainer>::TraverseMono(FContext<flags> &c) const
 	{
 		TreeStats<1> stats;
-		stats.TracingRay();
 
 		uint dirMask=(c.iDir.x<0.0f?1:0)+(c.iDir.y<0.0f?2:0)+(c.iDir.z<0.0f?4:0);
 		float tMin=0.0f,tMax=c.Distance(0);

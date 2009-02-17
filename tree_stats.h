@@ -58,13 +58,11 @@ public:
 		return *this;
 	}
 
-	double GetCoherent() const		{ return enabled?double(data[3])/double(data[3]+data[4]):0.0; }
 	double GetBreaking() const		{ return enabled?double(data[5])/double(data[5]+data[6]):0.0; }
 	double GetIntersectFail() const	{ return enabled?double(data[8])/double(data[7]+data[8]):0.0; }
 
 	uint GetIntersects() const { return enabled?data[0]:0; }
 	uint GetLoopIters() const { return enabled?data[1]:0; }
-	uint GetTracedRays() const { return enabled?data[2]:0; }
 	uint GetSkips() const { return enabled?data[9]:0; }
 
 	string GenInfo(int resx,int resy,double msRenderTime,double msBuildTime);
@@ -84,8 +82,7 @@ public:
 
 	inline void Skip(uint val=1) { if(enabled) data[9]+=val; }
 
-	inline void TracingRay(uint val=1) { if(enabled) { data[2]+=val; data[4]+=val; } }
-	inline void TracingPacket(uint val=1) { if(enabled) { data[2]+=val; data[3]+=val; } }
+	inline void TracingRays(uint val=1) { if(enabled) { data[2]+=val; } }
 
 
 private:
@@ -94,8 +91,8 @@ private:
 	// intersects		0
 	// iters			1
 	// tracedRays		2
-	// coherent			3
-	// nonCoherent		4
+	// 
+	// 
 	// breaking			5
 	// notBreaking		6
 	// intersectPass	7

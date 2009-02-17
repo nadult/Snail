@@ -1,33 +1,32 @@
 import os
 
-libs = [ 'baselib', 'glfw', 'gfxlib', 'png', 'pthread', 'z',
-			'bulletdynamics','bulletcollision', 'bulletmath' ] 
+libs = [ 'baselib', 'glfw', 'gfxlib', 'png', 'z', 'bulletdynamics','bulletcollision', 'bulletmath' ] 
 libsLinux = libs + [ 'GL', 'GLU', 'Xrandr' ]
-libsWin32 = libs + [ 'opengl32', 'glu32', 'kernel32', 'ws2_32' ]
+libsWin32 = libs + [ 'opengl32', 'glu32', 'kernel32', 'ws2_32', 'thread' ]
 
 envLinux32 = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
 		TARGET_PLATFORM='linux32',
-	#	CXX = '/usr/local/gcc-4.4/bin/g++ -O3 -std=gnu++0x -msse2 -m32 -finline-limit=200',
-		CXX = '/usr/local/gcc-4.3.2/bin/g++ -O3 -std=gnu++0x -msse2 -m32',
+		CXX = '/usr/local/gcc-4.4/bin/g++ -O3 -ffast-math -std=gnu++0x -msse2 -m32 -mtune=core2 --param inline-unit-growth=100',
+	#	CXX = '/usr/local/gcc-4.3.2/bin/g++ -O3 -std=gnu++0x -msse2 -m32 -ffast-math',
 		CPPPATH = '.',
 	)
 envLinux64 = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
 		TARGET_PLATFORM='linux64',
-	#	CXX = '/usr/local/gcc-4.4/bin/g++ -std=gnu++0x -msse2 -ffast-math',
-		CXX = '/usr/local/gcc-4.3.2/bin/g++ -std=gnu++0x -msse2 -ffast-math',
+	#	CXX = '/usr/local/gcc-4.4/bin/g++ -std=gnu++0x -ffast-math -mtune=core2 --param inline-unit-growth=100',
+		CXX = '/usr/local/gcc-4.3.2/bin/g++ -std=gnu++0x -ffast-math',
 		CPPPATH = '.',
 	)
 envWin32 = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
 		TARGET_PLATFORM='win32',
-		CXX = '/usr/local/mingw32-4.3/bin/i686-mingw32-g++ -std=gnu++0x -msse2 -ffast-math -finline-limit=200 -mthreads',
-		CPPPATH = ['.', '/usr/local/mingw32-4.3/include'],
-		LIBPATH = '/usr/local/mingw32-4.3/lib',
+		CXX = '/usr/local/mingw32-4.4/bin/i686-mingw32-g++ -O3 -std=gnu++0x -msse2 -ffast-math --param inline-unit-growth=100 -mtune=core2 -mthreads',
+		CPPPATH = ['.', '/usr/local/mingw32-4.4/include'],
+		LIBPATH = '/usr/local/mingw32-4.4/lib',
 	)
 
 def ReleaseEnv(env):

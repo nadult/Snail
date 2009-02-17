@@ -43,7 +43,7 @@ namespace bih {
 		enum { pickLongestAxis=0 };
 		int axis=MaxAxis(box.max-box.min);
 
-		const float travCost=0.1;
+		const float travCost=0.8;
 		const float hitTestCost=1.0;
 		const float noSplitCost=hitTestCost*indices.size();
 
@@ -191,7 +191,7 @@ namespace bih {
 										uint level,bool sah,bool fast) {
 		maxLevel=Max(maxLevel,level+1);
 		
-/*		{ // eliminating duplicates
+		{ // eliminating duplicates
 	RESORT:
 			std::sort(indices.begin(),indices.end());
 			for(int n=1;n<indices.size();n++) {
@@ -203,7 +203,7 @@ namespace bih {
 					goto RESORT;
 				}
 			}
-		} */
+		}
 
 //		if(sizeoi(CElement)!=64) sah=0;
 		if(level>Max(0,desiredMaxLevel-10)||fast) sah=0;

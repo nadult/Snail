@@ -123,6 +123,7 @@ struct DistanceShader {
 			Vec3q lColor(light.color.x,light.color.y,light.color.z);
 			floatq tDistance[size]; for(int q=0;q<size;q++) tDistance[q]=distance[q]*0.99999f;
 
+			for(int q=0;q<size;q++) stats.TracingRays(CountMaskBits(sel[q]));
 			Context<size,isct::fShOrig|isct::fShadow> c(&lPos,fromLight,idir,tDistance,0,0,&stats);
 			geometry.TraversePacket(c,sel);
 
@@ -180,13 +181,16 @@ struct DistanceShader {
 		i32x4 tObject[size],tElement[size];
 
 		for(int q=0;q<size;q++) tDistance[q]=maxDist;
+		for(int q=0;q<size;q++) result.stats.TracingRays(CountMaskBits(inputSelector[q]));
+
+	//	bool doAntialias[size/blockSize]={0,};
+
 		Context<size,flags> tc(rays,tDistance,tObject,tElement,&result.stats);
 
 		geometry.TraversePacket(tc,inputSelector);
 		RaySelector<size> selector=inputSelector;
 		RaySelector<size> reflSel; reflSel.Clear();
 		RaySelector<size> refrSel; refrSel.Clear();
-
 
 		if(gVals[4]) { //no shading
 			for(int q=0;q<size;q++) {
@@ -206,12 +210,13 @@ struct DistanceShader {
 		shading::Sample samples[size];
 		int matCount=materials.size();
 
+
 		for(uint b=0;b<size/blockSize;b++) {
 			uint b4=b<<2;
 
 			f32x4b mask[blockSize];
 			i32x4 matId[blockSize],object[blockSize],element[blockSize];
-
+		
 			for(int q=0;q<blockSize;q++) {
 				int tq=b4+q;
 
@@ -293,6 +298,8 @@ struct DistanceShader {
 											cache.samplingCache);
 			}
 			else {
+			//	doAntialias[b]=1;
+
 				for(uint q=0;q<4;q++) {
 					uint tq=b4+q;
 					if(!selector[tq]) continue;
@@ -323,7 +330,6 @@ struct DistanceShader {
 
 						s.normal=Vec3q(shTri.nrm[0])+Vec3q(shTri.nrm[1])*bar.x+Vec3q(shTri.nrm[2])*bar.y;
 					}
-					
 
 					if(AccStruct::isctFlags&isct::fElement?ForAny(object[q]!=obj0||element[q]!=elem0):ForAny(object[q]!=obj0))
 					  for(int k=1;k<4;k++) {
@@ -404,7 +410,9 @@ struct DistanceShader {
 					}
 				}
 			}
+
 		}
+
 
 		if(reflSel.Any()&&!gVals[5]&&flags&isct::fPrimary) {
 			Result<size> reflResult=TraceReflection(rays.DirPtr(),samples,reflSel,cache);
@@ -453,15 +461,44 @@ struct DistanceShader {
 				result.color[q]=samples[q].diffuse*lDiffuse[q]+samples[q].specular*lSpecular[q];
 			}
 		}
-		else
-			for(int q=0;q<size;q++)
-				result.color[q]=samples[q].diffuse;
+		else for(int q=0;q<size;q++)
+			result.color[q]=samples[q].diffuse;
 
 		if(gVals[2]&&flags&isct::fPrimary) {
 			Vec3q col=StatsShader<size>(result.stats)[0];
 			for(int q=0;q<size;q++)
 				result.color[q]=col;
 		}
+
+	/*	if(isct::fPrimary&&sharedOrigin&&!cache.supersampling&&!gVals[6]) {
+			cache.supersampling=1;
+
+			for(uint b=0;b<size/blockSize;b++) {
+				uint b4=b<<2;
+
+				if(!doAntialias[b]) continue;
+
+				Vec3q dir[blockSize*4],idir[blockSize*4];
+				for(int q=0;q<blockSize;q++) {
+					Vec3f dirs[4]; Convert(rays.Dir(q+b4),dirs);
+					dir[q*4+0]=rays.Dir(q+b4)+(Vec3q)((dirs[1]-dirs[0])*0.33333f);
+					dir[q*4+1]=rays.Dir(q+b4)-(Vec3q)((dirs[1]-dirs[0])*0.33333f);
+					dir[q*4+2]=rays.Dir(q+b4)+(Vec3q)((dirs[2]-dirs[0])*0.33333f);
+					dir[q*4+3]=rays.Dir(q+b4)-(Vec3q)((dirs[2]-dirs[0])*0.33333f);
+				}
+				for(int q=0;q<blockSize*4;q++) idir[q]=VInv(dir[q]);
+
+				Result<blockSize*4> sup=RayTrace(RayGroup<blockSize*4,1>(rays.OriginPtr(),dir,idir),
+													FullSelector<blockSize*4>(),cache);
+
+				for(int q=0;q<blockSize;q++)
+					result.color[b4+q]=(result.color[b4+q ]+
+						sup.color[q*4+0]+sup.color[q*4+1]+sup.color[q*4+2]+sup.color[q*4+3] )*f32x4(1.0f/5.0f);
+				result.stats += sup.stats;
+			}
+				
+			cache.supersampling=0;
+		} */
 
 		return result;
 	}

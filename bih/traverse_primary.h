@@ -9,7 +9,6 @@
 																	c.Dir(0).z.m,0+(2<<2)))&7;
 	
 		TreeStats<1> stats;	
-		stats.TracingPacket(4*size);
 
 		if(!CElement::isComplex&&flags&isct::fShadow&&c.shadowCache.Size()) {
 			if(elements[c.shadowCache[0]].Collide(c,c.shadowCache[0])) {

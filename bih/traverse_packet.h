@@ -5,7 +5,6 @@
 		int dirMask=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(c.Dir(0).x.m,c.Dir(0).y.m,0),
 																	c.Dir(0).z.m,0+(2<<2)))&7;
 		TreeStats<1> stats;
-		stats.TracingPacket(4*size);
 
 		if(!CElement::isComplex&&flags&isct::fShadow&&c.shadowCache.Size()) {
 			if(elements[c.shadowCache[0]].Collide(c,c.shadowCache[0])) {

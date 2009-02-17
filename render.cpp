@@ -117,6 +117,8 @@ struct RenderTask {
 	}
 };
 
+#include <iostream>
+
 template <int QuadLevels,class AccStruct>
 TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
 	enum { taskSize=64 };

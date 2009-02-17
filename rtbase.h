@@ -50,6 +50,11 @@ inline Vec3p Minimize(const Vec3q &v) { return Vec3p(Minimize(v.x),Minimize(v.y)
 
 INLINE bool IsNan(const Vec3f &f) { return isnan(f.x)||isnan(f.y)||isnan(f.z); }
 INLINE bool IsNan(const Vec4f &f) { return isnan(f.x)||isnan(f.y)||isnan(f.z)||isnan(f.w); }
+INLINE bool IsNan(const Vec3q &f) { return 
+		isnan(f.x[0])||isnan(f.y[0])||isnan(f.z[0])||
+		isnan(f.x[1])||isnan(f.y[1])||isnan(f.z[1])||
+		isnan(f.x[2])||isnan(f.y[2])||isnan(f.z[2])||
+		isnan(f.x[3])||isnan(f.y[3])||isnan(f.z[3]); }
 
 INLINE Vec3q SafeInv(const Vec3q &v) {
 	const float epsilon=0.0000001f,inf=1.0f/0.0f;

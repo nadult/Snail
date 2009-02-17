@@ -84,7 +84,7 @@ public:
 		const string &GetName() const { return name; }
 		void SetName(const string &str) { name=str; }
 		
-	protected:
+//	protected:
 		vector<IndexedTri> tris;
 		vector<Vec3f> verts;
 		vector<Vec2f> uvs;
