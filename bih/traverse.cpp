@@ -20,6 +20,7 @@ namespace bih {
 
 			if(Selector<1>::full||bitMask==0x0f) {	
 				if(!filterSigns||GetVecSign(c.Dir(0))!=8) {
+					if(separateFirstElement) elements[0].Collide(c,0);
 					TraversePacket0(c);
 					split=0;
 				}
@@ -31,6 +32,7 @@ namespace bih {
 					if(!(bitMask&(1<<q))) continue;
 
 					FContext<flags> fc(c,q);
+					if(separateFirstElement) elements[0].Collide(fc,0);
 					TraverseMono(fc);
 				} 
 			}
@@ -72,6 +74,7 @@ namespace bih {
 						for(int q=1;q<size;q++) dot=Min(dot,c.Dir(0)|c.Dir(q));
 						if(ForAny(dot<0.9998f)) primary=0;
 					}
+					if(separateFirstElement) elements[0].Collide(c,0);
 					if(primary) TraversePrimary(c);
 					else TraversePacket0(c);
 

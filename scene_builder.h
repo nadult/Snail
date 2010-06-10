@@ -4,7 +4,7 @@
 #include "rtbase.h"
 #include "tree_box.h"
 
-template <class StaticTree,class FullTree>
+template <class StaticTree>
 class SceneBuilder {
 public:
 	struct Object {

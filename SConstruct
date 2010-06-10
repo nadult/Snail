@@ -16,8 +16,8 @@ envLinux64 = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
 		TARGET_PLATFORM='linux64',
-	#	CXX = '/usr/local/gcc-4.4/bin/g++ -std=gnu++0x -ffast-math -mtune=core2 --param inline-unit-growth=100',
-		CXX = '/usr/local/gcc-4.3.2/bin/g++ -std=gnu++0x -ffast-math',
+		CXX = '/usr/local/gcc-4.5/bin/g++ -O3 -ffast-math -mtune=amdfam10 -std=gnu++0x -pthread -fexcess-precision=fast --param inline-unit-growth=100',
+	#	CXX = '/usr/local/gcc-4.3.2/bin/g++ -std=gnu++0x -ffast-math',
 		CPPPATH = '.',
 	)
 envWin32 = Environment (

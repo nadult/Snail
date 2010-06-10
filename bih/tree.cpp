@@ -152,6 +152,7 @@ namespace bih {
 
 		vector<u32> parents; parents.push_back(0);
 
+		if(separateFirstElement) indices.erase(indices.begin());
 		Build(indices,parents,0,bBox,0,1,fast);
 	//	OptimizeBFS();
 	}

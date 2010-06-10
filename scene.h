@@ -18,8 +18,9 @@ public:
 
 class Cache {
 public:
-	Cache() :supersampling(0) { }
+	Cache() :supersampling(0),reflections(0) { }
 
+	int reflections;
 	ShTriCache shTriCache;
 	sampling::Cache samplingCache;
 	bool supersampling;

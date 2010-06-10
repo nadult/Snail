@@ -173,7 +173,7 @@ void LoadV3O(string fileName,TriVector &out,ShadingDataVec &shadingData,float sc
 				Loader ldr(hmapFile);
 				u16 width,height;
 				ldr &width & height;
-				ldr.Skip(15);
+				ldr.Seek(ldr.Pos() + 15);
 
 				idxAdd=verts.size();
 

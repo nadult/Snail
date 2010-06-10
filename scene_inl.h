@@ -414,9 +414,11 @@ struct DistanceShader {
 		}
 
 
-		if(reflSel.Any()&&!gVals[5]&&flags&isct::fPrimary) {
+		if(reflSel.Any()&&!gVals[5]&&cache.reflections<4) {
+			cache.reflections++;
 			Result<size> reflResult=TraceReflection(rays.DirPtr(),samples,reflSel,cache);
 			result.stats+=reflResult.stats;
+			cache.reflections--;
 
 			for(int q=0;q<size;q++) {
 				samples[q].diffuse=Condition(reflSel.SSEMask(q),

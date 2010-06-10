@@ -93,6 +93,7 @@ namespace bih {
 		enum { isctFlags=CElement::isctFlags|isct::fObject|isct::fStats };
 		enum { filterSigns=1 };
 		enum { desiredMaxLevel=60 }; // Can be more, depends on the scene
+		enum { separateFirstElement=sizeof(ElementContainer)!=sizeof(TriangleVector) };
 		
 		Tree() { }
 

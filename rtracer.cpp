@@ -15,6 +15,8 @@
 #include "scene_builder.h"
 #include "frame_counter.h"
 
+//#include "bvh.h"
+
 int TreeVisMain(const TriVector&);
 
 int gVals[16]={0,};
@@ -50,6 +52,10 @@ Dst BitCast(const Src &src) {
 template <class Scene>
 void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
 	scene.materials.clear();
+//	for(int n=0;n<128;n++)
+//		scene.materials.push_back(shading::NewMaterial(""));
+//	scene.materials[1]=shading::NewMaterial("data/ultradxt1.dds");
+//	return;
 
 /*	string names[]={ 	"data/tex316bit.dds",		"data/347.dds",
 						"data/1669.dds", 			"data/tex1.png",
@@ -102,6 +108,7 @@ void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
 
 		try {
 		 	scene.materials[it->second]=typename Scene::PMaterial(shading::NewMaterial(name));
+			scene.materials[it->second]->flags|=shading::Material::fReflection;
 		}
 		catch(const Exception &ex) {
 			std::cout << ex.what() << '\n';
@@ -149,7 +156,7 @@ void FreeBlitter();
 
 GLWindow *GetGLWindow();
 
-int safe_main(int argc, char **argv) {
+int unsafe_main(int argc, char **argv) {
 	printf("Snail v0.11 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
 		PrintHelp();
@@ -188,12 +195,12 @@ int safe_main(int argc, char **argv) {
 		else if(string("-flipNormals")==argv[n]) flipNormals=0;
 		else if(string("-texPath")==argv[n]) { texPath=argv[n+1]; n++; }
 		else {
-			if(argv[n][0]=='-') printf("Unknown option: ",argv[n]);
+			if(argv[n][0]=='-') printf("Unknown option: %s\n",argv[n]);
 			else modelFile=argv[n];
 		}
 	}
 
-	if(gameMode) return game::main(argc,argv);
+//	if(gameMode) return game::main(argc,argv);
 
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
@@ -219,12 +226,12 @@ int safe_main(int argc, char **argv) {
 	}
 	
 	Scene<StaticTree> staticScene;
-//	staticScene.geometry.Construct(baseScene.ToTriangleVector());
-//	staticScene.geometry.PrintInfo();
+	staticScene.geometry.Construct(baseScene.ToTriangleVector());
+	staticScene.geometry.PrintInfo();
 //	Saver(string("dump/")+modelFile) & staticScene.geometry;
-	Loader(string("dump/")+modelFile) & staticScene.geometry;
+//	Loader(string("dump/")+modelFile) & staticScene.geometry;
 
-	SceneBuilder<StaticTree,FullTree> builder; /*{
+	SceneBuilder<StaticTree> builder; /*{
 		vector<BaseScene::Object> objects;
 
 		for(int n=0;n<baseScene.objects.size();n++) {
@@ -301,7 +308,10 @@ int safe_main(int argc, char **argv) {
 		if(out->KeyDown('K')) img.SaveToFile("out/output.tga");
 		if(out->KeyDown('O')) options.reflections^=1;
 		if(out->KeyDown('I')) options.rdtscShader^=1;
-		if(out->KeyDown('C')) cam.pos=scene.geometry.GetBBox().Center();
+		if(out->KeyDown('C')) {
+			if(staticEnabled) cam.pos=staticScene.geometry.GetBBox().Center();
+			else cam.pos=scene.geometry.GetBBox().Center();
+		}
 		if(out->KeyDown('P')) {
 			camConfigs.AddConfig(string(modelFile),cam);
 			Saver("scenes/cameras.dat") & camConfigs;
@@ -353,9 +363,9 @@ int safe_main(int argc, char **argv) {
 
 		double buildTime=GetTime(); {
 			static float pos=0.0f; if(out->Key(Key_space)) pos+=0.025f;
-			SceneBuilder<StaticTree,FullTree> temp=builder;
+			SceneBuilder<StaticTree> temp=builder;
 		//	for(int n=0;n<temp.instances.size();n++) {
-		//		SceneBuilder<StaticTree,FullTree>::Instance &inst=temp.instances[n];
+		//		SceneBuilder<StaticTree>::Instance &inst=temp.instances[n];
 		//		inst.trans.w=inst.trans.w+Vec4f(0.0f,sin(pos+n*n)*5.0f*speed,0.0f,0.0f);
 		//	}
 			mesh.Animate(meshAnim,pos);
@@ -410,7 +420,7 @@ int safe_main(int argc, char **argv) {
 
 int main(int argc,char **argv) {
 	try {
-		return safe_main(argc,argv);
+		return unsafe_main(argc,argv);
 	}
 	catch(const std::exception &ex) {
 		std::cout << ex.what() << '\n';
