@@ -15,6 +15,9 @@
 #include "scene_builder.h"
 #include "frame_counter.h"
 
+#include "font.h"
+#include "frame_counter.h"
+
 //#include "bvh.h"
 
 int TreeVisMain(const TriVector&);
@@ -108,7 +111,6 @@ void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
 
 		try {
 		 	scene.materials[it->second]=typename Scene::PMaterial(shading::NewMaterial(name));
-			scene.materials[it->second]->flags|=shading::Material::fReflection;
 		}
 		catch(const Exception &ex) {
 			std::cout << ex.what() << '\n';
@@ -141,22 +143,7 @@ vector<Light> GenLights() {
 
 namespace game { int main(int argc,char **argv); }
 
-struct FrameData {
-	Image image;
-	TreeStats<1> stats;
-	float buildTime,frmTime,time;
-	bool staticEnabled,lightsEnabled;
-	int nLights,fps;
-};
-
-bool PollEvents();
-void InitBlitter(int,int,bool);
-void InsertFrame(FrameData *frame);
-void FreeBlitter();
-
-GLWindow *GetGLWindow();
-
-int unsafe_main(int argc, char **argv) {
+static int tmain(int argc, char **argv) {
 	printf("Snail v0.11 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
 		PrintHelp();
@@ -180,11 +167,12 @@ int unsafe_main(int argc, char **argv) {
 #endif
 	bool fullscreen=0;
 	int threads=4;
-	const char *modelFile="doom3/admin.proc";
+	const char *modelFile="pompei.obj";//"doom3/admin.proc";
+
 	Options options;
 	bool flipNormals=1;
 	bool gameMode=0;
-	string texPath="/mnt/Data/data/doom3/";
+	string texPath="/mnt/data/data/doom3/";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
@@ -221,14 +209,14 @@ int unsafe_main(int argc, char **argv) {
 		if(flipNormals) baseScene.FlipNormals();
 		for(int n=0;n<baseScene.objects.size();n++)
 			baseScene.objects[n].Repair();
-	//	baseScene.GenNormals();
-	//	baseScene.Optimize();
+		baseScene.GenNormals();
+//		baseScene.Optimize();
 	}
 	
 	Scene<StaticTree> staticScene;
 	staticScene.geometry.Construct(baseScene.ToTriangleVector());
 	staticScene.geometry.PrintInfo();
-//	Saver(string("dump/")+modelFile) & staticScene.geometry;
+	Saver(string("dump/")+modelFile) & staticScene.geometry;
 //	Loader(string("dump/")+modelFile) & staticScene.geometry;
 
 	SceneBuilder<StaticTree> builder; /*{
@@ -264,7 +252,9 @@ int unsafe_main(int argc, char **argv) {
 		builder.AddInstance(0,Identity<>());
 	}
 
-	InitBlitter(resx,resy,fullscreen);
+	GLWindow window(resx, resy, fullscreen);
+	Font font;
+
 	Image img(resx,resy,16);
 
 	double minTime=1.0f/0.0f,maxTime=0.0f;
@@ -272,10 +262,10 @@ int unsafe_main(int argc, char **argv) {
 	for(int n=0;n<10;n++) gVals[n]=1;
 	gVals[2]=0; gVals[4]=0; gVals[3]=0;
 
-	SetMaterials(staticScene,baseScene,texPath);
+	SetMaterials(staticScene, baseScene, texPath);
 
 	Scene<FullTree> scene;
-	SetMaterials(scene,baseScene,texPath);
+	SetMaterials(scene, baseScene, texPath);
 	mesh.SetMaterial(scene.materials.size()-1);
 
 	vector<Light> lights=GenLights();
@@ -291,66 +281,68 @@ int unsafe_main(int argc, char **argv) {
 	bool staticEnabled=0;
 	float speed; {
 		scene.geometry.Construct(builder.ExtractElements());
-		Vec3p size=scene.geometry.GetBBox().Size();
-		speed=(size.x+size.y+size.z)*0.0025f;
+		Vec3p size = scene.geometry.GetBBox().Size();
+		speed=(size.x + size.y + size.z) * 0.0025f;
 	}
 
 	FrameCounter frmCounter;
-	float frmTime=0,lastFrmTime=0;
+	double frmTime = GetTime(), lastFrmTime = 0;
 
-	while(PollEvents()) {
+	while(window.PollEvents()) {
 		frmCounter.NextFrame();
-		lastFrmTime=GetTime()-frmTime;
-		frmTime=GetTime();
+		lastFrmTime = GetTime() - frmTime;
+		frmTime = GetTime();
 
-		GLWindow *out=GetGLWindow();
-		if(out->KeyUp(Key_esc)) break;
-		if(out->KeyDown('K')) img.SaveToFile("out/output.tga");
-		if(out->KeyDown('O')) options.reflections^=1;
-		if(out->KeyDown('I')) options.rdtscShader^=1;
-		if(out->KeyDown('C')) {
+		if(window.KeyUp(Key_esc)) break;
+		if(window.KeyDown('K')) img.SaveToFile("out/output.tga");
+		if(window.KeyDown('O')) options.reflections^=1;
+		if(window.KeyDown('I')) options.rdtscShader^=1;
+		if(window.KeyDown('C')) {
 			if(staticEnabled) cam.pos=staticScene.geometry.GetBBox().Center();
 			else cam.pos=scene.geometry.GetBBox().Center();
 		}
-		if(out->KeyDown('P')) {
+		if(window.KeyDown('P')) {
 			camConfigs.AddConfig(string(modelFile),cam);
 			Saver("scenes/cameras.dat") & camConfigs;
 			cam.Print();
 		}
-		if(out->KeyDown('L')) {
+		if(window.KeyDown('L')) {
 			printf("Lights %s\n",lightsEnabled?"disabled":"enabled");
 			lightsEnabled^=1;
 		}
-		if(out->KeyDown('J')) {
+		if(window.KeyDown('J')) {
 			Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
 
 			lights.push_back(Light(cam.pos,colors[rand()&3],800.0f));
 		}
 
 		{
-			float tspeed=speed*(out->Key(Key_lshift)?5.0f:1.0f);
-			if(out->Key('W')) cam.pos+=cam.front*tspeed;
-			if(out->Key('S')) cam.pos-=cam.front*tspeed;
-			if(out->Key('A')) cam.pos-=cam.right*tspeed;
-			if(out->Key('D')) cam.pos+=cam.right*tspeed;
-			if(out->Key('R')) cam.pos+=cam.up*tspeed;
-			if(out->Key('F')) cam.pos-=cam.up*tspeed;
+			float tspeed=speed*(window.Key(Key_lshift)?5.0f:1.0f);
+			if(window.Key('W')) cam.pos+=cam.front*tspeed;
+			if(window.Key('S')) cam.pos-=cam.front*tspeed;
+			if(window.Key('A')) cam.pos-=cam.right*tspeed;
+			if(window.Key('D')) cam.pos+=cam.right*tspeed;
+			if(window.Key('R')) cam.pos+=cam.up*tspeed;
+			if(window.Key('F')) cam.pos-=cam.up*tspeed;
 		}
 
-		if(out->KeyDown(Key_f1)) staticEnabled^=1;
-		if(out->KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
-		if(out->KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
-		if(out->KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
-		if(out->KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
-		if(out->KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"on":"off"); }
-		if(out->KeyDown(Key_f7)) { gVals[6]^=1; printf("Val 6 %s\n",gVals[6]?"on":"off"); }
+		for(int n = 1; n <= 8; n++) if(window.Key('0' + n))
+				{ threads = n; printf("Threads: %d\n", threads); }
+
+		if(window.KeyDown(Key_f1)) staticEnabled^=1;
+		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
+		if(window.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
+		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
+		if(window.KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
+		if(window.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"on":"off"); }
+		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Val 6 %s\n",gVals[6]?"on":"off"); }
 
 		{
-			int dx=out->Key(Key_space)?out->MouseMove().x:0,dy=0;
-			if(out->Key('N')) dx-=20;
-			if(out->Key('M')) dx+=20;
-			if(out->Key('V')) dy-=20;
-			if(out->Key('B')) dy+=20;
+			int dx=window.Key(Key_space)?window.MouseMove().x:0,dy=0;
+			if(window.Key('N')) dx-=20;
+			if(window.Key('M')) dx+=20;
+			if(window.Key('V')) dy-=20;
+			if(window.Key('B')) dy+=20;
 			if(dx) {
 				Matrix<Vec4f> rotMat=RotateY(-dx*0.003f);
 				cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
@@ -362,7 +354,7 @@ int unsafe_main(int argc, char **argv) {
 		}
 
 		double buildTime=GetTime(); {
-			static float pos=0.0f; if(out->Key(Key_space)) pos+=0.025f;
+			static float pos=0.0f; if(window.Key(Key_space)) pos+=0.025f;
 			SceneBuilder<StaticTree> temp=builder;
 		//	for(int n=0;n<temp.instances.size();n++) {
 		//		SceneBuilder<StaticTree>::Instance &inst=temp.instances[n];
@@ -370,12 +362,12 @@ int unsafe_main(int argc, char **argv) {
 		//	}
 			mesh.Animate(meshAnim,pos);
 			meshTree.Construct(mesh.triVec,1);
-	//		staticScene.geometry=meshTree;
+	//		staticScene.geometry = meshTree;
 
 			temp.AddObject(&meshTree,Identity<>(),meshTree.GetBBox());
 			for(int x=-1;x<2;x++) for(int z=-1;z<2;z++)
 				temp.AddInstance(temp.objects.size()-1,
-						RotateY(3.1415f)*Translate(Vec3f(132+x*50,0,z*50-346)));
+						RotateY(3.1415f)*Translate(Vec3f(132 + x * 50, 0, z * 50 - 346)));
 			scene.geometry.Construct(temp.ExtractElements(),1);
 			BBox box=meshTree.GetBBox();
 
@@ -397,20 +389,17 @@ int unsafe_main(int argc, char **argv) {
 		time=GetTime()-time; minTime=Min(minTime,time);
 		maxTime=Max(time,maxTime);
 
-		FrameData *frame=new FrameData;
-		frame->image=img;
-		frame->stats=stats;
-		frame->staticEnabled=staticEnabled;
-		frame->lightsEnabled=lightsEnabled;
-		frame->nLights=lights.size();
-		frame->time=time;
-		frame->buildTime=buildTime;
-		frame->frmTime=lastFrmTime;
-		frame->fps=frmCounter.FPS();
-		InsertFrame(frame);
-	}
+		window.RenderImage(img);
 
-	FreeBlitter();
+		font.BeginDrawing(resx,resy);
+		font.SetSize(Vec2f(30, 20));
+			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx,resy,time*1000.0,buildTime*1000.0));
+			font.PrintAt(Vec2f(5, 25), "FPS (",staticEnabled?"static":"dynamic","): ", frmCounter.FPS());
+			font.PrintAt(Vec2f(5, 45), "Lights: ",lightsEnabled?lights.size() : 0);
+			font.PrintAt(Vec2f(5, 65), "Last frame time: ", lastFrmTime * 1000.0f, "ms");
+		font.FinishDrawing();
+		window.SwapBuffers();
+	}
 
 	printf("Minimum msec/frame: %.4f (%.2f FPS)\n",minTime*1000.0,1.0f/minTime);
 	printf("Maximum msec/frame: %.4f (%.2f FPS)\n",maxTime*1000.0,1.0f/maxTime);
@@ -420,7 +409,7 @@ int unsafe_main(int argc, char **argv) {
 
 int main(int argc,char **argv) {
 	try {
-		return unsafe_main(argc,argv);
+		return tmain(argc,argv);
 	}
 	catch(const std::exception &ex) {
 		std::cout << ex.what() << '\n';

@@ -7,15 +7,15 @@ extern const float bestCandidateSamples[4096][5];
 
 class GridSampler {
 public:
-	INLINE Vec2f operator()(int x,int y) { return Vec2f(x,y); }
+	const Vec2f operator()(int x,int y) const { return Vec2f(x,y); }
 };
 
 class BestCandidateSampler {
 public:
-	INLINE Vec2f operator()(int x,int y) {
-		int offset=(x&63)+(y&63)*64;
-		return Vec2f(	float(x)+bestCandidateSamples[offset][0],
-						float(y)+bestCandidateSamples[offset][1] );
+	const Vec2f operator()(int x,int y) const {
+		int offset = (x & 63) + (y & 63) * 64;
+		return Vec2f(	float(x) + bestCandidateSamples[offset][0],
+						float(y) + bestCandidateSamples[offset][1] );
 	}
 };
 
@@ -41,7 +41,7 @@ public:
 		2:  x,y-1
 		3:  x-1,y-1
 	*/
-	void Generate(int pw,int ph,int x,int y,Vec3q *out);
+	void Generate(int pw,int ph,int x,int y,Vec3q *out) const;
 
 	/*!
 		Decomposes group of ray output data from
@@ -57,13 +57,15 @@ public:
 		. .  . .		. . . .
 		. .  . .		. . . .
 	*/
-	void Decompose(const Vec3q *in,Vec3q *out);
+	void Decompose(const Vec3q *in,Vec3q *out) const;
 private:
-	void Generate(int level,int pw,int ph,int x,int y,Vec3q *out);
+	void Generate(int level,int pw,int ph,int x,int y,Vec3q *out) const;
 
 	// invW is multiplied by ratio (w/h)
 	float w,h,invW,invH,planeDist;
-	int tLevel;
+	int level;
+
+	floatq taddx, taddy;
 };
 
 #endif

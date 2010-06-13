@@ -195,7 +195,7 @@ public:
 	Vec3f min,max;
 };
 
-namespace baselib { template<> struct SerializeAsPOD<BBox> { enum { value=1 }; }; }
+SERIALIZE_AS_POD(BBox)
 
 float BoxPointDistanceSq(const BBox &box,const Vec3f &point);
 

@@ -1,7 +1,7 @@
 import os
 
-libs = [ 'baselib', 'glfw', 'gfxlib', 'png', 'z', 'bulletdynamics','bulletcollision', 'bulletmath' ] 
-libsLinux = libs + [ 'GL', 'GLU', 'Xrandr' ]
+libs = [ 'baselib', 'glfw', 'gfxlib', 'png', 'z' ] 
+libsLinux = libs + [ 'GL', 'GLU', 'Xrandr', 'pthread' ]
 libsWin32 = libs + [ 'opengl32', 'glu32', 'kernel32', 'ws2_32', 'thread' ]
 
 envLinux32 = Environment (
@@ -16,7 +16,7 @@ envLinux64 = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
 		TARGET_PLATFORM='linux64',
-		CXX = '/usr/local/gcc-4.5/bin/g++ -O3 -ffast-math -mtune=amdfam10 -std=gnu++0x -pthread -fexcess-precision=fast --param inline-unit-growth=100',
+		CXX = '/usr/local/gcc-4.4.4/bin/g++ -pthread -ffast-math -std=gnu++0x -O3 -march=native -mfpmath=sse -fno-stack-protector -g -DNDEBUG',
 	#	CXX = '/usr/local/gcc-4.3.2/bin/g++ -std=gnu++0x -ffast-math',
 		CPPPATH = '.',
 	)
@@ -31,7 +31,7 @@ envWin32 = Environment (
 
 def ReleaseEnv(env):
 	return env.Clone(
-		CXXFLAGS='-O3 -mfpmath=sse -g -DNDEBUG -Wstrict-aliasing=2 -Wno-unused -Wno-conversion',
+		CXXFLAGS='-Wstrict-aliasing=2 -Wno-unused -Wno-conversion',
 		BUILDDIR='build/'+env['TARGET_PLATFORM']+'_release/'
 	)
 def DebugEnv(env):

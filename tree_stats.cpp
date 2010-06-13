@@ -28,14 +28,14 @@
 
 		if(!enabled) {
 			char buf[2048];
-			sprintf(buf,"MSec/frame:%6.2f  MPixels/sec:%6.2f\n",msRenderTime,
+			sprintf(buf,"ms/frame:%6.2f  MPixels/sec:%6.2f\n",msRenderTime,
 					(resx*resy*(1000.0/msRenderTime))*0.000001);
 			return string(buf);
 		}
 
 		char buf[2048];
 		sprintf(buf,
-				/*"isct,iter:"*/"%5.2f %5.2f  MSec/frame:%6.2f  MRays/sec:%5.2f  "
+				/*"isct,iter:"*/"%5.2f %5.2f  ms/frame:%6.2f  MRays/sec:%5.2f  "
 				/*"Coh:%.2f%% " "br:%.2f%% fa:%.2f%%"*/ "%.0f R:%d Build:%6.2f",
 				double(data[0])/nPixels,double(data[1])/nPixels,
 				msRenderTime,raysPerSec*0.000001/*,GetCoherent()*100.0f*/,

@@ -34,7 +34,7 @@ namespace bih {
 
 }
 
-namespace baselib { template<> struct SerializeAsPOD<bih::Node> { enum { value=1 }; }; }
+SERIALIZE_AS_POD(bih::Node)
 
 namespace bih {
 

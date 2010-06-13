@@ -59,7 +59,6 @@ namespace
 		}
 
 		glfwDisable(GLFW_AUTO_POLL_EVENTS);
-		glfwSwapInterval(1);
 		glfwSetWindowPos(0,24);
 
 		wantClose=0;
@@ -123,6 +122,8 @@ namespace
 		key2Glfw[Key_kp_equal]=GLFW_KEY_KP_EQUAL;
 		key2Glfw[Key_kp_enter]=GLFW_KEY_KP_ENTER;
 		created=1;
+		
+		glfwSwapInterval(0);
 	}
 
 	GLWindow::~GLWindow()

@@ -231,9 +231,9 @@ struct Context {
 	void UpdateStats(const TreeStats<1> &st) { if(stats) *stats+=st; }
 
 	RayGroup<size,sharedOrigin> rays;
-	floatq * __restrict__ distance;
-	i32x4  * __restrict__ object;
-	i32x4  * __restrict__ element;
+	floatq * __restrict__ __attribute__((aligned(16))) distance;
+	i32x4  * __restrict__ __attribute__((aligned(16))) object;
+	i32x4  * __restrict__ __attribute__((aligned(16))) element;
 	ShadowCache shadowCache;
 	TreeStats<1> *stats;
 };

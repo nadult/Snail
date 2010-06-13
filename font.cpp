@@ -6,11 +6,11 @@
 	}
 	
 	void Font::SetPos(const Vec2f &pos) {
-		font.SetPos(Vec2f(pos.x,pos.y-height));
+		font.SetPos({pos.x, pos.y - height});
 	}
 
 	void Font::SetSize(const Vec2f &size) {
-		font.SetSize(size);
+		font.SetSize({size.x, size.y});
 	}
 
 	void Font::BeginDrawing(int resx,int resy) {
@@ -47,7 +47,7 @@
 
 	void Font::Print(const string &text) {
 		Vec2f uv[1024],pos[1024];
-		int count=font.GenQuads(text.c_str(),pos,uv,1024);
+		int count = font.GenQuads(text.c_str(), (float*)pos, (float*)uv, 1024);
 
 		glBegin(GL_QUADS);
 		for(int mode=0;mode<2;mode++) {

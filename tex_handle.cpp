@@ -100,15 +100,8 @@
 	void TexHandle::Serialize(Serializer &sr) {
 		Surface surface;
 		if(sr.IsSaving()) GetSurface(surface);
-		sr&surface;
-		if(sr.IsLoading()) {
-			try {
-				SetSurface(surface);
-			}
-			catch(const Exception &ex) {
-				throw Exception(Stringizer()+ex.what()+": "+sr.StreamName());
-			}
-		}
+		sr & surface;
+		if(sr.IsLoading()) SetSurface(surface);
 	}
 	
 	void TexHandle::CreateMip(uint level,uint w,uint h,Format fmt) {

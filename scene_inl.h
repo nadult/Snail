@@ -93,14 +93,21 @@ struct DistanceShader {
 
 		const Light &light=lights[idx];
 		Vec3p lightPos=light.pos;
-		Vec3q fromLight[size],idir[size];
-		floatq distance[size];
-		floatq dot[size];
-		f32x4b mask[size];
+
+		ALLOCAA(Vec3q, fromLight, size);
+		ALLOCAA(Vec3q, idir, size);
+		ALLOCAA(floatq, distance, size);
+		ALLOCAA(floatq, dot, size);
+		ALLOCAA(f32x4b, mask, size);
+
+//		Vec3q fromLight[size], idir[size];
+//		floatq distance[size];
+//		floatq dot[size];
+//		f32x4b mask[size];
 
 		RaySelector<size> sel=inputSel;
 
-		for(int q=0;q<size;q++) {
+		for(int q = 0; q < size; q++) {
 			if(!sel[q]) continue;
 			const shading::Sample &s=samples[q];
 
@@ -121,10 +128,13 @@ struct DistanceShader {
 		if(shadows) {
 			Vec3q lPos(lightPos.x,lightPos.y,lightPos.z);
 			Vec3q lColor(light.color.x,light.color.y,light.color.z);
-			floatq tDistance[size]; for(int q=0;q<size;q++) tDistance[q]=distance[q]*0.99999f;
+		//	floatq tDistance[size];
+			ALLOCAA(floatq, tDistance, size);
+			for(int q = 0; q < size; q++)
+				tDistance[q] = distance[q]*0.99999f;
 
 			for(int q=0;q<size;q++) stats.TracingRays(CountMaskBits(sel[q]));
-			Context<size,isct::fShOrig|isct::fShadow> c(&lPos,fromLight,idir,tDistance,0,0,&stats);
+			Context<size,isct::fShOrig|isct::fShadow> c(&lPos, fromLight, idir, tDistance, 0, 0, &stats);
 			geometry.TraversePacket(c,sel);
 
 			for(int q=0;q<size;q++) {
@@ -134,7 +144,8 @@ struct DistanceShader {
 				f32x4b msk=mask[q]&&dist-tDistance[q]<=dist*0.0001f;
 
 				f32x4 atten=dist*light.iRadius;
-				atten=Max(f32x4(0.0f),((floatq(1.0f)-atten)*0.2f+FastInv(f32x4(16.0f)*atten*atten))-f32x4(0.0625f));
+				atten=Max(f32x4(0.0f), ((floatq(1.0f)-atten) * 0.2f + FastInv(f32x4(16.0f)*atten*atten)) -
+						f32x4(0.0625f));
 
 				f32x4 diffMul=dot[q]*atten;
 				f32x4 specMul=dot[q]; specMul*=specMul; specMul*=specMul; specMul*=specMul; specMul*=specMul;
@@ -146,7 +157,7 @@ struct DistanceShader {
 		}
 		else {
 			Vec3q lColor(light.color.x,light.color.y,light.color.z);
-			for(int q=0;q<size;q++) {
+			for(int q = 0; q < size; q++) {
 				if(!sel[q]) continue;
 
 				f32x4 dist=distance[q];
@@ -155,7 +166,8 @@ struct DistanceShader {
 				atten=Max(f32x4(0.0f),((floatq(1.0f)-atten)*0.2f+FastInv(f32x4(16.0f)*atten*atten))-f32x4(0.0625f));
 
 				f32x4 diffMul=dot[q]*atten;
-				f32x4 specMul=dot[q]; specMul*=specMul; specMul*=specMul; specMul*=specMul; specMul*=specMul;
+				f32x4 specMul=dot[q];
+				specMul*=specMul; specMul*=specMul; specMul*=specMul; specMul*=specMul;
 				specMul*=atten;
 		
 				diffuse [q]+=Condition(mask[q],lColor*diffMul);
@@ -198,7 +210,7 @@ struct DistanceShader {
 				floatq dist2=dist*250.0f;
 				floatq dist1=dist*20.0f;
 				floatq dist3=dist*2.0f;
-				result.color[q]=Vec3q(dist1,dist2,dist3);
+				result.color[q]=Vec3q(dist1, dist2, dist3);
 			}
 			return result;
 		}
@@ -207,15 +219,19 @@ struct DistanceShader {
 		Vec3q maxPos(-1.0f/0.0f,-1.0f/0.0f,-1.0f/0.0f);
 
 		ShTriCache &shTriCache=cache.shTriCache;
-		shading::Sample samples[size];
+		//shading::Sample samples[size];
+		ALLOCAA(shading::Sample, samples, size);
 		int matCount=materials.size();
-
 
 		for(uint b=0;b<size/blockSize;b++) {
 			uint b4=b<<2;
 
-			f32x4b mask[blockSize];
-			i32x4 matId[blockSize],object[blockSize],element[blockSize];
+	//		f32x4b mask[blockSize];
+	//		i32x4 matId[blockSize],object[blockSize],element[blockSize];
+			ALLOCAA(f32x4b, mask, blockSize);
+			ALLOCAA(i32x4, matId, blockSize);
+			ALLOCAA(i32x4, object, blockSize);
+			ALLOCAA(i32x4, element, blockSize);
 		
 			for(int q=0;q<blockSize;q++) {
 				int tq=b4+q;
@@ -414,10 +430,10 @@ struct DistanceShader {
 		}
 
 
-		if(reflSel.Any()&&!gVals[5]&&cache.reflections<4) {
+		if(reflSel.Any() && !gVals[5] && cache.reflections < 1) {
 			cache.reflections++;
-			Result<size> reflResult=TraceReflection(rays.DirPtr(),samples,reflSel,cache);
-			result.stats+=reflResult.stats;
+			Result<size> reflResult = TraceReflection(rays.DirPtr(),samples,reflSel,cache);
+			result.stats += reflResult.stats;
 			cache.reflections--;
 
 			for(int q=0;q<size;q++) {
@@ -426,9 +442,9 @@ struct DistanceShader {
 								samples[q].diffuse );
 			}
 		}
-		if(refrSel.Any()&&!gVals[5]&&flags&isct::fPrimary) {
-			Result<size> refrResult=TraceRefraction(rays,samples,refrSel,cache);
-			result.stats+=refrResult.stats;
+		if(refrSel.Any() && !gVals[5] && (flags&isct::fPrimary)) {
+			Result<size> refrResult = TraceRefraction(rays,samples,refrSel,cache);
+			result.stats += refrResult.stats;
 
 			for(int q=0;q<size;q++) {
 				samples[q].diffuse=Condition(refrSel.SSEMask(q),
@@ -437,12 +453,14 @@ struct DistanceShader {
 			}
 		}
 
-		Vec3q lDiffuse[size],lSpecular[size];
+	//	Vec3q lDiffuse[size],lSpecular[size];
+		ALLOCAA(Vec3q, lDiffuse, size);
+		ALLOCAA(Vec3q, lSpecular, size);
 		if(lights.size()) {
 			Vec3q dif(ambientLight),spec(0.0f,0.0f,0.0f);
 			for(int q=0;q<size;q++) {
-				lDiffuse[q]=dif;
-				lSpecular[q]=spec;
+				lDiffuse[q] = dif;
+				lSpecular[q] = spec;
 			}
 		}
 		{

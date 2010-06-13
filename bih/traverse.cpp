@@ -69,7 +69,7 @@ namespace bih {
 				if(signsFiltered) {
 					bool primary=flags&(isct::fPrimary|isct::fShadow)&&gVals[1];
 
-					if(flags&isct::fShadow&&!isComplex) {
+					if((flags & isct::fShadow) &&!isComplex) {
 						floatq dot=1.0f;
 						for(int q=1;q<size;q++) dot=Min(dot,c.Dir(0)|c.Dir(q));
 						if(ForAny(dot<0.9998f)) primary=0;

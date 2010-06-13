@@ -170,7 +170,7 @@ private:
 	int temp[3];
 };
 
-static_assert(sizeof(TriAccel)==64,"bah");
+static_assert(sizeof(TriAccel) == 64, "TriAccel size should be 64");
 
 class Triangle
 {
@@ -218,7 +218,7 @@ public:
 
 	template <int flags,class VecO,class Vec>
 	Isct<typename Vec::TScalar,1,isct::fDistance|flags>
-		Collide(const VecO &rOrig,const Vec &rDir) const NOINLINE;
+		Collide(const VecO &rOrig,const Vec &rDir) const __attribute__((noinline));
 
 	template <int flags,class VecO,class Vec>
 	INLINE Isct<typename Vec::TScalar,1,isct::fDistance|flags>
@@ -227,7 +227,7 @@ public:
 
 	template <int flags,int packetSize>
 	Isct<f32x4,packetSize,isct::fDistance|flags>
-		Collide(const RayGroup<packetSize,flags> &rays) const NOINLINE;
+		Collide(const RayGroup<packetSize,flags> &rays) const __attribute__((noinline));
 
 	template <class Vec0,class Vec,class Real>
 	Vec3<typename Vec::TScalar> Barycentric(const Vec0 &rOrig,const Vec &rDir,const Real &dist,int) const;
@@ -482,11 +482,9 @@ public:
 	friend class BaseScene;
 };
 
-namespace baselib {
-	template<> struct SerializeAsPOD<TriangleVector::TriIdx> { enum { value=1 }; };
-	template<> struct SerializeAsPOD<TriangleVector::Vert> { enum { value=1 }; };
-	template<> struct SerializeAsPOD<TriAccel> { enum { value=1 }; };
-}
+SERIALIZE_AS_POD(TriangleVector::TriIdx)
+SERIALIZE_AS_POD(TriangleVector::Vert)
+SERIALIZE_AS_POD(TriAccel)
 
 	// After changing the element, you have to set the id because it will be trashed
 	class ShTriCache {

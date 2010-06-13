@@ -15,6 +15,9 @@
 #define EXPECT_TAKEN(a)			a
 #define EXPECT_NOT_TAKEN(a)		a
 
+#define ALLOCA(type, name, ...)	type &__restrict__ name = *new (alloca(sizeof(type))) type(__VA_ARGS__);
+#define ALLOCAA(type, name, size) type *__restrict__ name = new (alloca(sizeof(type) * size)) type[size];
+
 using namespace baselib;
 using namespace veclib;
 
@@ -73,19 +76,20 @@ INLINE Vec3f SafeInv(const Vec3f &v) {
 }
 
 template <int size>
-void ComputeMinMax(const Vec3q *vec,float *__restrict__ min,float *__restrict__ max) {
-	floatq tMin[3]={1.0f/0.0f,1.0f/0.0f,1.0f/0.0f};
-	floatq tMax[3]={-1.0f/0.0f,-1.0f/0.0f,-1.0f/0.0f};
+void ComputeMinMax(const Vec3q *__restrict__ vec,float *__restrict__ min,float *__restrict__ max) throw() {
+	floatq minx, miny, minz, maxx, maxy, maxz;
+	minx = miny = minz =  1.0f / 0.0f;
+	maxx = maxy = maxz = -1.0f / 0.0f;
 
-	for(int q=0;q<size;q++) {
-		const Vec3q &v=vec[q];
-		tMin[0]=Min(tMin[0],v.x); tMax[0]=Max(tMax[0],v.x);
-		tMin[1]=Min(tMin[1],v.y); tMax[1]=Max(tMax[1],v.y);
-		tMin[2]=Min(tMin[2],v.z); tMax[2]=Max(tMax[2],v.z);
+	for(int q = 0; q < size; q++) {
+		Vec3q v = vec[q];
+		minx = Min(minx, v.x); maxx = Max(maxx, v.x);
+		miny = Min(miny, v.y); maxy = Max(maxy, v.y);
+		minz = Min(minz, v.z); maxz = Max(maxz, v.z);
 	}
 	
-	min[0]=Minimize(tMin[0]); min[1]=Minimize(tMin[1]); min[2]=Minimize(tMin[2]);
-	max[0]=Maximize(tMax[0]); max[1]=Maximize(tMax[1]); max[2]=Maximize(tMax[2]);
+	min[0] = Minimize(minx); min[1] = Minimize(miny); min[2] = Minimize(minz);
+	max[0] = Maximize(maxx); max[1] = Maximize(maxy); max[2] = Maximize(maxz);
 }
 
 extern int gVals[16];
@@ -103,11 +107,11 @@ public:
 		indices[0][last]=idx;
 		last=(last+1)%(size*4);
 	}
-	bool Find(u32 idx) {
-		i32x4 tidx(idx); i32x4b test;
-		test=indices[0]==tidx;
-		for(int n=1;n<size;n++)
-			test=test||indices[n]==tidx;
+	bool Find(u32 idx) const {
+		i32x4 tidx(idx);
+		i32x4b test = indices[0] == tidx;
+		for(int n = 1; n < size; n++)
+			test = test || indices[n] == tidx;
 		return ForAny(test);
 	}
 	i32x4 indices[size];

@@ -52,19 +52,19 @@ public:
 	vector<PMaterial> materials;
 
 	template <int size,bool sharedOrigin,class Selector>
-	Result<size> RayTrace(const RayGroup<size,sharedOrigin>&,const Selector&,Cache&) const NOINLINE;
+	Result<size> RayTrace(const RayGroup<size,sharedOrigin>&,const Selector&,Cache&) const __attribute__((noinline));
 
 private:
 	template <int size,class Selector>
 	TreeStats<1> TraceLight(const Selector&,const shading::Sample*,Vec3q*__restrict__,Vec3q*__restrict__,int)
-							const NOINLINE;
+							const __attribute__((noinline));
 
 	template <int size,template <int> class Selector>
 	Result<size> TraceReflection(const Vec3q*__restrict__,const shading::Sample *__restrict__,
-								 const Selector<size>&,Cache&) const NOINLINE;
+								 const Selector<size>&,Cache&) const __attribute__((noinline));
 	template <int size,bool sharedOrigin,template <int> class Selector>
 	Result<size> TraceRefraction(const RayGroup<size,sharedOrigin>&,const shading::Sample *__restrict__,
-								 const Selector<size>&,Cache&) const NOINLINE;
+								 const Selector<size>&,Cache&) const __attribute__((noinline));
 
 	vector<char> materialFlags;
 };

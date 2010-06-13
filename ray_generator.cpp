@@ -1,57 +1,65 @@
 #include "ray_generator.h"
 
 RayGenerator::RayGenerator(int level,int tw,int th,float pd)
-	:invW(1.0f/float(tw)),invH(1.0f/float(th)),planeDist(pd),tLevel(level),w(tw),h(th) {
+	:invW(1.0f/float(tw)),invH(1.0f/float(th)),planeDist(pd),level(level),w(tw),h(th) {
 	invW *= float(w)/float(h);
+
+	taddx = floatq(0.0f, 1.0f, 0.0f, 1.0f) - floatq(w * 0.5f);
+	taddy = floatq(0.0f, 0.0f, 1.0f, 1.0f) - floatq(h * 0.5f);
 }
 
-void RayGenerator::Generate(int pw,int ph,int x,int y,Vec3q *out) {
-	Generate(tLevel,pw,ph,x,y,out);
+void RayGenerator::Generate(int pw,int ph,int x,int y,Vec3q *out) const {
+	Generate(level,pw,ph,x,y,out);
 }
 
-void RayGenerator::Generate(int level,int pw,int ph,int x,int y,Vec3q *out) {
-	if(level==0) {
-		Vec3f points[4];
+static int tx1[4] = { 0, 2, 0, 2 };
+static int ty1[4] = { 0, 0, 2, 2 };
 
-	/*	if(gVals[3]) {
-			BestCandidateSampler sampler;
-			points[0]=(Vec3f)sampler(x,y);
-			points[1]=(Vec3f)sampler(x+1,y);
-			points[2]=(Vec3f)sampler(x,y+1);
-			points[3]=(Vec3f)sampler(x+1,y+1);
-		}
-		else { */
-			GridSampler sampler;
-			points[0]=(Vec3f)sampler(x,y);
-			points[1]=(Vec3f)sampler(x+1,y);
-			points[2]=(Vec3f)sampler(x,y+1);
-			points[3]=(Vec3f)sampler(x+1,y+1);
-	//	}
+static int tx2[16] = { 0, 2, 0, 2, 4, 6, 4, 6, 0, 2, 0, 2, 4, 6, 4, 6 };
+static int ty2[16] = { 0, 0, 2, 2, 0, 0, 2, 2, 4, 4, 6, 6, 4, 4, 6, 6 };
 
-		for(int k=0;k<4;k++) points[k].z=planeDist;
+void RayGenerator::Generate(int level,int pw,int ph,int x,int y, Vec3q *out) const {
+	GridSampler sampler;
 
-		Convert(points,out[0]);
-		out[0].x-=w*0.5f; out[0].y-=h*0.5f;
-		out[0].x*=invW;
-		out[0].y*=invH;
-		out[0]*=RSqrt(out[0]|out[0]);
+	if(level > 2) {
+		int npw = pw >> 1,nph = ph >> 1,nl = level - 1;
 
-		return;
+		Generate(nl, npw, nph, x      , y      , out + 0);
+		Generate(nl, npw, nph, x + npw, y      , out + (1 << nl*2));
+		Generate(nl, npw, nph, x      , y + nph, out + (2 << nl*2));
+		Generate(nl, npw, nph, x + npw, y + nph, out + (3 << nl*2));
 	}
-
-	int npw=pw>>1,nph=ph>>1,nl=level-1;
-
-	Generate(nl,npw,nph,x,y,out+0);
-	Generate(nl,npw,nph,x+npw,y,out+(1<<nl*2));
-	Generate(nl,npw,nph,x,y+nph,out+(2<<nl*2));
-	Generate(nl,npw,nph,x+npw,y+nph,out+(3<<nl*2));
+	else if(level == 2) {
+		for(int t = 0; t < 16; t++) {
+			Vec2f tpos = sampler(x + tx2[t], y + ty2[t]);
+			Vec3q points(tpos.x, tpos.y, planeDist);
+			points.x = (points.x + taddx) * floatq(invW);
+			points.y = (points.y + taddy) * floatq(invH);
+			out[t] = points * RSqrt(points | points);
+		}
+	}
+	else if(level == 1) {
+		for(int t = 0; t < 4; t++) {
+			Vec2f tpos = sampler(x + tx1[t], y + ty1[t]);
+			Vec3q points(tpos.x, tpos.y, planeDist);
+			points.x = (points.x + taddx) * floatq(invW);
+			points.y = (points.y + taddy) * floatq(invH);
+			out[t] = points * RSqrt(points | points);
+		}
+	}
+	else { // level == 0
+		Vec2f tpos = sampler(x, y);
+		Vec3q points(tpos.x, tpos.y, planeDist);
+		points.x = (points.x + taddx) * floatq(invW);
+		points.y = (points.y + taddy) * floatq(invH);
+		out[0] = points * RSqrt(points | points);
+	}
 }
 
-void RayGenerator::Decompose(const Vec3q *in,Vec3q *out)
-{
-	const int nQuads=1<<(tLevel*2);
+void RayGenerator::Decompose(const Vec3q *in,Vec3q *out) const {
+	const int nQuads=1<<(level*2);
 
-	if(tLevel>=1) {
+	if(level>=1) {
 		for(int n=0;n<nQuads;n+=2) {
 			__m128 tmp;
 			tmp				=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpacklo_ps(in[n+0].x.m,in[n+1].x.m));
@@ -67,7 +75,7 @@ void RayGenerator::Decompose(const Vec3q *in,Vec3q *out)
 			out[n+0].z.m=tmp;
 		}
 	}
-	if(tLevel>=2) {
+	if(level>=2) {
 		for(int n=0;n<nQuads;n+=8) {
 			Vec3q *p=out+n,tmp;
 
@@ -75,7 +83,7 @@ void RayGenerator::Decompose(const Vec3q *in,Vec3q *out)
 			{ const Vec3q tmp=p[3]; p[3]=p[5]; p[5]=p[6]; p[6]=tmp; }
 		}
 	}
-	if(tLevel>=3) {
+	if(level>=3) {
 		for(int n=0;n<nQuads;n+=32) {
 			Vec3q *p=out+n;
 
@@ -88,7 +96,7 @@ void RayGenerator::Decompose(const Vec3q *in,Vec3q *out)
 			}
 		}
 	}
-	if(tLevel>=4) {
+	if(level>=4) {
 		for(int n=0;n<nQuads;n+=128) {
 			Vec3q *p=out+n;
 
@@ -108,7 +116,7 @@ void RayGenerator::Decompose(const Vec3q *in,Vec3q *out)
 	}
 }
 
-/*
+//source: PBRT
 const float bestCandidateSamples[4096][5] = {
   { 0.8147236705f, 0.1354770064f, 0.0000925521f, 0.4019474089f, 0.6087165475f, },
   { 0.9057919383f, 0.8350085616f, 0.0003553750f, 0.0861424059f, 0.0100619597f, },
@@ -4206,4 +4214,4 @@ const float bestCandidateSamples[4096][5] = {
   { 0.3875006735f, 0.8072223663f, 0.5735291839f, 0.9130150676f, 0.2748070061f, },
   { 0.2921602428f, 0.9884731770f, 0.5731204748f, 0.5407849550f, 0.3014898002f, },
   { 0.4359965920f, 0.2804161608f, 0.5733448863f, 0.9205425978f, 0.2539848983f, },
-}; */
+}; 

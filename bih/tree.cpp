@@ -170,7 +170,7 @@ namespace bih {
 		double objBytes=elements.mem_size();
 
 		printf("Elems:  %6.2fMB\n",objBytes*0.000001);
-		printf("Nodes: %8d * %2d = %6.2fMB\n",nodes.size(),sizeof(Node),nodeBytes*0.000001);
+		printf("Nodes: %8d * %2d = %6.2fMB\n", (int)nodes.size(), (int)sizeof(Node), nodeBytes*0.000001);
 		printf("~ %.0f bytes per triangle\n",double(nodeBytes+objBytes)/double(elements.size()));
 		printf("Levels: %d\n\n",maxLevel);
 	}
