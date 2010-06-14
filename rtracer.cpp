@@ -23,6 +23,7 @@
 int TreeVisMain(const TriVector&);
 
 int gVals[16]={0,};
+double gdVals[16]={0,};
 
 using std::cout;
 using std::endl;
@@ -125,7 +126,7 @@ void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
 	}
 }
 
-vector<Light> GenLights() {
+vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
 	vector<Light> out;
 
 	float pos=float(gVals[5])*0.01f;
@@ -133,7 +134,7 @@ vector<Light> GenLights() {
 	out.push_back(
 		/*Toasters*/ //Light(RotateY(pos)*Vec3f(0,400.5f,0),Vec3f(8,8,5),10000.f)
 		/*sponza*/  // Light(Vec3f(0,2,0),Vec3f(8,8,5),20.0f)
-		/*admin*/   Light(Vec3f(-78.0f,110.0f,-531.0f),Vec3f(1,1,0.7),1000.0f)
+		/*admin*/   Light(Vec3f(-78.0f,110.0f,-531.0f) * scale, Vec3f(1,1,0.7), power)
 	);
 //	out.push_back(Light(Vec3f(-600.0f,144.0f,-341.0f),Vec3f(0.3,0.6,1.0),800.0f));
 //	out.push_back(Light(Vec3f(407.0f,209.64f,1634.0f),Vec3f(1,1,1),1000.0f));
@@ -214,10 +215,26 @@ static int tmain(int argc, char **argv) {
 	}
 	
 	Scene<StaticTree> staticScene;
-	staticScene.geometry.Construct(baseScene.ToTriangleVector());
-	staticScene.geometry.PrintInfo();
-	Saver(string("dump/")+modelFile) & staticScene.geometry;
-//	Loader(string("dump/")+modelFile) & staticScene.geometry;
+	try {
+		Loader(string("dump/")+modelFile) & staticScene.geometry;
+	}
+	catch(...) {
+		staticScene.geometry.Construct(baseScene.ToTriangleVector());
+		staticScene.geometry.PrintInfo();
+		Saver(string("dump/")+modelFile) & staticScene.geometry;
+	}
+
+	float sceneScale; {
+		Vec3f bMin(1.0f / 0.0f, 1.0f / 0.0f, 1.0f / 0.0f);
+		Vec3f bMax = -bMin;
+		for(int n = 0; n < baseScene.objects.size(); n++) {
+			auto box = baseScene.objects[n].GetBBox();
+			bMin = VMin(bMin, box.min);
+			bMax = VMax(bMax, box.max);
+		}
+		Vec3f size = bMax - bMin;
+		sceneScale = Length(size);
+	}
 
 	SceneBuilder<StaticTree> builder; /*{
 		vector<BaseScene::Object> objects;
@@ -260,7 +277,11 @@ static int tmain(int argc, char **argv) {
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
 	for(int n=0;n<10;n++) gVals[n]=1;
-	gVals[2]=0; gVals[4]=0; gVals[3]=0;
+	gVals[0] = 0; gVals[2]=0; gVals[4]=0; gVals[3]=0;
+	
+	gdVals[0] = 0.1f * sceneScale;
+	gdVals[1] = 0.22f * sceneScale;
+
 
 	SetMaterials(staticScene, baseScene, texPath);
 
@@ -268,7 +289,7 @@ static int tmain(int argc, char **argv) {
 	SetMaterials(scene, baseScene, texPath);
 	mesh.SetMaterial(scene.materials.size()-1);
 
-	vector<Light> lights=GenLights();
+	vector<Light> lights;// = GenLights();
 			
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
@@ -313,7 +334,7 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown('J')) {
 			Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
 
-			lights.push_back(Light(cam.pos,colors[rand()&3],800.0f));
+			lights.push_back(Light(cam.pos, colors[rand()&3], 800.0f * 0.001f * sceneScale));
 		}
 
 		{
@@ -326,16 +347,22 @@ static int tmain(int argc, char **argv) {
 			if(window.Key('F')) cam.pos-=cam.up*tspeed;
 		}
 
+		if(window.Key('G')) { gdVals[0]+=0.01 * sceneScale; printf("16 max dist: %f\n", gdVals[0] / sceneScale); }
+		if(window.Key('V')) { gdVals[0]-=0.01 * sceneScale; printf("16 max dist: %f\n", gdVals[0] / sceneScale); }
+		if(window.Key('H')) { gdVals[1]+=0.01 * sceneScale; printf("4 max dist: %f\n", gdVals[1] / sceneScale); }
+		if(window.Key('B')) { gdVals[1]-=0.01 * sceneScale; printf("4 max dist: %f\n", gdVals[1] / sceneScale); }
+
 		for(int n = 1; n <= 8; n++) if(window.Key('0' + n))
 				{ threads = n; printf("Threads: %d\n", threads); }
 
-		if(window.KeyDown(Key_f1)) staticEnabled^=1;
+		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Traversing from 8x8: %s\n", gVals[0]?"on" : "off"); }
 		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
 		if(window.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
 		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
 		if(window.KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
 		if(window.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"on":"off"); }
 		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Val 6 %s\n",gVals[6]?"on":"off"); }
+		if(window.KeyDown(Key_f8)) { gVals[7]^=1; printf("Val 7 %s\n",gVals[7]?"on":"off"); }
 
 		{
 			int dx=window.Key(Key_space)?window.MouseMove().x:0,dy=0;
@@ -353,14 +380,16 @@ static int tmain(int argc, char **argv) {
 		//	}
 		}
 
-		double buildTime=GetTime(); {
-			static float pos=0.0f; if(window.Key(Key_space)) pos+=0.025f;
+		static float animPos = 0;
+		if(window.Key(Key_space)) animPos+=0.025f;
+
+		double buildTime=GetTime(); /*{
 			SceneBuilder<StaticTree> temp=builder;
 		//	for(int n=0;n<temp.instances.size();n++) {
 		//		SceneBuilder<StaticTree>::Instance &inst=temp.instances[n];
-		//		inst.trans.w=inst.trans.w+Vec4f(0.0f,sin(pos+n*n)*5.0f*speed,0.0f,0.0f);
+		//		inst.trans.w=inst.trans.w+Vec4f(0.0f,sin(animPos+n*n)*5.0f*speed,0.0f,0.0f);
 		//	}
-			mesh.Animate(meshAnim,pos);
+			mesh.Animate(meshAnim,animPos);
 			meshTree.Construct(mesh.triVec,1);
 	//		staticScene.geometry = meshTree;
 
@@ -371,20 +400,21 @@ static int tmain(int argc, char **argv) {
 			scene.geometry.Construct(temp.ExtractElements(),1);
 			BBox box=meshTree.GetBBox();
 
-			vector<Light> tLights=lightsEnabled?lights:vector<Light>();
-			for(int n=0;n<tLights.size();n++) {
-				tLights[n].pos += Vec3f(sin(pos+n*n),cos(pos+n*n),sin(pos-n*n)*cos(pos+n*n))*speed;
-			}
-			staticScene.lights=scene.lights=tLights;
-		buildTime=GetTime()-buildTime; }
+					} */ buildTime=GetTime()-buildTime;
 
+		vector<Light> tLights = lightsEnabled?lights:vector<Light>();
+			for(int n=0;n<tLights.size();n++)
+				tLights[n].pos += Vec3f(sin(animPos+n*n),cos(animPos+n*n),
+					sin(animPos-n*n)*cos(animPos+n*n))*speed;
+		staticScene.lights = scene.lights = tLights;
 		staticScene.Update();
-		scene.Update();
+	//	scene.Update();
 		
 		double time=GetTime();
 		TreeStats<1> stats;
-		if(staticEnabled) stats=Render(staticScene,cam,img,options,threads);
-		else stats=Render(scene,cam,img,options,threads);
+	//	if(staticEnabled)
+			stats=Render(staticScene,cam,img,options,threads);
+	//	else stats=Render(scene,cam,img,options,threads);
 
 		time=GetTime()-time; minTime=Min(minTime,time);
 		maxTime=Max(time,maxTime);
@@ -397,6 +427,9 @@ static int tmain(int argc, char **argv) {
 			font.PrintAt(Vec2f(5, 25), "FPS (",staticEnabled?"static":"dynamic","): ", frmCounter.FPS());
 			font.PrintAt(Vec2f(5, 45), "Lights: ",lightsEnabled?lights.size() : 0);
 			font.PrintAt(Vec2f(5, 65), "Last frame time: ", lastFrmTime * 1000.0f, "ms");
+			font.PrintAt(Vec2f(5, 85), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
+					" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7], ' ',
+					gdVals[0] / sceneScale, ' ', gdVals[1] / sceneScale);
 		font.FinishDrawing();
 		window.SwapBuffers();
 	}

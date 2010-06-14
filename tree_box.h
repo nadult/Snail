@@ -59,8 +59,9 @@
 		}
 
 		template <int flags,int size>
-		bool Collide(Context<size,flags> &c,int idx) const {
+		bool Collide(Context<size,flags> &c, int idx, bool *anyCol = 0) const {
 			assert(tree);
+			if(anyCol) *anyCol = 0; //TODO
 
 			bool test=0;
 

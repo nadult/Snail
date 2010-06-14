@@ -22,23 +22,23 @@
 			sharedOrig[2]=c.Origin(0).z[0];
 		}
 
-	//	ALLOCAA(floatq, tMin, size);
-	//	ALLOCAA(floatq, tMax, size);
-		floatq tMin[size],tMax[size];
+		floatq tMin[size], tMax[size];
 		for(int q=0;q<size;q++) {
-			tMin[q]=ConstEpsilon<floatq>();
-			tMax[q]=c.distance[q];
+			tMin[q] = ConstEpsilon<floatq>();
+			tMax[q] = c.distance[q];
 		}
 		bBox.UpdateMinMaxDist(c.rays, dirMask, tMin, tMax);
 
-		ALLOCAA(floatq, fStackBegin, size*2*(maxLevel + 2));
+		floatq fStackBegin[size * 2 * (maxLevel + 2)];
 		floatq *__restrict__ fStack = fStackBegin;
-		u32 nStackBegin[maxLevel+2], *nStack = nStackBegin;
+		u32 nStackBegin[maxLevel + 2], *nStack = nStackBegin;
 
 		ALLOCA(ObjectIdxBuffer<4>, mailbox);
 
 		const Node *node0=&nodes[0];
-		int idx=0;
+		int idx = 0;
+		bool anyCol = 0;
+		float farHit = -1.0f / 0.0f;
 
 		while(true) {
 			stats.LoopIteration();
@@ -50,7 +50,15 @@
 					mailbox.Insert(idx);
 
 					stats.Intersection(size);
-					int full = elements[idx].Collide(c,idx);
+					int full = elements[idx].Collide(c,idx, &anyCol);
+
+					if(anyCol) {
+						floatq tHit(-1.0f / 0.0f);
+						for(int q = 1; q < size; q++)
+							tHit = Condition(c.Distance(q) < floatq(1.0f / 0.0f), Max(c.Distance(q), tHit), tHit);
+						farHit = Maximize(tHit);
+					}
+
 					if(!CElement::isComplex && (flags & isct::fShadow) && full)
 						c.shadowCache.Insert(idx);
 				}
@@ -63,7 +71,20 @@
 					tMin[q] = fStack[q];
 				for(int q = 0; q < size; q++)
 					tMax[q] = Min(fStack[size + q], c.Distance(q));
-				
+	
+				if(gVals[7] && !(flags & isct::fShadow) && (size == 16 || size == 4) &&
+						farHit > (size == 16? gdVals[0] : size == 4? gdVals[1] : 1.0f / 0.0f)) {
+					for(int q = 0; q < 4; q++) {
+						auto subC = c.Split(q);
+						if(flags & isct::fShadow) subC.shadowCache = c.shadowCache;
+						TraversePacket(subC);
+						if(flags & isct::fShadow) c.shadowCache = subC.shadowCache;
+					}
+					if(size == 16) stats.Skip(); else stats.Breaking(1);
+					c.UpdateStats(stats);
+					return;
+				}
+			
 				--nStack;
 				idx=*nStack;
 				continue;
@@ -74,8 +95,6 @@
 			int axis=node->Axis();
 			int nidx=dirMask&(1<<axis)?1:0;
 
-		//	ALLOCAA(floatq, near, size);
-		//	ALLOCAA(floatq, far, size);
 			floatq near[size],far[size];
 			f32x4b test1,test2; {
 				const floatq *inv=(&c.rays.IDirPtr()->x)+axis;

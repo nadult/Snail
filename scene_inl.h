@@ -69,7 +69,7 @@ struct StatsShader {
 		return Vec3q(
 			float(stats.GetIntersects())*(0.04f/size),
 			float(stats.GetLoopIters())*(0.02f/size),
-			float(stats.GetSkips()*0.25f) );
+			float(stats.GetSkips()*0.5f + (stats.GetBreaking()? 0.25 : 0)) );
 	}
 	const TreeStats<1> &stats;
 };
@@ -484,7 +484,7 @@ struct DistanceShader {
 		else for(int q=0;q<size;q++)
 			result.color[q]=samples[q].diffuse;
 
-		if(gVals[2]&&flags&isct::fPrimary) {
+		if(gVals[2] && flags&isct::fPrimary) {
 			Vec3q col=StatsShader<size>(result.stats)[0];
 			for(int q=0;q<size;q++)
 				result.color[q]=col;

@@ -223,9 +223,11 @@ struct Context {
 	INLINE i32x4 &Element(int q) { return element[q]; }
 
 	Context<size/4,flags> Split(int part) const {
-		int offset=part*(size/4);
-		return Context<size/4,flags>(RayGroup<size/4,sharedOrigin>(rays,offset),distance+offset,
-									 object+offset,element+offset,stats);
+		const int offset = part * (size / 4);
+		Context<size/4, flags> out(RayGroup<size/4,sharedOrigin>(rays,offset),distance+offset,
+					 object+offset,element+offset,stats);
+		out.mailbox = mailbox;
+		return out;
 	}
 
 	void UpdateStats(const TreeStats<1> &st) { if(stats) *stats+=st; }
@@ -235,6 +237,7 @@ struct Context {
 	i32x4  * __restrict__ __attribute__((aligned(16))) object;
 	i32x4  * __restrict__ __attribute__((aligned(16))) element;
 	ShadowCache shadowCache;
+	ObjectIdxBuffer<4> mailbox;
 	TreeStats<1> *stats;
 };
 

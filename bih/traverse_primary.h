@@ -34,8 +34,9 @@
 		const Node *node0=&nodes[0];
 		struct TPStackElem { float min,max; u32 idx; } stackBegin[maxLevel + 1], *stack = stackBegin;
 		int idx=0;
+		bool anyCol = 0;
 
-		ALLOCA(ObjectIdxBuffer<4>, mailbox);
+		ALLOCA(ObjectIdxBuffer<4>, mailbox, c.mailbox);
 
 		while(true) {
 			stats.LoopIteration();
@@ -47,7 +48,22 @@
 					mailbox.Insert(idx);
 
 					stats.Intersection(size);
-					int full = elements[idx].Collide(c,idx);
+					int full = elements[idx].Collide(c, idx, &anyCol);
+
+					if(gVals[7] && !(flags & isct::fShadow) && anyCol && (size == 16 || size == 4) &&
+							tMin > (size == 16? gdVals[0] : size == 4? gdVals[1] : 1.0f / 0.0f)) {
+						for(int q = 0; q < 4; q++) {
+							Context<size / 4, flags> subC(c.Split(q));
+							if(flags & isct::fShadow) subC.shadowCache = c.shadowCache;
+							TraversePacket(subC);
+							if(flags & isct::fShadow) c.shadowCache = subC.shadowCache;
+						}
+					
+						if(size == 16) stats.Skip(); else stats.Breaking(1);
+						c.UpdateStats(stats);
+						return;
+					}
+
 					if(!CElement::isComplex && (flags & isct::fShadow) && full)
 						c.shadowCache.Insert(idx);
 				}

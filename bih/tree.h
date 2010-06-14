@@ -93,7 +93,7 @@ namespace bih {
 		enum { isctFlags=CElement::isctFlags|isct::fObject|isct::fStats };
 		enum { filterSigns=1 };
 		enum { desiredMaxLevel=60 }; // Can be more, depends on the scene
-		enum { separateFirstElement=sizeof(ElementContainer)!=sizeof(TriangleVector) };
+		enum { separateFirstElement = sizeof(ElementContainer) != sizeof(TriangleVector) };
 		
 		Tree() { }
 
@@ -137,6 +137,8 @@ namespace bih {
 		template <int flags,int size> INLINE void TraversePacket(Context<size,flags> &c) const {
 			TraversePacket(c,FullSelector<size>());
 		}
+		
+		template <int flags> INLINE void TraversePacket(Context<0,flags> &c) const { }
 
 		vector<Node,AlignedAllocator<Node> > nodes;
 		ElementContainer elements;

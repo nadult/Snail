@@ -93,6 +93,7 @@ void ComputeMinMax(const Vec3q *__restrict__ vec,float *__restrict__ min,float *
 }
 
 extern int gVals[16];
+extern double gdVals[16];
 
 template <int size>
 class ObjectIdxBuffer

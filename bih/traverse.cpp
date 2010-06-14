@@ -39,8 +39,7 @@ namespace bih {
 		}
 
 		template<class ElementContainer> template <int flags,int size,template <int> class Selector>
-			void
-			Tree<ElementContainer>::TraversePacket(Context<size,flags> &c,const Selector<size> &selector) const
+		void Tree<ElementContainer>::TraversePacket(Context<size,flags> &c,const Selector<size> &selector) const
 		{
 			bool split=1;
 
@@ -54,7 +53,8 @@ namespace bih {
 						break;
 					}
 
-			if((Selector<size>::full||selectorsFiltered)&&size<=(reflected?4:isComplex?64:16)) {
+			if((Selector<size>::full||selectorsFiltered)
+					&& size <= (reflected?4 : isComplex? 64 : 16)) {
 				const Vec3q &dir=c.Dir(0);
 				bool signsFiltered=1;
 				int msk=_mm_movemask_ps(_mm_shuffle_ps(_mm_shuffle_ps(dir.x.m,dir.y.m,0),dir.z.m,0+(2<<2)))&7;
@@ -67,7 +67,7 @@ namespace bih {
 				}
 
 				if(signsFiltered) {
-					bool primary=flags&(isct::fPrimary|isct::fShadow)&&gVals[1];
+					bool primary = (flags & (isct::fPrimary|isct::fShadow)) && gVals[1];
 
 					if((flags & isct::fShadow) &&!isComplex) {
 						floatq dot=1.0f;
@@ -78,7 +78,7 @@ namespace bih {
 					if(primary) TraversePrimary(c);
 					else TraversePacket0(c);
 
-				//	if(primary&&(flags&isct::fShadow)) c.stats.Skip();
+				//	if(primary && (flags & isct::fShadow)) c.stats.Skip();
 					split=0;
 				}
 			}
@@ -86,9 +86,9 @@ namespace bih {
 			if(split) {
 				for(int q=0;q<4;q++) {
 					Context<size/4,flags> subC(c.Split(q));
-					if(flags&isct::fShadow) subC.shadowCache=c.shadowCache;
+					if(flags & isct::fShadow) subC.shadowCache=c.shadowCache;
 					TraversePacket(subC,selector.SubSelector(q));
-					if(flags&isct::fShadow) c.shadowCache=subC.shadowCache;
+					if(flags & isct::fShadow) c.shadowCache=subC.shadowCache;
 				}
 			}
 		}
