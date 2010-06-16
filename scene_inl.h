@@ -347,34 +347,45 @@ struct DistanceShader {
 						s.normal=Vec3q(shTri.nrm[0])+Vec3q(shTri.nrm[1])*bar.x+Vec3q(shTri.nrm[2])*bar.y;
 					}
 
-					if(AccStruct::isctFlags&isct::fElement?ForAny(object[q]!=obj0||element[q]!=elem0):ForAny(object[q]!=obj0))
-					  for(int k=1;k<4;k++) {
-						int obj=object[q][k],elem=element[q][k];
-						if(invBitMask&(1<<k)||(obj==obj0&&elem==elem0)) continue;
+					if(AccStruct::isctFlags&isct::fElement?ForAny(object[q]!=obj0||element[q]!=elem0):ForAny(object[q]!=obj0)) {
+						float texDiffX[4], texDiffY[4], texCoordX[4], texCoordY[4];
+						Vec3f normal[4];
+						Convert(s.texDiff .x, texDiffX ); Convert(s.texDiff .y, texDiffY);
+						Convert(s.texCoord.x, texCoordX); Convert(s.texCoord.y, texCoordY);
+						Convert(s.normal, normal);
 
-						uint hash=shTriCache.Hash(obj,elem);
-						ShTriangle &shTri=shTriCache[hash];
-						if(!shTriCache.SameId(hash,obj,elem)) {
-							shTri=geometry.GetSElement(obj,elem);
-							shTriCache.SetId(hash,obj,elem);
-						}
-					
-						int tMatId=shTri.matId>=matCount?0:shTri.matId;
-						matId[q][k]=tMatId+1;
+						for(int k=1;k<4;k++) {
+							int obj=object[q][k],elem=element[q][k];
+							if(invBitMask&(1<<k)||(obj==obj0&&elem==elem0)) continue;
 
-						Vec2q bar=shTri.Barycentric(rays.Origin(tq),rays.Dir(tq));
-
-						Vec2q tex=Vec2q(shTri.uv[0].x,shTri.uv[0].y)+
-								  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.x+
-								  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.y;
-
-						Vec2f diff=Maximize(tex)-Minimize(tex);
-						s.texDiff.x[k]=diff.x; s.texDiff.y[k]=diff.y;
-						s.texCoord.x[k]=tex.x[k]; s.texCoord.y[k]=tex.y[k];
-						Vec3f nrm=shTri.nrm[0]+shTri.nrm[1]*bar.x[k]+shTri.nrm[2]*bar.y[k];
+							uint hash=shTriCache.Hash(obj,elem);
+							ShTriangle &shTri=shTriCache[hash];
+							if(!shTriCache.SameId(hash,obj,elem)) {
+								shTri=geometry.GetSElement(obj,elem);
+								shTriCache.SetId(hash,obj,elem);
+							}
 						
-						s.normal.x[k]=nrm.x; s.normal.y[k]=nrm.y; s.normal.z[k]=nrm.z;
-					  }
+							int tMatId=shTri.matId>=matCount?0:shTri.matId;
+							matId[q][k]=tMatId+1;
+
+							Vec2q bar=shTri.Barycentric(rays.Origin(tq),rays.Dir(tq));
+
+							Vec2q tex=Vec2q(shTri.uv[0].x,shTri.uv[0].y)+
+									  Vec2q(shTri.uv[1].x,shTri.uv[1].y)*bar.x+
+									  Vec2q(shTri.uv[2].x,shTri.uv[2].y)*bar.y;
+
+							Vec2f diff=Maximize(tex)-Minimize(tex);
+							texDiffX [k]=diff.x;   texDiffY [k]=diff.y;
+							texCoordX[k]=tex.x[k]; texCoordY[k]=tex.y[k];
+							Vec3f nrm=shTri.nrm[0]+shTri.nrm[1]*bar.x[k]+shTri.nrm[2]*bar.y[k];
+							
+							normal[k].x=nrm.x; normal[k].y=nrm.y; normal[k].z=nrm.z;
+						}
+						
+						Convert(texDiffX , s.texDiff.x ); Convert(texDiffY , s.texDiff.y);
+						Convert(texCoordX, s.texCoord.x); Convert(texCoordY, s.texCoord.y);
+						Convert(normal, s.normal);
+					}
 				}
 				int matId0=matId[0][0];
 

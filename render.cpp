@@ -267,5 +267,5 @@ typedef bih::Tree<TriangleVector> StaticTree;
 typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
 
 template TreeStats<1> Render<StaticTree>(const Scene<StaticTree>&,const Camera&,Image&,const Options,uint);
-template TreeStats<1> Render<FullTree  >(const Scene<FullTree>  &,const Camera&,Image&,const Options,uint);
+//template TreeStats<1> Render<FullTree  >(const Scene<FullTree>  &,const Camera&,Image&,const Options,uint);
 	

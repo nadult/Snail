@@ -29,8 +29,8 @@ void Image::SaveToFile(const char *fileName) {
 
 	vector<u8> line(width*3);
 
-	for(int n=0;n<height;n++) {
-		for(int x=0;x<width;x++) {
+	for(size_t n = 0; n < height; n++) {
+		for(size_t x = 0; x < width; x++) {
 			line[x*3+0]=buffer[n*width*3+x*3+2];
 			line[x*3+1]=buffer[n*width*3+x*3+1];
 			line[x*3+2]=buffer[n*width*3+x*3+0];

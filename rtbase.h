@@ -44,22 +44,22 @@ INLINE bool isnan(float t) {
 	return (i&0x7f800000)==0x7f8 && (i&0x7fffff)!=0;
 }
 
-inline float Maximize(const floatq &t) { return Max(Max(t[0],t[1]),Max(t[2],t[3])); }
-inline float Minimize(const floatq &t) { return Min(Min(t[0],t[1]),Min(t[2],t[3])); }
+inline float Maximize(floatq t) { return Max(Max(t[0],t[1]),Max(t[2],t[3])); }
+inline float Minimize(floatq t) { return Min(Min(t[0],t[1]),Min(t[2],t[3])); }
 inline Vec2p Maximize(const Vec2q &v) { return Vec2p(Maximize(v.x),Maximize(v.y)); }
 inline Vec2p Minimize(const Vec2q &v) { return Vec2p(Minimize(v.x),Minimize(v.y)); }
-inline Vec3p Maximize(const Vec3q &v) { return Vec3p(Maximize(v.x),Maximize(v.y),Maximize(v.z)); }
-inline Vec3p Minimize(const Vec3q &v) { return Vec3p(Minimize(v.x),Minimize(v.y),Minimize(v.z)); }
+inline Vec3p Maximize(Vec3q v) { return Vec3p(Maximize(v.x),Maximize(v.y),Maximize(v.z)); }
+inline Vec3p Minimize(Vec3q v) { return Vec3p(Minimize(v.x),Minimize(v.y),Minimize(v.z)); }
 
 INLINE bool IsNan(const Vec3f &f) { return isnan(f.x)||isnan(f.y)||isnan(f.z); }
 INLINE bool IsNan(const Vec4f &f) { return isnan(f.x)||isnan(f.y)||isnan(f.z)||isnan(f.w); }
-INLINE bool IsNan(const Vec3q &f) { return 
+INLINE bool IsNan(Vec3q f) { return 
 		isnan(f.x[0])||isnan(f.y[0])||isnan(f.z[0])||
 		isnan(f.x[1])||isnan(f.y[1])||isnan(f.z[1])||
 		isnan(f.x[2])||isnan(f.y[2])||isnan(f.z[2])||
 		isnan(f.x[3])||isnan(f.y[3])||isnan(f.z[3]); }
 
-INLINE Vec3q SafeInv(const Vec3q &v) {
+INLINE Vec3q SafeInv(Vec3q v) {
 	const float epsilon=0.0000001f,inf=1.0f/0.0f;
 	return Vec3q(
 		Condition(Abs(v.x)<floatq(epsilon),floatq(inf),Inv(v.x)),
@@ -76,7 +76,7 @@ INLINE Vec3f SafeInv(const Vec3f &v) {
 }
 
 template <int size>
-void ComputeMinMax(const Vec3q *__restrict__ vec,float *__restrict__ min,float *__restrict__ max) throw() {
+void ComputeMinMax(const Vec3q *vec,float *__restrict__ min,float *__restrict__ max) throw() {
 	floatq minx, miny, minz, maxx, maxy, maxz;
 	minx = miny = minz =  1.0f / 0.0f;
 	maxx = maxy = maxz = -1.0f / 0.0f;
@@ -96,7 +96,7 @@ extern int gVals[16];
 extern double gdVals[16];
 
 template <int size>
-class ObjectIdxBuffer
+class ObjectIdxBuffer 
 {
 public:
 	ObjectIdxBuffer() {
@@ -159,7 +159,7 @@ namespace isct {
 }
 
 /*
-inline bool TestForNans(const Vec3q &v,int id,bool thr=1) {
+inline bool TestForNans(Vec3q v,int id,bool thr=1) {
 	bool nan=isnan(v.x[0])||isnan(v.x[1])||isnan(v.x[2])||isnan(v.x[3]);
 	nan=nan||isnan(v.y[0])||isnan(v.y[1])||isnan(v.y[2])||isnan(v.y[3]);
 	nan=nan||isnan(v.z[0])||isnan(v.z[1])||isnan(v.z[2])||isnan(v.z[3]);

@@ -103,44 +103,48 @@ namespace sampling {
 		ax&=wMask; ay&=hMask;
 		bx&=wMask; by&=hMask;
 
-		f32x4 count;
+		union { __m128 count; float countf[4]; };
 		TSample sum[4];
 		i32x4 one(1);
 
 		if(ForAll(ax<=bx&&ay<=by)) {
-			count=f32x4(by-ay+one)*f32x4(bx-ax+one);
+			count = (f32x4(by-ay+one)*f32x4(bx-ax+one)).m;
 			ComputeRect(ax,ay,bx,by,sum);
 		}
 		else for(int k=0;k<4;k++) {
 			if(ax[k]>bx[k]) {
 				if(ay[k]>by[k]) {
-					count[k]=(bx[k]+1)*(by[k]+1)+(w-ax[k])*(h-ay[k]);
+					countf[k]=(bx[k]+1)*(by[k]+1)+(w-ax[k])*(h-ay[k]);
 					sum[k]=ComputeRect(0,0,bx[k],by[k])+ComputeRect(ax[k],ay[k],w-1,h-1);
 				}
 				else {
-					count[k]=(bx[k]+1+w-ax[k])*(by[k]-ay[k]+1);
+					countf[k]=(bx[k]+1+w-ax[k])*(by[k]-ay[k]+1);
 					sum[k]=ComputeRect(0,ay[k],bx[k],by[k])+ComputeRect(ax[k],ay[k],w-1,by[k]);
 				}
 			}
 			else {
 				if(ay[k]>by[k]) {
-					count[k]=(bx[k]-ax[k]+1)*(by[k]+h+1-ay[k]);
+					countf[k]=(bx[k]-ax[k]+1)*(by[k]+h+1-ay[k]);
 					sum[k]=ComputeRect(ax[k],0,bx[k],by[k])+ComputeRect(ax[k],ay[k],bx[k],h-1);
 				}
 				else {
-					count[k]=(by[k]-ay[k]+1)*(bx[k]-ax[k]+1);
+					countf[k]=(by[k]-ay[k]+1)*(bx[k]-ax[k]+1);
 					sum[k]=ComputeRect(ax[k],ay[k],bx[k],by[k]);
 				}
 			}
 		}
 
-		Vec3q out;
-		out.x[0]=sum[0].R(); out.y[0]=sum[0].G(); out.z[0]=sum[0].B();
-		out.x[1]=sum[1].R(); out.y[1]=sum[1].G(); out.z[1]=sum[1].B();
-		out.x[2]=sum[2].R(); out.y[2]=sum[2].G(); out.z[2]=sum[2].B();
-		out.x[3]=sum[3].R(); out.y[3]=sum[3].G(); out.z[3]=sum[3].B();
+		union {
+			__m128 out[3];
+			struct { float ox[4]; float oy[4]; float oz[4]; } o;
+		};
+		o.ox[0]=sum[0].R(); o.oy[0]=sum[0].G(); o.oz[0]=sum[0].B();
+		o.ox[1]=sum[1].R(); o.oy[1]=sum[1].G(); o.oz[1]=sum[1].B();
+		o.ox[2]=sum[2].R(); o.oy[2]=sum[2].G(); o.oz[2]=sum[2].B();
+		o.ox[3]=sum[3].R(); o.oy[3]=sum[3].G(); o.oz[3]=sum[3].B();
 
-		return Condition(fullMask,Vec3q(avg.x,avg.y,avg.z),out*Inv(count*255.0f));
+		return Condition(fullMask,Vec3q(avg.x,avg.y,avg.z),
+				Vec3q(out[0], out[1], out[2]) * Inv(floatq(count) * 255.0f));
 	}
 
 }

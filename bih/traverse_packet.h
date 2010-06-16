@@ -36,9 +36,7 @@
 		ALLOCA(ObjectIdxBuffer<4>, mailbox);
 
 		const Node *node0=&nodes[0];
-		int idx = 0;
-		bool anyCol = 0;
-		float farHit = -1.0f / 0.0f;
+		int idx=0;
 
 		while(true) {
 			stats.LoopIteration();
@@ -50,15 +48,7 @@
 					mailbox.Insert(idx);
 
 					stats.Intersection(size);
-					int full = elements[idx].Collide(c,idx, &anyCol);
-
-					if(anyCol) {
-						floatq tHit(-1.0f / 0.0f);
-						for(int q = 1; q < size; q++)
-							tHit = Condition(c.Distance(q) < floatq(1.0f / 0.0f), Max(c.Distance(q), tHit), tHit);
-						farHit = Maximize(tHit);
-					}
-
+					int full = elements[idx].Collide(c,idx);
 					if(!CElement::isComplex && (flags & isct::fShadow) && full)
 						c.shadowCache.Insert(idx);
 				}
@@ -66,14 +56,18 @@
 			POP_STACK:
 				if(fStack == fStackBegin) break;
 
+				floatq ttMin = c.Distance(0);
 				fStack -= size * 2;
-				for(int q = 0; q < size; q++)
+				for(int q = 0; q < size; q++) {
 					tMin[q] = fStack[q];
+					ttMin = Min(ttMin, c.Distance(q));
+				}
 				for(int q = 0; q < size; q++)
 					tMax[q] = Min(fStack[size + q], c.Distance(q));
+				float min = Minimize(ttMin);
 	
 				if(gVals[7] && !(flags & isct::fShadow) && (size == 16 || size == 4) &&
-						farHit > (size == 16? gdVals[0] : size == 4? gdVals[1] : 1.0f / 0.0f)) {
+						min > (size == 16? gdVals[0] : size == 4? gdVals[1] : 1.0f / 0.0f)) {
 					for(int q = 0; q < 4; q++) {
 						auto subC = c.Split(q);
 						if(flags & isct::fShadow) subC.shadowCache = c.shadowCache;

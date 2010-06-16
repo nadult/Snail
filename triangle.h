@@ -85,18 +85,17 @@ public:
 	}
 
 	template <int w,int tflags,int size>
-	int Collide_(Context<size,tflags> &c,int idx, bool *anyCol) const {
+	int Collide_(Context<size,tflags> &c,int idx) const {
 		floatq tdett,ppu,ppv;
 		if(tflags&isct::fShOrig) {
 			Vec3q orig=c.Origin(0);
-			tdett=np-((&orig.x)[iu][0]*nu+(&orig.x)[iv][0]*nv+(&orig.x)[w][0]);
+			tdett = np - ((&orig.x)[(int)iu][0] * nu + (&orig.x)[(int)iv][0] * nv + (&orig.x)[(int)w][0]);
 			ppu=floatq(pu)-(&orig.x)[iu];
 			ppv=floatq(pv)-(&orig.x)[iv];
 		}
 
 		bool sign=flags&1;
 		bool full= tflags & isct::fShadow? 1 : 0;
-		f32x4b anyCol4(false);
 
 		if(EXPECT_NOT_TAKEN(flags&2)) for(int q=0;q<size;q++) {
 			const Vec3q dir=c.Dir(q);
@@ -118,7 +117,6 @@ public:
 			floatq tmp=detu+detv;
 			f32x4b mask=sign?detu<=0.0f&&detv<=0.0f&&det<=tmp:detu>=0.0f&&detv>=0.0f&&det>=tmp;
 			mask = mask && dist > 0.0f && dist < c.distance[q];
-			anyCol4 = anyCol4 || mask;
 
 			if(tflags&isct::fShadow) full &= ForAll(mask);
 
@@ -145,7 +143,6 @@ public:
 			floatq tmp=detu+detv;
 			f32x4b mask=sign?detu<=0.0f&&detv<=0.0f&&det<=tmp:detu>=0.0f&&detv>=0.0f&&det>=tmp;
 			mask=mask&&dist>0.0f&&dist<c.distance[q];
-			anyCol4 = anyCol4 || mask;
 
 			if(tflags&isct::fShadow) full&=ForAll(mask);
 
@@ -153,16 +150,14 @@ public:
 			if(!(tflags&isct::fShadow)) c.object[q]=Condition(i32x4b(mask),i32x4(idx),c.object[q]);
 		}
 
-		if(anyCol)
-			*anyCol = ForAny(anyCol4);
 		return full;
 	}
 	
 	template <int tflags,int size>
-	int Collide(Context<size,tflags> &c,int idx, bool *anyCol = 0) const {
-		return	iw == 0? Collide_<0>(c, idx, anyCol) :
-				iw == 1? Collide_<1>(c, idx, anyCol) :
-						 Collide_<2>(c, idx, anyCol);
+	int Collide(Context<size,tflags> &c,int idx) const {
+		return	iw == 0? Collide_<0>(c, idx) :
+				iw == 1? Collide_<1>(c, idx) :
+						 Collide_<2>(c, idx);
 	}
 
 private:

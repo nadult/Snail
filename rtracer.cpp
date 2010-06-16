@@ -44,7 +44,7 @@ void PrintHelp() {
 }
 
 typedef bih::Tree<TriangleVector> StaticTree;
-typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
+//typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
 
 template <class Dst,class Src>
 Dst BitCast(const Src &src) {
@@ -155,12 +155,12 @@ static int tmain(int argc, char **argv) {
 	CameraConfigs camConfigs;
 	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
 
-	Mesh mesh;
-	MeshAnim meshAnim;
-	mesh.Load("scenes/doom3/imp/imp.md5mesh");
-	meshAnim.Load("scenes/doom3/imp/walk1.md5anim");
+//	Mesh mesh;
+//	MeshAnim meshAnim;
+//	mesh.Load("scenes/doom3/imp/imp.md5mesh");
+//	meshAnim.Load("scenes/doom3/imp/walk1.md5anim");
 
-	StaticTree meshTree;
+//	StaticTree meshTree;
 
 	int resx=800,resy=600;
 #ifndef NDEBUG
@@ -280,20 +280,20 @@ static int tmain(int argc, char **argv) {
 	gVals[0] = 0; gVals[2]=0; gVals[4]=0; gVals[3]=0;
 	
 	gdVals[0] = 0.1f * sceneScale;
-	gdVals[1] = 0.22f * sceneScale;
+	gdVals[1] = 0.75f * sceneScale;
 
 
 	SetMaterials(staticScene, baseScene, texPath);
 
-	Scene<FullTree> scene;
-	SetMaterials(scene, baseScene, texPath);
-	mesh.SetMaterial(scene.materials.size()-1);
+//	Scene<FullTree> scene;
+//	SetMaterials(scene, baseScene, texPath);
+//	mesh.SetMaterial(scene.materials.size()-1);
 
 	vector<Light> lights;// = GenLights();
 			
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
-		cam.pos=scene.geometry.GetBBox().Center();
+		cam.pos=staticScene.geometry.GetBBox().Center();
 
 	buildTime=GetTime()-buildTime;
 	std::cout << "Build time: " << buildTime << '\n';
@@ -301,8 +301,8 @@ static int tmain(int argc, char **argv) {
 	bool lightsEnabled=1;
 	bool staticEnabled=0;
 	float speed; {
-		scene.geometry.Construct(builder.ExtractElements());
-		Vec3p size = scene.geometry.GetBBox().Size();
+	//	scene.geometry.Construct(builder.ExtractElements());
+		Vec3p size = staticScene.geometry.GetBBox().Size();
 		speed=(size.x + size.y + size.z) * 0.0025f;
 	}
 
@@ -319,8 +319,9 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown('O')) options.reflections^=1;
 		if(window.KeyDown('I')) options.rdtscShader^=1;
 		if(window.KeyDown('C')) {
-			if(staticEnabled) cam.pos=staticScene.geometry.GetBBox().Center();
-			else cam.pos=scene.geometry.GetBBox().Center();
+		//	if(staticEnabled)
+				cam.pos=staticScene.geometry.GetBBox().Center();
+		//	else cam.pos=scene.geometry.GetBBox().Center();
 		}
 		if(window.KeyDown('P')) {
 			camConfigs.AddConfig(string(modelFile),cam);
@@ -406,7 +407,7 @@ static int tmain(int argc, char **argv) {
 			for(int n=0;n<tLights.size();n++)
 				tLights[n].pos += Vec3f(sin(animPos+n*n),cos(animPos+n*n),
 					sin(animPos-n*n)*cos(animPos+n*n))*speed;
-		staticScene.lights = scene.lights = tLights;
+		staticScene.lights /*= scene.lights*/ = tLights;
 		staticScene.Update();
 	//	scene.Update();
 		

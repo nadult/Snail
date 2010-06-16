@@ -115,9 +115,9 @@ INST(StaticTree,pFlags,64,FullSelector)
 INST(StaticTree,sFlags,64,RaySelector)
 INST(StaticTree,rFlags,64,RaySelector)
 
-INST(FullTree,pFlags,64,FullSelector)
-INST(FullTree,sFlags,64,RaySelector)
-INST(FullTree,rFlags,64,RaySelector)
+//INST(FullTree,pFlags,64,FullSelector)
+//INST(FullTree,sFlags,64,RaySelector)
+//INST(FullTree,rFlags,64,RaySelector)
 
 #undef INST
 

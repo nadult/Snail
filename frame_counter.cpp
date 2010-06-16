@@ -2,7 +2,7 @@
 #include "baselib.h"
 
 FrameCounter::FrameCounter()
-	:time(baselib::GetTime()),fps(0),frames(0) {
+	:time(baselib::GetTime()), frames(0), fps(0) {
 }
 
 void FrameCounter::NextFrame() {

@@ -10,7 +10,7 @@ public:
 
 private:
 	unsigned frames;
-	double time,fps;
+	double time, fps;
 };
 
 #endif

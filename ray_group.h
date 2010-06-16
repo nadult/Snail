@@ -20,8 +20,8 @@ INLINE f32x4b GetSSEMaskFromBits(u8 bits) {
 }
 
 INLINE int CountMaskBits(u8 bits) {
-	assert(bits<=15);
-	char count[16]= { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4 };
+	assert(bits <= 15);
+	static const char count[16] = { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4 };
 	return count[bits];
 }
 
@@ -253,9 +253,9 @@ struct FContext {
 		dir=Vec3f(tDir.x[o],tDir.y[o],tDir.z[o]);
 		iDir=Vec3f(tIDir.x[o],tIDir.y[o],tIDir.z[o]);
 		
-		distance=&c.distance[0][o];
-		object  =&c.object  [0][o];
-		element =&c.element [0][o];
+		distance = &c.distance[0][o];
+		object   = &c.object  [0][o];
+		element  = &c.element [0][o];
 		if(flags&isct::fShadow) shadowCache=c.shadowCache;
 		stats=c.stats;
 	}
