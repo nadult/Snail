@@ -1,4 +1,5 @@
 
+	// TODO jakis blad w wersji 32-bitowej
 
 	template <class ElementContainer> template <int flags>
 	void Tree<ElementContainer>::TraverseMono(FContext<flags> &c) const

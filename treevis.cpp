@@ -8,6 +8,7 @@
 #include <stdio.h>
 
 
+//Source: geometrictools.com
 class Eigen
 {
 public:
@@ -777,7 +778,7 @@ struct Camera {
 	void React(GLWindow &input) {
 		float speed=10.0f;
 
-		Vec3f right=RotateVecY(front,ConstPI<float>()*0.5f);
+		Vec3f right=RotateVecY(front, constant::pi * 0.5f);
 		if(input.Key('A')) pos-=right*speed;
 		if(input.Key('D')) pos+=right*speed;
 		if(input.Key('W')) pos+=front*speed;

@@ -3,6 +3,8 @@
 	template <class ElementContainer> template <int flags,int size> void
 		Tree<ElementContainer>::TraversePrimary(Context<size,flags> &c) const
 	{
+		ObjectIdxBuffer<256> mailbox;
+
 		if(!(flags&isct::fShOrig))
 			ThrowException("BIH::TraversePrimary: origin must be shared");
 
@@ -36,7 +38,6 @@
 		int idx=0;
 
 		//TODO: poprawic zeby nie trzeba bylo robic ALLOC
-		ObjectIdxBuffer<4> mailbox __attribute__((aligned(16)));
 
 		while(true) {
 			stats.LoopIteration();

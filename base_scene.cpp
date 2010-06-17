@@ -465,9 +465,9 @@ void BaseScene::Object::FindOptimalTrans() {
 		for(int n=0;n<tris.size();n++) normals[n]=GetTriangle(n).fnrm;
 		
 		for(int x=0;x<dx;x++) for(int y=0;y<dy;y++) for(int z=0;z<dz;z++) {
-			float ax=dx==1?0.0f:ConstPI<float>()*0.5f*float(x)/float(dx-1);
-			float ay=dy==1?0.0f:ConstPI<float>()*0.5f*float(y)/float(dy-1);
-			float az=dz==1?0.0f:ConstPI<float>()*0.5f*float(z)/float(dz-1);
+			float ax=dx==1?0.0f:constant::pi*0.5f*float(x)/float(dx-1);
+			float ay=dy==1?0.0f:constant::pi*0.5f*float(y)/float(dy-1);
+			float az=dz==1?0.0f:constant::pi*0.5f*float(z)/float(dz-1);
 			
 			trans=Rotate(ax,ay,az);
 			

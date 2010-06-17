@@ -10,19 +10,24 @@ namespace sampling {
 	class PointSampler: public Sampler {
 	public:
 		PointSampler(const gfxlib::Texture&);
+		PointSampler(const PointSampler&);
 		PointSampler() { }
+		void operator=(const PointSampler&);
 
 		Vec3f operator()(const Vec2f &uv) const;
 		Vec3q operator()(const Vec2q &uv) const;
 		Vec3q operator()(const Vec2q &uv,const Vec2q &diff) const;
 		INLINE Vec3q operator()(const Vec2q &uv,const Vec2q &diff,Cache&) const { return operator()(uv,diff); }
 
-		void Sample(shading::Sample*,Cache&) const;
+		void Sample(shading::Sample*, Cache&) const;
 
 	protected:
+		void Update();
+
 		gfxlib::Texture tex;
-		uint wMask,hMask,mips,w,h,wShift;
-		float hMul,wMul;
+		uint mipPitch[16];
+		uint wMask, hMask, mips, w, h, wShift;
+		float hMul, wMul;
 	};
 
 }

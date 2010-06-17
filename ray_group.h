@@ -137,7 +137,7 @@ inline int GetVecSign(const Vec3q &dir) {
 	int out=(x?1:0)+(y?2:0)+(z?4:0);
 
 	if((x>0&&x<15)||(y>0&&y<15)||(z>0&&z<15)) out=8;
-	else if(ForAny(	Min(Abs(dir.x),Min(Abs(dir.y),Abs(dir.z)))<ConstEpsilon<f32x4>() )) out=8;
+	else if(ForAny(	Min(Abs(dir.x),Min(Abs(dir.y),Abs(dir.z))) < f32x4(0.000001f))) out=8;
 
 	return out;
 }

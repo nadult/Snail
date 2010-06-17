@@ -13,7 +13,7 @@
 
 #include <pthread.h>
 
-inline i32x4 ConvColor(const Vec3q &rgb) {
+inline static i32x4 ConvColor(Vec3q rgb) {
 	i32x4 tr=Trunc(Clamp(rgb.x*255.0f,floatq(0.0f),floatq(255.0f)));
 	i32x4 tg=Trunc(Clamp(rgb.y*255.0f,floatq(0.0f),floatq(255.0f)));
 	i32x4 tb=Trunc(Clamp(rgb.z*255.0f,floatq(0.0f),floatq(255.0f)));
@@ -65,9 +65,7 @@ struct RenderTask: public Task {
 		u8 *outPtr=(u8*)&out->buffer[startY * pitch + startX * 3];
 
 		Cache cache;
-//		Vec3q dir[NQuads], idir[NQuads];
-		ALLOCAA(Vec3q, dir, NQuads);
-		ALLOCAA(Vec3q, idir, NQuads);
+		Vec3q dir[NQuads], idir[NQuads];
 
 		for(int y=0;y<height;y+=PHeight) {
 			for(int x=0;x<width;x+=PWidth) {
@@ -83,12 +81,11 @@ struct RenderTask: public Task {
 				
 				Result<NQuads> result =
 					scene->RayTrace(RayGroup<NQuads,1>(&origin,dir,idir),FullSelector<NQuads>(),cache);
-				Vec3q *__restrict__ rgb = result.color;
 				*outStats += result.stats;
 
 				if(NQuads==1) {
 					union { __m128i icol; u8 c[16]; };
-					icol = ConvColor(rgb[0]).m;
+					icol = ConvColor(result.color[0]).m;
 
 					u8 *p1=outPtr+y*pitch+x*3;
 					u8 *p2=p1+pitch;
@@ -99,9 +96,9 @@ struct RenderTask: public Task {
 					p2[ 3]=c[12]; p2[ 4]=c[13]; p2[ 5]=c[14];
 				}
 				else {
-					rayGen.Decompose(rgb, rgb);
+					rayGen.Decompose(result.color, result.color);
 
-					Vec3q *src=rgb;
+					Vec3q *src = result.color;
 					u8 *dst=outPtr+x*3+y*pitch;
 					int lineDiff=pitch-PWidth*3;
 

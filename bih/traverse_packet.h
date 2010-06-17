@@ -23,8 +23,8 @@
 		}
 
 		floatq tMin[size], tMax[size];
-		for(int q=0;q<size;q++) {
-			tMin[q] = ConstEpsilon<floatq>();
+		for(int q = 0; q < size; q++) {
+			tMin[q] = floatq(constant::epsilon);
 			tMax[q] = c.distance[q];
 		}
 		bBox.UpdateMinMaxDist(c.rays, dirMask, tMin, tMax);
@@ -33,7 +33,7 @@
 		floatq *__restrict__ fStack = fStackBegin;
 		u32 nStackBegin[maxLevel + 2], *nStack = nStackBegin;
 
-		ALLOCA(ObjectIdxBuffer<4>, mailbox);
+		ObjectIdxBuffer<64> mailbox;
 
 		const Node *node0=&nodes[0];
 		int idx=0;

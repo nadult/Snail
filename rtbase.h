@@ -100,31 +100,45 @@ class ObjectIdxBuffer
 {
 public:
 	ObjectIdxBuffer() {
-		for(int n=0;n<size;n++)
-			indices[n]=i32x4(-1);
-		last=0;
+		for(int n = 0; n < size; n++)
+			indices[n] = -1;
 	}
 	void Insert(u32 idx) {
-		indices[0][last]=idx;
-		last=(last+1)%(size*4);
+		indices[idx & (size - 1)] = idx;
 	}
 	bool Find(u32 idx) const {
-		i32x4 tidx(idx);
-		i32x4b test = indices[0] == tidx;
-		for(int n = 1; n < size; n++)
-			test = test || indices[n] == tidx;
-		return ForAny(test);
+		return indices[idx & (size - 1)] == idx;
 	}
-	i32x4 indices[size];
-	uint last;
+
+	u32 indices[size];
+};
+
+template <>
+class ObjectIdxBuffer<256>
+{
+public:
+	//TODO: dziala tylko dla indeksow < 2^24
+	ObjectIdxBuffer() {
+		for(int n = 0; n < 256; n++)
+			indices[n] = 0xffff;
+	}
+	void Insert(u32 idx) {
+		int gIdx = idx & 255;
+		indices[gIdx] = (idx >> 8) & 0xffff;
+	}
+	bool Find(u32 idx) const {
+		return indices[idx & 255] == ((idx >> 8) & 0xffff);
+	}
+
+	u16 indices[256];
 };
 
 template <>
 class ObjectIdxBuffer<0>
 {
 public:
-	INLINE void Insert(u32) { }
-	INLINE bool Find(u32) { return false; }
+	void Insert(u32) { }
+	bool Find(u32) { return false; }
 };
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f>&);

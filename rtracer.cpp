@@ -31,7 +31,6 @@ using std::endl;
 void PrintHelp() {
 	printf("Synopsis:    rtracer model_file [options]\nOptions:\n\t-res x y   - set rendering resolution [512 512]\n\t");
 	printf("-fullscreen\n\t-toFile   - renders to file out/output.tga\n\t-threads n   - set threads number to n\n\t");
-	printf("-shading flat|gouraud   - sets shading mode [flat]\n");
 	printf("\nExamples:\n\t./rtracer -res 1280 800 abrams.obj\n\t./rtracer pompei.obj -res 800 600 -fullscreen\n\n");
 	printf("Interactive control:\n\tA,W,S,D R,F - move the camera\n\tN,M - rotate camera\n\t");
 	printf("k - save image to out/output.tga\n\to - toggle reflections\n\tl - toggle lights\n\t");
@@ -280,7 +279,7 @@ static int tmain(int argc, char **argv) {
 	gVals[0] = 0; gVals[2]=0; gVals[4]=0; gVals[3]=0;
 	
 	gdVals[0] = 0.1f * sceneScale;
-	gdVals[1] = 0.75f * sceneScale;
+	gdVals[1] = 0.2f * sceneScale;
 
 
 	SetMaterials(staticScene, baseScene, texPath);

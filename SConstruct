@@ -8,7 +8,7 @@ envLinux32 = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
 		TARGET_PLATFORM='linux32',
-		CXX = '/usr/local/gcc-4.4/bin/g++ -O3 -ffast-math -std=gnu++0x -msse2 -m32 -mtune=core2 --param inline-unit-growth=100',
+		CXX = '/usr/local/gcc-4.5/bin/g++ -pthread -O3 --param inline-unit-growth=1000 -ffast-math -std=gnu++0x -msse2 -m32 -march=native -fno-stack-protector -g -DNDEBUG',
 	#	CXX = '/usr/local/gcc-4.3.2/bin/g++ -O3 -std=gnu++0x -msse2 -m32 -ffast-math',
 		CPPPATH = '.',
 	)
