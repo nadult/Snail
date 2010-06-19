@@ -8,7 +8,7 @@
 #include "render.h"
 #include "shading/material.h"
 
-#include "bih/tree.h"
+#include "bvh/tree.h"
 #include "tree_box.h"
 #include "scene.h"
 #include "mesh.h"
@@ -42,7 +42,8 @@ void PrintHelp() {
 	printf("esc - exit\n\n");
 }
 
-typedef bih::Tree<TriangleVector> StaticTree;
+typedef BVH StaticTree;
+//typedef bih::Tree<TriangleVector> StaticTree;
 //typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
 
 template <class Dst,class Src>
@@ -214,14 +215,15 @@ static int tmain(int argc, char **argv) {
 	}
 	
 	Scene<StaticTree> staticScene;
-	try {
-		Loader(string("dump/")+modelFile) & staticScene.geometry;
-	}
-	catch(...) {
-		staticScene.geometry.Construct(baseScene.ToTriangleVector());
-		staticScene.geometry.PrintInfo();
-		Saver(string("dump/")+modelFile) & staticScene.geometry;
-	}
+//	try {
+//		Loader(string("dump/")+modelFile) & staticScene.geometry;
+//	}
+//	catch(...) {
+		staticScene.geometry.Construct(baseScene.ToTriVector());
+	//	staticScene.geometry.Construct(baseScene.ToTriangleVector());
+	//	staticScene.geometry.PrintInfo();
+//		Saver(string("dump/")+modelFile) & staticScene.geometry;
+//	}
 
 	float sceneScale; {
 		Vec3f bMin(1.0f / 0.0f, 1.0f / 0.0f, 1.0f / 0.0f);

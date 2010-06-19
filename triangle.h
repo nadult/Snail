@@ -276,9 +276,8 @@ public:
 		return Collide <flags>(rOrig, rDir);
 	}
 
-	template <int flags, int packetSize>
-	const Isct <f32x4, packetSize, isct::fDistance | flags>
-	Collide(const RayGroup <packetSize, flags> &rays) const __attribute__((noinline));
+	template <int flags, int size>
+	int Collide(Context<size, flags> &c, int idx, int firstActive = 0) const __attribute__((noinline));
 
 	template <class Vec0, class Vec, class Real>
 	const Vec3 <typename Vec::TScalar> Barycentric(Vec0 rOrig, Vec rDir, Real dist, int) const;
@@ -314,6 +313,8 @@ private:
 	Vec4p plane;
 };
 
+SERIALIZE_AS_POD(Triangle)
+
 template <int flags, class VecO, class Vec>
 const Isct <typename Vec::TScalar, 1, isct::fDistance | flags> Triangle::Collide(VecO rOrig, Vec rDir) const {
 	typedef typename Vec::TScalar    real;
@@ -331,7 +332,7 @@ const Isct <typename Vec::TScalar, 1, isct::fDistance | flags> Triangle::Collide
 	VecO tvec = rOrig - VecO(a);
 	real u    = rDir | (VecO(ba) ^ tvec);
 	real v    = rDir | (tvec ^ VecO(ca));
-	Bool test = Min(u, v) >= 0.0f && u + v <= det *real(t0);
+	Bool test = Min(u, v) >= 0.0f && u + v <= det * real(t0);
 
 //	if (ForAny(test)) {
 	real dist = -(tvec | nrm) / det;
@@ -341,32 +342,31 @@ const Isct <typename Vec::TScalar, 1, isct::fDistance | flags> Triangle::Collide
 	return out;
 }
 
-template <int flags, int packetSize>
-const Isct <f32x4, packetSize, isct::fDistance | flags> Triangle::Collide(const RayGroup <packetSize, flags> &rays) const {
-	Isct <f32x4, packetSize, isct::fDistance | flags> out;
-
+template <int flags, int size>
+int Triangle::Collide(Context<size, flags> &c, int idx, int firstActive) const {
 	Vec3p nrm = Nrm();
 	Vec3q ta(a);
 
 	Vec3q sharedTVec;
-	if(flags & isct::fShOrig) sharedTVec = rays.Origin(0) - ta;
-	f32x4 infinity = 1.0f / 0.0f;
+	if(flags & isct::fShOrig)
+		sharedTVec = c.Origin(0) - ta;
 
-	for(int q = 0; q < packetSize; q++) {
-		floatq det  = rays.Dir(q) | nrm;
-		Vec3q  tvec = flags & isct::fShOrig ? sharedTVec : rays.Origin(q) - ta;
+	for(int q = firstActive; q < size; q++) {
+		floatq det  = c.Dir(q) | nrm;
+		Vec3q  tvec = flags & isct::fShOrig ? sharedTVec : c.Origin(q) - ta;
 
-		floatq u    = rays.Dir(q) | (Vec3q(ba) ^ tvec);
-		floatq v    = rays.Dir(q) | (tvec ^ Vec3q(ca));
-		f32x4b test = Min(u, v) >= 0.0f && u + v <= det *floatq(ca.t0);
+		floatq u    = c.Dir(q) | (Vec3q(ba) ^ tvec);
+		floatq v    = c.Dir(q) | (tvec ^ Vec3q(ca));
+		f32x4b test = Min(u, v) >= 0.0f && u + v <= det * floatq(ca.t0);
 
-		//	if(ForAny(test)) {
 		floatq dist = -(tvec | nrm) / det;
-		out.Distance(q) = Condition(test, dist, infinity);
-		//	}
+		test = test && dist > floatq(0.0f) && dist < c.Distance(q);
+
+		c.Distance(q) = Condition(test, dist, c.Distance(q));
+		c.Object(q) = Condition(i32x4b(test), i32x4(idx), c.Object(q));
 	}
 
-	return out;
+	return 0;
 }
 
 template <class VecO, class Vec, class Real>
@@ -384,7 +384,7 @@ const Vec3 <typename Vec::TScalar> Triangle::Barycentric(VecO rOrig, Vec rDir, R
 	return out;
 }
 
-typedef vector <Triangle, AlignedAllocator <Triangle> >    TriVector;
+typedef vector <Triangle, AlignedAllocator <Triangle> > TriVector;
 
 class ShTriangle {
 public:

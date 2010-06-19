@@ -224,7 +224,7 @@ struct Context {
 
 	Context<size/4,flags> Split(int part) const {
 		const int offset = part * (size / 4);
-		Context<size/4, flags> out(RayGroup<size/4,sharedOrigin>(rays,offset),distance+offset,
+		Context<size/4, flags> out(RayGroup<size/4,sharedOrigin>(rays, offset), distance + offset,
 					 object+offset,element+offset,stats);
 		out.mailbox = mailbox;
 		return out;

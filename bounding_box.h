@@ -28,6 +28,13 @@ public:
 	bool Contains(const BBox &rhs,float t) const {
 		return BBox(Center()-Size()*0.5f*t,Center()+Size()*0.5f*t).Contains(rhs);
 	}
+	
+	const Vec3f ClosestPoint(const Vec3f &point) const {
+		return Vec3f(
+			point.x < min.x ? min.x : point.x > max.x ? max.x : point.x,
+			point.y < min.y ? min.y : point.y > max.y ? max.y : point.y,
+			point.z < min.z ? min.z : point.z > max.z ? max.z : point.z );
+	}
 
 	void UpdateMinMaxDist(const float* __restrict__ orig,const float* minInv,const float *maxInv,
 								 int dirMask,float& __restrict__ tMin,float & __restrict__ tMax) const {

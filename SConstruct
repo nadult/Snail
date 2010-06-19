@@ -25,7 +25,7 @@ envLinux64 = Environment (
 		ENV = os.environ,
 		PLATFORM = 'posix',
 		TARGET_PLATFORM='linux64',
-		CXX = '/usr/local/gcc-4.5/bin/g++ -pthread -ffast-math -std=gnu++0x -O3 -march=native -mfpmath=sse -fno-stack-protector -g -DNDEBUG',
+		CXX = '/usr/local/gcc-4.5/bin/g++ -pthread -ffast-math -std=gnu++0x -O3 -march=native -mfpmath=sse -fno-stack-protector -g',
 	#	CXX = '/usr/local/gcc-4.3.2/bin/g++ -std=gnu++0x -ffast-math',
 		CPPPATH = '.',
 	)

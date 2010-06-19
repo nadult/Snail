@@ -66,8 +66,8 @@ struct StatsShader
 	StatsShader(const TreeStats <1> &tStats) : stats(tStats) { }
 	Vec3q operator[](int) const {
 		return Vec3q(
-			   float(stats.GetIntersects()) * (0.04f / size),
-			   float(stats.GetLoopIters()) * (0.02f / size),
+			   float(stats.GetIntersects()) * (0.01f / size),
+			   float(stats.GetLoopIters()) * (0.01f / size),
 			   float(stats.GetSkips() * 0.5f + (stats.GetBreaking() ? 0.25 : 0)));
 	}
 

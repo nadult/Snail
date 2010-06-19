@@ -33,7 +33,7 @@ namespace {
 void BVH::FindSplit(int nNode, int first, int count, int depth) {
 	BBox bbox = nodes[nNode].bbox;
 
-	if(count <= 2) {
+	if(count <= 1) {
 		maxDepth = Max(maxDepth, depth);
 		nodes[nNode].subNode = 0;
 		nodes[nNode].first = first;
@@ -46,9 +46,13 @@ void BVH::FindSplit(int nNode, int first, int count, int depth) {
 			if(size.z > size[axis]) axis = 2;
 		}
 		int mid = count / 2;
+		if(mid == 0) mid = 1;
 
 		std::nth_element(&elements[first], &elements[first + mid], &elements[first + count],
-			[&](const Triangle &a, const Triangle &b) { return (&a.P1().x)[axis] < (&b.P1().x)[axis]; } );
+			[&](const Triangle &a, const Triangle &b) {
+				float p1 = (&a.P1().x)[axis] + (&a.P2().x)[axis] + (&a.P3().x)[axis];
+				float p2 = (&b.P1().x)[axis] + (&b.P2().x)[axis] + (&b.P3().x)[axis];
+				return p1 < p2; } );
 		
 		BBox leftBox(elements[first].BoundMin(), elements[first].BoundMax());
 		BBox rightBox(elements[first + count - 1].BoundMin(), elements[first + count - 1].BoundMax());
@@ -61,6 +65,20 @@ void BVH::FindSplit(int nNode, int first, int count, int depth) {
 		int subNode = nodes.size();
 		nodes[nNode].subNode = subNode;
 
+	//	float maxDiff = -constant::inf;
+	//	for(int ax = 0; ax < 3; ax++) {
+	//		float diff = Max(leftBox.min[axis] - rightBox.max[axis], rightBox.min[axis] - leftBox.max[axis]);
+	//		if(diff > maxDiff) {
+	//			maxDiff = diff;
+	//			axis = ax;
+	//		}
+	//	}
+		nodes[nNode].axis = axis;
+		nodes[nNode].firstNode = leftBox.min[axis] > rightBox.min[axis]? 1 : 0;
+		nodes[nNode].firstNode =
+			leftBox.min[axis] == rightBox.min[axis]? leftBox.max[axis] < rightBox.max[axis]? 0 :1 : 0;
+
+
 		nodes.push_back(Node(leftBox));
 		nodes.push_back(Node(rightBox));
 
@@ -69,8 +87,14 @@ void BVH::FindSplit(int nNode, int first, int count, int depth) {
 	}
 }
 
-BVH::BVH(const vector<Triangle, AlignedAllocator<Triangle> > &elements) :elements(elements) {
+BVH::BVH(const TriVector &elems) {
+	Construct(elems);
+}
+
+void BVH::Construct(const vector<Triangle, AlignedAllocator<Triangle> > &tElements) {
+	elements = tElements;
 	nodes.reserve(elements.size() * 2);
+	nodes.clear();
 	
 	maxDepth = 0;
 
@@ -82,3 +106,6 @@ BVH::BVH(const vector<Triangle, AlignedAllocator<Triangle> > &elements) :element
 	FindSplit(0, 0, elements.size(), 0);
 }
 
+void BVH::Serialize(Serializer &sr) {
+	sr & elements & nodes;
+}

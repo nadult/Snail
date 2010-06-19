@@ -3,7 +3,7 @@
 #include "scene_inl.h"
 #include "camera.h"
 
-#include "bih/tree.h"
+#include "bvh/tree.h"
 #include "gl_window.h"
 #include "formats/loader.h"
 #include "base_scene.h"
@@ -260,7 +260,8 @@ TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &im
 	return Render<1>(scene,camera,image,options,tasks);
 }
 
-typedef bih::Tree<TriangleVector> StaticTree;
+typedef BVH StaticTree;
+//typedef bih::Tree<TriangleVector> StaticTree;
 
 template TreeStats<1> Render<StaticTree>(const Scene<StaticTree>&,const Camera&,Image&,const Options,uint);
 
