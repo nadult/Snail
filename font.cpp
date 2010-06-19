@@ -46,8 +46,8 @@
 	}
 
 	void Font::Print(const string &text) {
-		Vec2f uv[1024],pos[1024];
-		int count = font.GenQuads(text.c_str(), (float*)pos, (float*)uv, 1024);
+		Vec2f uv[1024], pos[1024];
+		int count = font.GenQuads(text.c_str(), &pos[0].x, &uv[0].x, 1024);
 
 		glBegin(GL_QUADS);
 		for(int mode=0;mode<2;mode++) {

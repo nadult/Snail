@@ -17,19 +17,19 @@ public:
 	
 	inline Vec3f Size() const { return max-min; }
 	inline Vec3f Center() const { return (max+min)*0.5f; }
-	INLINE float Width() const { return max.x-min.x; }
-	INLINE float Height() const { return max.y-min.y; }
-	INLINE float Depth() const { return max.z-min.z; }
+	float Width() const { return max.x-min.x; }
+	float Height() const { return max.y-min.y; }
+	float Depth() const { return max.z-min.z; }
 	
 	bool Contains(const BBox &rhs) const {
-		return 	min.x<=rhs.min.x&&min.y<=rhs.min.y&&min.z<=rhs.min.z&&
-				max.x>=rhs.max.x&&max.y>=rhs.max.y&&max.z>=rhs.max.z;
+		return 	min.x <= rhs.min.x && min.y <= rhs.min.y && min.z <= rhs.min.z &&
+				max.x >= rhs.max.x && max.y >= rhs.max.y && max.z >= rhs.max.z;
 	}
 	bool Contains(const BBox &rhs,float t) const {
 		return BBox(Center()-Size()*0.5f*t,Center()+Size()*0.5f*t).Contains(rhs);
 	}
 
-	INLINE void UpdateMinMaxDist(const float* __restrict__ orig,const float* minInv,const float *maxInv,
+	void UpdateMinMaxDist(const float* __restrict__ orig,const float* minInv,const float *maxInv,
 								 int dirMask,float& __restrict__ tMin,float & __restrict__ tMax) const {
 		Vec3f origin(orig[0],orig[1],orig[2]);
 		Vec3f ttMin=(min-origin)*Vec3f(minInv[0],minInv[1],minInv[2]);
@@ -49,7 +49,7 @@ public:
 	template <int size,bool sharedOrigin>
 	void UpdateMinMaxDist(	const RayGroup<size,sharedOrigin> &rays,int dirMask,
 							floatq *__restrict__ tMin,floatq *__restrict__ tMax) const {
-		Vec3p rMin=min,rMax=max;
+		Vec3p rMin = min, rMax = max;
 
 		if(dirMask&1) Swap(rMin.x,rMax.x);
 		if(dirMask&2) Swap(rMin.y,rMax.y);
@@ -78,7 +78,7 @@ public:
 	}
 
 	template <class Real,class Vec>
-	INLINE bool Test(const Vec &orig,const Vec &dir,const Real &maxDist=Real(1.0f/0.0f)) const {
+	bool Test(const Vec &orig,const Vec &dir,const Real &maxDist=Real(1.0f/0.0f)) const {
 		Real l1,l2,idir[3]={Inv(dir.x),Inv(dir.y),Inv(dir.z)};
 		
 		l1=idir[0]*(Real(min.x)-orig.x);
@@ -100,7 +100,7 @@ public:
 	}
 
 	template <int size,class Real,class Vec>
-	INLINE bool TestIP(const Vec &orig,const Vec *__restrict__ idir,const Real *__restrict__ maxDist) const {
+	bool TestIP(const Vec &orig,const Vec *__restrict__ idir,const Real *__restrict__ maxDist) const {
 		Real l1,l2;
 		Real tx[2]={Real(min.x)-orig.x,Real(max.x)-orig.x};
 		Real ty[2]={Real(min.y)-orig.y,Real(max.y)-orig.y};
@@ -171,36 +171,34 @@ public:
 	}
 
 	template <class Real,class Vec>
-	INLINE bool TestI(const Vec &orig,const Vec &vidir,const Real &maxDist=Real(1.0f/0.0f)) const {
-		Real l1,l2,idir[3]={vidir.x,vidir.y,vidir.z};
-		
-		l1=idir[0]*(Real(min.x)-orig.x);
-		l2=idir[0]*(Real(max.x)-orig.x);
-		Real lmin=Min(l1,l2);
-		Real lmax=Max(l1,l2);
+	bool TestI(Vec orig, Vec idir, Real maxDist = Real(constant::inf)) const {
+		Real l1 = idir.x * (Real(min.x) - orig.x);
+		Real l2 = idir.x * (Real(max.x) - orig.x);
+		Real lmin = Min(l1, l2);
+		Real lmax = Max(l1, l2);
 
-		l1=idir[1]*(Real(min.y)-orig.y);
-		l2=idir[1]*(Real(max.y)-orig.y);
-		lmin=Max(Min(l1,l2),lmin);
-		lmax=Min(Max(l1,l2),lmax);
+		l1 = idir.y * (Real(min.y) - orig.y);
+		l2 = idir.y * (Real(max.y) - orig.y);
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
 
-		l1=idir[2]*(Real(min.z)-orig.z);
-		l2=idir[2]*(Real(max.z)-orig.z);
-		lmin=Max(Min(l1,l2),lmin);
-		lmax=Min(Max(l1,l2),lmax);
+		l1 = idir.z * (Real(min.z) - orig.z);
+		l2 = idir.z * (Real(max.z) - orig.z);
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
 
-		return !ForAll( lmax<Real(0.0f)||lmin>Min(lmax,maxDist) );
+		return !ForAll( lmax < Real(0.0f) || lmin > Min(lmax, maxDist) );
 	}
 
-	Vec3f min,max;
+	Vec3f min, max;
 };
 
 SERIALIZE_AS_POD(BBox)
 
 float BoxPointDistanceSq(const BBox &box,const Vec3f &point);
 
-INLINE BBox operator+(const BBox &a,const BBox &b) { BBox out(a); out+=b; return out; }
-INLINE BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out*=mat; return out; }
+inline BBox operator+(const BBox &a,const BBox &b) { BBox out(a); out+=b; return out; }
+inline BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out*=mat; return out; }
 
 class OptBBox {
 public:
@@ -214,7 +212,7 @@ public:
 	inline const BBox &GetBBox() const { return box; }
 	
 	template <class Real,class Vec>
-	INLINE bool Test(const Vec &rayOrig,const Vec &rayDir,const Real &maxDist=Real(1.0f/0.0f)) const {
+	bool Test(const Vec &rayOrig,const Vec &rayDir,const Real &maxDist=Real(1.0f/0.0f)) const {
 		return box.Test(invTrans*rayOrig,invTrans&rayDir,maxDist);
 	}
 	

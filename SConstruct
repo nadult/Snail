@@ -72,12 +72,13 @@ def Build( env, progName, libs ):
 	baseObjects		= BuildObjects( env, ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
 	formatsObjects	= BuildObjects( env, ListCppFiles('formats/'	), 'formats/')
 	bihObjects		= BuildObjects( env, ListCppFiles('bih/'		), 'bih/')
+	bvhObjects		= BuildObjects( env, ListCppFiles('bvh/'		), 'bvh/')
 	shadingObjects	= BuildObjects( env, ListCppFiles('shading/'	), 'shading/')
 	samplingObjects	= BuildObjects( env, ListCppFiles('sampling/'	), 'sampling/')
 	gameObjects		= BuildObjects( env, ListCppFiles('game/'		), 'game/')
 	env.Program(	progName,
-					baseObjects+formatsObjects+bihObjects+samplingObjects+shadingObjects+gameObjects,
-					LIBS=libs )
+					baseObjects + formatsObjects + bihObjects + samplingObjects + shadingObjects + gameObjects +
+					bvhObjects, LIBS = libs )
 
 Build( ReleaseEnv(envLinux64), 'rtracer' , libsLinux )
 Build( DebugEnv  (envLinux64), 'rtracerd', libsLinux )

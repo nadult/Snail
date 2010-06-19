@@ -238,8 +238,8 @@ TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &im
 	vector<RenderTask<AccStruct, QuadLevels>> tasks(numTasks);
 
 	uint num = 0;
-	for(uint y = 0;y < image.height; y += taskSize)
-		for(uint x = 0;x < image.width; x += taskSize) {
+	for(uint y = 0; y < image.height; y += taskSize)
+		for(uint x = 0; x < image.width; x += taskSize) {
 			tasks[num] = RenderTask<AccStruct,QuadLevels> (&scene,camera,&image,options,x,y,
 						Min((int)taskSize,int(image.width - x)),Min((int)taskSize,int(image.height - y)),
 						&taskStats[num]);
@@ -257,12 +257,13 @@ TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &im
 
 template <class AccStruct>
 TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,Image &image,const Options options,uint tasks) {
-	return Render<3>(scene,camera,image,options,tasks);
+	return Render<1>(scene,camera,image,options,tasks);
 }
 
 typedef bih::Tree<TriangleVector> StaticTree;
-typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
 
 template TreeStats<1> Render<StaticTree>(const Scene<StaticTree>&,const Camera&,Image&,const Options,uint);
+
+//typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
 //template TreeStats<1> Render<FullTree  >(const Scene<FullTree>  &,const Camera&,Image&,const Options,uint);
 	

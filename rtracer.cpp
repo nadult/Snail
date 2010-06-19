@@ -161,7 +161,7 @@ static int tmain(int argc, char **argv) {
 
 //	StaticTree meshTree;
 
-	int resx=800,resy=600;
+	int resx=1280, resy=720;
 #ifndef NDEBUG
 	resx/=2; resy/=2;
 #endif
@@ -280,7 +280,6 @@ static int tmain(int argc, char **argv) {
 	
 	gdVals[0] = 0.1f * sceneScale;
 	gdVals[1] = 0.2f * sceneScale;
-
 
 	SetMaterials(staticScene, baseScene, texPath);
 
