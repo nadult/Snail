@@ -106,7 +106,7 @@ void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
 //	scene.materials.push_back(mats[0]);
 //	scene.materials.push_back(mats[6]); */
 
-	scene.materials.resize(base.matNames.size()+1);
+	scene.materials.resize(base.matNames.size());
 	for(std::map<string,int>::const_iterator it=base.matNames.begin();it!=base.matNames.end();++it) {
 		string name=it->first==""?"":texPath+it->first;
 
@@ -118,7 +118,7 @@ void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
 			scene.materials[it->second]=scene.materials.front();
 		}
 	}
-	scene.materials.back()=typename Scene::PMaterial(shading::NewMaterial("scenes/doom3/imp/texture.tga"));
+//	scene.materials.back()=typename Scene::PMaterial(shading::NewMaterial("scenes/doom3/imp/texture.tga"));
 
 	if(scene.materials.size()>126) {
 		scene.materials[126]->flags|=shading::Material::fReflection;
