@@ -118,23 +118,23 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 			BaseScene::IndexedTri tri;
 			tri.matId=lastMatId;
 
-			for(int k=0;k<3;k++) {
+			for(int k = 0; k < 3; k++) {
 				tri.v[k] = atoi(p[k]);
 
-				if(tri.v[k]<0) tri.v[k]=verts.size()+tri.v[k]+1;
-				tri.vt[k]=tri.vn[k]=0;
+				if(tri.v[k] < 0) tri.v[k] = verts.size() + tri.v[k] + 1;
+				tri.vt[k] = tri.vn[k] = 0;
 				
-				char *puv=strchr(p[k],'/');
+				char *puv = strchr(p[k],'/');
 				
 				if(puv) {
-					char *pnrm=strchr(puv+1,'/');
-					if(pnrm!=puv+1) {
-						tri.vt[k]=atoi(puv+1);
-						if(tri.vt[k]<0) tri.vt[k]=uvs.size()+tri.vt[k];
+					char *pnrm = strchr(puv + 1,'/');
+					if(pnrm != puv + 1) {
+						tri.vt[k] = atoi(puv + 1);
+						if(tri.vt[k] < 0) tri.vt[k] = uvs.size() + tri.vt[k];
 					}
-					if(pnrm&&pnrm[1]) {
-						tri.vn[k]=atoi(pnrm+1);
-						if(tri.vn[k]<0) tri.vn[k]=normals.size()+tri.vn[k];
+					if(pnrm && pnrm[1]) {
+						tri.vn[k] = atoi(pnrm+1);
+						if(tri.vn[k] < 0) tri.vn[k] = normals.size() + tri.vn[k];
 					}
 				}
 				
@@ -142,11 +142,11 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 				tri.vt[k]--;
 				tri.vn[k]--;
 				
-				if(tri.v[k]>=int(verts.size())||tri.v[k]<0)
+				if(tri.v[k] >= int(verts.size())||tri.v[k]<0)
 					ThrowException("Wrong vertex index: ",tri.v[k],"/",int(verts.size()));
-				if(tri.vt[k]>=int(uvs.size()))
+				if(tri.vt[k] >= int(uvs.size()))
 					ThrowException("Wrong tex-coord index: ",tri.vt[k],"/",int(uvs.size()));
-				if(tri.vn[k]>=int(normals.size()))
+				if(tri.vn[k] >= int(normals.size()))
 					ThrowException("Wrong normal index",tri.vn[k],"/",int(normals.size()));
 			}
 			
@@ -173,7 +173,8 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 		}*/
 
 	}
-	
+
+
 	fb.close();
 	if(tris.size())
 		objects.push_back(BaseScene::Object(verts,uvs,normals,tris));

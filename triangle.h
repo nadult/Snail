@@ -283,6 +283,7 @@ public:
 	const Vec3 <typename Vec::TScalar> Barycentric(Vec0 rOrig, Vec rDir, Real dist, int) const;
 
 	bool TestInterval(Vec3f orig, Vec3f minDir, Vec3f maxDir) const;
+	bool TestFrustum(const Frustum&) const;
 private:
 	void SetFlag1(uint value) {
 		a.t0 = UValue(value).f;

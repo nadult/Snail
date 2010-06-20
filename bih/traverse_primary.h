@@ -23,7 +23,7 @@
 		}
 
 		float minInv[3], maxInv[3];
-	   	ComputeMinMax<size>(c.rays.IDirPtr(), minInv, maxInv);
+	   	ComputeMinMax<size>(c.rays.IDirPtr(), (Vec3f*)&minInv, (Vec3f*)&maxInv);
 
 		float sharedOrig[3];
 		sharedOrig[0] = c.Origin(0).x[0];

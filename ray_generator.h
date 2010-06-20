@@ -25,7 +25,7 @@ public:
 class RayGenerator
 {
 public:
-	RayGenerator(int level,int w,int h,float pd);
+	RayGenerator(int level, int w, int h, float planeDist, Vec3f right, Vec3f up, Vec3f front);
 
 	/*
 		Rays are grouped in recursive Z pattern:
@@ -61,11 +61,12 @@ public:
 private:
 	void Generate(int level,int pw,int ph,int x,int y,Vec3q *out) const;
 
-	// invW is multiplied by ratio (w/h)
-	float w,h,invW,invH,planeDist;
-	int level;
+	Vec3p tright, tup;
+	Vec3q txyz;
 
-	floatq taddx, taddy;
+	// invW is multiplied by ratio (w/h)
+	float w, h, invW, invH, planeDist;
+	int level;
 };
 
 #endif

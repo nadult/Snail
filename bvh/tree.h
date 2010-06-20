@@ -38,23 +38,10 @@ public:
 		int sign[3] = { c.Dir(0).x[0] < 0.0f, c.Dir(0).y[0] < 0.0f, c.Dir(0).z[0] < 0.0f };
 		Vec3f orig(c.Origin(0).x[0], c.Origin(0).y[0], c.Origin(0).z[0]);
 
-		float minIDir[3], maxIDir[3]; Vec3f minDir, maxDir; {
-			Vec3q imin = c.IDir(0), imax = c.IDir(0);
-			Vec3q min = c.Dir(0), max = c.Dir(0);
-
-			for(int q = 1; q < size; q++) {
-				imin = VMin(imin, c.IDir(q));
-				imax = VMax(imax, c.IDir(q));
-				min = VMin(min, c.Dir(q));
-				max = VMax(max, c.Dir(q));
-			}
-			for(int k = 0; k < 3; k++) {
-				minIDir[k] = Minimize(imin[k]);
-				maxIDir[k] = Maximize(imax[k]);
-				minDir[k] = Minimize(min[k]);
-				maxDir[k] = Maximize(max[k]);
-			}
-		}
+		Vec3f minIDir, maxIDir, minDir, maxDir;
+		ComputeMinMax<size>(&c.Dir(0), &minDir, &maxDir);
+		ComputeMinMax<size>(&c.IDir(0), &minIDir, &maxIDir);
+		Frustum frustum(orig, minDir, maxDir);
 		
 		while(stackPos) {
 			int nNode = stack[--stackPos].node;
@@ -71,7 +58,8 @@ public:
 				int count = nodes[nNode].count, first = nodes[nNode].first & 0x7fffffff;
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = elements[first + n];
-					if(tri.TestInterval(orig, minDir, maxDir)) { //TODO: dokladniejszy test
+				//	if(tri.TestFrustum(frustum)) {
+					if(tri.TestInterval(orig, minDir, maxDir)) {
 						tri.Collide(c, first + n, firstActive);
 						stats.Intersection(size);
 					}

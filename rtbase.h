@@ -23,6 +23,8 @@
 using namespace baselib;
 using namespace veclib;
 
+extern int gVals[16];
+
 typedef Vec2<float> Vec2f;
 typedef Vec3<float> Vec3f;
 typedef Vec4<float> Vec4f;
@@ -77,24 +79,93 @@ INLINE Vec3f SafeInv(const Vec3f &v) {
 		Condition(Abs(v.z)<epsilon,inf,Inv(v.z)));
 }
 
-template <int size>
-void ComputeMinMax(const Vec3q *vec,float *__restrict__ min,float *__restrict__ max) throw() {
-	floatq minx, miny, minz, maxx, maxy, maxz;
-	minx = miny = minz =  1.0f / 0.0f;
-	maxx = maxy = maxz = -1.0f / 0.0f;
-
-	for(int q = 0; q < size; q++) {
-		Vec3q v = vec[q];
-		minx = Min(minx, v.x); maxx = Max(maxx, v.x);
-		miny = Min(miny, v.y); maxy = Max(maxy, v.y);
-		minz = Min(minz, v.z); maxz = Max(maxz, v.z);
-	}
-	
-	min[0] = Minimize(minx); min[1] = Minimize(miny); min[2] = Minimize(minz);
-	max[0] = Maximize(maxx); max[1] = Maximize(maxy); max[2] = Maximize(maxz);
+inline int MaxAxis(Vec3f vec) {
+	return vec.y > vec.x? vec.z > vec.y? 2 : 1 : vec.z > vec.x? 2 : 0;
 }
 
-extern int gVals[16];
+template <int size>
+void ComputeMinMax(const Vec3q *vec, Vec3f *outMin, Vec3f *outMax) {
+	Vec3q min = vec[0], max = vec[0];
+	for(int q = 1; q < size; q++) {
+		min = VMin(min, vec[q]);
+		max = VMax(max, vec[q]);
+	}
+	
+	*outMin = Minimize(min);
+	*outMax = Maximize(max);
+}
+
+std::ostream &operator<<(std::ostream&, const Vec3f&);
+
+struct Plane {
+	Plane(Vec3f point, Vec3f normal) :normal(normal) {
+		distance = normal | point;
+	}
+	Plane(Vec3f a, Vec3f b, Vec3f c) {
+		normal = ((c - a) ^ (b - a));
+		normal *= RSqrt(normal | normal);
+		distance = a | normal;
+	}
+	Plane(Vec3f normal, float distance) :normal(normal), distance(distance) { }
+	Plane() { }
+
+	float Intersect(Vec3f origin, Vec3f dir) {
+		return -((normal | origin) + distance) / (normal | dir);
+	}	
+	const Plane operator-() const {
+		return Plane(-normal, -distance);
+	}
+
+	Vec3f normal;
+	float distance;
+};
+
+
+std::ostream &operator<<(std::ostream&, const Plane&);
+
+struct Frustum {
+	Frustum() { }
+	Frustum(Vec3f origin, Vec3f minDir, Vec3f maxDir) {
+		Vec3f mid = VAbs(maxDir + minDir);
+		int maxAxis = MaxAxis(mid);
+		int otherAxis = maxAxis == 0? 1 : 0;
+		mid = maxDir + minDir; mid *= RSqrt(mid | mid);
+
+		Vec3f points[4]; {
+			points[0] = points[1] = minDir;
+			points[2] = points[3] = maxDir;
+			Swap(points[1][otherAxis], points[3][otherAxis]);
+			Plane t(Vec3f(0, 0, 0), mid);
+
+			for(int n = 0; n < 4; n++) {
+				points[n] *= RSqrt(points[n] | points[n]);
+				points[n] = points[n] * t.Intersect(Vec3f(0, 0, 0), points[n]);
+				points[n] += origin;
+			}
+		}
+
+
+		if(gVals[0]) {
+			planes[0] = Plane(points[0], origin, points[1]);
+			planes[1] = Plane(points[1], origin, points[2]);
+			planes[2] = Plane(points[2], origin, points[3]);
+			planes[3] = Plane(points[3], origin, points[0]);
+		}
+		else {
+			planes[0] = -Plane(points[0], origin, points[1]);
+			planes[1] = Plane(points[1], origin, points[2]);
+			planes[2] = Plane(points[2], origin, points[3]);
+			planes[3] = Plane(points[3], origin, points[0]);
+		}
+		planes[4] = Plane(origin, mid * RSqrt(mid | mid));
+	}
+	
+	enum { size = 5 };
+	Plane planes[size];
+};
+
+std::ostream &operator<<(std::ostream&, const Frustum&);
+
 extern double gdVals[16];
 
 template <int size>

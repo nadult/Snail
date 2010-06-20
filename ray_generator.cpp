@@ -1,26 +1,26 @@
 #include "ray_generator.h"
 
-RayGenerator::RayGenerator(int level,int tw,int th,float pd)
-	:invW(1.0f/float(tw)),invH(1.0f/float(th)),planeDist(pd),level(level),w(tw),h(th) {
-	invW *= float(w)/float(h);
+RayGenerator::RayGenerator(int level, int tw, int th, float pd, Vec3f right, Vec3f up, Vec3f front)
+		:invW(1.0f/float(tw)), invH(1.0f/float(th)), planeDist(pd), level(level), w(tw), h(th) {
 
-	taddx = floatq(0.0f, 1.0f, 0.0f, 1.0f) - floatq(w * 0.5f);
-	taddy = floatq(0.0f, 0.0f, 1.0f, 1.0f) - floatq(h * 0.5f);
+	invW *= float(w) / float(h);
+
+	floatq taddx = floatq(0.0f, 1.0f, 0.0f, 1.0f) - floatq(w * 0.5f);
+	floatq taddy = floatq(0.0f, 0.0f, 1.0f, 1.0f) - floatq(h * 0.5f);
+
+	tright = right * invW;
+	tup = up * invH;	
+	txyz = Vec3q(tright) * taddx + Vec3q(tup) * taddy + front * planeDist;
 }
 
 void RayGenerator::Generate(int pw,int ph,int x,int y,Vec3q *out) const {
 	Generate(level,pw,ph,x,y,out);
 }
 
-static int tx1[4] = { 0, 2, 0, 2 };
-static int ty1[4] = { 0, 0, 2, 2 };
-
-static int tx2[16] = { 0, 2, 0, 2, 4, 6, 4, 6, 0, 2, 0, 2, 4, 6, 4, 6 };
-static int ty2[16] = { 0, 0, 2, 2, 0, 0, 2, 2, 4, 4, 6, 6, 4, 4, 6, 6 };
+static const int tx[16] = { 0, 2, 0, 2, 4, 6, 4, 6, 0, 2, 0, 2, 4, 6, 4, 6 };
+static const int ty[16] = { 0, 0, 2, 2, 0, 0, 2, 2, 4, 4, 6, 6, 4, 4, 6, 6 };
 
 void RayGenerator::Generate(int level,int pw,int ph,int x,int y, Vec3q *out) const {
-	GridSampler sampler;
-
 	if(level > 2) {
 		int npw = pw >> 1,nph = ph >> 1,nl = level - 1;
 
@@ -28,39 +28,38 @@ void RayGenerator::Generate(int level,int pw,int ph,int x,int y, Vec3q *out) con
 		Generate(nl, npw, nph, x + npw, y      , out + (1 << nl*2));
 		Generate(nl, npw, nph, x      , y + nph, out + (2 << nl*2));
 		Generate(nl, npw, nph, x + npw, y + nph, out + (3 << nl*2));
+		return;
 	}
-	else if(level == 2) {
+
+	GridSampler sampler;
+	Vec3q right(tright), up(tup), tadd = txyz;
+
+	if(level == 2) {
 		for(int t = 0; t < 16; t++) {
-			Vec2f tpos = sampler(x + tx2[t], y + ty2[t]);
-			Vec3q points(tpos.x, tpos.y, planeDist);
-			points.x = (points.x + taddx) * floatq(invW);
-			points.y = (points.y + taddy) * floatq(invH);
+			Vec2f tpos = sampler(x + tx[t], y + ty[t]);
+			Vec3q points = right * floatq(tpos.x) + up * floatq(tpos.y) + tadd;
 			out[t] = points * RSqrt(points | points);
 		}
 	}
 	else if(level == 1) {
 		for(int t = 0; t < 4; t++) {
-			Vec2f tpos = sampler(x + tx1[t], y + ty1[t]);
-			Vec3q points(tpos.x, tpos.y, planeDist);
-			points.x = (points.x + taddx) * floatq(invW);
-			points.y = (points.y + taddy) * floatq(invH);
+			Vec2f tpos = sampler(x + tx[t], y + ty[t]);
+			Vec3q points = right * floatq(tpos.x) + up * floatq(tpos.y) + tadd;
 			out[t] = points * RSqrt(points | points);
 		}
 	}
 	else { // level == 0
 		Vec2f tpos = sampler(x, y);
-		Vec3q points(tpos.x, tpos.y, planeDist);
-		points.x = (points.x + taddx) * floatq(invW);
-		points.y = (points.y + taddy) * floatq(invH);
+		Vec3q points = right * floatq(tpos.x) + up * floatq(tpos.y) + tadd;
 		out[0] = points * RSqrt(points | points);
 	}
 }
 
 void RayGenerator::Decompose(const Vec3q *in,Vec3q *out) const {
-	const int nQuads=1<<(level*2);
+	const int nQuads = 1 << (level * 2);
 
 	if(level>=1) {
-		for(int n=0;n<nQuads;n+=2) {
+		for(int n = 0; n < nQuads; n += 2) {
 			__m128 tmp;
 			tmp				=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpacklo_ps(in[n+0].x.m,in[n+1].x.m));
 			out[n+1].x.m	=_mm_shuffle(0+(2<<2)+(1<<4)+(3<<6),_mm_unpackhi_ps(in[n+0].x.m,in[n+1].x.m));

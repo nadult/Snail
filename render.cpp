@@ -27,18 +27,6 @@ struct Task {
 	virtual void Work() = 0;
 };
 
-template <int size>
-static void Transform(Vec3q *__restrict dir, Vec3q *__restrict idir, Vec3q ax, Vec3q ay, Vec3q az) NOINLINE;
-
-template <int size>
-static void Transform(Vec3q *__restrict dir, Vec3q *__restrict idir, Vec3q ax, Vec3q ay, Vec3q az) {
-	for(int n = 0; n < size; n++) {
-		dir[n] = ax * dir[n].x + ay * dir[n].y + az * dir[n].z;
-		idir[n] = SafeInv(dir[n]);
-		//TODO: SafeInv potrzebne np. w modelu angel.obj; Zrobic to jakos szybciej...
-	}
-}
-
 template <class AccStruct,int QuadLevels>
 struct RenderTask: public Task {
 	RenderTask() { }
@@ -61,7 +49,8 @@ struct RenderTask: public Task {
 		enum { NQuads = 1 << (QuadLevels * 2), PWidth = 2 << QuadLevels, PHeight = 2 << QuadLevels };
 
 		Vec3q origin; Broadcast(camera.pos, origin);
-		RayGenerator rayGen(QuadLevels, out->Width(), out->Height(), camera.plane_dist);
+		RayGenerator rayGen(QuadLevels, out->Width(), out->Height(), camera.plane_dist,
+				camera.right, camera.up, camera.front);
 
 		uint pitch = out->Pitch();
 		u8 *outPtr = ((u8*)out->DataPointer()) + startY * pitch + startX * 4;
@@ -72,7 +61,9 @@ struct RenderTask: public Task {
 		for(int y = 0; y < height; y += PHeight) {
 			for(int x = 0; x < width;x += PWidth) {
 				rayGen.Generate(PWidth, PHeight, startX + x, startY + y, dir);
-				Transform<NQuads>(dir, idir, (Vec3q)camera.right, (Vec3q)camera.up, (Vec3q)camera.front);
+				for(int n = 0; n < NQuads; n++)
+					idir[n] = VInv(dir[n] + Vec3q(floatq(0.00000001f))); //SafeInv(dir[n]);
+				//TODO: SafeInv potrzebne np. w modelu angel.obj; Zrobic to jakos szybciej...
 				
 				Result<NQuads> result =
 					scene->RayTrace(RayGroup<NQuads,1>(&origin,dir,idir),FullSelector<NQuads>(),cache);
