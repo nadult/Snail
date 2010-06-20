@@ -9,6 +9,8 @@
 #include "shading/material.h"
 
 #include "bvh/tree.h"
+//#include "bih/tree.h"
+
 #include "tree_box.h"
 #include "scene.h"
 #include "mesh.h"
@@ -17,8 +19,6 @@
 
 #include "font.h"
 #include "frame_counter.h"
-
-//#include "bvh.h"
 
 int TreeVisMain(const TriVector&);
 
@@ -171,13 +171,13 @@ static int tmain(int argc, char **argv) {
 	const char *modelFile="pompei.obj";//"doom3/admin.proc";
 
 	Options options;
-	bool flipNormals=1;
-	bool gameMode=0;
+	bool flipNormals = 1;
+	bool rebuild = 0;
 	string texPath="/mnt/data/data/doom3/";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
-		else if(string("-game")==argv[n]) gameMode=1;
+		else if(string("-rebuild") == argv[n]) { rebuild = 1; }
 		else if(string("-threads")==argv[n]&&n<argc-1) { threads=atoi(argv[n+1]); n+=1; }
 		else if(string("-fullscreen")==argv[n]) { fullscreen=1; }
 		else if(string("+flipNormals")==argv[n]) flipNormals=1;
@@ -194,36 +194,37 @@ static int tmain(int argc, char **argv) {
 	printf("Threads/cores: %d/%d\n\n",threads,4);
 
 	printf("Loading...\n");
-	double buildTime=GetTime();
+	double buildTime = GetTime();
 	BaseScene baseScene; {
-		string fileName=string("scenes/")+modelFile;
-		if(fileName.find(".proc")!=string::npos)
+		string fileName = string("scenes/")+modelFile;
+		if(fileName.find(".proc") != string::npos)
 			baseScene.LoadDoom3Proc(fileName);
-		else if(fileName.find(".obj")!=string::npos)
+		else if(fileName.find(".obj") != string::npos)
 			baseScene.LoadWavefrontObj(fileName);
 
-		int tris=0;
-		for(int n=0;n<baseScene.objects.size();n++)
-			tris+=baseScene.objects[n].tris.size();
+		int tris = 0;
+		for(int n = 0; n < baseScene.objects.size(); n++)
+			tris += baseScene.objects[n].tris.size();
 		printf("Tris: %d\n",tris);
 
 		if(flipNormals) baseScene.FlipNormals();
-		for(int n=0;n<baseScene.objects.size();n++)
+		for(int n = 0; n < baseScene.objects.size(); n++)
 			baseScene.objects[n].Repair();
 		baseScene.GenNormals();
 //		baseScene.Optimize();
 	}
 	
 	Scene<StaticTree> staticScene;
-//	try {
-//		Loader(string("dump/")+modelFile) & staticScene.geometry;
-//	}
-//	catch(...) {
+	if(!rebuild) {
+		try { Loader(string("dump/") + modelFile) & staticScene.geometry; }
+		catch(...) { rebuild = 1; }
+	}
+	if(rebuild) {
 		staticScene.geometry.Construct(baseScene.ToTriVector());
 	//	staticScene.geometry.Construct(baseScene.ToTriangleVector());
-	//	staticScene.geometry.PrintInfo();
-//		Saver(string("dump/")+modelFile) & staticScene.geometry;
-//	}
+		Saver(string("dump/") + modelFile) & staticScene.geometry;
+	}
+	staticScene.geometry.PrintInfo();
 
 	float sceneScale; {
 		Vec3f bMin(1.0f / 0.0f, 1.0f / 0.0f, 1.0f / 0.0f);
@@ -273,7 +274,7 @@ static int tmain(int argc, char **argv) {
 	GLWindow window(resx, resy, fullscreen);
 	Font font;
 
-	Image img(resx,resy,16);
+	gfxlib::Texture image(resx, resy, gfxlib::TI_A8B8G8R8);
 
 	double minTime=1.0f/0.0f,maxTime=0.0f;
 	
@@ -315,7 +316,7 @@ static int tmain(int argc, char **argv) {
 		frmTime = GetTime();
 
 		if(window.KeyUp(Key_esc)) break;
-		if(window.KeyDown('K')) img.SaveToFile("out/output.tga");
+		if(window.KeyDown('K')) Saver("out/output.dds") & image;
 		if(window.KeyDown('O')) options.reflections^=1;
 		if(window.KeyDown('I')) options.rdtscShader^=1;
 		if(window.KeyDown('C')) {
@@ -414,13 +415,13 @@ static int tmain(int argc, char **argv) {
 		double time=GetTime();
 		TreeStats<1> stats;
 	//	if(staticEnabled)
-			stats=Render(staticScene,cam,img,options,threads);
-	//	else stats=Render(scene,cam,img,options,threads);
+			stats=Render(staticScene, cam, image, options, threads);
+	//	else stats=Render(scene,cam,image,options,threads);
 
 		time=GetTime()-time; minTime=Min(minTime,time);
 		maxTime=Max(time,maxTime);
 
-		window.RenderImage(img);
+		window.RenderImage(image);
 
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));

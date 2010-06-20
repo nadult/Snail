@@ -196,32 +196,33 @@ namespace
 		else glfwDisable(GLFW_MOUSE_CURSOR);
 	}
 
-	void GLWindow::RenderImage(const Image &image) {
-		static GLuint texture,texW=0,texH=0;
+	void GLWindow::RenderImage(const gfxlib::Texture &image) {
+		static GLuint texture, texW = 0, texH = 0;
+		Assert(image.GetFormat() == gfxlib::TI_A8R8G8B8);
 		
-		if(image.width>texW||image.height>texH) {
-			if(!texW&&!texH) glGenTextures(1,&texture);
-			glBindTexture(GL_TEXTURE_2D,texture);
+		if(image.Width() > texW || image.Height() > texH) {
+			if(!texW && !texH) glGenTextures(1, &texture);
+			glBindTexture(GL_TEXTURE_2D, texture);
 			
-			for(texW=1;texW<image.width;texW*=2);
-			for(texH=1;texH<image.height;texH*=2);
+			for(texW = 1; texW < image.Width(); texW *= 2);
+			for(texH = 1; texH < image.Height(); texH *= 2);
 			
-			glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,texW,texH,0,GL_RGB,GL_UNSIGNED_BYTE,0);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texW, texH, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glClearColor(0.0,0.0,0.0,0.0);
 			glDisable(GL_DEPTH_TEST);
 		}
-		
+	
+		// TODO: PBO?	
 		glShadeModel(GL_FLAT);
-		glBindTexture(GL_TEXTURE_2D,texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
 		glEnable(GL_TEXTURE_2D);
-		glTexSubImage2D(GL_TEXTURE_2D,0,0,0,image.width,image.height,GL_RGB,GL_UNSIGNED_BYTE,&image.buffer[0]);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.Width(), image.Height(), GL_RGBA, GL_UNSIGNED_BYTE,
+				image.DataPointer());
 		
-		float u=float(GetWidth())/float(texW);
-		float v=float(GetHeight())/float(texH);
+		float u = float(GetWidth()) / float(texW);
+		float v = float(GetHeight()) / float(texH);
 		
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glBegin(GL_QUADS);
 			glTexCoord2f(0.0, 0.0); glVertex3f(-1.0, -1.0, 0.0);
 			glTexCoord2f(0.0, v  ); glVertex3f(-1.0, 1.0, 0.0);

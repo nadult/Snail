@@ -277,11 +277,12 @@ public:
 	}
 
 	template <int flags, int size>
-	int Collide(Context<size, flags> &c, int idx, int firstActive = 0) const __attribute__((noinline));
+	int Collide(Context<size, flags> &c, int idx, int firstActive = 0) const NOINLINE;
 
 	template <class Vec0, class Vec, class Real>
 	const Vec3 <typename Vec::TScalar> Barycentric(Vec0 rOrig, Vec rDir, Real dist, int) const;
 
+	bool TestInterval(Vec3f orig, Vec3f minDir, Vec3f maxDir) const;
 private:
 	void SetFlag1(uint value) {
 		a.t0 = UValue(value).f;

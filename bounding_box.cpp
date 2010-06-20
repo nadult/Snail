@@ -63,6 +63,34 @@ const BBox &BBox::operator+=(const BBox &other) {
 	return *this;
 }
 
+bool BBox::TestInterval(Vec3f orig, float *minIDir, float *maxIDir) const {
+	float l1, l2, l3, l4;
+	float lmin, lmax;
+
+	l1 = minIDir[0] * (min.x - orig.x);
+	l2 = maxIDir[0] * (min.x - orig.x);
+	l3 = minIDir[0] * (max.x - orig.x);
+	l4 = maxIDir[0] * (max.x - orig.x);
+	lmin = Min(Min(l1, l2), Min(l3, l4));
+	lmax = Max(Max(l1, l2), Max(l3, l4));
+
+	l1 = minIDir[1] * (min.y - orig.y);
+	l2 = maxIDir[1] * (min.y - orig.y);
+	l3 = minIDir[1] * (max.y - orig.y);
+	l4 = maxIDir[1] * (max.y - orig.y);
+	lmin = Max(lmin, Min(Min(l1, l2), Min(l3, l4)));
+	lmax = Min(lmax, Max(Max(l1, l2), Max(l3, l4)));
+
+	l1 = minIDir[2] * (min.z - orig.z);
+	l2 = maxIDir[2] * (min.z - orig.z);
+	l3 = minIDir[2] * (max.z - orig.z);
+	l4 = maxIDir[2] * (max.z - orig.z);
+	lmin = Max(lmin, Min(Min(l1, l2), Min(l3, l4)));
+	lmax = Min(lmax, Max(Max(l1, l2), Max(l3, l4)));
+
+	return lmax >= 0.0f && lmin <= lmax;
+}
+
 void GaussPointsFit(int iQuantity, const Vec3f* akPoint,Vec3f& rkCenter, Vec3f akAxis[3], float afExtent[3]);
 
 void TGaussPointsFit(int count,const Vec3f* points,Vec3f& center, Vec3f axis[3], float extent[3]) {

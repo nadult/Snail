@@ -12,7 +12,7 @@ namespace stats {
 
 }
 
-class Image;
+namespace gfxlib { class Texture; };
 
 // Gives information about what memory chunks are needed
 // for given view, lights, etc.
@@ -25,10 +25,10 @@ struct MemPattern {
 	inline void Touch(int pos,int count=1) {
 		if(enabled) {
 			int p=float(pos)*mul;
-			if(p>=0&&p<res) data[p]+=count;
+			if(p>=0 && p<res) data[p]+=count;
 		}
 	}
-	void Draw(Image &img) const;
+	void Draw(gfxlib::Texture &img) const;
 
 private:
 	int res; float mul;

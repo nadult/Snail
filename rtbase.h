@@ -18,6 +18,8 @@
 #define ALLOCA(type, name, ...)	type &__restrict__ name = *new (alloca(sizeof(type))) type(__VA_ARGS__);
 #define ALLOCAA(type, name, size) type *__restrict__ name = new (alloca(sizeof(type) * size)) type[size];
 
+#define NOINLINE __attribute__((noinline))
+
 using namespace baselib;
 using namespace veclib;
 

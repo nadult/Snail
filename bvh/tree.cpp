@@ -30,37 +30,87 @@ namespace {
 	} */
 };
 
+static const BBox TriBox(const Triangle &tri) {
+	return BBox(tri.BoundMin(), tri.BoundMax());
+}
+
+static float BoxSA(const BBox &box) {
+	return (box.Width() * (box.Depth() + box.Height()) + box.Depth() * box.Height()) * 2.0f;
+}
+
+static int FindMaxAxis(Vec3f boxSize) {
+	return boxSize.x > boxSize.y? boxSize.z > boxSize.x? 2 : 0 : boxSize.z > boxSize.y? 2 : 1;
+}
+
 void BVH::FindSplit(int nNode, int first, int count, int depth) {
 	BBox bbox = nodes[nNode].bbox;
 
+	const float traverseCost = 0.0;
+	const float intersectCost = 1.0;
+
 	if(count <= 1) {
+	LEAF_NODE:
 		maxDepth = Max(maxDepth, depth);
-		nodes[nNode].subNode = 0;
-		nodes[nNode].first = first;
+		nodes[nNode].first = first | 0x80000000;
 		nodes[nNode].count = count;
 	}
 	else {
-		int axis; {
-			Vec3f size = bbox.Size();
-			axis = size.x > size.y?0 : 1;
-			if(size.z > size[axis]) axis = 2;
+		int minIdx = count / 2, minAxis = FindMaxAxis(bbox.Size());
+		float minCost = constant::inf;
+		float nodeSA = BoxSA(bbox);
+		float noSplitCost = intersectCost * count * BoxSA(bbox);
+
+		for(int axis = 0; axis <= 2; axis++) {
+			std::sort(&elements[first], &elements[first + count],
+				[&elements, axis](const Triangle &a, const Triangle &b) {
+					float p1 = (&a.P1().x)[axis] + (&a.P2().x)[axis] + (&a.P3().x)[axis];
+					float p2 = (&b.P1().x)[axis] + (&b.P2().x)[axis] + (&b.P3().x)[axis];
+					return p1 < p2; } );
+			
+			vector<float> leftSA(count), rightSA(count); {
+				rightSA[count - 1] = BoxSA(TriBox(elements[first + count - 1]));
+				leftSA [0] = BoxSA(TriBox(elements[first]));
+
+				BBox lastBox = TriBox(elements[first]);
+				for(size_t n = 1; n < count; n++) {
+					lastBox += TriBox(elements[first + n]);
+					leftSA[n] = BoxSA(lastBox);
+				}
+
+				lastBox = TriBox(elements[first + count - 1]);
+				for(int n = count - 2; n >= 0; n--) {
+					lastBox += TriBox(elements[first + n]);
+					rightSA[n] = BoxSA(lastBox);
+				}
+			}
+
+			for(size_t n = 1; n < count; n++) {
+				float cost = leftSA[n - 1] * n + rightSA[n] * (count - n);
+				if(cost < minCost) {
+					minCost = cost;
+					minIdx = n;
+					minAxis = axis;
+				}
+			}
 		}
-		int mid = count / 2;
-		if(mid == 0) mid = 1;
 
-		std::nth_element(&elements[first], &elements[first + mid], &elements[first + count],
-			[&](const Triangle &a, const Triangle &b) {
-				float p1 = (&a.P1().x)[axis] + (&a.P2().x)[axis] + (&a.P3().x)[axis];
-				float p2 = (&b.P1().x)[axis] + (&b.P2().x)[axis] + (&b.P3().x)[axis];
+		minCost = traverseCost + intersectCost * minCost;
+		if(noSplitCost < minCost)
+			goto LEAF_NODE;
+
+		std::nth_element(&elements[first], &elements[first + minIdx], &elements[first + count],
+			[&elements, minAxis](const Triangle &a, const Triangle &b) {
+				float p1 = (&a.P1().x)[minAxis] + (&a.P2().x)[minAxis] + (&a.P3().x)[minAxis];
+				float p2 = (&b.P1().x)[minAxis] + (&b.P2().x)[minAxis] + (&b.P3().x)[minAxis];
 				return p1 < p2; } );
-		
-		BBox leftBox(elements[first].BoundMin(), elements[first].BoundMax());
-		BBox rightBox(elements[first + count - 1].BoundMin(), elements[first + count - 1].BoundMax());
 
-		for(size_t n = 1; n < mid; n++)
-			leftBox  += BBox(elements[first + n].BoundMin(), elements[first + n].BoundMax());
-		for(size_t n = mid; n < count; n++)
-			rightBox += BBox(elements[first + n].BoundMin(), elements[first + n].BoundMax());
+		BBox leftBox(TriBox(elements[first]));
+		BBox rightBox(TriBox(elements[first + count - 1]));
+
+		for(size_t n = 1; n < minIdx; n++)
+			leftBox  += TriBox(elements[first + n]);
+		for(size_t n = minIdx; n < count; n++)
+			rightBox += TriBox(elements[first + n]);
 
 		int subNode = nodes.size();
 		nodes[nNode].subNode = subNode;
@@ -73,17 +123,16 @@ void BVH::FindSplit(int nNode, int first, int count, int depth) {
 	//			axis = ax;
 	//		}
 	//	}
-		nodes[nNode].axis = axis;
-		nodes[nNode].firstNode = leftBox.min[axis] > rightBox.min[axis]? 1 : 0;
+		nodes[nNode].axis = minAxis;
+		nodes[nNode].firstNode = leftBox.min[minAxis] > rightBox.min[minAxis]? 1 : 0;
 		nodes[nNode].firstNode =
-			leftBox.min[axis] == rightBox.min[axis]? leftBox.max[axis] < rightBox.max[axis]? 0 :1 : 0;
-
+			leftBox.min[minAxis] == rightBox.min[minAxis]? leftBox.max[minAxis] < rightBox.max[minAxis]? 0 :1 : 0;
 
 		nodes.push_back(Node(leftBox));
 		nodes.push_back(Node(rightBox));
 
-		FindSplit(subNode + 0, first, mid, depth + 1);
-		FindSplit(subNode + 1, first + mid, count - mid, depth + 1);
+		FindSplit(subNode + 0, first, minIdx, depth + 1);
+		FindSplit(subNode + 1, first + minIdx, count - minIdx, depth + 1);
 	}
 }
 
@@ -107,5 +156,16 @@ void BVH::Construct(const vector<Triangle, AlignedAllocator<Triangle> > &tElemen
 }
 
 void BVH::Serialize(Serializer &sr) {
-	sr & elements & nodes;
+	sr & maxDepth & elements & nodes;
+}
+
+void BVH::PrintInfo() const {
+	double nodeBytes = nodes.size() * sizeof(Node);
+	double objBytes = sizeof(CElement) * elements.size();
+
+	printf("Elements count: %d\n", (int)elements.size());
+	printf("Elems:  %6.2fMB\n", objBytes * 0.000001);
+	printf("Nodes: %8d * %2d = %6.2fMB\n", (int)nodes.size(), (int)sizeof(Node), nodeBytes * 0.000001);
+	printf("~ %.0f bytes per triangle\n", double(nodeBytes + objBytes) / double(elements.size()));
+	printf("Levels: %d\n\n", maxDepth);
 }

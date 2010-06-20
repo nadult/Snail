@@ -26,11 +26,11 @@ public:
 
 class CameraConfigs {
 public:
-	void AddConfig(const string &fileName,const Camera&);
-	bool GetConfig(const string &fileName,Camera&) const;
+	void AddConfig(const string &fileName, const Camera&);
+	bool GetConfig(const string &fileName, Camera&) const;
 	void Serialize(Serializer&);
 
-	std::map<string,Camera> data;
+	std::map<string, Camera> data;
 };
 
 

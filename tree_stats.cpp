@@ -1,7 +1,8 @@
 #include "rtbase.h"
-#include "image.h"
+#include "gfxlib_texture.h"
 #include <stdio.h>
 
+/*
 	void MemPattern::Init(int size,int r) {
 		if(enabled) {
 			res=r; mul=double(res)/double(size);
@@ -9,7 +10,7 @@
 			for(int n=0;n<res;n++) data[n]=0;
 		}
 	}
-	void MemPattern::Draw(Image &img) const {
+	void MemPattern::Draw(gfxlib::Texture &img) const {
 		if(enabled) {
 			int width=Min(data.size(),img.width);
 			for(int n=0;n<width;n++) {
@@ -19,7 +20,7 @@
 				img.Pixel(n,img.height-1-0,r,g,b); img.Pixel(n,img.height-1-1,r,g,b); img.Pixel(n,img.height-1-2,r,g,b);
 			}
 		}
-	}
+	} */
 
 	template <bool enabled>
 	string TreeStats<enabled>::GenInfo(int resx,int resy,double msRenderTime,double msBuildTime) {

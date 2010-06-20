@@ -2,7 +2,7 @@
 #define RTRACER_GL_WINDOW_H
 
 #include "rtbase.h"
-#include "image.h"
+#include "gfxlib_texture.h"
 
 
 	enum KeyId {
@@ -68,7 +68,7 @@
 		GLWindow(uint w,uint h,bool fullscreen);
 		~GLWindow();
 
-		void RenderImage(const Image&);
+		void RenderImage(const gfxlib::Texture&);
 		
 		bool PollEvents();
 		void SwapBuffers();

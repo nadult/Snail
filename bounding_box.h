@@ -197,6 +197,8 @@ public:
 		return !ForAll( lmax < Real(0.0f) || lmin > Min(lmax, maxDist) );
 	}
 
+	bool TestInterval(Vec3f orig, float *minIDir, float *maxIDir) const NOINLINE;
+
 	Vec3f min, max;
 };
 
