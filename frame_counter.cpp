@@ -6,14 +6,14 @@ FrameCounter::FrameCounter()
 }
 
 void FrameCounter::NextFrame() {
-	double tTime=baselib::GetTime();
-	double interval=0.5f;
+	double tTime = baselib::GetTime();
+	double interval = 0.5f;
 
 	frames++;
-	if(tTime-time>interval) {
-		fps=double(frames)/interval;
-		time+=interval;
-		frames=0;
+	if(tTime - time > interval) {
+		fps = double(frames) / (tTime - time);
+		time = tTime;
+		frames = 0;
 	}
 }
 

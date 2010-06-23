@@ -158,7 +158,7 @@ class RayGroup
 public:
 	enum { size=size_, sharedOrigin=sharedOrigin_ };
 
-	INLINE RayGroup(const Vec3q *o,const Vec3q *d,const Vec3q *i) :origin(o),dir(d),iDir(i) { }
+	INLINE RayGroup(const Vec3q *o, const Vec3q *d, const Vec3q *i) :origin(o), dir(d), iDir(i) { }
 
 	template <int tSize>
 	INLINE RayGroup(const RayGroup<tSize,sharedOrigin> &rhs,int offset) {
@@ -177,6 +177,69 @@ public:
 
 private:
 	const Vec3q *dir,*iDir,*origin;
+};
+
+//TODO specjalizacja dla roznych originow?
+class CornerRays
+{
+public:
+	CornerRays() { }
+	template <int size, bool shared>
+	CornerRays(const RayGroup<size, shared> &gr) {
+		Assert(shared);
+
+		Vec3f td[4];
+		td[0] = ExtractN(gr.Dir( size == 4? 0 : size == 16?  0 :  0 ), 0);
+		td[1] = ExtractN(gr.Dir( size == 4? 1 : size == 16?  3 : 21 ), 1);
+		td[2] = ExtractN(gr.Dir( size == 4? 2 : size == 16? 12 : 42 ), 2);
+		td[3] = ExtractN(gr.Dir( size == 4? 3 : size == 16? 15 : 63 ), 3);
+		Convert(td, dir);
+		td[0] = ExtractN(gr.IDir( size == 4? 0 : size == 16?  0 :  0 ), 0);
+		td[1] = ExtractN(gr.IDir( size == 4? 1 : size == 16?  3 : 21 ), 1);
+		td[2] = ExtractN(gr.IDir( size == 4? 2 : size == 16? 12 : 42 ), 2);
+		td[3] = ExtractN(gr.IDir( size == 4? 3 : size == 16? 15 : 63 ), 3);
+		Convert(td, idir);
+		origin = ExtractN(gr.Origin(0), 0);
+	}
+
+	// Order:
+	// 0  -  1
+	// |     |
+	// 2  -  3
+	Vec3q dir, idir;
+	Vec3f origin;
+};
+
+class RayInterval {
+public:
+	RayInterval() { }
+	template <int size, bool shared>
+	RayInterval(const RayGroup<size, shared> &rays) {
+		Assert(shared);
+
+		ComputeMinMax<size>(&rays.Dir(0), &minDir, &maxDir);
+		ComputeMinMax<size>(&rays.IDir(0), &minIDir, &maxIDir);
+		origin = ExtractN(rays.Origin(0), 0);
+		
+		ix = floatq(minIDir.x, maxIDir.x, minIDir.x, maxIDir.x);
+		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
+		iz = floatq(minIDir.z, maxIDir.z, minIDir.z, maxIDir.z);
+	}
+	RayInterval(const CornerRays &rays) {
+		minIDir = Minimize(rays.idir);
+		minDir = Minimize(rays.dir);
+		maxIDir = Maximize(rays.idir);
+		maxDir = Maximize(rays.dir);
+		origin = rays.origin;
+
+		ix = floatq(minIDir.x, maxIDir.x, minIDir.x, maxIDir.x);
+		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
+		iz = floatq(minIDir.z, maxIDir.z, minIDir.z, maxIDir.z);
+	}
+
+	floatq ix, iy, iz;
+	Vec3f minIDir, maxIDir, minDir, maxDir;
+	Vec3f origin;
 };
 
 struct ShadowCache {

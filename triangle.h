@@ -282,8 +282,9 @@ public:
 	template <class Vec0, class Vec, class Real>
 	const Vec3 <typename Vec::TScalar> Barycentric(Vec0 rOrig, Vec rDir, Real dist, int) const;
 
-	bool TestInterval(Vec3f orig, Vec3f minDir, Vec3f maxDir) const;
 	bool TestFrustum(const Frustum&) const;
+	bool TestCornerRays(const CornerRays&) const;
+	bool TestInterval(const RayInterval&) const;
 private:
 	void SetFlag1(uint value) {
 		a.t0 = UValue(value).f;
@@ -485,15 +486,12 @@ public:
 	template <class Vec0, class Vec>
 	Vec2 <typename Vec::TScalar> Barycentric(const Vec0 &origin, const Vec &dir) const {
 		typedef typename Vec::TScalar Real;
-		Vec2 <Real> out;
 
-		Real det  = (dir | normal) * Real(t0);
-		Real idet = Inv(det);
+		auto det  = (dir | normal) * Real(t0);
+		auto idet = Inv(det);
 		Vec0 tvec = origin - Vec0(a);
-		out.x = (dir | (tvec ^ Vec0(ca))) * idet;
-		out.y = (dir | (Vec0(ba) ^ tvec)) * idet;
 
-		return out;
+		return Vec2<Real>(dir | (tvec ^ Vec0(ca)), dir | (Vec0(ba) ^ tvec)) * idet;
 	}
 };
 

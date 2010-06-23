@@ -5,6 +5,9 @@
 
 template <int,bool> class RayGroup;
 
+class CornerRays;
+class RayInterval;
+
 class BBox {
 public:
 	inline BBox() { }
@@ -197,7 +200,7 @@ public:
 		return !ForAll( lmax < Real(0.0f) || lmin > Min(lmax, maxDist) );
 	}
 
-	bool TestInterval(Vec3f orig, Vec3f minIDir, Vec3f maxIDir) const;
+	bool TestInterval(const RayInterval&) const;
 
 	Vec3f min, max;
 };

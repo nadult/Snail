@@ -64,6 +64,7 @@ public:
 	uint GetIntersects() const { return enabled?data[0]:0; }
 	uint GetLoopIters() const { return enabled?data[1]:0; }
 	uint GetSkips() const { return enabled?data[9]:0; }
+	uint GetRays() const { return enabled?data[2] : 0; }
 
 	string GenInfo(int resx,int resy,double msRenderTime,double msBuildTime);
 

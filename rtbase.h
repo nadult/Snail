@@ -55,6 +55,8 @@ inline Vec2p Minimize(const Vec2q &v) { return Vec2p(Minimize(v.x),Minimize(v.y)
 inline Vec3p Maximize(Vec3q v) { return Vec3p(Maximize(v.x),Maximize(v.y),Maximize(v.z)); }
 inline Vec3p Minimize(Vec3q v) { return Vec3p(Minimize(v.x),Minimize(v.y),Minimize(v.z)); }
 
+inline Vec3f ExtractN(Vec3q v, int n) { return Vec3f(v.x[n], v.y[n], v.z[n]); }
+
 INLINE bool IsNan(const Vec3f &f) { return isnan(f.x)||isnan(f.y)||isnan(f.z); }
 INLINE bool IsNan(const Vec4f &f) { return isnan(f.x)||isnan(f.y)||isnan(f.z)||isnan(f.w); }
 INLINE bool IsNan(Vec3q f) { return 
@@ -96,6 +98,7 @@ void ComputeMinMax(const Vec3q *vec, Vec3f *outMin, Vec3f *outMax) {
 }
 
 std::ostream &operator<<(std::ostream&, const Vec3f&);
+std::ostream &operator<<(std::ostream&, const floatq&);
 
 struct Plane {
 	Plane(Vec3f point, Vec3f normal) :normal(normal) {

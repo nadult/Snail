@@ -24,8 +24,8 @@
 
 	template <bool enabled>
 	string TreeStats<enabled>::GenInfo(int resx,int resy,double msRenderTime,double msBuildTime) {
-		double raysPerSec=double(data[2])*(1000.0/msRenderTime);
-		double nPixels=double(resx*resy);
+		double raysPerSec = double(data[2]) * (1000.0 / msRenderTime);
+		double nPixels = double(resx*resy);
 
 		if(!enabled) {
 			char buf[2048];
@@ -36,11 +36,11 @@
 
 		char buf[2048];
 		sprintf(buf,
-				/*"isct,iter:"*/"%5.2f %5.2f  ms/frame:%6.2f  MRays/sec:%5.2f  "
-				/*"Coh:%.2f%% " "br:%.2f%% fa:%.2f%%"*/ "%.0f R:%d Build:%6.2f",
-				double(data[0])/nPixels,double(data[1])/nPixels,
-				msRenderTime,raysPerSec*0.000001/*,GetCoherent()*100.0f*/,
-				/*GetBreaking()*100.0f,GetIntersectFail()*100.0f,*/double(data[9]),data[2],msBuildTime);
+				/*"isct,iter:"*/"%5.2f %5.2f  ms:%6.2f  mrs:%5.2f (%d rays) %d"
+				/*"Coh:%.2f%% " "br:%.2f%% fa:%.2f%%" " Build:%6.2f"*/,
+				double(data[0]) / nPixels, double(data[1]) / nPixels, msRenderTime, raysPerSec * 0.000001, data[2],
+				data[9]
+				/*,GetCoherent()*100.0f, GetBreaking()*100.0f, GetIntersectFail()*100.0f, msBuildTime*/);
 		return string(buf);
 	}
 

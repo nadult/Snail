@@ -308,12 +308,9 @@ static int tmain(int argc, char **argv) {
 	}
 
 	FrameCounter frmCounter;
-	double frmTime = GetTime(), lastFrmTime = 0;
 
 	while(window.PollEvents()) {
 		frmCounter.NextFrame();
-		lastFrmTime = GetTime() - frmTime;
-		frmTime = GetTime();
 
 		if(window.KeyUp(Key_esc)) break;
 		if(window.KeyDown('K')) Saver("out/output.dds") & image;
@@ -415,7 +412,7 @@ static int tmain(int argc, char **argv) {
 		double time=GetTime();
 		TreeStats<1> stats;
 	//	if(staticEnabled)
-			stats=Render(staticScene, cam, image, options, threads);
+			stats = Render(staticScene, cam, image, options, threads);
 	//	else stats=Render(scene,cam,image,options,threads);
 
 		time=GetTime()-time; minTime=Min(minTime,time);
@@ -423,12 +420,15 @@ static int tmain(int argc, char **argv) {
 
 		window.RenderImage(image);
 
+		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
+		double mrays = double(unsigned(frmCounter.FPS() * stats.GetRays() * 0.0001)) * 0.01;
+
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));
-			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx,resy,time*1000.0,buildTime*1000.0));
-			font.PrintAt(Vec2f(5, 25), "FPS (",staticEnabled?"static":"dynamic","): ", frmCounter.FPS());
-			font.PrintAt(Vec2f(5, 45), "Lights: ",lightsEnabled?lights.size() : 0);
-			font.PrintAt(Vec2f(5, 65), "Last frame time: ", lastFrmTime * 1000.0f, "ms");
+			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, time * 1000.0,buildTime * 1000.0));
+			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays);
+			if(lightsEnabled && lights.size())
+				font.PrintAt(Vec2f(5, 45), "Lights: ",lightsEnabled?lights.size() : 0);
 			font.PrintAt(Vec2f(5, 85), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
 					" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7], ' ',
 					gdVals[0] / sceneScale, ' ', gdVals[1] / sceneScale);
