@@ -25,8 +25,7 @@ void Shade(const Shader &shader, const Selector <size> &sel, Vec3q output[size])
 
 template <class Context>
 void InitializationShader(Context &c, uint i, const typename Context::real &maxDist) {
-	Vec3q ambient;
-	Broadcast(Vec3f(0.2, 0.2, 0.2), ambient);
+	Vec3q ambient = Vec3f(0.4, 0.4, 0.4);
 
 	c.distance[i] = maxDist;
 	c.color[i]    = f32x4(0.0f);

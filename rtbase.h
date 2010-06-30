@@ -15,9 +15,6 @@
 #define EXPECT_TAKEN(a)			a
 #define EXPECT_NOT_TAKEN(a)		a
 
-#define ALLOCA(type, name, ...)	type &__restrict__ name = *new (alloca(sizeof(type))) type(__VA_ARGS__);
-#define ALLOCAA(type, name, size) type *__restrict__ name = new (alloca(sizeof(type) * size)) type[size];
-
 #define NOINLINE __attribute__((noinline))
 
 using namespace baselib;
@@ -38,32 +35,24 @@ typedef f32x4		floatq;
 typedef i32x4		intq;
 
 template <class Vec>
-Vec Reflect(const Vec &ray,const Vec &nrm) {
-	typename Vec::TScalar dot=(nrm|ray);
-	return ray-nrm*(dot+dot);
+const Vec Reflect(const Vec ray,const Vec nrm) {
+	typename Vec::TScalar dot = (nrm | ray);
+	return ray - nrm * (dot + dot);
 }
 
-INLINE bool isnan(float t) {
-	union { float f; int i; }; f=t;
-	return (i&0x7f800000)==0x7f8 && (i&0x7fffff)!=0;
-}
+inline float Maximize(const floatq t) { return Max(Max(t[0], t[1]), Max(t[2], t[3])); }
+inline float Minimize(const floatq t) { return Min(Min(t[0], t[1]), Min(t[2], t[3])); }
+inline Vec2p Maximize(const Vec2q v) { return Vec2p(Maximize(v.x), Maximize(v.y)); }
+inline Vec2p Minimize(const Vec2q v) { return Vec2p(Minimize(v.x), Minimize(v.y)); }
+inline Vec3p Maximize(const Vec3q v) { return Vec3p(Maximize(v.x), Maximize(v.y), Maximize(v.z)); }
+inline Vec3p Minimize(const Vec3q v) { return Vec3p(Minimize(v.x), Minimize(v.y), Minimize(v.z)); }
 
-inline float Maximize(floatq t) { return Max(Max(t[0],t[1]),Max(t[2],t[3])); }
-inline float Minimize(floatq t) { return Min(Min(t[0],t[1]),Min(t[2],t[3])); }
-inline Vec2p Maximize(const Vec2q &v) { return Vec2p(Maximize(v.x),Maximize(v.y)); }
-inline Vec2p Minimize(const Vec2q &v) { return Vec2p(Minimize(v.x),Minimize(v.y)); }
-inline Vec3p Maximize(Vec3q v) { return Vec3p(Maximize(v.x),Maximize(v.y),Maximize(v.z)); }
-inline Vec3p Minimize(Vec3q v) { return Vec3p(Minimize(v.x),Minimize(v.y),Minimize(v.z)); }
+inline Vec3f ExtractN(const Vec3q v, int n) { return Vec3f(v.x[n], v.y[n], v.z[n]); }
 
-inline Vec3f ExtractN(Vec3q v, int n) { return Vec3f(v.x[n], v.y[n], v.z[n]); }
-
-INLINE bool IsNan(const Vec3f &f) { return isnan(f.x)||isnan(f.y)||isnan(f.z); }
-INLINE bool IsNan(const Vec4f &f) { return isnan(f.x)||isnan(f.y)||isnan(f.z)||isnan(f.w); }
-INLINE bool IsNan(Vec3q f) { return 
-		isnan(f.x[0])||isnan(f.y[0])||isnan(f.z[0])||
-		isnan(f.x[1])||isnan(f.y[1])||isnan(f.z[1])||
-		isnan(f.x[2])||isnan(f.y[2])||isnan(f.z[2])||
-		isnan(f.x[3])||isnan(f.y[3])||isnan(f.z[3]); }
+bool isnan(float t);
+bool IsNan(const Vec3f f);
+bool IsNan(const Vec4f f);
+bool IsNan(const Vec3q f);
 
 INLINE Vec3q SafeInv(Vec3q v) {
 	//TODO: SafeInv potrzebne np. w modelu angel.obj; Zrobic to jakos szybciej...

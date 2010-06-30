@@ -201,12 +201,12 @@ public:
 
 		Vec3f td[4];
 		td[0] = ExtractN(gr. Dir( size == 4? 0 : size == 16?  0 : size == 32?  0 : size == 64?  0 : size == 128? 0  : 0  ), 0);
-		td[1] = ExtractN(gr. Dir( size == 4? 1 : size == 16?  3 : size == 32? 19 : size == 64? 21 : size == 128? 85 : 85 ), 1);
+		td[1] = ExtractN(gr. Dir( size == 4? 1 : size == 16?  5 : size == 32? 19 : size == 64? 21 : size == 128? 85 : 85 ), 1);
 		td[2] = ExtractN(gr. Dir( size == 4? 2 : size == 16? 10 : size == 32? 10 : size == 64? 42 : size == 128? 42 : 170), 2);
 		td[3] = ExtractN(gr. Dir( size == 4? 3 : size == 16? 15 : size == 32? 31 : size == 64? 63 : size == 128? 127: 255), 3);
 		Convert(td, dir);
 		td[0] = ExtractN(gr.IDir( size == 4? 0 : size == 16?  0 : size == 32?  0 : size == 64?  0 : size == 128? 0  : 0  ), 0);
-		td[1] = ExtractN(gr.IDir( size == 4? 1 : size == 16?  3 : size == 32? 19 : size == 64? 21 : size == 128? 85 : 85 ), 1);
+		td[1] = ExtractN(gr.IDir( size == 4? 1 : size == 16?  5 : size == 32? 19 : size == 64? 21 : size == 128? 85 : 85 ), 1);
 		td[2] = ExtractN(gr.IDir( size == 4? 2 : size == 16? 10 : size == 32? 10 : size == 64? 42 : size == 128? 42 : 170), 2);
 		td[3] = ExtractN(gr.IDir( size == 4? 3 : size == 16? 15 : size == 32? 31 : size == 64? 63 : size == 128? 127: 255), 3);
 		Convert(td, idir);

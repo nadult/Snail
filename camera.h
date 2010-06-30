@@ -2,26 +2,31 @@
 #define RTRACER_CAMERA_H
 
 #include "rtbase.h"
-#include <map>
 #include <stdio.h>
+#include <map>
 
 
 class Camera
 {
 public:
-	Camera() :pos(0,0,0),right(1,0,0),front(0,0,1),up(0,1,0),plane_dist(0.5f) { }
-	Camera(Vec3f p,Vec3f f,Vec3f r,Vec3f u=Vec3f(0,1,0)) :pos(p),right(r),front(f),up(u),plane_dist(0.5f) { }
+	Camera(const Vec3f pos, float angle, float pitch);
+	Camera();
 
-	void Print() {
-		printf("Camera(Vec3f(%.4f,%.4f,%.4f),Vec3f(%.4f,%.4f,%.4f),Vec3f(%.4f,%.4f,%.4f));\n",
-				pos.x,pos.y,pos.z,front.x,front.y,front.z,right.x,right.y,right.z);
-	}
-	void Serialize(Serializer &sr) {
-		sr & pos & right & front & up &plane_dist;
-	}
+	void Print();
+	void Serialize(Serializer&);
 
-	Vec3f pos,right,front,up;
+	void Rotate(float a);
+	void RotateY(float p);
+	void Move(const Vec3f);
+	void SetPos(const Vec3f);
+
+	const Vec3f Pos() const;
+	void GetRotation(Vec3f &right, Vec3f &up, Vec3f &front) const;
+
 	float plane_dist;
+private:
+	float ang, pitch;
+	Vec3f pos;
 };
 
 class CameraConfigs {

@@ -36,8 +36,6 @@ void PrintHelp() {
 	printf("k - save image to out/output.tga\n\to - toggle reflections\n\tl - toggle lights\n\t");
 	printf("j - toggle lights movement\n\tp - print camera position; save camera configuration\n\t");
 	printf("c - center camera position in the scene\n\t");
-	//	printf("i - toggle scene complexity visualization (green: # visited nodes  red: # intersections)\n\t");
-	printf("0,1,2,3 - change tracing mode (on most scenes 0 is slowest,  2,3 is fastest)\n\t");
 	printf("F1 - toggle shadow caching\n\t");
 	printf("esc - exit\n\n");
 }
@@ -45,13 +43,6 @@ void PrintHelp() {
 typedef BVH StaticTree;
 //typedef bih::Tree<TriangleVector> StaticTree;
 //typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
-
-template <class Dst,class Src>
-Dst BitCast(const Src &src) {
-	union { Dst d; Src s; } u;
-	u.s=src;
-	return u.d;
-}
 
 template <class Scene>
 void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
@@ -142,10 +133,32 @@ vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
 	return out;
 }
 
-namespace game { int main(int argc,char **argv); }
+static void MoveCamera(Camera &cam, GLWindow &window, float speed) {
+	if(window.MouseKey(0)) {
+		float dx = window.MouseMove().x;
+		float dy = window.MouseMove().y;
+
+		if(dx) cam.Rotate(-dx * 0.02);
+		if(dy) cam.RotateY(dy * 0.02);
+	}
+
+	Vec3f move(0, 0, 0);
+	Vec3f right, up, front;
+	cam.GetRotation(right, up, front);
+
+	if(window.Key('W')) move += front;
+	if(window.Key('S')) move -= front;
+	if(window.Key('A')) move -= right;
+	if(window.Key('D')) move += right;
+	if(window.Key('R')) move += up;
+	if(window.Key('F')) move -= up;
+
+	cam.Move(move * speed * (window.Key(Key_lshift)? 5.0f : 1.0f));
+}
+
 
 static int tmain(int argc, char **argv) {
-	printf("Snail v0.11 by nadult\n");
+	printf("Snail v0.20 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
 		PrintHelp();
 		return 0;
@@ -164,16 +177,16 @@ static int tmain(int argc, char **argv) {
 
 	int resx=1280, resy=720;
 #ifndef NDEBUG
-	resx/=2; resy/=2;
+	resx /= 2; resy /= 2;
 #endif
-	bool fullscreen=0;
-	int threads=4;
-	const char *modelFile="pompei.obj";//"doom3/admin.proc";
+	bool fullscreen = 0;
+	int threads = 2;
+	const char *modelFile = "pompei.obj";//"doom3/admin.proc";
 
 	Options options;
 	bool flipNormals = 1;
 	bool rebuild = 0;
-	string texPath="/mnt/data/data/doom3/";
+	string texPath = "/mnt/data/data/doom3/";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
@@ -189,9 +202,7 @@ static int tmain(int argc, char **argv) {
 		}
 	}
 
-//	if(gameMode) return game::main(argc,argv);
-
-	printf("Threads/cores: %d/%d\n\n",threads,4);
+	printf("Threads/cores: %d/?\n\n", threads);
 
 	printf("Loading...\n");
 	double buildTime = GetTime();
@@ -211,7 +222,7 @@ static int tmain(int argc, char **argv) {
 		for(int n = 0; n < baseScene.objects.size(); n++)
 			baseScene.objects[n].Repair();
 		baseScene.GenNormals();
-//		baseScene.Optimize();
+	//	baseScene.Optimize();
 	}
 	
 	Scene<StaticTree> staticScene;
@@ -276,10 +287,12 @@ static int tmain(int argc, char **argv) {
 
 	gfxlib::Texture image(resx, resy, gfxlib::TI_A8B8G8R8);
 
-	double minTime=1.0f/0.0f,maxTime=0.0f;
+	double minTime = 1.0f / 0.0f, maxTime = 0.0f;
 	
-	for(int n=0;n<10;n++) gVals[n]=1;
-	gVals[0] = 0; gVals[2]=0; gVals[4]=0; gVals[3]=0;
+	for(int n = 0; n < 10; n++)
+		gVals[n] = 1;
+	gVals[0] = 0; gVals[2] = 0;
+	gVals[4] = 0; gVals[3] = 0;
 	
 	gdVals[0] = 0.1f * sceneScale;
 	gdVals[1] = 0.2f * sceneScale;
@@ -294,7 +307,7 @@ static int tmain(int argc, char **argv) {
 			
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
-		cam.pos=staticScene.geometry.GetBBox().Center();
+		cam.SetPos(staticScene.geometry.GetBBox().Center());
 
 	buildTime=GetTime()-buildTime;
 	std::cout << "Build time: " << buildTime << '\n';
@@ -304,7 +317,7 @@ static int tmain(int argc, char **argv) {
 	float speed; {
 	//	scene.geometry.Construct(builder.ExtractElements());
 		Vec3p size = staticScene.geometry.GetBBox().Size();
-		speed=(size.x + size.y + size.z) * 0.0025f;
+		speed = (size.x + size.y + size.z) * 0.0025f;
 	}
 
 	FrameCounter frmCounter;
@@ -318,7 +331,7 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown('I')) options.rdtscShader^=1;
 		if(window.KeyDown('C')) {
 		//	if(staticEnabled)
-				cam.pos=staticScene.geometry.GetBBox().Center();
+				cam.SetPos(staticScene.geometry.GetBBox().Center());
 		//	else cam.pos=scene.geometry.GetBBox().Center();
 		}
 		if(window.KeyDown('P')) {
@@ -333,18 +346,10 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown('J')) {
 			Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
 
-			lights.push_back(Light(cam.pos, colors[rand()&3], 300.0f * 0.001f * sceneScale));
+			lights.push_back(Light(cam.Pos(), colors[rand()&3], 800.0f * 0.001f * sceneScale));
 		}
 
-		{
-			float tspeed=speed*(window.Key(Key_lshift)?5.0f:1.0f);
-			if(window.Key('W')) cam.pos+=cam.front*tspeed;
-			if(window.Key('S')) cam.pos-=cam.front*tspeed;
-			if(window.Key('A')) cam.pos-=cam.right*tspeed;
-			if(window.Key('D')) cam.pos+=cam.right*tspeed;
-			if(window.Key('R')) cam.pos+=cam.up*tspeed;
-			if(window.Key('F')) cam.pos-=cam.up*tspeed;
-		}
+		MoveCamera(cam, window, speed);
 
 		if(window.Key('G')) { gdVals[0]+=0.01 * sceneScale; printf("16 max dist: %f\n", gdVals[0] / sceneScale); }
 		if(window.Key('V')) { gdVals[0]-=0.01 * sceneScale; printf("16 max dist: %f\n", gdVals[0] / sceneScale); }
@@ -363,21 +368,6 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Val 6 %s\n",gVals[6]?"on":"off"); }
 		if(window.KeyDown(Key_f8)) { gVals[7]^=1; printf("Val 7 %s\n",gVals[7]?"on":"off"); }
 
-		{
-			int dx=window.Key(Key_space)?window.MouseMove().x:0,dy=0;
-			if(window.Key('N')) dx-=20;
-			if(window.Key('M')) dx+=20;
-			if(window.Key('V')) dy-=20;
-			if(window.Key('B')) dy+=20;
-			if(dx) {
-				Matrix<Vec4f> rotMat=RotateY(-dx*0.003f);
-				cam.right=rotMat*cam.right; cam.front=rotMat*cam.front;
-			}
-		//	if(dy) {
-		//		Matrix<Vec4f> rotMat(Quat(AxisAngle(cam.right,-dy*0.002f)));
-		//		cam.up=rotMat*cam.up; cam.front=rotMat*cam.front;
-		//	}
-		}
 
 		static float animPos = 0;
 		if(window.Key(Key_space)) animPos+=0.025f;

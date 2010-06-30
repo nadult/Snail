@@ -202,7 +202,7 @@ public:
 			floatq dot = 1.0f;
 			for(int q = 1; q < size; q++)
 				dot = Min(dot, c.Dir(0) | c.Dir(q));
-			split = ForAny(dot < 0.995f);
+			split = ForAny(dot < 0.95f);
 
 			if(!split)
 				TraverseShadow0(c, selector);

@@ -48,9 +48,9 @@ struct RenderTask: public Task {
 		float ratio = float(out->Width())/float(out->Height());
 		enum { NQuads = 1 << (QuadLevels * 2), PWidth = 2 << QuadLevels, PHeight = 2 << QuadLevels };
 
-		Vec3q origin; Broadcast(camera.pos, origin);
-		RayGenerator rayGen(QuadLevels, out->Width(), out->Height(), camera.plane_dist,
-				camera.right, camera.up, camera.front);
+		Vec3q origin; Broadcast(camera.Pos(), origin);
+		Vec3f right, up, front; camera.GetRotation(right, up, front);
+		RayGenerator rayGen(QuadLevels, out->Width(), out->Height(), camera.plane_dist, right, up, front);
 
 		uint pitch = out->Pitch();
 		u8 *outPtr = ((u8*)out->DataPointer()) + startY * pitch + startX * 4;
@@ -205,7 +205,7 @@ static void Run(vector<TTask> &ttasks, int nThreads_) {
 }
 
 template <int QuadLevels,class AccStruct>
-TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,gfxlib::Texture &image,const Options options,
+TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera, gfxlib::Texture &image,const Options options,
 		uint nThreads) {
 	enum { taskSize = 64 };
 	
