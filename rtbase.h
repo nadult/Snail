@@ -66,11 +66,14 @@ INLINE bool IsNan(Vec3q f) { return
 		isnan(f.x[3])||isnan(f.y[3])||isnan(f.z[3]); }
 
 INLINE Vec3q SafeInv(Vec3q v) {
-	const float epsilon=0.0000001f,inf=1.0f/0.0f;
+	//TODO: SafeInv potrzebne np. w modelu angel.obj; Zrobic to jakos szybciej...
+	return VInv(v + Vec3q(floatq(0.00000001f)));
+
+/*	const float epsilon=0.0000001f,inf=1.0f/0.0f;
 	return Vec3q(
 		Condition(Abs(v.x)<floatq(epsilon),floatq(inf),Inv(v.x)),
 		Condition(Abs(v.y)<floatq(epsilon),floatq(inf),Inv(v.y)),
-		Condition(Abs(v.z)<floatq(epsilon),floatq(inf),Inv(v.z)));
+		Condition(Abs(v.z)<floatq(epsilon),floatq(inf),Inv(v.z))); */
 }
 
 INLINE Vec3f SafeInv(const Vec3f &v) {
@@ -97,6 +100,35 @@ void ComputeMinMax(const Vec3q *vec, Vec3f *outMin, Vec3f *outMax) {
 	*outMax = Maximize(max);
 }
 
+template <int size, class Selector>
+void ComputeMinMax(const Vec3q *vec, Vec3f *outMin, Vec3f *outMax, const Selector &sel) {
+	if(sel.All()) {
+		ComputeMinMax<size>(vec, outMin, outMax);
+	}
+	else {
+		Vec3q min, max;
+		int q = 0;
+		while(!sel[q] && q < size) q++;
+		if(q == size) {
+			*outMin = *outMax = Vec3f(0.0f, 0.0f, 0.0f);
+			return;
+		}
+
+		for(int k = 0; k < 4; k++) if(sel[q] & (1 << k)) {
+			max = min = (Vec3q)ExtractN(vec[q], k);
+			break;
+		}
+
+		for(;q < size; q++) {
+			f32x4b mask = GetSSEMaskFromBits(sel[q]);
+			min = Condition(mask, VMin(min, vec[q]), min);
+			max = Condition(mask, VMax(max, vec[q]), max);
+		}
+	
+		*outMin = Minimize(min);
+		*outMax = Maximize(max);
+	}
+}
 std::ostream &operator<<(std::ostream&, const Vec3f&);
 std::ostream &operator<<(std::ostream&, const floatq&);
 

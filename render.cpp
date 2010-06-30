@@ -61,9 +61,7 @@ struct RenderTask: public Task {
 		for(int y = 0; y < height; y += PHeight) {
 			for(int x = 0; x < width;x += PWidth) {
 				rayGen.Generate(PWidth, PHeight, startX + x, startY + y, dir);
-				for(int n = 0; n < NQuads; n++)
-					idir[n] = VInv(dir[n] + Vec3q(floatq(0.00000001f))); //SafeInv(dir[n]);
-				//TODO: SafeInv potrzebne np. w modelu angel.obj; Zrobic to jakos szybciej...
+				for(int n = 0; n < NQuads; n++) idir[n] = SafeInv(dir[n]);
 				
 				Result<NQuads> result =
 					scene->RayTrace(RayGroup<NQuads,1>(&origin,dir,idir),FullSelector<NQuads>(),cache);

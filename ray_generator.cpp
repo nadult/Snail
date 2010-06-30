@@ -22,7 +22,7 @@ static const int ty[16] = { 0, 0, 2, 2, 0, 0, 2, 2, 4, 4, 6, 6, 4, 4, 6, 6 };
 
 void RayGenerator::Generate(int level,int pw,int ph,int x,int y, Vec3q *out) const {
 	if(level > 2) {
-		int npw = pw >> 1,nph = ph >> 1,nl = level - 1;
+		int npw = pw >> 1, nph = ph >> 1, nl = level - 1;
 
 		Generate(nl, npw, nph, x      , y      , out + 0);
 		Generate(nl, npw, nph, x + npw, y      , out + (1 << nl*2));

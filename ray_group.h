@@ -42,25 +42,31 @@ private:
 		int bits4[size/4];
 	};
 public:
-	INLINE f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(bits[idx]); }
+	f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(bits[idx]); }
 
-	INLINE RaySelector<size/4> &SubSelector(int idx) { return sub[idx]; }
-	INLINE const RaySelector<size/4> &SubSelector(int idx) const { return sub[idx]; }
+	RaySelector<size/4> &SubSelector(int idx) { return sub[idx]; }
+	const RaySelector<size/4> &SubSelector(int idx) const { return sub[idx]; }
 
-	INLINE char &operator[](int idx)				{ return bits[idx]; }
-	INLINE const char &operator[](int idx) const	{ return bits[idx]; }
+	char &operator[](int idx)				{ return bits[idx]; }
+	const char &operator[](int idx) const	{ return bits[idx]; }
 
-	INLINE int &Mask4(int idx) 						{ return bits4[idx]; }
-	INLINE const int &Mask4(int idx) const 			{ return bits4[idx]; }
+	int &Mask4(int idx) 						{ return bits4[idx]; }
+	const int &Mask4(int idx) const 			{ return bits4[idx]; }
 
-	INLINE bool Any() const {
+	bool Any() const {
 		bool ret=0;
 		for(int n=0;n<size/4;n++) ret|=bits4[n]?1:0;
 		return ret;
 	}
+	bool All() const {
+		bool ret = 1;
+		for(int n = 0; n < size / 4; n++)
+			ret &= bits4[n] == 15;
+		return ret;
+	}
 
-	INLINE void Clear()			{ for(int n=0;n<size/4;n++) bits4[n]=0; }
-	INLINE void SelectAll() 	{ for(int n=0;n<size/4;n++) bits4[n]=0x0f0f0f0f; }
+	void Clear()			{ for(int n=0;n<size/4;n++) bits4[n]=0; }
+	void SelectAll() 	{ for(int n=0;n<size/4;n++) bits4[n]=0x0f0f0f0f; }
 };
 
 template <>
@@ -70,17 +76,18 @@ public:
 private:
 	char bits;
 public:
-	INLINE f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(bits); }
+	f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(bits); }
 
-	INLINE char &operator[](int idx)				{ return bits; }
-	INLINE const char &operator[](int idx) const	{ return bits; }
+	char &operator[](int idx)				{ return bits; }
+	const char &operator[](int idx) const	{ return bits; }
 
-	INLINE char &Mask4(int idx) 					{ return bits; }
-	INLINE const char &Mask4(int idx) const 		{ return bits; }
-	INLINE bool Any() const { return bits?1:0; }
+	char &Mask4(int idx) 					{ return bits; }
+	const char &Mask4(int idx) const 		{ return bits; }
+	bool Any() const { return bits? 1 : 0; }
+	bool All() const { return bits == 15; }
 
-	INLINE void Clear()			{ bits=0; }
-	INLINE void SelectAll() 	{ bits=15; }
+	void Clear()		{ bits = 0; }
+	void SelectAll() 	{ bits = 15; }
 };
 
 
@@ -94,18 +101,22 @@ private:
 	FullSelector<size/4> sub[4];
 
 public:
-	INLINE f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(15); }
+	f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(15); }
 
-	INLINE FullSelector<size/4> &SubSelector(int idx) { return sub[idx]; }
-	INLINE const FullSelector<size/4> &SubSelector(int idx) const { return sub[idx]; }
+	FullSelector<size/4> &SubSelector(int idx) { return sub[idx]; }
+	const FullSelector<size/4> &SubSelector(int idx) const { return sub[idx]; }
 
-	INLINE char operator[](int idx) const			{ return 15; }
-	INLINE int Mask4(int idx) const 				{ return 0xf0f0f0f; }
+	//TODO ...
+	char &operator[](int idx) { static char t = 15; return t; }
 
-	INLINE void SelectAll() 	{ }
-	INLINE bool Any() const { return 1; }
+	char operator[](int idx) const			{ return 15; }
+	int Mask4(int idx) const 				{ return 0xf0f0f0f; }
 
-	INLINE operator RaySelector<size>() const {
+	void SelectAll() 	{ }
+	bool Any() const { return 1; }
+	bool All() const { return 1; }
+
+	operator RaySelector<size>() const {
 		RaySelector<size> sel;
 		sel.SelectAll();
 		return sel;
@@ -118,13 +129,13 @@ public:
 	enum { size=1, full=1 };
 	
 public:
-	INLINE char operator[](int idx) const	{ return 15; }
-	INLINE int Mask4(int idx) const 		{ return 15; }
+	char operator[](int idx) const	{ return 15; }
+	int Mask4(int idx) const 		{ return 15; }
 
-	INLINE void SelectAll() 	{ }
-	INLINE bool Any() const { return 1; }
+	void SelectAll() 	{ }
+	bool Any() const { return 1; }
 
-	INLINE operator RaySelector<1>() const {
+	operator RaySelector<1>() const {
 		RaySelector<1> sel;
 		sel.SelectAll();
 		return sel;
@@ -158,22 +169,22 @@ class RayGroup
 public:
 	enum { size=size_, sharedOrigin=sharedOrigin_ };
 
-	INLINE RayGroup(const Vec3q *o, const Vec3q *d, const Vec3q *i) :origin(o), dir(d), iDir(i) { }
+	RayGroup(const Vec3q *o, const Vec3q *d, const Vec3q *i) :origin(o), dir(d), iDir(i) { }
 
 	template <int tSize>
-	INLINE RayGroup(const RayGroup<tSize,sharedOrigin> &rhs,int offset) {
+	RayGroup(const RayGroup<tSize,sharedOrigin> &rhs,int offset) {
 		origin=rhs.OriginPtr()+(sharedOrigin?0:offset);
 		dir=rhs.DirPtr()+offset;
 		iDir=rhs.IDirPtr()+offset;
 	}
 
-	INLINE const Vec3q &Dir(int n) const	{ return dir[n]; }
-	INLINE const Vec3q &Origin(int n) const { return origin[sharedOrigin?0:n]; }
-	INLINE const Vec3q &IDir(int n) const	{ return iDir[n]; }
+	const Vec3q &Dir(int n) const	{ return dir[n]; }
+	const Vec3q &Origin(int n) const { return origin[sharedOrigin?0:n]; }
+	const Vec3q &IDir(int n) const	{ return iDir[n]; }
 
-	INLINE const Vec3q *DirPtr() const		{ return dir; }
-	INLINE const Vec3q *OriginPtr() const	{ return origin; }
-	INLINE const Vec3q *IDirPtr() const		{ return iDir; }
+	const Vec3q *DirPtr() const		{ return dir; }
+	const Vec3q *OriginPtr() const	{ return origin; }
+	const Vec3q *IDirPtr() const		{ return iDir; }
 
 private:
 	const Vec3q *dir,*iDir,*origin;
@@ -185,19 +196,19 @@ class CornerRays
 public:
 	CornerRays() { }
 	template <int size, bool shared>
-	CornerRays(const RayGroup<size, shared> &gr) {
+	explicit CornerRays(const RayGroup<size, shared> &gr) {
 		Assert(shared);
 
 		Vec3f td[4];
-		td[0] = ExtractN(gr.Dir( size == 4? 0 : size == 16?  0 :  0 ), 0);
-		td[1] = ExtractN(gr.Dir( size == 4? 1 : size == 16?  3 : 21 ), 1);
-		td[2] = ExtractN(gr.Dir( size == 4? 2 : size == 16? 12 : 42 ), 2);
-		td[3] = ExtractN(gr.Dir( size == 4? 3 : size == 16? 15 : 63 ), 3);
+		td[0] = ExtractN(gr. Dir( size == 4? 0 : size == 16?  0 : size == 32?  0 : size == 64?  0 : size == 128? 0  : 0  ), 0);
+		td[1] = ExtractN(gr. Dir( size == 4? 1 : size == 16?  3 : size == 32? 19 : size == 64? 21 : size == 128? 85 : 85 ), 1);
+		td[2] = ExtractN(gr. Dir( size == 4? 2 : size == 16? 10 : size == 32? 10 : size == 64? 42 : size == 128? 42 : 170), 2);
+		td[3] = ExtractN(gr. Dir( size == 4? 3 : size == 16? 15 : size == 32? 31 : size == 64? 63 : size == 128? 127: 255), 3);
 		Convert(td, dir);
-		td[0] = ExtractN(gr.IDir( size == 4? 0 : size == 16?  0 :  0 ), 0);
-		td[1] = ExtractN(gr.IDir( size == 4? 1 : size == 16?  3 : 21 ), 1);
-		td[2] = ExtractN(gr.IDir( size == 4? 2 : size == 16? 12 : 42 ), 2);
-		td[3] = ExtractN(gr.IDir( size == 4? 3 : size == 16? 15 : 63 ), 3);
+		td[0] = ExtractN(gr.IDir( size == 4? 0 : size == 16?  0 : size == 32?  0 : size == 64?  0 : size == 128? 0  : 0  ), 0);
+		td[1] = ExtractN(gr.IDir( size == 4? 1 : size == 16?  3 : size == 32? 19 : size == 64? 21 : size == 128? 85 : 85 ), 1);
+		td[2] = ExtractN(gr.IDir( size == 4? 2 : size == 16? 10 : size == 32? 10 : size == 64? 42 : size == 128? 42 : 170), 2);
+		td[3] = ExtractN(gr.IDir( size == 4? 3 : size == 16? 15 : size == 32? 31 : size == 64? 63 : size == 128? 127: 255), 3);
 		Convert(td, idir);
 		origin = ExtractN(gr.Origin(0), 0);
 	}
@@ -214,7 +225,7 @@ class RayInterval {
 public:
 	RayInterval() { }
 	template <int size, bool shared>
-	RayInterval(const RayGroup<size, shared> &rays) {
+	explicit RayInterval(const RayGroup<size, shared> &rays) {
 		Assert(shared);
 
 		ComputeMinMax<size>(&rays.Dir(0), &minDir, &maxDir);
@@ -225,7 +236,20 @@ public:
 		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
 		iz = floatq(minIDir.z, maxIDir.z, minIDir.z, maxIDir.z);
 	}
-	RayInterval(const CornerRays &rays) {
+	template <int size, bool shared, class Selector>
+	RayInterval(const RayGroup<size, shared> &rays, const Selector &selector) {
+		Assert(shared);
+
+		ComputeMinMax<size>(&rays.Dir(0), &minDir, &maxDir, selector);
+		ComputeMinMax<size>(&rays.IDir(0), &minIDir, &maxIDir, selector);
+		origin = ExtractN(rays.Origin(0), 0);
+		
+		ix = floatq(minIDir.x, maxIDir.x, minIDir.x, maxIDir.x);
+		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
+		iz = floatq(minIDir.z, maxIDir.z, minIDir.z, maxIDir.z);
+	}
+	//TODO: zle; sa dziury np. na sponzie
+/*	RayInterval(const CornerRays &rays) {
 		minIDir = Minimize(rays.idir);
 		minDir = Minimize(rays.dir);
 		maxIDir = Maximize(rays.idir);
@@ -235,7 +259,7 @@ public:
 		ix = floatq(minIDir.x, maxIDir.x, minIDir.x, maxIDir.x);
 		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
 		iz = floatq(minIDir.z, maxIDir.z, minIDir.z, maxIDir.z);
-	}
+	} */
 
 	floatq ix, iy, iz;
 	Vec3f minIDir, maxIDir, minDir, maxDir;
@@ -243,11 +267,11 @@ public:
 };
 
 struct ShadowCache {
-	INLINE ShadowCache() { Clear(); }
-	INLINE void Clear() { lastTri=~0; }
-	INLINE int Size() const { return lastTri==~0?0:1; }
-	INLINE void Insert(int idx) { lastTri=idx; }
-	INLINE int operator[](int n) const { return lastTri; }
+	ShadowCache() { Clear(); }
+	void Clear() { lastTri=~0; }
+	int Size() const { return lastTri==~0?0:1; }
+	void Insert(int idx) { lastTri=idx; }
+	int operator[](int n) const { return lastTri; }
 
 private:
 	int lastTri;
@@ -258,38 +282,44 @@ struct Context {
 	enum { size=size_, flags=flags_, sharedOrigin=flags&isct::fShOrig };
 
 	template <int tSize>
-	INLINE Context(const Context<tSize,flags> &c,int off) :rays(c.rays,off) {
+	Context(const Context<tSize,flags> &c,int off) :rays(c.rays,off) {
 		distance=c.distance+off;
 		object=c.object+off;
 		element=c.element+off;
 		stats=c.stats;
 	}
 
-	INLINE Context(const RayGroup<size,sharedOrigin> &tRays,floatq *dist,i32x4 *obj,
+	Context(const RayGroup<size,sharedOrigin> &tRays,floatq *dist,i32x4 *obj,
 			i32x4 *elem,TreeStats<1> *st=0) :rays(tRays) {
 		distance=dist; object=obj; element=elem;
 		stats=st;
 	}
 
-	INLINE Context(const Vec3q *torig,const Vec3q *tdir,const Vec3q *tidir,floatq *dist,i32x4 *obj,i32x4 *elem,
+	Context(const Vec3q *torig,const Vec3q *tdir,const Vec3q *tidir,floatq *dist,i32x4 *obj,i32x4 *elem,
 			TreeStats<1> *st=0) :rays(torig,tdir,tidir) {
 		distance=dist; object=obj; element=elem;
 		stats=st;
 	}
 
-	INLINE const Vec3q &Dir(int q) const { return rays.Dir(q); }
-	INLINE const Vec3q &IDir(int q) const { return rays.IDir(q); }
-	INLINE const Vec3q &Origin(int q) const { return rays.Origin(q); }
+	const Vec3q &Dir(int q) const { return rays.Dir(q); }
+	const Vec3q &IDir(int q) const { return rays.IDir(q); }
+	const Vec3q &Origin(int q) const { return rays.Origin(q); }
 
-	INLINE f32x4 &Distance(int q) { return distance[q]; }
-	INLINE i32x4 &Object(int q) { return object[q]; }
-	INLINE i32x4 &Element(int q) { return element[q]; }
+	f32x4 &Distance(int q) { return distance[q]; }
+	i32x4 &Object(int q) { return object[q]; }
+	i32x4 &Element(int q) { return element[q]; }
 
-	Context<size/4,flags> Split(int part) const {
+	const Context<size/4,flags> Split(int part) const {
 		const int offset = part * (size / 4);
 		Context<size/4, flags> out(RayGroup<size/4,sharedOrigin>(rays, offset), distance + offset,
 					 object+offset,element+offset,stats);
-		out.mailbox = mailbox;
+		return out;
+	}
+
+	const Context<size/2,flags> Split2(int part) const {
+		const int offset = part * (size / 2);
+		Context<size/2, flags> out(RayGroup<size/2, sharedOrigin>(rays, offset), distance + offset,
+					 object+offset, element + offset, stats);
 		return out;
 	}
 
@@ -300,7 +330,6 @@ struct Context {
 	i32x4  * __restrict__ __attribute__((aligned(16))) object;
 	i32x4  * __restrict__ __attribute__((aligned(16))) element;
 	ShadowCache shadowCache;
-	ObjectIdxBuffer<4> mailbox;
 	TreeStats<1> *stats;
 };
 
@@ -323,13 +352,13 @@ struct FContext {
 		stats=c.stats;
 	}
 
-	INLINE const Vec3f &Dir(int) const { return dir; }
-	INLINE const Vec3f &IDir(int) const { return iDir; }
-	INLINE const Vec3f &Origin(int) const { return origin; }
+	const Vec3f &Dir(int) const { return dir; }
+	const Vec3f &IDir(int) const { return iDir; }
+	const Vec3f &Origin(int) const { return origin; }
 
-	INLINE float &Distance(int) { return distance[0]; }
-	INLINE int   &Object  (int) { return object  [0]; }
-	INLINE int   &Element (int) { return element [0]; }
+	float &Distance(int) { return distance[0]; }
+	int   &Object  (int) { return object  [0]; }
+	int   &Element (int) { return element [0]; }
 	
 	void UpdateStats(const TreeStats<1> &st) { if(stats) *stats+=st; }
 

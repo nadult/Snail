@@ -67,7 +67,7 @@ struct StatsShader
 	Vec3q operator[](int) const {
 		return Vec3q(
 			   float(stats.GetIntersects()) * (0.01f / size),
-			   float(stats.GetLoopIters()) * (0.01f / size),
+			   float(stats.GetLoopIters()) * (0.1f / size),
 			   float(stats.GetSkips() * 0.5f + (stats.GetBreaking() ? 0.25 : 0)));
 	}
 
@@ -131,7 +131,7 @@ TreeStats <1> Scene <AccStruct>::TraceLight(const Selector &inputSel, const shad
 
 		for(int q = 0; q < size; q++) stats.TracingRays(CountMaskBits(sel[q]));
 		Context <size, isct::fShOrig | isct::fShadow> c(&lPos, fromLight, idir, tDistance, 0, 0, &stats);
-		geometry.TraversePacket(c, sel);
+		geometry.TraverseShadow(c, sel);
 
 		for(int q = 0; q < size; q++) {
 			if(!sel[q]) continue;
@@ -206,7 +206,7 @@ Result <size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &r
 
 	Context <size, flags> tc(rays, tDistance, tObject, tElement, &result.stats);
 
-	geometry.TraversePacket(tc, inputSelector);
+	geometry.TraversePrimary(tc); // todo: inputSelector
 	RaySelector <size> selector = inputSelector;
 	RaySelector <size> reflSel;
 	reflSel.Clear();

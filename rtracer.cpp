@@ -333,7 +333,7 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown('J')) {
 			Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
 
-			lights.push_back(Light(cam.pos, colors[rand()&3], 800.0f * 0.001f * sceneScale));
+			lights.push_back(Light(cam.pos, colors[rand()&3], 300.0f * 0.001f * sceneScale));
 		}
 
 		{

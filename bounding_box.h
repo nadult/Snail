@@ -199,6 +199,26 @@ public:
 
 		return !ForAll( lmax < Real(0.0f) || lmin > Min(lmax, maxDist) );
 	}
+	template <class Real,class Vec>
+	bool TestI(Vec orig, Vec idir, Real maxDist, f32x4b mask) const {
+		Real l1 = idir.x * (Real(min.x) - orig.x);
+		Real l2 = idir.x * (Real(max.x) - orig.x);
+		Real lmin = Min(l1, l2);
+		Real lmax = Max(l1, l2);
+
+		l1 = idir.y * (Real(min.y) - orig.y);
+		l2 = idir.y * (Real(max.y) - orig.y);
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		l1 = idir.z * (Real(min.z) - orig.z);
+		l2 = idir.z * (Real(max.z) - orig.z);
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		return !ForAll( lmax < Real(0.0f) || lmin > Min(lmax, maxDist) || !mask );
+	}
+
 
 	bool TestInterval(const RayInterval&) const;
 

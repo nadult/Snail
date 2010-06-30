@@ -277,7 +277,10 @@ public:
 	}
 
 	template <int flags, int size>
-	int Collide(Context<size, flags> &c, int idx, int firstActive = 0) const NOINLINE;
+	int Collide(Context<size, flags> &c, int idx, int firstActive = 0, int lastActive = size - 1) const NOINLINE;
+	
+	template <int flags, int size, class Selector>
+	int CollideShadow(Context<size, flags> &c, int firstActive, int lastActive, Selector &sel) const NOINLINE;
 
 	template <class Vec0, class Vec, class Real>
 	const Vec3 <typename Vec::TScalar> Barycentric(Vec0 rOrig, Vec rDir, Real dist, int) const;
@@ -346,7 +349,7 @@ const Isct <typename Vec::TScalar, 1, isct::fDistance | flags> Triangle::Collide
 }
 
 template <int flags, int size>
-int Triangle::Collide(Context<size, flags> &c, int idx, int firstActive) const {
+int Triangle::Collide(Context<size, flags> &c, int idx, int firstActive, int lastActive) const {
 	Vec3p nrm = Nrm();
 	Vec3q ta(a);
 
@@ -354,7 +357,7 @@ int Triangle::Collide(Context<size, flags> &c, int idx, int firstActive) const {
 	if(flags & isct::fShOrig)
 		sharedTVec = c.Origin(0) - ta;
 
-	for(int q = firstActive; q < size; q++) {
+	for(int q = firstActive; q <= lastActive; q++) {
 		floatq det  = c.Dir(q) | nrm;
 		Vec3q  tvec = flags & isct::fShOrig ? sharedTVec : c.Origin(q) - ta;
 
@@ -366,7 +369,35 @@ int Triangle::Collide(Context<size, flags> &c, int idx, int firstActive) const {
 		test = test && dist > floatq(0.0f) && dist < c.Distance(q);
 
 		c.Distance(q) = Condition(test, dist, c.Distance(q));
-		c.Object(q) = Condition(i32x4b(test), i32x4(idx), c.Object(q));
+		if(!(flags & isct::fShadow))
+			c.Object(q) = Condition(i32x4b(test), i32x4(idx), c.Object(q));
+	}
+
+	return 0;
+}
+
+template <int flags, int size, class Selector>
+int Triangle::CollideShadow(Context<size, flags> &c, int firstActive, int lastActive, Selector &sel) const {
+	Vec3p nrm = Nrm();
+	Vec3q ta(a);
+
+	Vec3q sharedTVec;
+	if(flags & isct::fShOrig)
+		sharedTVec = c.Origin(0) - ta;
+
+	for(int q = firstActive; q <= lastActive; q++) {
+		floatq det  = c.Dir(q) | nrm;
+		Vec3q  tvec = flags & isct::fShOrig ? sharedTVec : c.Origin(q) - ta;
+
+		floatq u    = c.Dir(q) | (Vec3q(ba) ^ tvec);
+		floatq v    = c.Dir(q) | (tvec ^ Vec3q(ca));
+		f32x4b test = Min(u, v) >= 0.0f && u + v <= det * floatq(ca.t0);
+
+		floatq dist = -(tvec | nrm) / det;
+		test = test && dist > floatq(0.0f) && dist < c.Distance(q);
+
+		c.Distance(q) = Condition(test, dist, c.Distance(q));
+		sel[q] &= ~ForWhich(test);
 	}
 
 	return 0;

@@ -198,7 +198,8 @@ namespace
 
 	void GLWindow::RenderImage(const gfxlib::Texture &image) {
 		static GLuint texture, texW = 0, texH = 0;
-		Assert(image.GetFormat() == gfxlib::TI_A8R8G8B8);
+		Assert(image.GetFormat() == gfxlib::TI_A8R8G8B8 ||
+				image.GetFormat() == gfxlib::TI_A8B8G8R8);
 		
 		if(image.Width() > texW || image.Height() > texH) {
 			if(!texW && !texH) glGenTextures(1, &texture);
