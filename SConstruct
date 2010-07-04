@@ -69,15 +69,14 @@ def ExcludeFromList(tList,tObj):
 	return outList
 
 def Build( env, progName, libs ):
-	baseObjects		= BuildObjects( env, ExcludeFromList(ListCppFiles('./'),'gen_bihtrav.cpp'), './')
+	baseObjects		= BuildObjects( env, ListCppFiles('./'), './')
 	formatsObjects	= BuildObjects( env, ListCppFiles('formats/'	), 'formats/')
-	bihObjects		= BuildObjects( env, ListCppFiles('bih/'		), 'bih/')
 	bvhObjects		= BuildObjects( env, ListCppFiles('bvh/'		), 'bvh/')
 	shadingObjects	= BuildObjects( env, ListCppFiles('shading/'	), 'shading/')
 	samplingObjects	= BuildObjects( env, ListCppFiles('sampling/'	), 'sampling/')
 	gameObjects		= BuildObjects( env, ListCppFiles('game/'		), 'game/')
 	env.Program(	progName,
-					baseObjects + formatsObjects + bihObjects + samplingObjects + shadingObjects + gameObjects +
+					baseObjects + formatsObjects + samplingObjects + shadingObjects + gameObjects +
 					bvhObjects, LIBS = libs )
 
 Build( ReleaseEnv(envLinux64), 'rtracer' , libsLinux )

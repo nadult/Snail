@@ -67,46 +67,30 @@ const BBox &BBox::operator+=(const BBox &other) {
 bool BBox::TestInterval(const RayInterval &i) const {
 	float lmin, lmax;
 
-	if(1) {
-		float l1, l2, l3, l4;
+	float l1, l2, l3, l4;
 
-		l1 = i.minIDir.x * (min.x - i.origin.x);
-		l2 = i.maxIDir.x * (min.x - i.origin.x);
-		l3 = i.minIDir.x * (max.x - i.origin.x);
-		l4 = i.maxIDir.x * (max.x - i.origin.x);
-		
-		lmin = Min(Min(l1, l2), Min(l3, l4));
-		lmax = Max(Max(l1, l2), Max(l3, l4));
-
-		l1 = i.minIDir.y * (min.y - i.origin.y);
-		l2 = i.maxIDir.y * (min.y - i.origin.y);
-		l3 = i.minIDir.y * (max.y - i.origin.y);
-		l4 = i.maxIDir.y * (max.y - i.origin.y);
-		lmin = Max(lmin, Min(Min(l1, l2), Min(l3, l4)));
-		lmax = Min(lmax, Max(Max(l1, l2), Max(l3, l4)));
-
-		l1 = i.minIDir.z * (min.z - i.origin.z);
-		l2 = i.maxIDir.z * (min.z - i.origin.z);
-		l3 = i.minIDir.z * (max.z - i.origin.z);
-		l4 = i.maxIDir.z * (max.z - i.origin.z);
-		lmin = Max(lmin, Min(Min(l1, l2), Min(l3, l4)));
-		lmax = Min(lmax, Max(Max(l1, l2), Max(l3, l4)));
-	}
-	else {
-		// FFS its MUCH slower than scalar...	
-		floatq ll = i.ix * (floatq(_mm_shuffle_ps(_mm_set_ss(min.x), _mm_set_ss(max.x), 0)) - floatq(i.origin.x));
-		lmin = Minimize(ll);
-		lmax = Maximize(ll);
-
-		ll = i.iy * (floatq(_mm_shuffle_ps(_mm_set_ss(min.y), _mm_set_ss(max.y), 0)) - floatq(i.origin.y));
-		lmin = Max(lmin, Minimize(ll));
-		lmax = Min(lmax, Maximize(ll));
-
-		ll = i.iz * (floatq(_mm_shuffle_ps(_mm_set_ss(min.z), _mm_set_ss(max.z), 0)) - floatq(i.origin.z));
-		lmin = Max(lmin, Minimize(ll));
-		lmax = Min(lmax, Maximize(ll));
-	}
+	l1 = i.minIDir.x * (min.x - i.maxOrigin.x);
+	l2 = i.maxIDir.x * (min.x - i.maxOrigin.x);
+	l3 = i.minIDir.x * (max.x - i.minOrigin.x);
+	l4 = i.maxIDir.x * (max.x - i.minOrigin.x);
 	
+	lmin = Min(Min(l1, l2), Min(l3, l4));
+	lmax = Max(Max(l1, l2), Max(l3, l4));
+
+	l1 = i.minIDir.y * (min.y - i.maxOrigin.y);
+	l2 = i.maxIDir.y * (min.y - i.maxOrigin.y);
+	l3 = i.minIDir.y * (max.y - i.minOrigin.y);
+	l4 = i.maxIDir.y * (max.y - i.minOrigin.y);
+	lmin = Max(lmin, Min(Min(l1, l2), Min(l3, l4)));
+	lmax = Min(lmax, Max(Max(l1, l2), Max(l3, l4)));
+
+	l1 = i.minIDir.z * (min.z - i.maxOrigin.z);
+	l2 = i.maxIDir.z * (min.z - i.maxOrigin.z);
+	l3 = i.minIDir.z * (max.z - i.minOrigin.z);
+	l4 = i.maxIDir.z * (max.z - i.minOrigin.z);
+	lmin = Max(lmin, Min(Min(l1, l2), Min(l3, l4)));
+	lmax = Min(lmax, Max(Max(l1, l2), Max(l3, l4)));
+
 	return lmax >= 0.0f && lmin <= lmax;
 }
 

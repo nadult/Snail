@@ -9,7 +9,6 @@
 #include "shading/material.h"
 
 #include "bvh/tree.h"
-//#include "bih/tree.h"
 
 #include "tree_box.h"
 #include "scene.h"
@@ -41,8 +40,6 @@ void PrintHelp() {
 }
 
 typedef BVH StaticTree;
-//typedef bih::Tree<TriangleVector> StaticTree;
-//typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
 
 template <class Scene>
 void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
@@ -138,8 +135,8 @@ static void MoveCamera(Camera &cam, GLWindow &window, float speed) {
 		float dx = window.MouseMove().x;
 		float dy = window.MouseMove().y;
 
-		if(dx) cam.Rotate(-dx * 0.02);
-		if(dy) cam.RotateY(dy * 0.02);
+		if(dx) cam.Rotate(-dx * 0.01);
+		if(dy) cam.RotateY(dy * 0.01);
 	}
 
 	Vec3f move(0, 0, 0);
@@ -295,6 +292,7 @@ static int tmain(int argc, char **argv) {
 	gVals[0] = 0; gVals[2] = 0;
 	gVals[4] = 0; gVals[3] = 0;
 	
+
 	gdVals[0] = 0.1f * sceneScale;
 	gdVals[1] = 0.2f * sceneScale;
 

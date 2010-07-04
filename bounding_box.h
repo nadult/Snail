@@ -23,6 +23,10 @@ public:
 	float Width() const { return max.x-min.x; }
 	float Height() const { return max.y-min.y; }
 	float Depth() const { return max.z-min.z; }
+	float SurfaceArea() const {
+		Vec3f size = Size();
+		return 2.0f * (size.x * (size.y + size.z) + size.y * size.z);
+	}
 	
 	bool Contains(const BBox &rhs) const {
 		return 	min.x <= rhs.min.x && min.y <= rhs.min.y && min.z <= rhs.min.z &&

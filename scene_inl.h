@@ -201,11 +201,9 @@ Result <size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &r
 	for(int q = 0; q < size; q++) tDistance[q] = maxDist;
 	for(int q = 0; q < size; q++) result.stats.TracingRays(CountMaskBits(inputSelector[q]));
 
-	//	bool doAntialias[size/blockSize]={0,};
-
 	Context <size, flags> tc(rays, tDistance, tObject, tElement, &result.stats);
 
-	geometry.TraversePrimary(tc); // todo: inputSelector
+	geometry.TraversePrimary(tc, inputSelector);
 	RaySelector <size> selector = inputSelector;
 	RaySelector <size> reflSel;
 	reflSel.Clear();
@@ -317,8 +315,6 @@ Result <size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &r
 									 cache.samplingCache);
 		}
 		else {
-			//	doAntialias[b]=1;
-
 			for(uint q = 0; q < 4; q++) {
 				uint tq = b4 + q;
 				if(!selector[tq]) continue;
@@ -407,7 +403,7 @@ Result <size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &r
 
 				if(EXPECT_TAKEN(matId0))
 					materials[matId0 - 1]->Shade
-									  (samples + b4, RayGroup <blockSize, sharedOrigin>(tc.rays, b4), cache.samplingCache);
+						  (samples + b4, RayGroup <blockSize, sharedOrigin>(tc.rays, b4), cache.samplingCache);
 			}
 			else {
 				static_assert(blockSize == 4, "If you want some other value, you will have to modify the code here");
@@ -450,9 +446,9 @@ Result <size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &r
 			}
 		}
 	}
+	reflSel = selector;
 
-
-	if(reflSel.Any() && !gVals[5] && cache.reflections < 1) {
+	if(reflSel.Any() && gVals[5] && cache.reflections < 1) {
 		cache.reflections++;
 		Result <size> reflResult = TraceReflection(rays.DirPtr(), samples, reflSel, cache);
 		result.stats += reflResult.stats;
@@ -507,36 +503,6 @@ Result <size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &r
 		for(int q = 0; q < size; q++)
 			result.color[q] = col;
 	}
-
-	/*	if(isct::fPrimary&&sharedOrigin&&!cache.supersampling&&!gVals[6]) {
-	 *      cache.supersampling=1;
-	 *
-	 *      for(uint b=0;b<size/blockSize;b++) {
-	 *          uint b4=b<<2;
-	 *
-	 *          if(!doAntialias[b]) continue;
-	 *
-	 *          Vec3q dir[blockSize*4],idir[blockSize*4];
-	 *          for(int q=0;q<blockSize;q++) {
-	 *              Vec3f dirs[4]; Convert(rays.Dir(q+b4),dirs);
-	 *              dir[q*4+0]=rays.Dir(q+b4)+(Vec3q)((dirs[1]-dirs[0])*0.33333f);
-	 *              dir[q*4+1]=rays.Dir(q+b4)-(Vec3q)((dirs[1]-dirs[0])*0.33333f);
-	 *              dir[q*4+2]=rays.Dir(q+b4)+(Vec3q)((dirs[2]-dirs[0])*0.33333f);
-	 *              dir[q*4+3]=rays.Dir(q+b4)-(Vec3q)((dirs[2]-dirs[0])*0.33333f);
-	 *          }
-	 *          for(int q=0;q<blockSize*4;q++) idir[q]=VInv(dir[q]);
-	 *
-	 *          Result<blockSize*4> sup=RayTrace(RayGroup<blockSize*4,1>(rays.OriginPtr(),dir,idir),
-	 *                                              FullSelector<blockSize*4>(),cache);
-	 *
-	 *          for(int q=0;q<blockSize;q++)
-	 *              result.color[b4+q]=(result.color[b4+q ]+
-	 *                  sup.color[q*4+0]+sup.color[q*4+1]+sup.color[q*4+2]+sup.color[q*4+3] )*f32x4(1.0f/5.0f);
-	 *          result.stats += sup.stats;
-	 *      }
-	 *
-	 *      cache.supersampling=0;
-	 *  } */
 
 	return result;
 }

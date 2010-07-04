@@ -230,7 +230,10 @@ public:
 
 		ComputeMinMax<size>(&rays.Dir(0), &minDir, &maxDir);
 		ComputeMinMax<size>(&rays.IDir(0), &minIDir, &maxIDir);
-		origin = ExtractN(rays.Origin(0), 0);
+		if(shared)
+			minOrigin = maxOrigin = ExtractN(rays.Origin(0), 0);
+		else ComputeMinMax<size>(&rays.Origin(0), &minOrigin, &maxOrigin);
+
 		
 		ix = floatq(minIDir.x, maxIDir.x, minIDir.x, maxIDir.x);
 		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
@@ -242,7 +245,9 @@ public:
 
 		ComputeMinMax<size>(&rays.Dir(0), &minDir, &maxDir, selector);
 		ComputeMinMax<size>(&rays.IDir(0), &minIDir, &maxIDir, selector);
-		origin = ExtractN(rays.Origin(0), 0);
+		if(shared)
+			minOrigin = maxOrigin = ExtractN(rays.Origin(0), 0);
+		else ComputeMinMax<size>(&rays.Origin(0), &minOrigin, &maxOrigin);
 		
 		ix = floatq(minIDir.x, maxIDir.x, minIDir.x, maxIDir.x);
 		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
@@ -263,7 +268,7 @@ public:
 
 	floatq ix, iy, iz;
 	Vec3f minIDir, maxIDir, minDir, maxDir;
-	Vec3f origin;
+	Vec3f minOrigin, maxOrigin;
 };
 
 struct ShadowCache {
