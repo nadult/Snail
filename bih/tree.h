@@ -38,6 +38,54 @@ SERIALIZE_AS_POD(bih::Node)
 
 namespace bih {
 
+	// Inverse mailbox
+	template <int size>
+	class ObjectIdxBuffer 
+	{
+	public:
+		ObjectIdxBuffer() {
+			for(int n = 0; n < size; n++)
+				indices[n] = -1;
+		}
+		void Insert(u32 idx) {
+			indices[idx & (size - 1)] = idx;
+		}
+		bool Find(u32 idx) const {
+			return indices[idx & (size - 1)] == idx;
+		}
+
+		u32 indices[size];
+	};
+
+	template <>
+	class ObjectIdxBuffer<256>
+	{
+	public:
+		//TODO: dziala tylko dla indeksow < 2^24
+		ObjectIdxBuffer() {
+			for(int n = 0; n < 256; n++)
+				indices[n] = 0xffff;
+		}
+		void Insert(u32 idx) {
+			int gIdx = idx & 255;
+			indices[gIdx] = (idx >> 8) & 0xffff;
+		}
+		bool Find(u32 idx) const {
+			return indices[idx & 255] == ((idx >> 8) & 0xffff);
+		}
+
+		u16 indices[256];
+	};
+
+	template <>
+	class ObjectIdxBuffer<0>
+	{
+	public:
+		void Insert(u32) { }
+		bool Find(u32) { return false; }
+	};
+
+
 	class Index {
 	public:
 		Index() { }

@@ -31,20 +31,6 @@ bool Triangle::TestInterval(const RayInterval &i) const {
 	return Min(u[1], v[1]) >= 0.0f && u[0] + v[0] <= det * ca.t0;
 }
 
-bool Triangle::TestFrustum(const Frustum &frustum) const {
-	Vec3f p1 = P1(), p2 = P2(), p3 = P3();
-	
-	for(int n = 0; n < 1 + 0*Frustum::size; n++) {
-		Vec3f normal = frustum.planes[n].normal;
-		float dist = frustum.planes[n].distance;
-
-		if(	(p1 | normal) < dist && (p2 | normal) < dist && (p3 | normal) < dist)
-			return false;
-	}
-
-	return true;
-}
-
 bool Triangle::TestCornerRays(const CornerRays &rays) const {
 	Vec3f nrm = Nrm();
 	floatq det = rays.dir | nrm;

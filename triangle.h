@@ -285,7 +285,6 @@ public:
 	template <class Vec0, class Vec, class Real>
 	const Vec3 <typename Vec::TScalar> Barycentric(Vec0 rOrig, Vec rDir, Real dist, int) const;
 
-	bool TestFrustum(const Frustum&) const;
 	bool TestCornerRays(const CornerRays&) const;
 	bool TestInterval(const RayInterval&) const;
 private:

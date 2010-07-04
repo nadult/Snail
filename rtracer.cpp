@@ -197,8 +197,8 @@ static int tmain(int argc, char **argv) {
 		else if(string("-flipNormals")==argv[n]) flipNormals=0;
 		else if(string("-texPath")==argv[n]) { texPath=argv[n+1]; n++; }
 		else {
-			if(argv[n][0]=='-') printf("Unknown option: %s\n",argv[n]);
-			else modelFile=argv[n];
+			if(argv[n][0] == '-') printf("Unknown option: %s\n",argv[n]);
+			else modelFile = argv[n];
 		}
 	}
 
@@ -207,11 +207,12 @@ static int tmain(int argc, char **argv) {
 	printf("Loading...\n");
 	double buildTime = GetTime();
 	BaseScene baseScene; {
-		string fileName = string("scenes/")+modelFile;
+		string fileName = string("scenes/") + modelFile;
 		if(fileName.find(".proc") != string::npos)
 			baseScene.LoadDoom3Proc(fileName);
 		else if(fileName.find(".obj") != string::npos)
 			baseScene.LoadWavefrontObj(fileName);
+		else ThrowException("Unrecognized format: ", fileName);
 
 		int tris = 0;
 		for(int n = 0; n < baseScene.objects.size(); n++)

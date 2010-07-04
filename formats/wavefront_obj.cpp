@@ -67,7 +67,8 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 	objects.clear();
 	
 	std::filebuf fb;
-	if(!fb.open (fileName.c_str(),std::ios::in)) return;
+	if(!fb.open (fileName.c_str(),std::ios::in))
+		ThrowException("Error while opening: ", fileName);
 
 	std::istream is(&fb);
 	
