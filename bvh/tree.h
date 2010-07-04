@@ -167,18 +167,19 @@ public:
 	
 	template <int flags,int size,template <int> class Selector>
 	void TraversePrimary(Context<size,flags> &c,const Selector<size> &selector) const {
-		bool split = 1, any = Selector<size>::full;
+		bool split = 1;
 
 		bool selectorsFiltered = size <= 64;
 		if(!Selector<size>::full) {
+			bool any = 0;
 			for(int n = 0; n < size/4; n++) {
 				int mask = selector.Mask4(n);
 				selectorsFiltered &= mask == 0x0f0f0f0f;
 				any |= mask;
 			}
+			if(!any)
+				return;
 		}
-		if(!any)
-			return;
 
 		if((Selector<size>::full || selectorsFiltered) && size <= 64) {
 			//TODO distant origins
@@ -200,25 +201,26 @@ public:
 		}
 	}
 	
-	template <int flags,template <int> class Selector>
-	void TraverseShadow(Context<4,flags> &c,const Selector<4> &selector) const {
-		TraverseShadow0(c, selector);
-	}
+//	template <int flags,template <int> class Selector>
+//	void TraverseShadow(Context<4,flags> &c,const Selector<4> &selector) const {
+//		TraverseShadow0(c, selector);
+//	}
 
 	template <int flags,int size,template <int> class Selector>
 	void TraverseShadow(Context<size,flags> &c,const Selector<size> &selector) const {
-		bool split = 1, any = 0;
+		bool split = 1;
 
 		bool selectorsFiltered = size <= 64;
 		if(!Selector<size>::full) {
+			bool any = 0;
 			for(int n = 0; n < size/4; n++) {
 				int mask = selector.Mask4(n);
 				selectorsFiltered &= mask == 0x0f0f0f0f;
 				any |= mask;
 			}
+			if(!any)
+				return;
 		}
-		if(!any)
-			return;
 
 		if((Selector<size>::full || selectorsFiltered) && size <= 64) {
 			floatq dot = 1.0f;
@@ -233,9 +235,9 @@ public:
 		if(split) {
 			for(int q = 0; q < 4; q++) {
 				Context<size/4,flags> subC(c.Split(q));
-				if(flags & isct::fShadow) subC.shadowCache = c.shadowCache;
+				subC.shadowCache = c.shadowCache;
 				TraverseShadow0(subC, selector.SubSelector(q));
-				if(flags & isct::fShadow) c.shadowCache = subC.shadowCache;
+				c.shadowCache = subC.shadowCache;
 			}
 			if(c.stats) c.stats->Skip();
 		}

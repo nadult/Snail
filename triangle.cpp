@@ -39,7 +39,7 @@ bool Triangle::TestInterval(const RayInterval &i) const {
 		(nrm.z < 0.0f? i.minDir.z : i.maxDir.z) * nrm.z;
 	if(det < 0.0f)
 		return 0;
-/*
+
 	Vec3f tvec = i.minOrigin - a;
 	Vec3f c1 = ba ^ tvec, c2 = tvec ^ ca;
 	float u[2] = {
@@ -48,7 +48,10 @@ bool Triangle::TestInterval(const RayInterval &i) const {
 	float v[2] = {
 		(c2.x < 0.0f? i.maxDir.x : i.minDir.x) * c2.x + (c2.y < 0.0f? i.maxDir.y : i.minDir.y) * c2.y + (c2.z < 0.0f? i.maxDir.z : i.minDir.z) * c2.z,
 		(c2.x < 0.0f? i.minDir.x : i.maxDir.x) * c2.x + (c2.y < 0.0f? i.minDir.y : i.maxDir.y) * c2.y + (c2.z < 0.0f? i.minDir.z : i.maxDir.z) * c2.z };
-*/
+	
+	return Min(u[1], v[1]) >= 0.0f && u[0] + v[0] <= det * ca.t0;
+
+/*	// TODO: zleeee
 	Vec3<Interval> tvec(
 		Interval(i.minOrigin.x, i.maxOrigin.x) - a.x,
 		Interval(i.minOrigin.y, i.maxOrigin.y) - a.y,
@@ -60,7 +63,7 @@ bool Triangle::TestInterval(const RayInterval &i) const {
 
 	Interval u = c1 | dir, v = c2 | dir;
 
-	return Min(u.max, v.max) >= 0.0f && u.min + v.min <= det * ca.t0;
+	return Min(u.max, v.max) >= 0.0f && u.min + v.min <= det * ca.t0; */
 }
 
 bool Triangle::TestCornerRays(const CornerRays &rays) const {

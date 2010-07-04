@@ -180,24 +180,6 @@ namespace isct {
 
 }
 
-/*
-inline bool TestForNans(Vec3q v,int id,bool thr=1) {
-	bool nan=isnan(v.x[0])||isnan(v.x[1])||isnan(v.x[2])||isnan(v.x[3]);
-	nan=nan||isnan(v.y[0])||isnan(v.y[1])||isnan(v.y[2])||isnan(v.y[3]);
-	nan=nan||isnan(v.z[0])||isnan(v.z[1])||isnan(v.z[2])||isnan(v.z[3]);
-
-	if(nan) {
-		printf("%d: %f %f %f %f\n%f %f %f %f\n%f %f %f %f\n",id,
-				v.x[0],v.x[1],v.x[2],v.x[3],
-				v.y[0],v.y[1],v.y[2],v.y[3],
-				v.z[0],v.z[1],v.z[2],v.z[3]);
-		if(thr) ThrowException("NANs! run for your lives!");
-		return 1;
-	}
-
-	return 0;
-}*/
-
 // Intersection
 template <class Real,int packetSize,int flags_>
 class Isct {

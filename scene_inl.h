@@ -182,7 +182,7 @@ TreeStats <1> Scene <AccStruct>::TraceLight(const Selector &inputSel, const shad
 }
 
 template <class AccStruct> template <int size, bool sharedOrigin, class Selector>
-Result <size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &rays,
+Result<size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &rays,
 										  const Selector &inputSelector, Cache &cache) const {
 	enum {
 		flags = sharedOrigin ? isct::fShOrig | isct::fPrimary : 0,
@@ -201,7 +201,7 @@ Result <size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &r
 	for(int q = 0; q < size; q++) tDistance[q] = maxDist;
 	for(int q = 0; q < size; q++) result.stats.TracingRays(CountMaskBits(inputSelector[q]));
 
-	Context <size, flags> tc(rays, tDistance, tObject, tElement, &result.stats);
+	Context<size, flags> tc(rays, tDistance, tObject, tElement, &result.stats);
 
 	geometry.TraversePrimary(tc, inputSelector);
 	RaySelector <size> selector = inputSelector;
@@ -459,7 +459,7 @@ Result <size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &r
 					(reflResult.color[q] - samples[q].diffuse) * floatq(0.3f), samples[q].diffuse);
 		}
 	}
-	if(refrSel.Any() && !gVals[5] && (flags & isct::fPrimary)) {
+	if(refrSel.Any() && gVals[5]) {
 		Result <size> refrResult = TraceRefraction(rays, samples, refrSel, cache);
 		result.stats += refrResult.stats;
 
@@ -519,7 +519,9 @@ Result<size> Scene <AccStruct>::TraceReflection(const Vec3q *__restrict__ dir,
 		idir[q]     = SafeInv(reflDir[q]);
 	}
 
-	result = RayTrace(RayGroup <size, 0>(reflOrig, reflDir, idir), selector, cache);
+	result = selector.All()?
+		RayTrace(RayGroup <size, 0>(reflOrig, reflDir, idir), FullSelector<size>(), cache) :
+		RayTrace(RayGroup <size, 0>(reflOrig, reflDir, idir), selector, cache);
 	return result;
 }
 

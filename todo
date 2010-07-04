@@ -1,12 +1,3 @@
-BIH:
-- problem z pustymi drzewami (segfault)
-- poprawic mipmapy w prostokatnych teksturkach
-- jakis dziwny bug ktory moze powodowac zapetlenie sie algorytmu trawersowania ;/
-- zamienic wierzcholki dummy ktore wskazuja na 0, na ostatni node ...
-- przyspieszyc mono tracing
-
-- problem w kolejnosci mnozenia macierzy
-- przyspieszyc budowe eliminujac zbedne wywolania rekurencyjne
-- przyspieszyc budowe; optymalizacje boxow otaczajacych robic na krawedziach a nie trojkatach
-- uzyc RayGroup::IDir
-
+Bug z odbiciami widoczny na pompei.obj, odbicia na plaskich scianach
+dzialaja w pewnym promieniu od pewnego punktu.
+Inny bug z odbiciami jest widoczny na rurkach na abramsie

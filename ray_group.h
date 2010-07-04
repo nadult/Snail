@@ -33,11 +33,12 @@ template <int size_>
 class RaySelector {
 public:
 	enum { size=size_, full=0 };
-	static_assert((size&3)==0,"Selector size must be a power of 4");
+	static_assert((size & (size - 1)) == 0, "Selector size must be a power of 2");
 
 private:
 	union {
 		RaySelector<size/4> sub[4];
+//		RaySelector<size/2> sub2[2];
 		char bits[size];
 		int bits4[size/4];
 	};
@@ -46,12 +47,15 @@ public:
 
 	RaySelector<size/4> &SubSelector(int idx) { return sub[idx]; }
 	const RaySelector<size/4> &SubSelector(int idx) const { return sub[idx]; }
+	
+//	RaySelector<size/2> &SubSelector2(int idx) { return sub2[idx]; }
+//	const RaySelector<size/2> &SubSelector2(int idx) const { return sub2[idx]; }
 
-	char &operator[](int idx)				{ return bits[idx]; }
-	const char &operator[](int idx) const	{ return bits[idx]; }
+	char &operator[](int idx) { return bits[idx]; }
+	char operator[](int idx) const { return bits[idx]; }
 
-	int &Mask4(int idx) 						{ return bits4[idx]; }
-	const int &Mask4(int idx) const 			{ return bits4[idx]; }
+	int &Mask4(int idx) { return bits4[idx]; }
+	int Mask4(int idx) const { return bits4[idx]; }
 
 	bool Any() const {
 		bool ret=0;
@@ -61,12 +65,23 @@ public:
 	bool All() const {
 		bool ret = 1;
 		for(int n = 0; n < size / 4; n++)
-			ret &= bits4[n] == 15;
+			ret &= bits4[n] == 0x0f0f0f0f;
 		return ret;
 	}
 
 	void Clear()			{ for(int n=0;n<size/4;n++) bits4[n]=0; }
 	void SelectAll() 	{ for(int n=0;n<size/4;n++) bits4[n]=0x0f0f0f0f; }
+};
+
+template<>
+class RaySelector<0> {
+public:
+	enum { size=0, full=0 };
+public:
+	const char operator[](int idx) const	{ return 0; }
+	const char Mask4(int idx) const { return 0; }
+	bool Any() const { return 0; }
+	bool All() const { return 0; }
 };
 
 template <>
@@ -76,13 +91,13 @@ public:
 private:
 	char bits;
 public:
-	f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(bits); }
+	const f32x4b SSEMask(int idx) const { return GetSSEMaskFromBits(bits); }
 
-	char &operator[](int idx)				{ return bits; }
-	const char &operator[](int idx) const	{ return bits; }
+	char &operator[](int idx) { return bits; }
+	char operator[](int idx) const { return bits; }
 
-	char &Mask4(int idx) 					{ return bits; }
-	const char &Mask4(int idx) const 		{ return bits; }
+	char &Mask4(int idx) { return bits; }
+	char Mask4(int idx) const { return bits; }
 	bool Any() const { return bits? 1 : 0; }
 	bool All() const { return bits == 15; }
 
@@ -94,17 +109,21 @@ public:
 template <int size_>
 class FullSelector {
 public:
-	enum { size=size_, full=1 };
-	static_assert((size&3)==0,"Selector size must be a power of 4");
+	enum { size=size_, full = 1 };
+	static_assert((size & (size - 1)) == 0, "Selector size must be a power of 2");
 	
 private:
 	FullSelector<size/4> sub[4];
+//	FullSelector<size/2> sub2[2];
 
 public:
 	f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(15); }
 
 	FullSelector<size/4> &SubSelector(int idx) { return sub[idx]; }
 	const FullSelector<size/4> &SubSelector(int idx) const { return sub[idx]; }
+	
+//	FullSelector<size/2> &SubSelector2(int idx) { return sub2[idx]; }
+//	const FullSelector<size/2> &SubSelector2(int idx) const { return sub2[idx]; }
 
 	//TODO ...
 	char &operator[](int idx) { static char t = 15; return t; }
@@ -116,7 +135,7 @@ public:
 	bool Any() const { return 1; }
 	bool All() const { return 1; }
 
-	operator RaySelector<size>() const {
+	operator const RaySelector<size>() const {
 		RaySelector<size> sel;
 		sel.SelectAll();
 		return sel;
@@ -134,12 +153,24 @@ public:
 
 	void SelectAll() 	{ }
 	bool Any() const { return 1; }
+	bool All() const { return 1; }
 
 	operator RaySelector<1>() const {
 		RaySelector<1> sel;
 		sel.SelectAll();
 		return sel;
 	}
+};
+
+template<>
+class FullSelector<0> {
+public:
+	enum { size=0, full=0 };
+public:
+	const char operator[](int idx) const	{ return 0; }
+	const char Mask4(int idx) const { return 0; }
+	bool Any() const { return 0; }
+	bool All() const { return 0; }
 };
 
 // returns 8 for mixed rays
