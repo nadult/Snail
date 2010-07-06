@@ -210,15 +210,93 @@ public:
 	}
 
 	const Vec3q &Dir(int n) const	{ return dir[n]; }
-	const Vec3q &Origin(int n) const { return origin[sharedOrigin?0:n]; }
+	const Vec3q &Origin(int n) const{ return origin[sharedOrigin?0:n]; }
 	const Vec3q &IDir(int n) const	{ return iDir[n]; }
 
 	const Vec3q *DirPtr() const		{ return dir; }
 	const Vec3q *OriginPtr() const	{ return origin; }
-	const Vec3q *IDirPtr() const		{ return iDir; }
+	const Vec3q *IDirPtr() const	{ return iDir; }
 
 private:
 	const Vec3q *dir,*iDir,*origin;
+};
+
+class Frustum
+{
+public:
+	Frustum() { }
+	template <int size, bool shared>
+	explicit Frustum(const RayGroup<size, shared> &gr) {
+		int majorAxis = MaxAxis(ExtractN(gr.Dir(0), 0));
+
+	/*	for(int axis = 0; axis < 3; axis++) {
+			auto sign = floatq( ((&gr.Dir(0).x)[axis] < floatq(0.0f)).m );
+			if(sign[0] != sign[1] || sign[0] != sign[2] || sign[0] != sign[3])
+				continue;
+
+			int q = 1;
+			for(; q < size; q++)
+				if(ForAny( floatq( ((&gr.Dir(q).x)[axis] < floatq(0.0f)).m ) != sign ))
+					break;
+
+			if(q == size) {
+				majorAxis = axis;
+				break;
+			}
+		} */
+
+		int uAxis = (majorAxis + 1) % 3, vAxis = (majorAxis + 2) % 3;
+		float maxUS, minUS, maxVS, minVS; {
+			floatq maxUSq = (&gr.Dir(0).x)[uAxis] * (&gr.IDir(0).x)[majorAxis];
+			floatq minUSq = maxUSq;
+
+			for(int q = 1; q < size; q++) {
+				floatq slope = (&gr.Dir(q).x)[uAxis] * (&gr.IDir(q).x)[majorAxis];
+				maxUSq = Max(maxUSq, slope);
+				minUSq = Min(minUSq, slope);
+			}
+			
+			floatq maxVSq = (&gr.Dir(0).x)[vAxis] * (&gr.IDir(0).x)[majorAxis];
+			floatq minVSq = maxVSq;
+			for(int q = 1; q < size; q++) {
+				floatq slope = (&gr.Dir(q).x)[vAxis] * (&gr.IDir(q).x)[majorAxis];
+				maxVSq = Max(maxVSq, slope);
+				minVSq = Min(minVSq, slope);
+			}
+			maxUS = Maximize(maxUSq); minUS = Minimize(minUSq);
+			maxVS = Maximize(maxVSq); minVS = Minimize(minVSq);
+		}
+		
+		bool flip = (&gr.Dir(0).x)[majorAxis][0] < 0.0f;
+
+		Vec3f nrm[4];
+		(&nrm[0].x)[uAxis] =  1.0f; (&nrm[0].x)[majorAxis] = -maxUS; (&nrm[0].x)[vAxis] = 0.0f;
+		(&nrm[1].x)[uAxis] = -1.0f; (&nrm[1].x)[majorAxis] =  minUS; (&nrm[1].x)[vAxis] = 0.0f;
+		(&nrm[2].x)[vAxis] =  1.0f; (&nrm[2].x)[majorAxis] = -maxVS; (&nrm[2].x)[uAxis] = 0.0f;
+		(&nrm[3].x)[vAxis] = -1.0f; (&nrm[3].x)[majorAxis] =  minVS; (&nrm[3].x)[uAxis] = 0.0f;
+
+		for(int n = 0; n < 4; n++)
+			nrm[n] *= RSqrt(nrm[n] | nrm[n]);
+		if(!flip) for(int n = 0; n < 4; n++)
+			nrm[n] = -nrm[n];
+
+		if(shared) {
+			Vec3f origin = ExtractN(gr.Origin(0), 0);
+			for(int p = 0; p < 4; p++)
+				planes[p] = Plane(origin, nrm[p]);
+		}
+		else {
+			Vec3f omin, omax;
+			ComputeMinMax<size>(&gr.Origin(0), &omin, &omax);
+			exit(0);
+			for(int p = 0; p < 4; p++) {
+
+			}
+		}
+
+	}
+
+	Plane planes[4];
 };
 
 //TODO specjalizacja dla roznych originow?
@@ -242,6 +320,13 @@ public:
 		td[3] = ExtractN(gr.IDir( size == 4? 3 : size == 16? 15 : size == 32? 31 : size == 64? 63 : size == 128? 127: 255), 3);
 		Convert(td, idir);
 		origin = ExtractN(gr.Origin(0), 0);
+	}
+	explicit CornerRays(const Frustum &frustum) {
+		Vec3f rays[4];
+		Intersect(frustum.planes[0], frustum.planes[2], rays[0], origin);
+		Intersect(frustum.planes[0], frustum.planes[3], rays[1], origin);
+		Intersect(frustum.planes[1], frustum.planes[2], rays[2], origin);
+		Intersect(frustum.planes[1], frustum.planes[3], rays[3], origin);
 	}
 
 	// Order:

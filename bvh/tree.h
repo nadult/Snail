@@ -55,7 +55,7 @@ public:
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = elements[first + n];
 					if((flags & isct::fShOrig) && Selector::full?	tri.TestCornerRays(crays) :
-																	1 || tri.TestInterval(interval)) {
+																	gVals[0] || tri.TestInterval(interval)) {
 						tri.Collide(c, first + n, firstActive, lastActive);
 						stats.Intersection(size);
 					}
@@ -193,11 +193,37 @@ public:
 		}
 
 		if(split) {
-			for(int q = 0; q < 4; q++) {
-				Context<size/4,flags> subC(c.Split(q));
-				TraversePrimary0(subC, selector.SubSelector(q));
+			if(gVals[0]) {
+				RaySelector<size> temp = selector;
+				int start = 0;
+				while(true) {
+					RaySelector<size> newSel;
+					newSel.Clear();
+
+					for(;start < size; start++)
+						if(temp[start]) break;
+					if(start == size)
+						break;
+	
+					Vec3q lead;
+					for(int i = 0; i < 4; i++)
+						if(temp[start] & (1 << i))
+							lead = (Vec3q)ExtractN(c.Dir(start), i);
+					for(int q = start; q < size; q++) {
+						int mask = ForWhich((c.Dir(q) | lead) >= 0.9) & temp[q];
+						temp[q] &= ~mask;
+						newSel[q] = mask;
+					}
+					TraversePrimary0(c, newSel);
+				}
 			}
-		//	if(c.stats) c.stats->Skip();
+			else {
+				for(int q = 0; q < 4; q++) {
+					Context<size/4,flags> subC(c.Split(q));
+					TraversePrimary0(subC, selector.SubSelector(q));
+				}
+			}
+			if(c.stats) c.stats->Skip();
 		}
 	}
 	

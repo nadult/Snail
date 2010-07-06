@@ -287,6 +287,7 @@ public:
 
 	bool TestCornerRays(const CornerRays&) const;
 	bool TestInterval(const RayInterval&) const;
+	bool TestFrustum(const Frustum&) const;
 private:
 	void SetFlag1(uint value) {
 		a.t0 = UValue(value).f;

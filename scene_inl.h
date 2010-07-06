@@ -448,7 +448,7 @@ Result<size> Scene <AccStruct>::RayTrace(const RayGroup <size, sharedOrigin> &ra
 	}
 	reflSel = selector;
 
-	if(reflSel.Any() && gVals[5] && cache.reflections < 1) {
+	if(reflSel.Any() && !gVals[5] && cache.reflections < 1) {
 		cache.reflections++;
 		Result <size> reflResult = TraceReflection(rays.DirPtr(), samples, reflSel, cache);
 		result.stats += reflResult.stats;

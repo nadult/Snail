@@ -118,6 +118,7 @@ void ComputeMinMax(const Vec3q *vec, Vec3f *outMin, Vec3f *outMax, const Selecto
 		*outMax = Maximize(max);
 	}
 }
+
 std::ostream &operator<<(std::ostream&, const Vec3f&);
 std::ostream &operator<<(std::ostream&, const floatq&);
 
@@ -143,6 +144,8 @@ struct Plane {
 	Vec3f normal;
 	float distance;
 };
+
+void Intersect(const Plane &a, const Plane &b, Vec3f &dir, Vec3f &point);
 
 
 std::ostream &operator<<(std::ostream&, const Plane&);
