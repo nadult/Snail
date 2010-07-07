@@ -10,10 +10,8 @@
 
 #include "bvh/tree.h"
 
-#include "tree_box.h"
 #include "scene.h"
 #include "mesh.h"
-#include "scene_builder.h"
 #include "frame_counter.h"
 
 #include "font.h"
@@ -245,39 +243,6 @@ static int tmain(int argc, char **argv) {
 		}
 		Vec3f size = bMax - bMin;
 		sceneScale = Length(size);
-	}
-
-	SceneBuilder<StaticTree> builder; /*{
-		vector<BaseScene::Object> objects;
-
-		for(int n=0;n<baseScene.objects.size();n++) {
-			const BaseScene::Object &obj=baseScene.objects[n];
-			bool contained=0;
-			for(int k=0;k<objects.size();k++) {
-				BaseScene::Object &tObj=objects[k];
-				if(obj.GetBBox().Contains(tObj.GetBBox(),1.5f)||tObj.GetBBox().Contains(obj.GetBBox(),1.5f)) {
-					contained=1;
-					tObj.Join(obj);
-					break;
-				}
-			}
-			if(!contained) objects.push_back(baseScene.objects[n]);
-
-		}
-
-		int count=0;	
-		for(int o=0;o<objects.size();o++) {
-			BaseScene::Object &obj=objects[o];
-		//	obj.Optimize();
-			TriangleVector vec=obj.ToTriangleVector();
-		if(vec.size()) {
-			builder.AddObject(new StaticTree(vec),obj.GetTrans(),obj.GetBBox());
-				builder.AddInstance(count++,Identity<>());
-			}
-		}
-	}*/ {
-		builder.AddObject(&staticScene.geometry,Identity<>(),staticScene.geometry.GetBBox());
-		builder.AddInstance(0,Identity<>());
 	}
 
 	GLWindow window(resx, resy, fullscreen);

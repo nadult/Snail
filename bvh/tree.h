@@ -28,17 +28,19 @@ public:
 				tri.Nrm(), tri.Nrm(), tri.Nrm(), 0, 1);
 	}
 
-	template <int flags, int size, class Selector>
-	void TraversePrimary0(Context<size, flags> &c, const Selector sel) const {
+	template <bool sharedOrigin, bool hasMask>
+	void TraversePrimary0(Context<sharedOrigin, hasMask> &c) const {
+		const int size = c.Size();
+
 		struct StackElem { int node; short firstActive, lastActive; };
 		StackElem stack[maxDepth + 2]; int stackPos = 0;
-		stack[stackPos++] = {0, 0, size - 1};
+		stack[stackPos++] = {0, 0, (short)(size - 1)};
 		TreeStats<1> stats;
 
 		int sign[3] = { c.Dir(0).x[0] < 0.0f, c.Dir(0).y[0] < 0.0f, c.Dir(0).z[0] < 0.0f };
 
 		CornerRays crays(c.rays);
-		RayInterval interval(c.rays, sel);
+		RayInterval interval(c.rays);
 		
 		while(stackPos) {
 			int nNode = stack[--stackPos].node;
@@ -54,8 +56,7 @@ public:
 				int count = nodes[nNode].count, first = nodes[nNode].first & 0x7fffffff;
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = elements[first + n];
-					if((flags & isct::fShOrig) && Selector::full?	tri.TestCornerRays(crays) :
-																	gVals[0] || tri.TestInterval(interval)) {
+					if(sharedOrigin && !hasMask? tri.TestCornerRays(crays) : gVals[0] || tri.TestInterval(interval)) {
 						tri.Collide(c, first + n, firstActive, lastActive);
 						stats.Intersection(size);
 					}
@@ -69,17 +70,17 @@ public:
 					continue;
 
 				for(int q = firstActive; q < size; q++)
-					if(sel[q] && box.TestI(c.Origin(q), c.IDir(q), c.Distance(q), GetSSEMaskFromBits(sel[q]))) {
+					if(c.Mask(q) && box.TestI(c.Origin(q), c.IDir(q), c.Distance(q), c.SSEMask(q))) {
 						firstActive = q;
 						test = 1;
 						break;
 					}
 				for(int q = lastActive; q > firstActive; q--)
-					if(sel[q] && box.TestI(c.Origin(q), c.IDir(q), c.Distance(q), GetSSEMaskFromBits(sel[q]))) {
+					if(c.Mask(q) && box.TestI(c.Origin(q), c.IDir(q), c.Distance(q), c.SSEMask(q))) {
 						lastActive = q;
 						test = 1;
 						break;
-				}
+					}
 			}
 
 			if(test) {
@@ -95,20 +96,22 @@ public:
 			(*c.stats) += stats;
 	}
 
-	template <int flags, int size, class Selector>
-	void TraverseShadow0(Context<size, flags> &c, Selector sel, int firstNode = 0) const {
+	template <bool sharedOrigin, bool hasMask>
+	void TraverseShadow0(Context<sharedOrigin, hasMask> &c, int firstNode = 0) const {
+		const int size = c.Size();
+
 		struct StackElem { int node; short firstActive, lastActive; };
 		StackElem stack[maxDepth + 2]; int stackPos = 0;
-		stack[stackPos++] = {firstNode, 0, size - 1 };
+		stack[stackPos++] = {firstNode, 0, (short)(size - 1) };
 		TreeStats<1> stats;
 
 		int sign[3] = { c.Dir(0).x[0] < 0.0f, c.Dir(0).y[0] < 0.0f, c.Dir(0).z[0] < 0.0f };
 		if(c.shadowCache[0] != ~0) {
 			const Triangle &tri = elements[c.shadowCache[0]];
-			tri.CollideShadow(c, 0, size - 1, sel);
+			tri.CollideShadow(c, 0, size - 1);
 		}
 
-		RayInterval interval(c.rays, sel);
+		RayInterval interval(c.rays);
 		
 		while(stackPos) {
 			int nNode = stack[--stackPos].node;
@@ -125,7 +128,7 @@ public:
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = elements[first + n];
 					if(tri.TestInterval(interval)) {
-						tri.CollideShadow(c, firstActive, lastActive, sel);
+						tri.CollideShadow(c, firstActive, lastActive);
 						c.shadowCache.Insert(first + n);
 						stats.Intersection(size);
 					}
@@ -139,13 +142,13 @@ public:
 					continue;
 
 				for(int q = firstActive; q < size; q++)
-					if(sel[q] && box.TestI(c.Origin(q), c.IDir(q), c.Distance(q), GetSSEMaskFromBits(sel[q]))) {
+					if(c.Mask(q) && box.TestI(c.Origin(q), c.IDir(q), c.Distance(q), c.SSEMask(q))) {
 						firstActive = q;
 						test = 1;
 						break;
 					}
 				for(int q = lastActive; q > firstActive; q--)
-					if(sel[q] && box.TestI(c.Origin(q), c.IDir(q), c.Distance(q), GetSSEMaskFromBits(sel[q]))) {
+					if(c.Mask(q) && box.TestI(c.Origin(q), c.IDir(q), c.Distance(q), c.SSEMask(q))) {
 						lastActive = q;
 						test = 1;
 						break;
@@ -165,14 +168,17 @@ public:
 			(*c.stats) += stats;
 	}
 	
-	template <int flags,int size,template <int> class Selector>
-	void TraversePrimary(Context<size,flags> &c,const Selector<size> &selector) const {
+	template <bool sharedOrigin, bool hasMask>
+	void TraversePrimary(Context<sharedOrigin, hasMask> &c) const {
+		const int size = c.Size();
 		bool split = 1;
 
-		bool selectorsFiltered = size <= 64;
-		if(!Selector<size>::full) {
+		RaySelector selector(c.MaskPtr(), c.Size());
+		bool selectorsFiltered = 1;
+		if(hasMask) {
+			const int size4 = size / 4; //TODO: ...
 			bool any = 0;
-			for(int n = 0; n < size/4; n++) {
+			for(int n = 0; n < size4; n++) {
 				int mask = selector.Mask4(n);
 				selectorsFiltered &= mask == 0x0f0f0f0f;
 				any |= mask;
@@ -181,7 +187,7 @@ public:
 				return;
 		}
 
-		if((Selector<size>::full || selectorsFiltered) && size <= 64) {
+		if(!hasMask || selectorsFiltered) {
 			//TODO distant origins
 			floatq dot = 1.0f;
 			for(int q = 1; q < size; q++)
@@ -189,15 +195,16 @@ public:
 			split = ForAny(dot < 0.99);
 
 			if(!split)
-				TraversePrimary0(c, selector);
+				TraversePrimary0(c);
 		}
 
 		if(split) {
-			if(gVals[0]) {
-				RaySelector<size> temp = selector;
+		//	if(gVals[0]) {
+				RaySelector temp = selector;
 				int start = 0;
 				while(true) {
-					RaySelector<size> newSel;
+					char buf[c.Size() + 4];
+					RaySelector newSel(buf, c.Size());
 					newSel.Clear();
 
 					for(;start < size; start++)
@@ -214,15 +221,17 @@ public:
 						temp[q] &= ~mask;
 						newSel[q] = mask;
 					}
-					TraversePrimary0(c, newSel);
+					//TODO: nowy selektor
+				//	TraversePrimary0(Context, newSel);
 				}
-			}
-			else {
-				for(int q = 0; q < 4; q++) {
-					Context<size/4,flags> subC(c.Split(q));
-					TraversePrimary0(subC, selector.SubSelector(q));
-				}
-			}
+		//	}
+		//	else {
+				//TODO: split
+			//	for(int q = 0; q < 4; q++) {
+			//		Context<size/4,flags> subC(c.Split(q));
+			//		TraversePrimary0(subC, selector.SubSelector(q));
+			//	}
+		//	}
 			if(c.stats) c.stats->Skip();
 		}
 	}
@@ -232,8 +241,11 @@ public:
 //		TraverseShadow0(c, selector);
 //	}
 
-	template <int flags,int size,template <int> class Selector>
-	void TraverseShadow(Context<size,flags> &c,const Selector<size> &selector) const {
+	template <bool sharedOrigin, bool hasMask>
+	void TraverseShadow(Context<sharedOrigin, hasMask> &c) const {
+		TraverseShadow0(c);
+
+		/*
 		bool split = 1;
 
 		bool selectorsFiltered = size <= 64;
@@ -266,7 +278,7 @@ public:
 				c.shadowCache = subC.shadowCache;
 			}
 			if(c.stats) c.stats->Skip();
-		}
+		}*/
 	}
 
 

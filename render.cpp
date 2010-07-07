@@ -8,7 +8,6 @@
 #include "gl_window.h"
 #include "formats/loader.h"
 #include "base_scene.h"
-#include "tree_box.h"
 #include "font.h"
 #include "render.h"
 
@@ -62,14 +61,13 @@ struct RenderTask: public Task {
 			for(int x = 0; x < width;x += PWidth) {
 				rayGen.Generate(PWidth, PHeight, startX + x, startY + y, dir);
 				for(int n = 0; n < NQuads; n++) idir[n] = SafeInv(dir[n]);
-				
-				Result<NQuads> result =
-					scene->RayTrace(RayGroup<NQuads,1>(&origin,dir,idir),FullSelector<NQuads>(),cache);
-				*outStats += result.stats;
+			
+				Vec3q colors[NQuads];	
+				*outStats += scene->RayTrace(RayGroup<1, 0>(&origin, dir, idir, NQuads), cache, colors);
 
 				if(NQuads == 1) {
 					union { __m128i icol; u8 c[16]; };
-					icol = ConvColor(result.color[0]).m;
+					icol = ConvColor(colors[0]).m;
 
 					u8 *p1 = outPtr + y * pitch + x * 4;
 					u8 *p2 = p1 + pitch;
@@ -80,9 +78,9 @@ struct RenderTask: public Task {
 					p2[ 4] = c[12]; p2[ 5] = c[13]; p2[ 6] = c[14];
 				}
 				else {
-					rayGen.Decompose(result.color, result.color);
+					rayGen.Decompose(colors, colors);
 
-					Vec3q *src = result.color;
+					const Vec3q *src = colors;
 					u8 *dst = outPtr + x * 4 + y * pitch;
 					int lineDiff = pitch - PWidth * 4;
 

@@ -1,2 +1,7 @@
 Bug z odbiciami widoczny na pompei.obj, odbicia na plaskich scianach
 dzialaja w pewnym promieniu od pewnego punktu.
+
+Uporzadkowac maski (consty i Mask4)
+
+refactoring
+bledy w swiatlach widoczne z gory na doom3/admin.proc

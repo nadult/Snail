@@ -6,41 +6,31 @@
 
 namespace shading {
 
-	template <bool NDotR=true>
+	template <bool NDotR = true>
 	class TexMaterial: public Material {
 	public:
-		TexMaterial(sampling::PSampler tSampler) :Material(fTexCoords),sampler(tSampler) { }
+		TexMaterial(sampling::PSampler tSampler) :Material(fTexCoords), sampler(tSampler) { }
 		TexMaterial() { }
 
-		template <class Rays>
-		void Shade_(Sample *__restrict__ samples,const Rays &rays,SCache &sc) const {
-			sampler->Sample(samples,sc);
+		template <bool sharedOrigin, bool hasMask>
+		void Shade_(Sample *samples, const RayGroup<sharedOrigin, hasMask> &rays, SCache &sc) const {
+			sampler->Sample(samples, sc);
 
-			for(int q=0;q<blockSize;q++) {
-				Sample &s=samples[q];
+			for(int q = 0; q < blockSize; q++) {
+				Sample &s = samples[q];
 
-				Vec3q diffuse=s.temp1;
-				Vec3q specular(0.0f,0.0f,0.0f);
-				if(NDotR) diffuse*=rays.Dir(q)|s.normal;
+				Vec3q diffuse = s.temp1;
+				Vec3q specular(0.0f, 0.0f, 0.0f);
+				if(NDotR) diffuse *= rays.Dir(q) | s.normal;
 
-				s.diffuse=diffuse;
-				s.specular=specular;
-			}
-		}
-		template <class Rays>
-		void Shade_(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const Rays &rays,SCache &sc) const {
-			sampler->Sample(samples,sc);
-
-			for(int q=0;q<blockSize;q++) {
-				if(!ForAny(mask[q])) continue;
-				Sample &s=samples[q];
-
-				Vec3q diffuse=s.temp1;
-				Vec3q specular(0.0f,0.0f,0.0f);
-				if(NDotR) diffuse*=rays.Dir(q)|s.normal;
-
-				s.diffuse=Condition(mask[q],diffuse,s.diffuse);
-				s.specular=Condition(mask[q],specular,s.specular);
+				if(hasMask) {
+					s.diffuse = Condition(rays.SSEMask(q), diffuse, s.diffuse);
+					s.specular = Condition(rays.SSEMask(q), diffuse, s.specular);
+				}
+				else {
+					s.diffuse = diffuse;
+					s.specular = diffuse;
+				}
 			}
 		}
 

@@ -3,7 +3,7 @@
 
 #include "rtbase.h"
 
-template <int,bool> class RayGroup;
+template <bool,bool> class RayGroup;
 
 class CornerRays;
 class RayInterval;

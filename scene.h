@@ -5,20 +5,11 @@
 #include "light.h"
 #include "shading.h"
 #include "formats/loader.h"
-
-template <int size_>
-class Result {
-public:
-	enum { size=size_ };
-	Vec3q color[size];
-	TreeStats<1> stats;
-};
-
 #include "sampling.h"
 
 class Cache {
 public:
-	Cache() :supersampling(0),reflections(0) { }
+	Cache() :supersampling(0), reflections(0) { }
 
 	int reflections;
 	ShTriCache shTriCache;
@@ -42,8 +33,8 @@ public:
 	// Call this after changes made to any of the attributes
 	void Update() {
 		materialFlags.resize(materials.size());
-		for(int n=0;n<materials.size();n++)
-			materialFlags[n]=materials[n]->flags;
+		for(int n = 0; n < materials.size(); n++)
+			materialFlags[n] = materials[n]->flags;
 	}
 
 	AccStruct geometry;
@@ -51,20 +42,16 @@ public:
 	vector<Light> lights;
 	vector<PMaterial> materials;
 
-	template <int size,bool sharedOrigin,class Selector>
-	Result<size> RayTrace(const RayGroup<size,sharedOrigin>&,const Selector&,Cache&) const __attribute__((noinline));
+	template <bool sharedOrigin, bool hasMask>
+	TreeStats<1> RayTrace(const RayGroup<sharedOrigin, hasMask>&, Cache&, Vec3q *outColor)
+		const __attribute__((noinline));
 
 private:
-	template <int size,class Selector>
-	TreeStats<1> TraceLight(const Selector&,const shading::Sample*,Vec3q*__restrict__,Vec3q*__restrict__,int)
+	TreeStats<1> TraceLight(RaySelector, const shading::Sample*, Vec3q*__restrict__, Vec3q*__restrict__, int)
 							const __attribute__((noinline));
 
-	template <int size,template <int> class Selector>
-	Result<size> TraceReflection(const Vec3q*__restrict__,const shading::Sample *__restrict__,
-								 const Selector<size>&,Cache&) const __attribute__((noinline));
-	template <int size,bool sharedOrigin,template <int> class Selector>
-	Result<size> TraceRefraction(const RayGroup<size,sharedOrigin>&,const shading::Sample *__restrict__,
-								 const Selector<size>&,Cache&) const __attribute__((noinline));
+	TreeStats<1> TraceReflection(RaySelector, const Vec3q*, const shading::Sample*, Cache&, Vec3q *__restrict__)
+		const __attribute__((noinline));
 
 	vector<char> materialFlags;
 };

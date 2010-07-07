@@ -5,8 +5,7 @@
 
 extern f32x4b GetSSEMaskFromBits_array[16];
 
-INLINE f32x4b GetSSEMaskFromBits(u8 bits) {
-	assert(bits<=15);
+inline f32x4b GetSSEMaskFromBits(u8 bits) {
 	/*
 	union { u32 tmp[4]; __m128 out; };
 
@@ -19,215 +18,154 @@ INLINE f32x4b GetSSEMaskFromBits(u8 bits) {
 	return GetSSEMaskFromBits_array[bits];
 }
 
-INLINE int CountMaskBits(u8 bits) {
-	assert(bits <= 15);
+inline int CountMaskBits(u8 bits) {
 	static const char count[16] = { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4 };
 	return count[bits];
 }
 
-typedef int RayIndex;
-
-// this class stores a list of active rays
-// with their masks
-template <int size_>
+//TODO: zabezpieczyc operacje na 4 elementach na raz
 class RaySelector {
 public:
-	enum { size=size_, full=0 };
-	static_assert((size & (size - 1)) == 0, "Selector size must be a power of 2");
+	RaySelector(char *mask, int size) :mask(mask), size(size), size4((size + 3) / 4) { }
+	operator char*() { return mask; }
+	operator const char*() const { return mask; }
+
+	char operator[](int n) const { return mask[n]; }
+	char &operator[](int n) { return mask[n]; }
+	const f32x4b SSEMask(int n) const { return GetSSEMaskFromBits(mask[n]); }
+	int Mask4(int n) const { return mask4[n]; }
+	int &Mask4(int n) { return mask4[n]; }
+
+	bool Any() const {
+		for(int n = 0; n < size4; n++)
+			if(mask4[n])
+				return 1;
+		return 0;
+	}
+	bool All() const {
+		for(int n = 0; n < size4 - 1; n++)
+			if(mask4[n] != 0x0f0f0f0f)
+				return 0;
+
+		int lastMask = mask4[size4 - 1] | (0x0f0f0f0f << (8 * (4 - (size4 * 4 - size))));
+		return lastMask == 0x0f0f0f0f;
+	}
+	int Size() const { return size; }
+	int Size4() const { return size4; }
+
+	void Clear() {
+		for(int n = 0; n < size4; n++)
+			mask4[n] = 0;
+	}
+	void SelectAll() {
+		for(int n = 0; n < size4; n++)
+			mask4[n] = 0x0f0f0f0f;
+	}
 
 private:
 	union {
-		RaySelector<size/4> sub[4];
-//		RaySelector<size/2> sub2[2];
-		char bits[size];
-		int bits4[size/4];
+		char *mask;
+		int *mask4;
 	};
-public:
-	f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(bits[idx]); }
-
-	RaySelector<size/4> &SubSelector(int idx) { return sub[idx]; }
-	const RaySelector<size/4> &SubSelector(int idx) const { return sub[idx]; }
-	
-//	RaySelector<size/2> &SubSelector2(int idx) { return sub2[idx]; }
-//	const RaySelector<size/2> &SubSelector2(int idx) const { return sub2[idx]; }
-
-	char &operator[](int idx) { return bits[idx]; }
-	char operator[](int idx) const { return bits[idx]; }
-
-	int &Mask4(int idx) { return bits4[idx]; }
-	int Mask4(int idx) const { return bits4[idx]; }
-
-	bool Any() const {
-		bool ret=0;
-		for(int n=0;n<size/4;n++) ret|=bits4[n]?1:0;
-		return ret;
-	}
-	bool All() const {
-		bool ret = 1;
-		for(int n = 0; n < size / 4; n++)
-			ret &= bits4[n] == 0x0f0f0f0f;
-		return ret;
-	}
-
-	void Clear()			{ for(int n=0;n<size/4;n++) bits4[n]=0; }
-	void SelectAll() 	{ for(int n=0;n<size/4;n++) bits4[n]=0x0f0f0f0f; }
+	int size, size4;
 };
 
-template<>
-class RaySelector<0> {
-public:
-	enum { size=0, full=0 };
-public:
-	const char operator[](int idx) const	{ return 0; }
-	const char Mask4(int idx) const { return 0; }
-	bool Any() const { return 0; }
-	bool All() const { return 0; }
-};
-
-template <>
-class RaySelector<1> {
-public:
-	enum { size=1, full=0 };
-private:
-	char bits;
-public:
-	const f32x4b SSEMask(int idx) const { return GetSSEMaskFromBits(bits); }
-
-	char &operator[](int idx) { return bits; }
-	char operator[](int idx) const { return bits; }
-
-	char &Mask4(int idx) { return bits; }
-	char Mask4(int idx) const { return bits; }
-	bool Any() const { return bits? 1 : 0; }
-	bool All() const { return bits == 15; }
-
-	void Clear()		{ bits = 0; }
-	void SelectAll() 	{ bits = 15; }
-};
-
-
-template <int size_>
-class FullSelector {
-public:
-	enum { size=size_, full = 1 };
-	static_assert((size & (size - 1)) == 0, "Selector size must be a power of 2");
-	
-private:
-	FullSelector<size/4> sub[4];
-//	FullSelector<size/2> sub2[2];
-
-public:
-	f32x4b SSEMask(int idx) const			{ return GetSSEMaskFromBits(15); }
-
-	FullSelector<size/4> &SubSelector(int idx) { return sub[idx]; }
-	const FullSelector<size/4> &SubSelector(int idx) const { return sub[idx]; }
-	
-//	FullSelector<size/2> &SubSelector2(int idx) { return sub2[idx]; }
-//	const FullSelector<size/2> &SubSelector2(int idx) const { return sub2[idx]; }
-
-	//TODO ...
-	char &operator[](int idx) { static char t = 15; return t; }
-
-	char operator[](int idx) const			{ return 15; }
-	int Mask4(int idx) const 				{ return 0xf0f0f0f; }
-
-	void SelectAll() 	{ }
-	bool Any() const { return 1; }
-	bool All() const { return 1; }
-
-	operator const RaySelector<size>() const {
-		RaySelector<size> sel;
-		sel.SelectAll();
-		return sel;
-	}
-};
-
-template <>
-class FullSelector<1> {
-public:
-	enum { size=1, full=1 };
-	
-public:
-	char operator[](int idx) const	{ return 15; }
-	int Mask4(int idx) const 		{ return 15; }
-
-	void SelectAll() 	{ }
-	bool Any() const { return 1; }
-	bool All() const { return 1; }
-
-	operator RaySelector<1>() const {
-		RaySelector<1> sel;
-		sel.SelectAll();
-		return sel;
-	}
-};
-
-template<>
-class FullSelector<0> {
-public:
-	enum { size=0, full=0 };
-public:
-	const char operator[](int idx) const	{ return 0; }
-	const char Mask4(int idx) const { return 0; }
-	bool Any() const { return 0; }
-	bool All() const { return 0; }
-};
-
-// returns 8 for mixed rays
-inline int GetVecSign(const Vec3q &dir) {
-	int x=SignMask(dir.x),y=SignMask(dir.y),z=SignMask(dir.z);
-	int out=(x?1:0)+(y?2:0)+(z?4:0);
-
-	if((x>0&&x<15)||(y>0&&y<15)||(z>0&&z<15)) out=8;
-	else if(ForAny(	Min(Abs(dir.x),Min(Abs(dir.y),Abs(dir.z))) < f32x4(0.000001f))) out=8;
-
-	return out;
-}
-
-template <class Selector1,class Selector2>
-inline void SplitSelectorsBySign(const Selector1 &in,Selector2 out[9],Vec3q *dir) {
-	for(int n=0;n<9;n++) out[n].Clear();
-	for(int i=0;i<in.Num();i++) {
-		int n=in[i];
-		out[GetVecSign(dir[n])].Add(in,i);
-	}
-}
-
-
-template <int size_,bool sharedOrigin_>
+template <bool sharedOrigin_, bool hasMask_>
 class RayGroup
 {
 public:
-	enum { size=size_, sharedOrigin=sharedOrigin_ };
+	enum { sharedOrigin = sharedOrigin_, hasMask = hasMask_ };
 
-	RayGroup(const Vec3q *o, const Vec3q *d, const Vec3q *i) :origin(o), dir(d), iDir(i) { }
-
-	template <int tSize>
-	RayGroup(const RayGroup<tSize,sharedOrigin> &rhs,int offset) {
-		origin=rhs.OriginPtr()+(sharedOrigin?0:offset);
-		dir=rhs.DirPtr()+offset;
-		iDir=rhs.IDirPtr()+offset;
-	}
+	RayGroup(const Vec3q *origin, const Vec3q *dir, const Vec3q *iDir, int size)
+		:size(size), origin(origin), dir(dir), iDir(iDir) { }
+	RayGroup(const RayGroup &rhs, int offset)
+		:size(rhs.size - offset), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
+		iDir(rhs.iDir + offset) { }
+	RayGroup(const RayGroup<sharedOrigin, 1> &rhs, int offset)
+		:size(rhs.size - offset), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
+		iDir(rhs.iDir + offset) { }
 
 	const Vec3q &Dir(int n) const	{ return dir[n]; }
-	const Vec3q &Origin(int n) const{ return origin[sharedOrigin?0:n]; }
+	const Vec3q &Origin(int n) const{ return origin[sharedOrigin? 0 : n]; }
 	const Vec3q &IDir(int n) const	{ return iDir[n]; }
+	char Mask(int n) const			{ return 15; }
+	const f32x4b SSEMask(int n)const{ return _mm_set1_ps(UValue(~0).f); }
 
 	const Vec3q *DirPtr() const		{ return dir; }
 	const Vec3q *OriginPtr() const	{ return origin; }
 	const Vec3q *IDirPtr() const	{ return iDir; }
+	char *MaskPtr() const			{ return 0; }
+
+	int Size() const { return size; }
+
+	bool Any() const { return 1; }
+	bool All() const { return 1; }
 
 private:
-	const Vec3q *dir,*iDir,*origin;
+	int size;
+	const Vec3q *__restrict__ dir;
+	const Vec3q *__restrict__ iDir;
+	const Vec3q *__restrict__ origin;
+};
+
+template <bool sharedOrigin_>
+class RayGroup<sharedOrigin_, true>
+{
+public:
+	enum { sharedOrigin = sharedOrigin_, hasMask = true };
+
+	RayGroup(const Vec3q *origin, const Vec3q *dir, const Vec3q *iDir, int size, char *mask)
+		:size(size), origin(origin), dir(dir), iDir(iDir), mask(mask) { }
+	RayGroup(const Vec3q *origin, const Vec3q *dir, const Vec3q *iDir, RaySelector &selector)
+		:size(selector.Size()), origin(origin), dir(dir), iDir(iDir), mask(&selector[0]) { }
+	RayGroup(const RayGroup &rhs, int offset)
+		:size(rhs.size - offset), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
+		iDir(rhs.iDir + offset), mask(rhs.mask + offset) { }
+
+	const Vec3q &Dir(int n) const	{ return dir[n]; }
+	const Vec3q &Origin(int n) const{ return origin[sharedOrigin? 0 : n]; }
+	const Vec3q &IDir(int n) const	{ return iDir[n]; }
+	char Mask(int n) const			{ return mask[n]; }
+	const f32x4b SSEMask(int n) const{ return GetSSEMaskFromBits(mask[n]); }
+
+	const Vec3q *DirPtr() const		{ return dir; }
+	const Vec3q *OriginPtr() const	{ return origin; }
+	const Vec3q *IDirPtr() const	{ return iDir; }
+	char *MaskPtr() const			{ return mask; }
+
+	int Size() const { return size; }
+
+	bool Any() const {
+		for(int n = 0; n < size; n++)
+			if(mask[n])
+				return 1;
+		return 0;
+	}
+	bool All() const {
+		for(int n = 0; n < size; n++)
+			if(mask[n] != 15)
+				return 0;
+		return 1;
+	}
+
+
+private:
+	friend class RayGroup<sharedOrigin, false>;
+	int size;
+	const Vec3q *__restrict__ dir;
+	const Vec3q *__restrict__ iDir;
+	const Vec3q *__restrict__ origin;
+	char *mask;
 };
 
 class Frustum
 {
 public:
 	Frustum() { }
-	template <int size, bool shared>
-	explicit Frustum(const RayGroup<size, shared> &gr) {
+	template <bool shared, bool hasMask>
+	explicit Frustum(const RayGroup<shared, hasMask> &gr) {
 		int majorAxis = MaxAxis(ExtractN(gr.Dir(0), 0));
+		static_assert(!hasMask, "masked groups not supported yet");
 
 	/*	for(int axis = 0; axis < 3; axis++) {
 			auto sign = floatq( ((&gr.Dir(0).x)[axis] < floatq(0.0f)).m );
@@ -250,7 +188,7 @@ public:
 			floatq maxUSq = (&gr.Dir(0).x)[uAxis] * (&gr.IDir(0).x)[majorAxis];
 			floatq minUSq = maxUSq;
 
-			for(int q = 1; q < size; q++) {
+			for(int q = 1; q < gr.Size(); q++) {
 				floatq slope = (&gr.Dir(q).x)[uAxis] * (&gr.IDir(q).x)[majorAxis];
 				maxUSq = Max(maxUSq, slope);
 				minUSq = Min(minUSq, slope);
@@ -258,7 +196,7 @@ public:
 			
 			floatq maxVSq = (&gr.Dir(0).x)[vAxis] * (&gr.IDir(0).x)[majorAxis];
 			floatq minVSq = maxVSq;
-			for(int q = 1; q < size; q++) {
+			for(int q = 1; q < gr.Size(); q++) {
 				floatq slope = (&gr.Dir(q).x)[vAxis] * (&gr.IDir(q).x)[majorAxis];
 				maxVSq = Max(maxVSq, slope);
 				minVSq = Min(minVSq, slope);
@@ -287,13 +225,12 @@ public:
 		}
 		else {
 			Vec3f omin, omax;
-			ComputeMinMax<size>(&gr.Origin(0), &omin, &omax);
+			ComputeMinMax(&gr.Origin(0), gr.Size(), &omin, &omax);
 			exit(0);
 			for(int p = 0; p < 4; p++) {
 
 			}
 		}
-
 	}
 
 	Plane planes[4];
@@ -304,9 +241,11 @@ class CornerRays
 {
 public:
 	CornerRays() { }
-	template <int size, bool shared>
-	explicit CornerRays(const RayGroup<size, shared> &gr) {
-		Assert(shared);
+
+	template <bool shared, bool hasMask>
+	explicit CornerRays(const RayGroup<shared, hasMask> &gr) {
+		if(hasMask) return; //TODO
+		int size = gr.Size();
 
 		Vec3f td[4];
 		td[0] = ExtractN(gr. Dir( size == 4? 0 : size == 16?  0 : size == 32?  0 : size == 64?  0 : size == 128? 0  : 0  ), 0);
@@ -340,48 +279,33 @@ public:
 class RayInterval {
 public:
 	RayInterval() { }
-	template <int size, bool shared>
-	explicit RayInterval(const RayGroup<size, shared> &rays) {
-		Assert(shared);
+	template <bool shared, bool hasMask>
+	explicit RayInterval(const RayGroup<shared, hasMask> &rays) {
+		int size = rays.Size();
 
-		ComputeMinMax<size>(&rays.Dir(0), &minDir, &maxDir);
-		ComputeMinMax<size>(&rays.IDir(0), &minIDir, &maxIDir);
+		if(hasMask) {
+			ComputeMinMax(rays.DirPtr(), rays.MaskPtr(), size, &minDir, &maxDir);
+			ComputeMinMax(rays.IDirPtr(), rays.MaskPtr(), size, &minIDir, &maxIDir);
+		}
+		else {
+			ComputeMinMax(rays.DirPtr(), size, &minDir, &maxDir);
+			ComputeMinMax(rays.IDirPtr(), size, &minIDir, &maxIDir);
+		}
+
 		if(shared)
 			minOrigin = maxOrigin = ExtractN(rays.Origin(0), 0);
-		else ComputeMinMax<size>(&rays.Origin(0), &minOrigin, &maxOrigin);
-
+		else {
+			if(hasMask)
+				ComputeMinMax(rays.OriginPtr(), rays.MaskPtr(), size, &minOrigin, &maxOrigin);
+			else
+				ComputeMinMax(rays.OriginPtr(), size, &minOrigin, &maxOrigin);
+		}
 		
 		ix = floatq(minIDir.x, maxIDir.x, minIDir.x, maxIDir.x);
 		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
 		iz = floatq(minIDir.z, maxIDir.z, minIDir.z, maxIDir.z);
 	}
-	template <int size, bool shared, class Selector>
-	RayInterval(const RayGroup<size, shared> &rays, const Selector &selector) {
-		Assert(shared);
-
-		ComputeMinMax<size>(&rays.Dir(0), &minDir, &maxDir, selector);
-		ComputeMinMax<size>(&rays.IDir(0), &minIDir, &maxIDir, selector);
-		if(shared)
-			minOrigin = maxOrigin = ExtractN(rays.Origin(0), 0);
-		else ComputeMinMax<size>(&rays.Origin(0), &minOrigin, &maxOrigin);
-		
-		ix = floatq(minIDir.x, maxIDir.x, minIDir.x, maxIDir.x);
-		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
-		iz = floatq(minIDir.z, maxIDir.z, minIDir.z, maxIDir.z);
-	}
-	//TODO: zle; sa dziury np. na sponzie
-/*	RayInterval(const CornerRays &rays) {
-		minIDir = Minimize(rays.idir);
-		minDir = Minimize(rays.dir);
-		maxIDir = Maximize(rays.idir);
-		maxDir = Maximize(rays.dir);
-		origin = rays.origin;
-
-		ix = floatq(minIDir.x, maxIDir.x, minIDir.x, maxIDir.x);
-		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
-		iz = floatq(minIDir.z, maxIDir.z, minIDir.z, maxIDir.z);
-	} */
-
+	
 	floatq ix, iy, iz;
 	Vec3f minIDir, maxIDir, minDir, maxDir;
 	Vec3f minOrigin, maxOrigin;
@@ -398,62 +322,38 @@ private:
 	int lastTri;
 };
 
-template <int size_,int flags_>
+template <bool sharedOrigin, bool hasMask>
 struct Context {
-	enum { size=size_, flags=flags_, sharedOrigin=flags&isct::fShOrig };
-
-	template <int tSize>
-	Context(const Context<tSize,flags> &c,int off) :rays(c.rays,off) {
-		distance=c.distance+off;
-		object=c.object+off;
-		element=c.element+off;
-		stats=c.stats;
-	}
-
-	Context(const RayGroup<size,sharedOrigin> &tRays,floatq *dist,i32x4 *obj,
-			i32x4 *elem,TreeStats<1> *st=0) :rays(tRays) {
-		distance=dist; object=obj; element=elem;
-		stats=st;
-	}
-
-	Context(const Vec3q *torig,const Vec3q *tdir,const Vec3q *tidir,floatq *dist,i32x4 *obj,i32x4 *elem,
-			TreeStats<1> *st=0) :rays(torig,tdir,tidir) {
-		distance=dist; object=obj; element=elem;
-		stats=st;
-	}
+	Context(const RayGroup<sharedOrigin, hasMask> &tRays, floatq *distance, i32x4 *object, i32x4 *element,
+			TreeStats<1> *stats = 0)
+		:rays(tRays), distance(distance), object(object), element(element), stats(stats) { }
 
 	const Vec3q &Dir(int q) const { return rays.Dir(q); }
 	const Vec3q &IDir(int q) const { return rays.IDir(q); }
 	const Vec3q &Origin(int q) const { return rays.Origin(q); }
+	char Mask(int q) const { return rays.Mask(q); }
+	const f32x4b SSEMask(int q) const { return rays.SSEMask(q); }
+	char *MaskPtr() { return rays.MaskPtr(); }
 
 	f32x4 &Distance(int q) { return distance[q]; }
 	i32x4 &Object(int q) { return object[q]; }
 	i32x4 &Element(int q) { return element[q]; }
+	int Size() const { return rays.Size(); }
 
-	const Context<size/4,flags> Split(int part) const {
-		const int offset = part * (size / 4);
-		Context<size/4, flags> out(RayGroup<size/4,sharedOrigin>(rays, offset), distance + offset,
-					 object+offset,element+offset,stats);
-		return out;
-	}
+	void UpdateStats(const TreeStats<1> &st) { if(stats) *stats += st; }
 
-	const Context<size/2,flags> Split2(int part) const {
-		const int offset = part * (size / 2);
-		Context<size/2, flags> out(RayGroup<size/2, sharedOrigin>(rays, offset), distance + offset,
-					 object+offset, element + offset, stats);
-		return out;
-	}
+	bool All() const { return rays.All(); }
+	bool Any() const { return rays.Any(); }
 
-	void UpdateStats(const TreeStats<1> &st) { if(stats) *stats+=st; }
-
-	RayGroup<size,sharedOrigin> rays;
-	floatq * __restrict__ __attribute__((aligned(16))) distance;
-	i32x4  * __restrict__ __attribute__((aligned(16))) object;
-	i32x4  * __restrict__ __attribute__((aligned(16))) element;
+	RayGroup<sharedOrigin, hasMask> rays;
+	floatq * __restrict__ distance;
+	i32x4  * __restrict__ object;
+	i32x4  * __restrict__ element;
 	ShadowCache shadowCache;
 	TreeStats<1> *stats;
 };
 
+/*
 template <int flags_>
 struct FContext {
 	enum { flags=flags_, sharedOrigin=flags&isct::fShOrig };
@@ -490,6 +390,7 @@ struct FContext {
 	ShadowCache shadowCache;
 	TreeStats<1> *stats;
 };
+*/
 
 #endif
 

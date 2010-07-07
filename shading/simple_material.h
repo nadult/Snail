@@ -5,34 +5,28 @@
 
 namespace shading {
 
-	template <bool NDotR=true>
+	template <bool NDotR = true>
 	class SimpleMaterial: public Material {
 	public:
 		SimpleMaterial(const Vec3f &col) :Material(0),color(col) { }
 		SimpleMaterial() { }
 
-		template <class Rays>
-		void Shade_(Sample *__restrict__ samples,const Rays &rays,SCache &sc) const {
-			for(int q=0;q<blockSize;q++) {
-				Sample &s=samples[q];
+		template <bool sharedOrigin, bool hasMask>
+		void Shade_(Sample *__restrict__ samples, const RayGroup<sharedOrigin, hasMask> &rays, SCache &sc) const {
+			for(int q = 0; q < blockSize; q++) {
+				Sample &s = samples[q];
 
-				Vec3q diffuse(color),specular(0.0f,0.0f,0.0f);
-				if(NDotR) diffuse*=rays.Dir(q)|s.normal;
+				Vec3q diffuse(color), specular(0.0f,0.0f,0.0f);
+				if(NDotR) diffuse *= rays.Dir(q) | s.normal;
 
-				s.diffuse=diffuse;
-				s.specular=diffuse;
-			}
-		}
-		template <class Rays>
-		void Shade_(Sample *__restrict__ samples,const f32x4b*__restrict__ mask,const Rays &rays,SCache &sc) const {
-			for(int q=0;q<blockSize;q++) {
-				Sample &s=samples[q];
-
-				Vec3q diffuse(color),specular(0.0f,0.0f,0.0f);
-				if(NDotR) diffuse*=rays.Dir(q)|s.normal;
-
-				s.diffuse=Condition(mask[q],diffuse,s.diffuse);
-				s.specular=Condition(mask[q],diffuse,s.specular);
+				if(hasMask) {
+					s.diffuse = Condition(rays.SSEMask(q), diffuse, s.diffuse);
+					s.specular = Condition(rays.SSEMask(q), diffuse, s.specular);
+				}
+				else {
+					s.diffuse = diffuse;
+					s.specular = diffuse;
+				}
 			}
 		}
 
