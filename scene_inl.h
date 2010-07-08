@@ -102,11 +102,10 @@ TreeStats <1> Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading:
 	floatq dot[size];
 	f32x4b mask[size];
 
-	//todo: nowy selektor to nowy bufor charow
 	char selData[size + 4];
 	RaySelector sel(selData, size);
-	for(int n = 0; n < size; n++)
-		sel[n] = inputSel[n];
+	for(int n = 0; n < sel.Size4(); n++)
+		sel.Mask4(n) = inputSel.Mask4(n);
 
 	for(int q = 0; q < size; q++) {
 		if(!sel[q]) continue;
@@ -328,7 +327,7 @@ TreeStats<1> Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &
 				int    invBitMask = ~ForWhich(imask);
 
 				int obj0 = object[q][0], elem0 = element[q][0];
-				if(i32x4(imask)[0]) {
+				if(EXPECT_TAKEN( i32x4(imask)[0] )) {
 					uint        hash  = shTriCache.Hash(obj0, elem0);
 					ShTriangle &shTri = shTriCache[hash];
 					if(!shTriCache.SameId(hash, obj0, elem0)) {
@@ -448,7 +447,7 @@ TreeStats<1> Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &
 			}
 		}
 	}
-/*	reflSel = selector;
+	reflSel = selector;
 
 	if(reflSel.Any() && !gVals[5] && cache.reflections < 1) {
 		cache.reflections++;
@@ -460,7 +459,7 @@ TreeStats<1> Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &
 			samples[q].diffuse = Condition(reflSel.SSEMask(q), samples[q].diffuse +
 					(reflColor[q] - samples[q].diffuse) * floatq(0.3f), samples[q].diffuse);
 		}
-	} */
+	}
 
 	Vec3q lDiffuse[size], lSpecular[size];
 	if(lights.size()) {

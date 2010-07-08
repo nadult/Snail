@@ -52,11 +52,10 @@ public:
 
 			if(nodes[nNode].IsLeaf()) {
 				const BBox &box = nodes[nNode].bbox;
-
 				int count = nodes[nNode].count, first = nodes[nNode].first & 0x7fffffff;
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = elements[first + n];
-					if(sharedOrigin && !hasMask? tri.TestCornerRays(crays) : gVals[0] || tri.TestInterval(interval)) {
+					if(sharedOrigin && !hasMask? tri.TestCornerRays(crays) : tri.TestInterval(interval)) {
 						tri.Collide(c, first + n, firstActive, lastActive);
 						stats.Intersection(size);
 					}
@@ -200,7 +199,10 @@ public:
 
 		if(split) {
 		//	if(gVals[0]) {
-				RaySelector temp = selector;
+				char tempData[size + 4];
+				RaySelector temp(tempData, size);
+				for(int n = 0; n < temp.Size(); n++)
+					temp[n] = c.Mask(n);
 				int start = 0;
 				while(true) {
 					char buf[c.Size() + 4];
@@ -214,15 +216,18 @@ public:
 	
 					Vec3q lead;
 					for(int i = 0; i < 4; i++)
-						if(temp[start] & (1 << i))
+						if(temp[start] & (1 << i)) {
 							lead = (Vec3q)ExtractN(c.Dir(start), i);
+							break;
+						}
 					for(int q = start; q < size; q++) {
 						int mask = ForWhich((c.Dir(q) | lead) >= 0.9) & temp[q];
 						temp[q] &= ~mask;
 						newSel[q] = mask;
 					}
-					//TODO: nowy selektor
-				//	TraversePrimary0(Context, newSel);
+					Context<sharedOrigin, 1> splitCtx(RayGroup<sharedOrigin, 1>(c.rays.OriginPtr(),
+									c.rays.DirPtr(), c.rays.IDirPtr(), size, buf), c.distance, c.object, c.element);
+					TraversePrimary0(splitCtx);
 				}
 		//	}
 		//	else {
@@ -243,42 +248,45 @@ public:
 
 	template <bool sharedOrigin, bool hasMask>
 	void TraverseShadow(Context<sharedOrigin, hasMask> &c) const {
-		TraverseShadow0(c);
-
-		/*
+	//	if(gVals[1]) {
+			TraverseShadow0(c);
+	/*		return;
+		}
+		const int size = c.Size();
 		bool split = 1;
-
-		bool selectorsFiltered = size <= 64;
-		if(!Selector<size>::full) {
+		bool selectorsFiltered = 1;
+		if(hasMask) {
 			bool any = 0;
-			for(int n = 0; n < size/4; n++) {
-				int mask = selector.Mask4(n);
-				selectorsFiltered &= mask == 0x0f0f0f0f;
+			for(int n = 0; n < size; n++) {
+				int mask = c.Mask(n);
+				selectorsFiltered &= mask == 0x0f;
 				any |= mask;
 			}
 			if(!any)
 				return;
 		}
 
-		if((Selector<size>::full || selectorsFiltered) && size <= 64) {
+		if(hasMask || selectorsFiltered) {
 			floatq dot = 1.0f;
 			for(int q = 1; q < size; q++)
 				dot = Min(dot, c.Dir(0) | c.Dir(q));
-			split = ForAny(dot < 0.95f);
+			split = ForAny(dot < 0.99f);
 
 			if(!split)
-				TraverseShadow0(c, selector);
+				TraverseShadow0(c);
 		}
 
 		if(split) {
+			const int size4 = c.Size() / 4;
 			for(int q = 0; q < 4; q++) {
-				Context<size/4,flags> subC(c.Split(q));
+				Context<sharedOrigin, hasMask> subC(RayGroup<sharedOrigin, hasMask>(c.rays, size4 * q, size4),
+						c.distance, c.object, c.element, c.stats);
 				subC.shadowCache = c.shadowCache;
-				TraverseShadow0(subC, selector.SubSelector(q));
+				TraverseShadow0(subC);
 				c.shadowCache = subC.shadowCache;
 			}
 			if(c.stats) c.stats->Skip();
-		}*/
+		} */
 	}
 
 

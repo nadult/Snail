@@ -5,3 +5,4 @@ Uporzadkowac maski (consty i Mask4)
 
 refactoring
 bledy w swiatlach widoczne z gory na doom3/admin.proc
+bug w BBox::TestInterval przy przedzialach dla promieni o roznych zrodlach

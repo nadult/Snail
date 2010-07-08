@@ -235,7 +235,8 @@ TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera, gfxlib::
 
 template <class AccStruct>
 TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,gfxlib::Texture &image,const Options options,uint tasks) {
-	return Render<3>(scene,camera,image,options,tasks);
+	return gVals[0]?
+		Render<3>(scene,camera,image,options,tasks) : Render<2>(scene,camera,image,options,tasks);
 }
 
 //typedef bih::Tree<TriangleVector> BIH;

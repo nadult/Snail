@@ -84,6 +84,12 @@ public:
 	RayGroup(const RayGroup<sharedOrigin, 1> &rhs, int offset)
 		:size(rhs.size - offset), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
 		iDir(rhs.iDir + offset) { }
+	RayGroup(const RayGroup &rhs, int offset, int newSize)
+		:size(newSize), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
+		iDir(rhs.iDir + offset) { }
+	RayGroup(const RayGroup<sharedOrigin, 1> &rhs, int offset, int newSize)
+		:size(newSize), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
+		iDir(rhs.iDir + offset) { }
 
 	const Vec3q &Dir(int n) const	{ return dir[n]; }
 	const Vec3q &Origin(int n) const{ return origin[sharedOrigin? 0 : n]; }
@@ -120,6 +126,9 @@ public:
 		:size(selector.Size()), origin(origin), dir(dir), iDir(iDir), mask(&selector[0]) { }
 	RayGroup(const RayGroup &rhs, int offset)
 		:size(rhs.size - offset), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
+		iDir(rhs.iDir + offset), mask(rhs.mask + offset) { }
+	RayGroup(const RayGroup &rhs, int offset, int newSize)
+		:size(newSize), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
 		iDir(rhs.iDir + offset), mask(rhs.mask + offset) { }
 
 	const Vec3q &Dir(int n) const	{ return dir[n]; }

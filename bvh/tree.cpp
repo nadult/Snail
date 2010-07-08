@@ -48,7 +48,7 @@ void BVH::FindSplit(int nNode, int first, int count, int depth) {
 	const float traverseCost = 0.0;
 	const float intersectCost = 1.0;
 
-	if(count <= 1) {
+	if(count <= 3) {
 	LEAF_NODE:
 		maxDepth = Max(maxDepth, depth);
 		nodes[nNode].first = first | 0x80000000;
