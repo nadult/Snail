@@ -16,16 +16,12 @@ public:
 	TriAccel() { }
 	TriAccel(const Vec3f &p0, const Vec3f &p1, const Vec3f &p2) {
 		Vec3f a = p0, b = p1, c = p2;
-
 		nrm = (b - a) ^ (c - a);
 
 		float inv_nw;
 		bool  sign = 0;
 		{
-			float a[3] =
-			{
-				Abs(nrm.x), Abs(nrm.y), Abs(nrm.z)
-			};
+			float a[3] = { Abs(nrm.x), Abs(nrm.y), Abs(nrm.z) };
 
 			iw = a[0] > a[1] ? 0 : 1;
 			iw = a[2] > a[iw] ? 2 : iw;
@@ -205,12 +201,8 @@ public:
 		isComplex = 0 // doesn't contain any hierarchy of objects
 	};
 
-	Triangle(const Vec3f &ta, const Vec3f &tb, const Vec3f &tc) {
-		Vec3p b, c;
-
-		Convert(ta, a);
-		Convert(tb, b);
-		Convert(tc, c);
+	Triangle(const Vec3f ta, const Vec3f b, const Vec3f c) {
+		a = ta;
 		ba = b - a;
 		ca = c - a;
 		ComputeData();
@@ -228,36 +220,36 @@ public:
 		return !nan;
 	}
 
-	const Vec3p P1() const { return a; }
-	const Vec3p P2() const { return ba + a; }
-	const Vec3p P3() const { return ca + a; }
+	const Vec3f P1() const { return a; }
+	const Vec3f P2() const { return ba + a; }
+	const Vec3f P3() const { return ca + a; }
 
-	const Vec3p Edge1() const { return ba; }
-	const Vec3p Edge2() const { return ca - ba; }
-	const Vec3p Edge3() const { return -ca; }
+	const Vec3f Edge1() const { return ba; }
+	const Vec3f Edge2() const { return ca - ba; }
+	const Vec3f Edge3() const { return -ca; }
 
-	const Vec3p Edge1Normal() const {
-		Vec3p tmp = Nrm() ^ Edge1();
+	const Vec3f Edge1Normal() const {
+		Vec3f tmp = Nrm() ^ Edge1();
 		return tmp * RSqrt(tmp | tmp);
 	}
 
-	const Vec3p Edge2Normal() const {
-		Vec3p tmp = Nrm() ^ Edge2();
+	const Vec3f Edge2Normal() const {
+		Vec3f tmp = Nrm() ^ Edge2();
 		return tmp * RSqrt(tmp | tmp);
 	}
 
-	const Vec3p Edge3Normal() const {
-		Vec3p tmp = Nrm() ^ Edge3();
+	const Vec3f Edge3Normal() const {
+		Vec3f tmp = Nrm() ^ Edge3();
 		return tmp * RSqrt(tmp | tmp);
 	}
 
-	const Vec3p Nrm() const { return Vec3p(plane); }
-	const Vec3p Nrm(int) const { return Nrm(); }
+	const Vec3f Nrm() const { return Vec3f(plane); }
+	const Vec3f Nrm(int) const { return Nrm(); }
 
-	const Vec3p BoundMin() const {
+	const Vec3f BoundMin() const {
 		return VMin(P1(), VMin(P2(), P3()));
 	}
-	const Vec3p BoundMax() const {
+	const Vec3f BoundMax() const {
 		return VMax(P1(), VMax(P2(), P3()));
 	}
 
@@ -277,46 +269,57 @@ public:
 	}
 
 	template <bool sharedOrigin, bool hasMask>
-	int Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActive, int lastActive) const NOINLINE;
+	int Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActive, int lastActive, char*) const;
 	
 	template <bool sharedOrigin, bool hasMask>
-	int CollideShadow(Context<sharedOrigin, hasMask> &c, int firstActive, int lastActive) const NOINLINE;
+	void Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActive, int lastActive) const;
+	
+	template <bool sharedOrigin, bool hasMask>
+	int CollideShadow(Context<sharedOrigin, hasMask> &c, int firstActive, int lastActive) const;
 
 	template <class Vec0, class Vec, class Real>
 	const Vec3 <typename Vec::TScalar> Barycentric(Vec0 rOrig, Vec rDir, Real dist, int) const;
 
+	bool TestInterval(Vec3f origin, Vec3f minDir, Vec3f maxDir) const {
+		Vec3f nrm = Nrm();
+		Vec3f nrm1 = nrm * minDir, nrm2 = nrm * maxDir;
+
+		float det = Max(nrm1.x, nrm2.x) + Max(nrm1.y, nrm2.y) + Max(nrm1.z, nrm2.z);
+		if(det < 0.0f)
+			return 0;
+
+		Vec3f tvec = origin - a;
+		Vec3f c1 = ba ^ tvec, c2 = tvec ^ ca;
+		Vec3f c1a = minDir * c1, c1b = maxDir * c1;
+		Vec3f c2a = minDir * c2, c2b = maxDir * c2;
+
+		float u[2] = {
+			Min(c1a.x, c1b.x) + Min(c1a.y, c1b.y) + Min(c1a.z, c1b.z),
+			Max(c1a.x, c1b.x) + Max(c1a.y, c1b.y) + Max(c1a.z, c1b.z) };
+		float v[2] = {
+			Min(c2a.x, c2b.x) + Min(c2a.y, c2b.y) + Min(c2a.z, c2b.z),
+			Max(c2a.x, c2b.x) + Max(c2a.y, c2b.y) + Max(c2a.z, c2b.z) };
+		
+		return Min(u[1], v[1]) >= 0.0f && u[0] + v[0] <= det * t0;
+	}
+
+
 	bool TestCornerRays(const CornerRays&) const;
 	bool TestInterval(const RayInterval&) const;
 	bool TestFrustum(const Frustum&) const;
-private:
-	void SetFlag1(uint value) {
-		a.t0 = UValue(value).f;
-	}
-	uint GetFlag1() const {
-		return UValue(a.t0).i;
-	}
 
-public:
-	void SetFlag2(uint value) {
-		ba.t0 = UValue(value).f;
-	}
-	uint GetFlag2() const {
-		return UValue(ba.t0).i;
-	}
-
-private:
 	void ComputeData() {
-		Vec3p nrm      = (ba) ^ (ca);
+		Vec3f nrm      = (ba) ^ (ca);
 		float e1ce2Len = Length(nrm);
 
 		nrm  /= e1ce2Len;
-		ca.t0 = e1ce2Len;
-		plane = Vec4p(nrm.x, nrm.y, nrm.z, nrm | a);
+		t0 = e1ce2Len;
+		plane = Vec4f(nrm.x, nrm.y, nrm.z, nrm | a);
 	}
 
-private:
-	Vec3p a, ba, ca;
-	Vec4p plane;
+	Vec3f a, ba, ca;
+	float t0; int temp[2];
+	Vec4f plane;
 };
 
 SERIALIZE_AS_POD(Triangle)
@@ -348,66 +351,12 @@ const Isct <typename Vec::TScalar, 1, isct::fDistance | flags> Triangle::Collide
 	return out;
 }
 
-template <bool sharedOrigin, bool hasMask>
-int Triangle::Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActive, int lastActive) const {
-	Vec3p nrm = Nrm();
-	Vec3q ta(a);
-
-	Vec3q sharedTVec;
-	if(sharedOrigin)
-		sharedTVec = c.Origin(0) - ta;
-
-	for(int q = firstActive; q <= lastActive; q++) {
-		floatq det  = c.Dir(q) | nrm;
-		Vec3q  tvec = sharedOrigin? sharedTVec : c.Origin(q) - ta;
-
-		floatq u    = c.Dir(q) | (Vec3q(ba) ^ tvec);
-		floatq v    = c.Dir(q) | (tvec ^ Vec3q(ca));
-		f32x4b test = Min(u, v) >= 0.0f && u + v <= det * floatq(ca.t0);
-
-		floatq dist = -(tvec | nrm) / det;
-		test = test && dist > floatq(0.0f) && dist < c.Distance(q);
-
-		c.Distance(q) = Condition(test, dist, c.Distance(q));
-		c.Object(q) = Condition(i32x4b(test), i32x4(idx), c.Object(q));
-	}
-
-	return 0;
-}
-
-template <bool sharedOrigin, bool hasMask>
-int Triangle::CollideShadow(Context<sharedOrigin, hasMask> &c, int firstActive, int lastActive) const {
-	Vec3p nrm = Nrm();
-	Vec3q ta(a);
-
-	Vec3q sharedTVec;
-	if(sharedOrigin)
-		sharedTVec = c.Origin(0) - ta;
-
-	for(int q = firstActive; q <= lastActive; q++) {
-		floatq det  = c.Dir(q) | nrm;
-		Vec3q  tvec = sharedOrigin? sharedTVec : c.Origin(q) - ta;
-
-		floatq u    = c.Dir(q) | (Vec3q(ba) ^ tvec);
-		floatq v    = c.Dir(q) | (tvec ^ Vec3q(ca));
-		f32x4b test = Min(u, v) >= 0.0f && u + v <= det * floatq(ca.t0);
-
-		floatq dist = -(tvec | nrm) / det;
-		test = test && dist > floatq(0.0f) && dist < c.Distance(q);
-
-		c.Distance(q) = Condition(test, dist, c.Distance(q));
-		if(hasMask) c.MaskPtr()[q] &= ~ForWhich(test);
-	}
-
-	return 0;
-}
-
 template <class VecO, class Vec, class Real>
 const Vec3 <typename Vec::TScalar> Triangle::Barycentric(VecO rOrig, Vec rDir, Real dist, int) const {
 	typedef typename Vec::TBool    Bool;
 	Vec3 <typename Vec::TScalar> out;
 
-	typename Vec::TScalar det = (rDir | Nrm()) * ca.t0;
+	typename Vec::TScalar det = (rDir | Nrm()) * t0;
 	VecO tvec = rOrig - VecO(a);
 	typename Vec::TScalar idet = Inv(det);
 	out.z = (rDir | (VecO(ba) ^ tvec)) * idet;
@@ -583,7 +532,7 @@ public:
 	size_t size() const {
 		return tris.size();
 	}
-	size_t mem_size() const {
+	size_t MemSize() const {
 		return verts.size() * (sizeof(Vert)) + tris.size() * sizeof(TriIdx);
 	}
 
@@ -604,18 +553,80 @@ public:
 	friend class BaseScene;
 };
 
+class CompactTris {
+public:
+	vector<Vec3f> verts;
+	vector<Vec3f> normals;
+
+	void Serialize(Serializer &sr) {
+		sr &verts & normals & tris;
+	}
+
+	typedef Triangle      CElement;
+	typedef ShTriangle    SElement;
+
+	const CElement GetCElement(int elem) const {
+		auto tri = tris[elem];
+		return Triangle(verts[tri.v1], verts[tri.v2], verts[tri.v3]);
+	}
+	const CElement operator[](int elem) const {
+		return GetCElement(elem);
+	}
+
+	const SElement GetSElement(int elem, int) const {
+		const TriIdx &idx = tris[elem];
+		const Vec2f uv(0.0f, 0.0f);
+
+		return ShTriangle(verts[idx.v1], verts[idx.v2], verts[idx.v3], uv, uv, uv, normals[idx.v1], normals[idx.v2],
+				normals[idx.v3], idx.mat & 0x7ffffff, idx.mat & 0x80000000 ? 1 : 0);
+	}
+
+	const Vec3f BoundMin(int n) const {
+		const TriIdx &idx = tris[n];
+
+		return VMin(verts[idx.v1], VMin(verts[idx.v2], verts[idx.v3]));
+	}
+
+	const Vec3f BoundMax(int n) const {
+		const TriIdx &idx = tris[n];
+
+		return VMax(verts[idx.v1], VMax(verts[idx.v2], verts[idx.v3]));
+	}
+
+	const BBox GetBBox(int n) const {
+		const TriIdx &idx = tris[n];
+		Vec3f min = VMin(verts[idx.v1], VMin(verts[idx.v2], verts[idx.v3]));
+		Vec3f max = VMax(verts[idx.v1], VMax(verts[idx.v2], verts[idx.v3]));
+
+		return BBox(min, max);
+	}
+
+	size_t size() const {
+		return tris.size();
+	}
+	size_t MemSize() const {
+		return verts.size() * (sizeof(Vec3f) * 2) + tris.size() * sizeof(TriIdx);
+	}
+
+	struct TriIdx { u32 v1, v2, v3, mat; };
+	vector<TriIdx> tris;
+};
+
 SERIALIZE_AS_POD(TriangleVector::TriIdx)
 SERIALIZE_AS_POD(TriangleVector::Vert)
 SERIALIZE_AS_POD(TriAccel)
 
-// After changing the element, you have to set the id because it will be trashed
-class ShTriCache {
-public:
-	enum {
-		size = 64
-	};
+SERIALIZE_AS_POD(CompactTris::TriIdx)
 
-	ShTriCache() {
+
+
+// After changing the element, you have to set the id because it will be trashed
+template <class Tri, int tsize = 64>
+class TriCache {
+public:
+	enum { size = tsize };
+
+	TriCache() {
 		for(int n = 0; n < size; n++) {
 			data[n].temp[0] = ~0;
 			data[n].temp[1] = ~0;
@@ -626,28 +637,30 @@ public:
 		return (objId + elemId) & (size - 1);
 	}
 
-	ShTriangle &operator[](uint idx) {
+	Tri &operator[](uint idx) {
 		return data[idx];
 	}
-	const ShTriangle &operator[](uint idx) const {
+	const Tri &operator[](uint idx) const {
 		return data[idx];
 	}
 
 	bool SameId(uint idx, u32 objId, u32 elemId) const {
-		const ShTriangle &d = data[idx];
+		const Tri &d = data[idx];
 
 		return d.temp[0] == objId && d.temp[1] == elemId;
 	}
 
 	void SetId(uint idx, u32 objId, u32 elemId) {
-		ShTriangle &d = data[idx];
+		Tri &d = data[idx];
 
 		d.temp[0] = objId;
 		d.temp[1] = elemId;
 	}
 
 private:
-	ShTriangle data[size];
+	Tri data[size];
 };
+
+typedef TriCache<Triangle, 64> TriangleCache;
 
 #endif

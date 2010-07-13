@@ -7,6 +7,7 @@ template <bool,bool> class RayGroup;
 
 class CornerRays;
 class RayInterval;
+class Frustum;
 
 class BBox {
 public:
@@ -31,6 +32,10 @@ public:
 	bool Contains(const BBox &rhs) const {
 		return 	min.x <= rhs.min.x && min.y <= rhs.min.y && min.z <= rhs.min.z &&
 				max.x >= rhs.max.x && max.y >= rhs.max.y && max.z >= rhs.max.z;
+	}
+	bool Overlaps(const BBox &rhs) const {
+		return 	min.x <= rhs.max.x && min.y <= rhs.max.y && min.z <= rhs.max.z &&
+				max.x >= rhs.min.x && max.y >= rhs.min.y && max.z >= rhs.min.z;
 	}
 	bool Contains(const BBox &rhs,float t) const {
 		return BBox(Center()-Size()*0.5f*t,Center()+Size()*0.5f*t).Contains(rhs);
@@ -185,6 +190,25 @@ public:
 	}
 
 	template <class Real,class Vec>
+	char TestMask(Vec orig, Vec idir, Real maxDist = Real(constant::inf)) const {
+		Real l1 = idir.x * (Real(min.x) - orig.x);
+		Real l2 = idir.x * (Real(max.x) - orig.x);
+		Real lmin = Min(l1, l2);
+		Real lmax = Max(l1, l2);
+
+		l1 = idir.y * (Real(min.y) - orig.y);
+		l2 = idir.y * (Real(max.y) - orig.y);
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		l1 = idir.z * (Real(min.z) - orig.z);
+		l2 = idir.z * (Real(max.z) - orig.z);
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		return ForWhich( lmax >= Real(0.0f) && lmin <= Min(lmax, maxDist) );
+	}
+	template <class Real,class Vec>
 	bool TestI(Vec orig, Vec idir, Real maxDist = Real(constant::inf)) const {
 		Real l1 = idir.x * (Real(min.x) - orig.x);
 		Real l2 = idir.x * (Real(max.x) - orig.x);
@@ -201,7 +225,7 @@ public:
 		lmin = Max(Min(l1, l2), lmin);
 		lmax = Min(Max(l1, l2), lmax);
 
-		return !ForAll( lmax < Real(0.0f) || lmin > Min(lmax, maxDist) );
+		return ForAny( lmax >= Real(0.0f) && lmin <= Min(lmax, maxDist) );
 	}
 	template <class Real,class Vec>
 	bool TestI(Vec orig, Vec idir, Real maxDist, f32x4b mask) const {
@@ -223,8 +247,9 @@ public:
 		return !ForAll( lmax < Real(0.0f) || lmin > Min(lmax, maxDist) || !mask );
 	}
 
-
+	bool TestCornerRays(const CornerRays&) const;
 	bool TestInterval(const RayInterval&) const;
+	bool TestFrustum(const Frustum&) const;
 
 	Vec3f min, max;
 };
@@ -235,6 +260,12 @@ float BoxPointDistanceSq(const BBox &box,const Vec3f &point);
 
 inline BBox operator+(const BBox &a,const BBox &b) { BBox out(a); out+=b; return out; }
 inline BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out*=mat; return out; }
+
+class OBBox {
+public:
+	BBox box;
+	Vec3f ax0, ax1, ax2;
+};
 
 class OptBBox {
 public:

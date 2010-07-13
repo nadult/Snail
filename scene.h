@@ -7,6 +7,8 @@
 #include "formats/loader.h"
 #include "sampling.h"
 
+typedef TriCache<ShTriangle> ShTriCache;
+
 class Cache {
 public:
 	Cache() :supersampling(0), reflections(0) { }

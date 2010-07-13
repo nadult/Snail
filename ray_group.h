@@ -174,7 +174,6 @@ public:
 	template <bool shared, bool hasMask>
 	explicit Frustum(const RayGroup<shared, hasMask> &gr) {
 		int majorAxis = MaxAxis(ExtractN(gr.Dir(0), 0));
-		static_assert(!hasMask, "masked groups not supported yet");
 
 	/*	for(int axis = 0; axis < 3; axis++) {
 			auto sign = floatq( ((&gr.Dir(0).x)[axis] < floatq(0.0f)).m );
@@ -198,6 +197,7 @@ public:
 			floatq minUSq = maxUSq;
 
 			for(int q = 1; q < gr.Size(); q++) {
+				if(!gr.Mask(q)) continue;
 				floatq slope = (&gr.Dir(q).x)[uAxis] * (&gr.IDir(q).x)[majorAxis];
 				maxUSq = Max(maxUSq, slope);
 				minUSq = Min(minUSq, slope);
@@ -206,6 +206,7 @@ public:
 			floatq maxVSq = (&gr.Dir(0).x)[vAxis] * (&gr.IDir(0).x)[majorAxis];
 			floatq minVSq = maxVSq;
 			for(int q = 1; q < gr.Size(); q++) {
+				if(!gr.Mask(q)) continue;
 				floatq slope = (&gr.Dir(q).x)[vAxis] * (&gr.IDir(q).x)[majorAxis];
 				maxVSq = Max(maxVSq, slope);
 				minVSq = Min(minVSq, slope);

@@ -3,6 +3,38 @@
 #include <algorithm>
 
 
+CompactTris BaseScene::ToCompactTris() const {
+	CompactTris out;
+
+	for(size_t o = 0; o < objects.size(); o++) {
+		const Matrix<Vec4f> &trans = objects[o].trans;
+		size_t verts = out.verts.size();
+		size_t inds = out.tris.size();
+		
+		CompactTris obj = objects[o].ToCompactTris();
+		int newVerts = verts + obj.verts.size();
+		out.verts.resize(newVerts);
+		out.normals.resize(newVerts);
+
+		for(size_t n = 0; n < obj.verts.size(); n++) {
+			out.verts[verts + n] = trans * obj.verts[n];
+			out.normals[verts + n] = trans & obj.normals[n];
+		}
+
+		out.tris.resize(out.tris.size() + obj.tris.size());
+		for(size_t n = 0; n < obj.tris.size(); n++) {
+			CompactTris::TriIdx &idx = out.tris[n+ inds];
+			idx = obj.tris[n];
+
+			idx.v1 += verts;
+			idx.v2 += verts;
+			idx.v3 += verts;
+		}
+	}
+
+	return out;
+}
+
 TriangleVector BaseScene::ToTriangleVector() const {
 	TriangleVector out;
 
@@ -114,15 +146,15 @@ BaseScene::Object::Object(const vector<Vec3f> &tverts,const vector<Vec2f> &tuvs,
 		}
 	
 		for(int n=0;n<usage.size();n++) {
-			if(usage[n]&1) {
+			if(usage[n] & 1) {
 				vIMap[n]=verts.size();
 				verts.push_back(tverts[n]);
 			}
-			if(usage[n]&2) {
+			if(usage[n] & 2) {
 				uvIMap[n]=uvs.size();
 				uvs.push_back(tuvs[n]);
 			}
-			if(usage[n]&4) {
+			if(usage[n] & 4) {
 				nrmIMap[n]=normals.size();
 				normals.push_back(tnormals[n]);
 			}
@@ -377,6 +409,58 @@ void BaseScene::Object::Join(const Object &rhs) {
 	optBBox=OptBBox(bbox,Inverse(trans));
 }
 
+CompactTris BaseScene::Object::ToCompactTris() const {
+	CompactTris out;
+	vector<Idx> inds;
+	inds.reserve(tris.size() * 3);
+
+	Vec2f defaultUv(0.0f,0.0f);
+	Vec3f defaultNrm(0.0f,0.0f,0.0f);
+
+	for(size_t n = 0; n < tris.size(); n++) {
+		const IndexedTri &tri = tris[n];
+		for(int k = 0; k < 3; k++)
+			inds.push_back(Idx(tri.v[k], tri.vt[k], tri.vn[k]));
+	}
+
+	{
+		std::sort(inds.begin(), inds.end());
+		vector<Idx>::iterator end=std::unique(inds.begin(),inds.end());
+		inds.resize(end-inds.begin());
+	}
+
+	out.verts.resize(inds.size());
+	out.normals.resize(inds.size());
+	out.tris.resize(tris.size());
+
+//	std::sort(inds.begin(),inds.end(),SortByPos(verts));
+
+	for(int n=0;n<inds.size();n++) {
+		out.verts[n] = verts[inds[n].v];
+		out.normals[n] = inds[n].n == -1? defaultNrm : normals[inds[n].n];
+	}
+
+	for(int n = 0; n < inds.size(); n++)
+		inds[n].dstIdx = n;
+	std::sort(inds.begin(),inds.end());
+	for(int n=0;n<tris.size();n++) {
+		const IndexedTri &src=tris[n];
+		CompactTris::TriIdx &dst = out.tris[n];
+
+		u32 idx[3];
+		for(int k=0;k<3;k++)
+			idx[k]=std::lower_bound(inds.begin(),inds.end(),Idx(src.v[k],src.vt[k],src.vn[k]))-inds.begin();
+
+		dst.v1 = inds[idx[0]].dstIdx;
+		dst.v2 = inds[idx[1]].dstIdx;
+		dst.v3 = inds[idx[2]].dstIdx;
+		bool flatNrm=	Same(out.normals[dst.v1], out.normals[dst.v2])&&
+						Same(out.normals[dst.v1], out.normals[dst.v3]);
+		dst.mat = (src.matId&0x7fffffff)+(flatNrm?0x80000000:0);
+	}
+	
+	return out;
+}
 
 TriangleVector BaseScene::Object::ToTriangleVector() const {
 	TriangleVector out;

@@ -45,65 +45,76 @@ static int FindMaxAxis(Vec3f boxSize) {
 void BVH::FindSplit(int nNode, int first, int count, int depth) {
 	BBox bbox = nodes[nNode].bbox;
 
-	const float traverseCost = 0.0;
-	const float intersectCost = 1.0;
+	enum { useSah = 1 };
 
-	if(count <= 3) {
+	if(count <= 1) {
 	LEAF_NODE:
-		maxDepth = Max(maxDepth, depth);
+		nodes[nNode].bbox = TriBox(elements[first]);
+		for(int n = 1; n < count; n++)
+			nodes[nNode].bbox += TriBox(elements[first + n]);
+		depth = Max(depth, depth);
 		nodes[nNode].first = first | 0x80000000;
 		nodes[nNode].count = count;
 	}
 	else {
 		int minIdx = count / 2, minAxis = FindMaxAxis(bbox.Size());
-		float minCost = constant::inf;
-		float nodeSA = BoxSA(bbox);
-		float noSplitCost = intersectCost * count * BoxSA(bbox);
+		if(useSah) {
+			const float traverseCost = .0;
+			const float intersectCost = 1.0;
 
-		for(int axis = 0; axis <= 2; axis++) {
-			std::sort(&elements[first], &elements[first + count],
-				[&elements, axis](const Triangle &a, const Triangle &b) {
-					float p1 = (&a.P1().x)[axis] + (&a.P2().x)[axis] + (&a.P3().x)[axis];
-					float p2 = (&b.P1().x)[axis] + (&b.P2().x)[axis] + (&b.P3().x)[axis];
+			float minCost = constant::inf;
+			float nodeSA = BoxSA(bbox);
+			float noSplitCost = intersectCost * count * BoxSA(bbox);
+
+			for(int axis = 0; axis <= 2; axis++) {
+				std::sort(&elements.tris[first], &elements.tris[first + count],
+				[&elements, axis](const CompactTris::TriIdx &a, const CompactTris::TriIdx &b) {
+					float p1 = (&elements.verts[a.v1].x)[axis] + (&elements.verts[a.v2].x)[axis]
+										+ (&elements.verts[a.v3].x)[axis];
+					float p2 = (&elements.verts[b.v1].x)[axis] + (&elements.verts[b.v2].x)[axis]
+										+ (&elements.verts[b.v3].x)[axis];
 					return p1 < p2; } );
-			
-			vector<float> leftSA(count), rightSA(count); {
-				rightSA[count - 1] = BoxSA(TriBox(elements[first + count - 1]));
-				leftSA [0] = BoxSA(TriBox(elements[first]));
 
-				BBox lastBox = TriBox(elements[first]);
+				vector<float> leftSA(count), rightSA(count); {
+					rightSA[count - 1] = BoxSA(TriBox(elements[first + count - 1]));
+					leftSA [0] = BoxSA(TriBox(elements[first]));
+
+					BBox lastBox = TriBox(elements[first]);
+					for(size_t n = 1; n < count; n++) {
+						lastBox += TriBox(elements[first + n]);
+						leftSA[n] = BoxSA(lastBox);
+					}
+
+					lastBox = TriBox(elements[first + count - 1]);
+					for(int n = count - 2; n >= 0; n--) {
+						lastBox += TriBox(elements[first + n]);
+						rightSA[n] = BoxSA(lastBox);
+					}
+				}
+
 				for(size_t n = 1; n < count; n++) {
-					lastBox += TriBox(elements[first + n]);
-					leftSA[n] = BoxSA(lastBox);
-				}
-
-				lastBox = TriBox(elements[first + count - 1]);
-				for(int n = count - 2; n >= 0; n--) {
-					lastBox += TriBox(elements[first + n]);
-					rightSA[n] = BoxSA(lastBox);
+					float cost = leftSA[n - 1] * n + rightSA[n] * (count - n);
+					if(cost < minCost) {
+						minCost = cost;
+						minIdx = n;
+						minAxis = axis;
+					}
 				}
 			}
 
-			for(size_t n = 1; n < count; n++) {
-				float cost = leftSA[n - 1] * n + rightSA[n] * (count - n);
-				if(cost < minCost) {
-					minCost = cost;
-					minIdx = n;
-					minAxis = axis;
-				}
-			}
+			minCost = traverseCost + intersectCost * minCost;
+			if(noSplitCost < minCost)
+				goto LEAF_NODE;
 		}
 
-		minCost = traverseCost + intersectCost * minCost;
-		if(noSplitCost < minCost)
-			goto LEAF_NODE;
-
-		std::nth_element(&elements[first], &elements[first + minIdx], &elements[first + count],
-			[&elements, minAxis](const Triangle &a, const Triangle &b) {
-				float p1 = (&a.P1().x)[minAxis] + (&a.P2().x)[minAxis] + (&a.P3().x)[minAxis];
-				float p2 = (&b.P1().x)[minAxis] + (&b.P2().x)[minAxis] + (&b.P3().x)[minAxis];
-				return p1 < p2; } );
-
+		std::nth_element(&elements.tris[first], &elements.tris[first + minIdx], &elements.tris[first + count],
+		[&elements, minAxis](const CompactTris::TriIdx &a, const CompactTris::TriIdx &b) {
+			float p1 = (&elements.verts[a.v1].x)[minAxis] + (&elements.verts[a.v2].x)[minAxis]
+								+ (&elements.verts[a.v3].x)[minAxis];
+			float p2 = (&elements.verts[b.v1].x)[minAxis] + (&elements.verts[b.v2].x)[minAxis]
+								+ (&elements.verts[b.v3].x)[minAxis];
+			return p1 < p2; } );
+			
 		BBox leftBox(TriBox(elements[first]));
 		BBox rightBox(TriBox(elements[first + count - 1]));
 
@@ -136,16 +147,16 @@ void BVH::FindSplit(int nNode, int first, int count, int depth) {
 	}
 }
 
-BVH::BVH(const TriVector &elems) {
+BVH::BVH(const CompactTris &elems) {
 	Construct(elems);
 }
 
-void BVH::Construct(const vector<Triangle, AlignedAllocator<Triangle> > &tElements) {
+void BVH::Construct(const CompactTris &tElements) {
 	elements = tElements;
 	nodes.reserve(elements.size() * 2);
 	nodes.clear();
 	
-	maxDepth = 0;
+	depth = 0;
 
 	BBox bbox(elements[0].BoundMin(), elements[0].BoundMax());
 	for(size_t n = 1; n < elements.size(); n++)
@@ -153,19 +164,27 @@ void BVH::Construct(const vector<Triangle, AlignedAllocator<Triangle> > &tElemen
 
 	nodes.push_back(Node(bbox));
 	FindSplit(0, 0, elements.size(), 0);
+	InputAssert(depth <= maxDepth);
+	UpdateCache();
+}
+
+void BVH::UpdateCache() {
+	triCache.resize(elements.size());
+	for(int n = 0; n < elements.size();n++)
+		triCache[n] = elements[n];
 }
 
 void BVH::Serialize(Serializer &sr) {
-	sr & maxDepth & elements & nodes;
+	sr & depth & elements & nodes;
+	if(sr.IsLoading()) UpdateCache();
 }
 
 void BVH::PrintInfo() const {
 	double nodeBytes = nodes.size() * sizeof(Node);
-	double objBytes = sizeof(CElement) * elements.size();
+	double objBytes = elements.MemSize();
 
-	printf("Elements count: %d\n", (int)elements.size());
-	printf("Elems:  %6.2fMB\n", objBytes * 0.000001);
+	printf("Triangles: %d (%.2fMB)\n", (int)elements.size(), objBytes * 0.000001);
 	printf("Nodes: %8d * %2d = %6.2fMB\n", (int)nodes.size(), (int)sizeof(Node), nodeBytes * 0.000001);
 	printf("~ %.0f bytes per triangle\n", double(nodeBytes + objBytes) / double(elements.size()));
-	printf("Levels: %d\n\n", maxDepth);
+	printf("Levels: %d\n\n", depth);
 }

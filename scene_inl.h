@@ -90,7 +90,7 @@ template <class AccStruct>
 TreeStats <1> Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading::Sample *samples,
 		Vec3q *__restrict__ diffuse, Vec3q *__restrict__ specular, int idx) const {
 	int size = inputSel.Size();
-	enum { shadows = 1 };
+	enum { shadows = 0 };
 
 	TreeStats <1> stats;
 
@@ -208,7 +208,20 @@ TreeStats<1> Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &
 	for(int q = 0; q < size; q++) stats.TracingRays(CountMaskBits(rays.Mask(q)));
 
 	Context<sharedOrigin, hasMask> tc(rays, tDistance, tObject, tElement, &stats);
-	geometry.TraversePrimary(tc);
+	geometry.TraversePrimary0(tc);
+/*	 {
+		int size4 = size / 4;
+		RayInterval interval(rays);
+		int start = gVals[1]?geometry.EPSearch(interval) : 0;
+		if(start != -1) {
+			for(int k = 0; k < 4; k++) {
+				RayGroup<sharedOrigin, hasMask> trays(rays, size4 * k, size4);
+				Context<sharedOrigin, hasMask> tc(trays, tDistance + size4 * k, tObject + size4 * k, tElement + size4 * k,
+						&stats);
+				geometry.TraversePrimary0(tc, start);
+			}
+		}
+	} */
 	char selectorData[size + 4], reflSelData[size + 4];
 	RaySelector selector(selectorData, size), reflSel(reflSelData, size);
 	selector.SelectAll();
@@ -314,7 +327,7 @@ TreeStats<1> Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &
 				}
 			}
 
-			materials[tMatId]->Shade(s, RayGroup<sharedOrigin, hasMask>(tc.rays, b4), cache.samplingCache);
+			materials[tMatId]->Shade(s, RayGroup<sharedOrigin, hasMask>(rays, b4), cache.samplingCache);
 		}
 		else {
 			for(uint q = 0; q < 4; q++) {
@@ -405,7 +418,7 @@ TreeStats<1> Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &
 				reflSel.Mask4(b) = materialFlags[matId0 - 1] & shading::Material::fReflection ? 0x0f0f0f0f : 0;
 
 				if(EXPECT_TAKEN(matId0)) materials[matId0 - 1]->
-					Shade(samples + b4, RayGroup<sharedOrigin, 0>(tc.rays, b4), cache.samplingCache);
+					Shade(samples + b4, RayGroup<sharedOrigin, 0>(rays, b4), cache.samplingCache);
 			}
 			else {
 				static_assert(blockSize == 4, "If you want some other value, you will have to modify the code here");
@@ -441,7 +454,7 @@ TreeStats<1> Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &
 					mask[3] = matId[3] == id4;
 
 					materials[id - 1]->Shade(samples + b4, RayGroup<sharedOrigin, 1>( RayGroup<sharedOrigin, 1>(
-							tc.rays.OriginPtr(), tc.rays.DirPtr(), tc.rays.IDirPtr(), size, selectorData), b4),
+							rays.OriginPtr(), rays.DirPtr(), rays.IDirPtr(), size, selectorData), b4),
 											cache.samplingCache);
 				}
 			}

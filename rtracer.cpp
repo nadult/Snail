@@ -227,7 +227,7 @@ static int tmain(int argc, char **argv) {
 		catch(...) { rebuild = 1; }
 	}
 	if(rebuild) {
-		staticScene.geometry.Construct(baseScene.ToTriVector());
+		staticScene.geometry.Construct(baseScene.ToCompactTris());
 	//	staticScene.geometry.Construct(baseScene.ToTriangleVector());
 		Saver(string("dump/") + modelFile) & staticScene.geometry;
 	}
