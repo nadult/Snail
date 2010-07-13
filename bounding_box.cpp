@@ -64,6 +64,73 @@ const BBox &BBox::operator+=(const BBox &other) {
 	return *this;
 }
 
+template <bool sharedOrigin, bool hasMask>
+bool BBox::Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &lastActive) const {
+	bool ret = 0;
+
+	//TODO: !sharedOrigin
+	Vec3f tmin = min - ExtractN(context.Origin(0), 0);
+	Vec3f tmax = max - ExtractN(context.Origin(0), 0);
+
+	for(int q = firstActive; q <= lastActive; q++) if(context.Mask(q)) {
+		Vec3q idir = context.IDir(q);
+
+		floatq l1 = idir.x * tmin.x;
+		floatq l2 = idir.x * tmax.x;
+		floatq lmin = Min(l1, l2);
+		floatq lmax = Max(l1, l2);
+
+		l1 = idir.y * tmin.y;
+		l2 = idir.y * tmax.y;
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		l1 = idir.z * tmin.z;
+		l2 = idir.z * tmax.z;
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		if(ForAny( lmax >= floatq(0.0f) && lmin <= Min(lmax, context.Distance(q)) )) {
+			firstActive = q;
+			ret = 1;
+			break;
+		}
+	}
+	for(int q = lastActive; q >= firstActive; q--) if(context.Mask(q)) {
+		Vec3q idir = context.IDir(q);
+
+		floatq l1 = idir.x * tmin.x;
+		floatq l2 = idir.x * tmax.x;
+		floatq lmin = Min(l1, l2);
+		floatq lmax = Max(l1, l2);
+
+		l1 = idir.y * tmin.y;
+		l2 = idir.y * tmax.y;
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		l1 = idir.z * tmin.z;
+		l2 = idir.z * tmax.z;
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		if(ForAny( lmax >= floatq(0.0f) && lmin <= Min(lmax, context.Distance(q)) )) {
+			lastActive = q;
+			ret = 1;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+
+template bool BBox::Test<0, 0>(Context<0, 0>&, int&, int&) const;
+template bool BBox::Test<0, 1>(Context<0, 1>&, int&, int&) const;
+template bool BBox::Test<1, 0>(Context<1, 0>&, int&, int&) const;
+template bool BBox::Test<1, 1>(Context<1, 1>&, int&, int&) const;
+
+
 bool BBox::TestInterval(const RayInterval &i) const {
 	float lmin, lmax;
 
@@ -92,59 +159,6 @@ bool BBox::TestInterval(const RayInterval &i) const {
 	lmax = Min(lmax, Max(Max(l1, l2), Max(l3, l4)));
 
 	return lmax >= 0.0f && lmin <= lmax;
-}
-
-bool BBox::TestCornerRays(const CornerRays &crays) const {
-	Vec3f tmin = min - crays.origin, tmax = max - crays.origin;
-
-	floatq l1 = crays.idir.x * tmin.x;
-	floatq l2 = crays.idir.x * tmax.x;
-	floatq lmin = Min(l1, l2);
-	floatq lmax = Max(l1, l2);
-
-	l1 = crays.idir.y * tmin.y;
-	l2 = crays.idir.y * tmax.y;
-	lmin = Max(Min(l1, l2), lmin);
-	lmax = Min(Max(l1, l2), lmax);
-
-	l1 = crays.idir.z * tmin.z;
-	l2 = crays.idir.z * tmax.z;
-	lmin = Max(Min(l1, l2), lmin);
-	lmax = Min(Max(l1, l2), lmax);
-
-	Vec3q orig(crays.origin);
-	Vec3q pmin = orig + crays.dir * lmin;
-	Vec3q pmax = orig + crays.dir * lmax;
-
-	Vec3f ttmin = Minimize(VMin(pmin, pmax));
-	Vec3f ttmax = Maximize(VMax(pmin, pmax));
-
-	return Overlaps(BBox(ttmin, ttmax));
-}
-
-bool BBox::TestFrustum(const Frustum &frustum) const {
-	Vec3f pp[8] = {
-		Vec3f(min.x, min.y, min.z),
-		Vec3f(min.x, min.y, max.z),
-		Vec3f(min.x, max.y, min.z),
-		Vec3f(min.x, max.y, max.z),
-		Vec3f(max.x, min.y, min.z),
-		Vec3f(max.x, min.y, max.z),
-		Vec3f(max.x, max.y, min.z),
-		Vec3f(max.x, max.y, max.z) };
-
-	for(int p = 0; p < 4; p++) {
-		const Plane &plane = frustum.planes[p];
-
-		float dst = -constant::inf;
-		for(int n = 0; n < 8; n++)
-			dst = Max(dst, plane.normal | pp[n]);
-
-		if(dst < plane.distance)
-			return 0;
-	}
-	return 1;
-
 }
 
 void GaussPointsFit(int iQuantity, const Vec3f* akPoint,Vec3f& rkCenter, Vec3f akAxis[3], float afExtent[3]);
@@ -184,7 +198,6 @@ OptBBox::OptBBox(const BBox &b,const Matrix<Vec4f> &m) :box(b),trans(m),invTrans
 }
 OptBBox::OptBBox(const BBox &b,const Matrix<Vec4f> &m,const Matrix<Vec4f> &inv) :box(b),trans(m),invTrans(inv) {
 }
-
 
 OptBBox::OptBBox(const Vec3f *verts,uint count) {
 	Vec3f center,axis[3]; float ext[3];

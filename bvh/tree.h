@@ -27,9 +27,6 @@ public:
 		return elements.GetSElement(elem, subElem);
 	}
 
-	int EPSearch(const RayInterval&, int start = 0) const;
-	bool FindAny(const RayInterval&, int start) const;
-
 	template <bool sharedOrigin, bool hasMask>
 	void TraversePrimary0(Context<sharedOrigin, hasMask> &c, int firstNode = 0) const;
 
@@ -39,11 +36,6 @@ public:
 	template <bool sharedOrigin, bool hasMask>
 	void TraversePrimary(Context<sharedOrigin, hasMask> &c) const;
 	
-//	template <int flags,template <int> class Selector>
-//	void TraverseShadow(Context<4,flags> &c,const Selector<4> &selector) const {
-//		TraverseShadow0(c, selector);
-//	}
-
 	template <bool sharedOrigin, bool hasMask>
 	void TraverseShadow(Context<sharedOrigin, hasMask> &c) const;
 

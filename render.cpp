@@ -1,3 +1,4 @@
+#include "pch.h"
 #include <iostream>
 #include "ray_generator.h"
 #include "scene_inl.h"
@@ -12,6 +13,7 @@
 #include "render.h"
 
 #include <pthread.h>
+#include "quicklz/quicklz.h"
 
 static i32x4 ConvColor(Vec3q rgb) {
 	i32x4 tr = Trunc(Clamp(rgb.x * 255.0f, floatq(0.0f), floatq(255.0f)));
@@ -29,27 +31,33 @@ struct Task {
 template <class AccStruct,int QuadLevels>
 struct RenderTask: public Task {
 	RenderTask() { }
-	RenderTask(const Scene<AccStruct> *sc,const Camera &cam,gfxlib::Texture *tOut,const Options &opt,uint tx,uint ty,
-					uint tw,uint th,TreeStats<1> *outSt) :scene(sc),camera(cam),out(tOut),options(opt),
-					startX(tx),startY(ty),width(tw),height(th),outStats(outSt) {
-		}
+	RenderTask(const Scene<AccStruct> *sc, const Camera &cam, gfxlib::Texture *tOut,
+			const Options &opt, uint tx, uint ty, uint tw, uint th, uint rank, TreeStats<1> *outSt)
+		:scene(sc), camera(cam), out(tOut), options(opt), startX(tx), startY(ty),
+		width(tw), height(th), rank(rank), outStats(outSt) { }
 
-	uint startX,startY;
-	uint width,height;
+	uint startX, startY;
+	uint width, height;
+	uint rank;
 
 	TreeStats<1> *outStats;
 	const Scene<AccStruct> *scene;
-	Camera camera;
 	gfxlib::Texture *out;
+	Camera camera;
 	Options options;
 
+	enum {
+		colorizeNodes = 1
+	};
+
 	void Work() {
-		float ratio = float(out->Width())/float(out->Height());
+		float ratio = float(out->Width()) / float(out->Height());
 		enum { NQuads = 1 << (QuadLevels * 2), PWidth = 2 << QuadLevels, PHeight = 2 << QuadLevels };
 
 		Vec3q origin; Broadcast(camera.Pos(), origin);
 		Vec3f right, up, front; camera.GetRotation(right, up, front);
-		RayGenerator rayGen(QuadLevels, out->Width(), out->Height(), camera.plane_dist, right, up, front);
+		RayGenerator rayGen(QuadLevels, out->Width(), out->Height(), camera.plane_dist,
+							right, up, front);
 
 		uint pitch = out->Pitch();
 		u8 *outPtr = ((u8*)out->DataPointer()) + startY * pitch + startX * 4;
@@ -58,14 +66,29 @@ struct RenderTask: public Task {
 		Vec3q dir[NQuads], idir[NQuads];
 
 		for(int y = 0; y < height; y += PHeight) {
-			for(int x = 0; x < width;x += PWidth) {
+			for(int x = 0; x < width; x += PWidth) {
 				rayGen.Generate(PWidth, PHeight, startX + x, startY + y, dir);
 				for(int n = 0; n < NQuads; n++) idir[n] = SafeInv(dir[n]);
 			
 				Vec3q colors[NQuads];	
 				*outStats += scene->RayTrace(RayGroup<1, 0>(&origin, dir, idir, NQuads), cache, colors);
 
+				if(colorizeNodes && gVals[8]) {
+					Vec3f ncolors[] = {
+						Vec3f(1, 0, 0),
+						Vec3f(0, 1, 0),
+						Vec3f(0, 0, 1),
+						Vec3f(1, 1, 0),
+						Vec3f(1, 0, 1),
+						Vec3f(0, 1, 1),
+						Vec3f(1, 1, 1) };
+					Vec3q color(ncolors[rank % (sizeof(ncolors) / sizeof(Vec3f))]);
+					for(int q = 0; q < NQuads; q++)
+						colors[q] *= color;
+				}
+
 				if(NQuads == 1) {
+					exit(0); //TODO
 					union { __m128i icol; u8 c[16]; };
 					icol = ConvColor(colors[0]).m;
 
@@ -84,9 +107,19 @@ struct RenderTask: public Task {
 					u8 *dst = outPtr + x * 4 + y * pitch;
 					int lineDiff = pitch - PWidth * 4;
 
-					for(int ty = 0; ty < PHeight; ty++) {
-						for(int tx = 0; tx < PWidth; tx += 4) {
+					int ex = Min(width - x, PWidth), ey = Min(height - y, PHeight);
+					for(int ty = 0; ty < ey; ty++) {
+						for(int tx = 0; tx + 3 < ex; tx += 4) {
 							_mm_storeu_si128((__m128i*)dst, ConvColor(*src++).m);
+							dst += 16;
+						}
+						if(ex & 3) {
+							union { __m128i mi; int i4[4]; };
+							mi = ConvColor(*src++).m;
+							int *idst = (int*)dst;
+							idst[0] = i4[0];
+							if((ex & 3) > 1) idst[1] = i4[1];
+							if((ex & 3) > 2) idst[2] = i4[2];
 							dst += 16;
 						}
 						dst += lineDiff;
@@ -96,6 +129,18 @@ struct RenderTask: public Task {
 		}
 
 	}
+};
+
+struct CompressTask: public Task {
+	CompressTask(const gfxlib::Texture &image, CompressedPart *part) :image(&image), part(part) { }
+	void Work() {
+		char scratch[QLZ_SCRATCH_COMPRESS];
+		const char *src = (const char*)image->DataPointer() + part->info.y * image->Pitch();
+		part->info.size = qlz_compress(src, &part->data[0], part->info.size, scratch);
+	}
+
+	const gfxlib::Texture *image;
+	CompressedPart *part;
 };
 
 #include <iostream>
@@ -202,48 +247,119 @@ static void Run(vector<TTask> &ttasks, int nThreads_) {
 	}
 }
 
-template <int QuadLevels,class AccStruct>
-TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera, gfxlib::Texture &image,const Options options,
-		uint nThreads) {
+template <int QuadLevels, class AccStruct>
+TreeStats<1> Render(const Scene<AccStruct> &scene, const Camera &camera,
+		gfxlib::Texture &image, const Options options, uint nThreads) {
 	enum { taskSize = 64 };
-	
-	Assert(image.Width() % 16 == 0);
 	Assert(image.GetFormat().BytesPerPixel() == 4);
 
-	uint numTasks = ((image.Width() + taskSize - 1) / taskSize) * ((image.Height() + taskSize - 1) / taskSize);
+	uint nTasks = ((image.Width() + taskSize - 1) / taskSize) * ((image.Height() + taskSize - 1) / taskSize);
 
-	vector<TreeStats<1> > taskStats(numTasks);
-	vector<RenderTask<AccStruct, QuadLevels>> tasks(numTasks);
+	vector<TreeStats<1> > taskStats(nTasks);
+	vector<RenderTask<AccStruct, QuadLevels>> tasks(nTasks);
 
 	uint num = 0;
 	for(uint y = 0; y < image.Height(); y += taskSize)
 		for(uint x = 0; x < image.Width(); x += taskSize) {
 			tasks[num] = RenderTask<AccStruct,QuadLevels> (&scene, camera, &image, options, x, y,
 						Min((int)taskSize, int(image.Width() - x)), Min((int)taskSize, int(image.Height() - y)),
-						&taskStats[num]);
+						0, &taskStats[num]);
 			num++;
+	}
+	Run(tasks, nThreads);
+
+	TreeStats<1> stats;
+	for(uint n = 0; n < nTasks; n++)
+		stats += taskStats[n];
+
+	return stats;
+}
+
+
+template <int QuadLevels,class AccStruct>
+TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,
+		gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
+		const Options options, uint nThreads) {
+	enum { taskSize = 64 };
+	Assert(image.GetFormat().BytesPerPixel() == 4);
+
+	vector<TreeStats<1> > taskStats;
+	vector<RenderTask<AccStruct, QuadLevels>> tasks;
+	tasks.reserve(1024);
+	taskStats.reserve(1024);
+
+	uint num = 0;
+
+	for(uint sy = 0; sy < (image.Height() + strapHeight - 1) / strapHeight; sy++)
+		if(sy % nRanks == rank) {
+			for(uint x = 0; x < image.Width(); x += taskSize) {
+				uint y = sy * strapHeight;
+
+				taskStats.push_back(TreeStats<1>());
+				tasks.push_back(
+					RenderTask<AccStruct,QuadLevels> (&scene, camera, &image, options,
+						x, y, Min((int)taskSize, int(image.Width() - x)),
+						Min((int)strapHeight, int(image.Height() - y)), rank, &taskStats[num]) );
+				num++;
+			}
 		}
 
 	Run(tasks, nThreads);
 
 	TreeStats<1> stats;
-	for(uint n=0;n<numTasks;n++)
+	for(uint n=0;n < tasks.size();n++)
 		stats += taskStats[n];
 
 	return stats;
 }
 
 template <class AccStruct>
-TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,gfxlib::Texture &image,const Options options,uint tasks) {
+TreeStats<1> Render(const Scene<AccStruct> &scene, const Camera &camera,
+				gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
+				const Options options, uint threads) {
 	return !gVals[0]?
-		Render<4>(scene,camera,image,options,tasks) : Render<3>(scene,camera,image,options,tasks);
+		Render<2>(scene, camera, image, rank, nRanks, strapHeight, options, threads) :
+		Render<3>(scene, camera, image, rank, nRanks, strapHeight, options, threads);
 }
 
-//typedef bih::Tree<TriangleVector> BIH;
+template <class AccStruct>
+TreeStats<1> Render(const Scene<AccStruct> &scene, const Camera &camera,
+				gfxlib::Texture &image, const Options options, uint threads) {
+	return !gVals[0]?
+		Render<2>(scene, camera, image, options, threads) :
+		Render<3>(scene, camera, image, options, threads);
+}
 
-template TreeStats<1> Render<BVH>(const Scene<BVH>&,const Camera&,gfxlib::Texture&,const Options,uint);
-//template TreeStats<1> Render<BIH>(const Scene<BIH>&,const Camera&,gfxlib::Texture&,const Options,uint);
-
-//typedef bih::Tree<TreeBoxVector<StaticTree> > FullTree;
-//template TreeStats<1> Render<FullTree  >(const Scene<FullTree>  &,const Camera&,gfxlib::Texture&,const Options,uint);
+template TreeStats<1> Render<BVH>(const Scene<BVH>&, const Camera&, gfxlib::Texture&,
+									uint, uint, uint, const Options, uint);
+template TreeStats<1> Render<BVH>(const Scene<BVH>&, const Camera&, gfxlib::Texture&,
+									const Options, uint);
 	
+
+int CompressParts(const gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
+				uint nThreads, vector<CompressedPart> &buffers) {
+	vector<CompressTask> tasks;
+	tasks.reserve(128);
+	int num = 0;
+	for(uint sy = 0; sy < (image.Height() + strapHeight - 1) / strapHeight; sy++)
+		if(sy % nRanks == rank)
+			num++;
+	if(buffers.size() < num)
+		buffers.resize(num);
+	num = 0;
+
+	for(uint sy = 0; sy < (image.Height() + strapHeight - 1) / strapHeight; sy++)
+		if(sy % nRanks == rank) {
+			int height = Min(image.Height() - sy * strapHeight, strapHeight);
+			CompressedPart *part = &buffers[num++];
+			part->info.x = 0; part->info.w = image.Width(); part->info.y = sy * strapHeight;
+			part->info.h = Min(image.Height() - sy * strapHeight, strapHeight);
+			part->info.size = part->info.w * part->info.h * 4;
+			if(part->data.size() < part->info.size)
+				part->data.resize(part->info.size);
+			tasks.push_back(CompressTask(image, part));
+		}
+
+	Run(tasks, nThreads);
+	return num;
+}

@@ -112,8 +112,6 @@ void Intersect(const Plane &a, const Plane &b, Vec3f &dir, Vec3f &point);
 
 std::ostream &operator<<(std::ostream&, const Plane&);
 
-extern double gdVals[16];
-
 Matrix<Vec4f> Inverse(const Matrix<Vec4f>&);
 
 #include "tree_stats.h"

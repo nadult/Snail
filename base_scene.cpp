@@ -23,13 +23,14 @@ CompactTris BaseScene::ToCompactTris() const {
 
 		out.tris.resize(out.tris.size() + obj.tris.size());
 		for(size_t n = 0; n < obj.tris.size(); n++) {
-			CompactTris::TriIdx &idx = out.tris[n+ inds];
+			CompactTris::TriIdx &idx = out.tris[n + inds];
 			idx = obj.tris[n];
 
 			idx.v1 += verts;
 			idx.v2 += verts;
 			idx.v3 += verts;
 		}
+
 	}
 
 	return out;
@@ -131,7 +132,6 @@ void BaseScene::Optimize() {
 
 BaseScene::Object::Object(const vector<Vec3f> &tverts,const vector<Vec2f> &tuvs,const vector<Vec3f> &tnormals,
 							const vector<BaseScene::IndexedTri> &ttris) {
-								
 	vector<int> vIMap(tverts.size()),uvIMap(tuvs.size()),nrmIMap(tnormals.size());
 	
 	{
@@ -443,20 +443,22 @@ CompactTris BaseScene::Object::ToCompactTris() const {
 	for(int n = 0; n < inds.size(); n++)
 		inds[n].dstIdx = n;
 	std::sort(inds.begin(),inds.end());
+
 	for(int n=0;n<tris.size();n++) {
 		const IndexedTri &src=tris[n];
 		CompactTris::TriIdx &dst = out.tris[n];
 
 		u32 idx[3];
 		for(int k=0;k<3;k++)
-			idx[k]=std::lower_bound(inds.begin(),inds.end(),Idx(src.v[k],src.vt[k],src.vn[k]))-inds.begin();
+			idx[k] = std::lower_bound(inds.begin(), inds.end(), Idx(src.v[k],src.vt[k],src.vn[k]))
+				- inds.begin();
 
 		dst.v1 = inds[idx[0]].dstIdx;
 		dst.v2 = inds[idx[1]].dstIdx;
 		dst.v3 = inds[idx[2]].dstIdx;
-		bool flatNrm=	Same(out.normals[dst.v1], out.normals[dst.v2])&&
+		bool flatNrm=	Same(out.normals[dst.v1], out.normals[dst.v2]) &&
 						Same(out.normals[dst.v1], out.normals[dst.v3]);
-		dst.mat = (src.matId&0x7fffffff)+(flatNrm?0x80000000:0);
+		dst.mat = (src.matId & 0x7fffffff) + (flatNrm? 0x80000000 : 0);
 	}
 	
 	return out;
@@ -592,9 +594,9 @@ void BaseScene::Object::GenNormals() {
 		Vec3f nrm=(verts[tri.v[1]]-verts[tri.v[0]])^(verts[tri.v[2]]-verts[tri.v[0]]);
 		nrm*=RSqrt(nrm|nrm);
 		if(tri.vn[0]<0||tri.vn[1]<0||tri.vn[2]<0) {
-			if(tri.vn[0]<0) tri.vn[0]=normals.size();
-			if(tri.vn[1]<0) tri.vn[1]=normals.size();
-			if(tri.vn[2]<0) tri.vn[2]=normals.size();
+			if(tri.vn[0] < 0) tri.vn[0]=normals.size();
+			if(tri.vn[1] < 0) tri.vn[1]=normals.size();
+			if(tri.vn[2] < 0) tri.vn[2]=normals.size();
 			normals.push_back(nrm);
 		}
 	}

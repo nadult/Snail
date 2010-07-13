@@ -42,12 +42,17 @@ static int FindMaxAxis(Vec3f boxSize) {
 	return boxSize.x > boxSize.y? boxSize.z > boxSize.x? 2 : 0 : boxSize.z > boxSize.y? 2 : 1;
 }
 
+void BVH::UpdateCache() {
+	triCache.resize(elements.size());
+	for(int n = 0; n < elements.size(); n++)
+		triCache[n] = elements[n];
+}
+
 void BVH::FindSplit(int nNode, int first, int count, int depth) {
 	BBox bbox = nodes[nNode].bbox;
-
 	enum { useSah = 1 };
 
-	if(count <= 1) {
+	if(count <= 2) {
 	LEAF_NODE:
 		nodes[nNode].bbox = TriBox(elements[first]);
 		for(int n = 1; n < count; n++)
@@ -58,10 +63,10 @@ void BVH::FindSplit(int nNode, int first, int count, int depth) {
 	}
 	else {
 		int minIdx = count / 2, minAxis = FindMaxAxis(bbox.Size());
+	
 		if(useSah) {
-			const float traverseCost = .0;
+			const float traverseCost = 0.0;
 			const float intersectCost = 1.0;
-
 			float minCost = constant::inf;
 			float nodeSA = BoxSA(bbox);
 			float noSplitCost = intersectCost * count * BoxSA(bbox);
@@ -107,6 +112,7 @@ void BVH::FindSplit(int nNode, int first, int count, int depth) {
 				goto LEAF_NODE;
 		}
 
+		if(minAxis != 2)
 		std::nth_element(&elements.tris[first], &elements.tris[first + minIdx], &elements.tris[first + count],
 		[&elements, minAxis](const CompactTris::TriIdx &a, const CompactTris::TriIdx &b) {
 			float p1 = (&elements.verts[a.v1].x)[minAxis] + (&elements.verts[a.v2].x)[minAxis]
@@ -165,18 +171,10 @@ void BVH::Construct(const CompactTris &tElements) {
 	nodes.push_back(Node(bbox));
 	FindSplit(0, 0, elements.size(), 0);
 	InputAssert(depth <= maxDepth);
-	UpdateCache();
-}
-
-void BVH::UpdateCache() {
-	triCache.resize(elements.size());
-	for(int n = 0; n < elements.size();n++)
-		triCache[n] = elements[n];
 }
 
 void BVH::Serialize(Serializer &sr) {
 	sr & depth & elements & nodes;
-	if(sr.IsLoading()) UpdateCache();
 }
 
 void BVH::PrintInfo() const {

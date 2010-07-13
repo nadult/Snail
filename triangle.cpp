@@ -128,6 +128,7 @@ template int Triangle::CollideShadow<1, 0>(Context<1, 0>&, int, int) const;
 template int Triangle::CollideShadow<1, 1>(Context<1, 1>&, int, int) const;
 
 bool Triangle::TestInterval(const RayInterval &i) const {
+	//TODO: min/max origin
 	Vec3f nrm = Nrm();
 
 	float det =

@@ -90,7 +90,7 @@ template <class AccStruct>
 TreeStats <1> Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading::Sample *samples,
 		Vec3q *__restrict__ diffuse, Vec3q *__restrict__ specular, int idx) const {
 	int size = inputSel.Size();
-	enum { shadows = 0 };
+	enum { shadows = 1 };
 
 	TreeStats <1> stats;
 
@@ -209,19 +209,6 @@ TreeStats<1> Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &
 
 	Context<sharedOrigin, hasMask> tc(rays, tDistance, tObject, tElement, &stats);
 	geometry.TraversePrimary0(tc);
-/*	 {
-		int size4 = size / 4;
-		RayInterval interval(rays);
-		int start = gVals[1]?geometry.EPSearch(interval) : 0;
-		if(start != -1) {
-			for(int k = 0; k < 4; k++) {
-				RayGroup<sharedOrigin, hasMask> trays(rays, size4 * k, size4);
-				Context<sharedOrigin, hasMask> tc(trays, tDistance + size4 * k, tObject + size4 * k, tElement + size4 * k,
-						&stats);
-				geometry.TraversePrimary0(tc, start);
-			}
-		}
-	} */
 	char selectorData[size + 4], reflSelData[size + 4];
 	RaySelector selector(selectorData, size), reflSel(reflSelData, size);
 	selector.SelectAll();
@@ -460,9 +447,9 @@ TreeStats<1> Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &
 			}
 		}
 	}
-	reflSel = selector;
+//	reflSel = selector;
 
-	if(reflSel.Any() && !gVals[5] && cache.reflections < 1) {
+	if(reflSel.Any() && gVals[5] && cache.reflections < 1) {
 		cache.reflections++;
 		Vec3q reflColor[size];
 		stats += TraceReflection(reflSel, rays.DirPtr(), samples, cache, reflColor);

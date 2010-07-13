@@ -1,30 +1,32 @@
+#include "pch.h"
 #include <iostream>
 #include "camera.h"
 
 #include "gl_window.h"
 #include "formats/loader.h"
 #include "base_scene.h"
-
-#include "render.h"
-#include "shading/material.h"
-
 #include "bvh/tree.h"
 
 #include "scene.h"
 #include "mesh.h"
 #include "frame_counter.h"
+#include "render.h"
 
 #include "font.h"
 #include "frame_counter.h"
 
-int TreeVisMain(const TriVector&);
+#include <boost/asio.hpp>
+#include "quicklz/quicklz.h"
+
+using boost::asio::ip::tcp;
 
 int gVals[16]={0,};
+double gdVals[16]={0,};
 
 using std::cout;
 using std::endl;
 
-void PrintHelp() {
+static void PrintHelp() {
 	printf("Synopsis:    rtracer model_file [options]\nOptions:\n\t-res x y   - set rendering resolution [512 512]\n\t");
 	printf("-fullscreen\n\t-toFile   - renders to file out/output.tga\n\t-threads n   - set threads number to n\n\t");
 	printf("\nExamples:\n\t./rtracer -res 1280 800 abrams.obj\n\t./rtracer pompei.obj -res 800 600 -fullscreen\n\n");
@@ -39,7 +41,7 @@ void PrintHelp() {
 typedef BVH StaticTree;
 
 template <class Scene>
-void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
+static void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
 	scene.materials.clear();
 //	for(int n=0;n<128;n++)
 //		scene.materials.push_back(shading::NewMaterial(""));
@@ -111,7 +113,7 @@ void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
 	}
 }
 
-vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
+static vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
 	vector<Light> out;
 
 	float pos=float(gVals[5])*0.01f;
@@ -129,12 +131,14 @@ vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
 
 static void MoveCamera(Camera &cam, GLWindow &window, float speed) {
 	if(window.MouseKey(0)) {
+		window.GrabMouse(1);
 		float dx = window.MouseMove().x;
 		float dy = window.MouseMove().y;
 
-		if(dx) cam.Rotate(-dx * 0.01);
-		if(dy) cam.RotateY(dy * 0.01);
+		if(dx) cam.Rotate(-dx * 0.005);
+		if(dy) cam.RotateY(dy * 0.005);
 	}
+	else window.GrabMouse(0);
 
 	Vec3f move(0, 0, 0);
 	Vec3f right, up, front;
@@ -150,8 +154,29 @@ static void MoveCamera(Camera &cam, GLWindow &window, float speed) {
 	cam.Move(move * speed * (window.Key(Key_lshift)? 5.0f : 1.0f));
 }
 
+void ReadSocket(tcp::socket &socket, void *ptr, int size) {
+	int bytes = 0;
+	while(bytes < size) {
+		int len = socket.read_some(boost::asio::buffer(((char*)ptr) + bytes, size - bytes));
+		bytes += len;
+	}
+}
 
-static int tmain(int argc, char **argv) {
+void WriteSocket(tcp::socket &socket, const void *ptr, int size) {
+	boost::asio::write(socket, boost::asio::buffer(ptr, size));
+}
+
+void SendFrameRequest(tcp::socket &socket, const Camera &cam, const vector<Light> &lights,
+					int threads, bool finish) {
+	WriteSocket(socket, &finish, sizeof(finish));
+	WriteSocket(socket, &cam, sizeof(cam));
+	int size = lights.size(); WriteSocket(socket, &size, sizeof(size));
+	WriteSocket(socket, &lights[0], size * sizeof(Light));
+	WriteSocket(socket, gVals, sizeof(gVals));
+	WriteSocket(socket, &threads, sizeof(threads));
+}
+
+static int client_main(int argc, char **argv) {
 	printf("Snail v0.20 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
 		PrintHelp();
@@ -169,18 +194,16 @@ static int tmain(int argc, char **argv) {
 
 //	StaticTree meshTree;
 
-	int resx=1280, resy=720;
-#ifndef NDEBUG
-	resx /= 2; resy /= 2;
-#endif
+	int resx=1024, resy=1024;
 	bool fullscreen = 0;
 	int threads = 2;
-	const char *modelFile = "pompei.obj";//"doom3/admin.proc";
+	const char *modelFile = "foot.obj";
+	const char *host = "blader";
 
 	Options options;
 	bool flipNormals = 1;
 	bool rebuild = 0;
-	string texPath = "/mnt/data/data/doom3/";
+	string texPath = "scenes/";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
@@ -190,8 +213,12 @@ static int tmain(int argc, char **argv) {
 		else if(string("+flipNormals")==argv[n]) flipNormals=1;
 		else if(string("-flipNormals")==argv[n]) flipNormals=0;
 		else if(string("-texPath")==argv[n]) { texPath=argv[n+1]; n++; }
+		else if(string("-host")==argv[n]) { host=argv[n+1]; n++; }
 		else {
-			if(argv[n][0] == '-') printf("Unknown option: %s\n",argv[n]);
+			if(argv[n][0] == '-') {
+				printf("Unknown option: %s\n",argv[n]);
+				exit(0);
+			}
 			else modelFile = argv[n];
 		}
 	}
@@ -233,7 +260,6 @@ static int tmain(int argc, char **argv) {
 	staticScene.geometry.PrintInfo();
 	staticScene.materials.push_back(shading::NewMaterial(""));
 	staticScene.Update();
-	staticScene.geometry.UpdateCache();
 
 	float sceneScale; {
 		Vec3f size = staticScene.geometry.GetBBox().Size();
@@ -244,11 +270,14 @@ static int tmain(int argc, char **argv) {
 	Font font;
 
 	gfxlib::Texture image(resx, resy, gfxlib::TI_A8B8G8R8);
+
+	double minTime = 1.0f / 0.0f, maxTime = 0.0f;
 	vector<Light> lights;// = GenLights();
 			
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
 		cam.SetPos(staticScene.geometry.GetBBox().Center());
+
 
 	bool lightsEnabled=1;
 	bool staticEnabled=0;
@@ -257,37 +286,73 @@ static int tmain(int argc, char **argv) {
 		Vec3p size = staticScene.geometry.GetBBox().Size();
 		speed = (size.x + size.y + size.z) * 0.0025f;
 	}
+	
+//	Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
+//	lights.push_back(Light(cam.Pos(), colors[rand()&3], 800.0f * 0.001f * sceneScale));
+//	lights.push_back(Light(cam.Pos(), colors[rand()&3], 800.0f * 0.001f * sceneScale));
+//	lights.push_back(Light(cam.Pos(), colors[rand()&3], 800.0f * 0.001f * sceneScale));
+//	lights.push_back(Light(cam.Pos(), colors[rand()&3], 800.0f * 0.001f * sceneScale));
 
 	FrameCounter frmCounter;
+		
+	boost::asio::io_service ioService;
+	tcp::resolver resolver(ioService);
+	tcp::resolver::query query(host, "20000");
+	tcp::resolver::iterator endpointIterator = resolver.resolve(query);
+	tcp::resolver::iterator end;
 
-	while(window.PollEvents()) {
+	tcp::socket socket(ioService);
+	boost::system::error_code error = boost::asio::error::host_not_found;
+	while(error && endpointIterator != end) {
+		socket.close();
+		socket.connect(*endpointIterator++, error);
+	}
+	if(error)
+		ThrowException("Error while connecting to server: ", error);
+
+	{
+		char model[256]; snprintf(model, 256, "%s", modelFile);
+		
+		WriteSocket(socket, &resx, 4);
+		WriteSocket(socket, &resy, 4);
+		WriteSocket(socket, model, sizeof(model));
+	}
+
+	bool finish = 0;
+	SendFrameRequest(socket, cam, lights, threads, finish);
+
+	while(!finish) {
+		if(!window.PollEvents() || window.KeyUp(Key_esc)) finish = 1;
 		frmCounter.NextFrame();
-
-		if(window.KeyUp(Key_esc)) break;
-		if(window.KeyDown('K')) Saver("out/output.dds") & image;
-		if(window.KeyDown('O')) options.reflections^=1;
-		if(window.KeyDown('I')) options.rdtscShader^=1;
-		if(window.KeyDown('C')) {
-		//	if(staticEnabled)
-				cam.SetPos(staticScene.geometry.GetBBox().Center());
-		//	else cam.pos=scene.geometry.GetBBox().Center();
-		}
+		
+		if(window.KeyDown('K'))
+			Saver("out/output.dds") & image;
+		if(window.KeyDown('I'))
+			options.rdtscShader ^= 1;
+		if(window.KeyDown('C'))
+			cam.SetPos(staticScene.geometry.GetBBox().Center());
 		if(window.KeyDown('P')) {
 			camConfigs.AddConfig(string(modelFile),cam);
 			Saver("scenes/cameras.dat") & camConfigs;
 			cam.Print();
 		}
 		if(window.KeyDown('L')) {
-			printf("Lights %s\n",lightsEnabled?"disabled":"enabled");
-			lightsEnabled^=1;
+			printf("Lights %s\n", lightsEnabled? "disabled" : "enabled");
+			lightsEnabled ^= 1;
 		}
 		if(window.KeyDown('J')) {
-			Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
+			Vec3f colors[4] = {
+				Vec3f(1,1,1), Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0) };
 
-			lights.push_back(Light(cam.Pos(), colors[rand()&3], 800.0f * 0.001f * sceneScale));
+			lights.push_back(Light(cam.Pos(), colors[rand()&3], 1500.0f * 0.001f * sceneScale));
 		}
 
 		MoveCamera(cam, window, speed);
+
+		if(window.Key('G')) { gdVals[0]+=0.01 * sceneScale; printf("16 max dist: %f\n", gdVals[0] / sceneScale); }
+		if(window.Key('V')) { gdVals[0]-=0.01 * sceneScale; printf("16 max dist: %f\n", gdVals[0] / sceneScale); }
+		if(window.Key('H')) { gdVals[1]+=0.01 * sceneScale; printf("4 max dist: %f\n", gdVals[1] / sceneScale); }
+		if(window.Key('B')) { gdVals[1]-=0.01 * sceneScale; printf("4 max dist: %f\n", gdVals[1] / sceneScale); }
 
 		for(int n = 1; n <= 8; n++) if(window.Key('0' + n))
 				{ threads = n; printf("Threads: %d\n", threads); }
@@ -300,29 +365,12 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"on":"off"); }
 		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Val 6 %s\n",gVals[6]?"on":"off"); }
 		if(window.KeyDown(Key_f8)) { gVals[7]^=1; printf("Val 7 %s\n",gVals[7]?"on":"off"); }
+		if(window.KeyDown(Key_f9)) { gVals[8]^=1; printf("Val 8 %s\n",gVals[8]?"on":"off"); }
+		if(window.KeyDown(Key_f10)) { gVals[9]^=1; printf("Val 9 %s\n",gVals[9]?"on":"off"); }
 
 
 		static float animPos = 0;
-		if(window.Key(Key_space)) animPos+=0.025f;
-
-		double buildTime=GetTime(); /*{
-			SceneBuilder<StaticTree> temp=builder;
-		//	for(int n=0;n<temp.instances.size();n++) {
-		//		SceneBuilder<StaticTree>::Instance &inst=temp.instances[n];
-		//		inst.trans.w=inst.trans.w+Vec4f(0.0f,sin(animPos+n*n)*5.0f*speed,0.0f,0.0f);
-		//	}
-			mesh.Animate(meshAnim,animPos);
-			meshTree.Construct(mesh.triVec,1);
-	//		staticScene.geometry = meshTree;
-
-			temp.AddObject(&meshTree,Identity<>(),meshTree.GetBBox());
-			for(int x=-1;x<2;x++) for(int z=-1;z<2;z++)
-				temp.AddInstance(temp.objects.size()-1,
-						RotateY(3.1415f)*Translate(Vec3f(132 + x * 50, 0, z * 50 - 346)));
-			scene.geometry.Construct(temp.ExtractElements(),1);
-			BBox box=meshTree.GetBBox();
-
-					} */ buildTime=GetTime()-buildTime;
+		if(window.Key(Key_space)) animPos += 0.025f;
 
 		vector<Light> tLights = lightsEnabled?lights:vector<Light>();
 			for(int n=0;n<tLights.size();n++)
@@ -331,14 +379,47 @@ static int tmain(int argc, char **argv) {
 		staticScene.lights /*= scene.lights*/ = tLights;
 		staticScene.Update();
 	//	scene.Update();
-		
-		double time=GetTime();
-		TreeStats<1> stats;
-	//	if(staticEnabled)
-			stats = Render(staticScene, cam, image, options, threads);
-	//	else stats=Render(scene,cam,image,options,threads);
+		double time = GetTime();
+		int w = image.Width(), h = image.Height();
+		vector<char> compressed(w * h * 4 + 400), decompressed(w * h * 4);
 
-		time=GetTime()-time;
+		int nBytes = 0;
+		TreeStats<1> stats; {
+
+			int nPixels = w * h, received = 0;
+			SendFrameRequest(socket, cam, lights, threads, finish);
+
+			static bool first = 1;
+			if(!first) {
+				char dummy[1460];
+				ReadSocket(socket, dummy, sizeof(dummy));
+			} else first = 0;
+
+			while(received < nPixels) {
+				struct { int x, y, w, h, size; } info;
+				ReadSocket(socket, &info, sizeof(info));
+				ReadSocket(socket, &compressed[0], info.size);
+				nBytes += info.size;
+
+				InputAssert(qlz_size_decompressed(&compressed[0]) == info.w * info.h * 4);
+
+				char scratch[QLZ_SCRATCH_DECOMPRESS];
+				qlz_decompress(&compressed[0], &decompressed[0], scratch);
+
+				for(int y = 0; y < info.h; y++) {
+					const char *csrc = &decompressed[0] + y * info.w * 4;
+					char *cdst = (char*)image.DataPointer() + (y + info.y) * image.Pitch() +
+									info.x * 4;
+					std::copy(csrc, csrc + info.w * 4, cdst);
+				}
+				received += info.w * info.h;
+			}
+		
+			ReadSocket(socket, &stats, sizeof(stats));	
+		}
+
+		time = GetTime() - time;
+
 		window.RenderImage(image);
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
@@ -346,12 +427,13 @@ static int tmain(int argc, char **argv) {
 
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));
-			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, time * 1000.0,buildTime * 1000.0));
-			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays);
+			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, time * 1000.0, 0));
+			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays, " KBytes/frame:", nBytes / 1024);
 			if(lightsEnabled && lights.size())
 				font.PrintAt(Vec2f(5, 45), "Lights: ",lightsEnabled?lights.size() : 0);
 			font.PrintAt(Vec2f(5, 85), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
-					" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7]);
+					" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7], ' ',
+					gdVals[0] / sceneScale, ' ', gdVals[1] / sceneScale);
 		font.FinishDrawing();
 		window.SwapBuffers();
 	}
@@ -361,7 +443,7 @@ static int tmain(int argc, char **argv) {
 
 int main(int argc,char **argv) {
 	try {
-		return tmain(argc,argv);
+		return client_main(argc, argv);
 	}
 	catch(const std::exception &ex) {
 		std::cout << ex.what() << '\n';
@@ -371,4 +453,5 @@ int main(int argc,char **argv) {
 		std::cout << "Unknown exception thrown.\n";
 		throw;
 	}
+	
 }

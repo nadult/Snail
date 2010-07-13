@@ -4,10 +4,10 @@
 #include "rtbase.h"
 
 template <bool,bool> class RayGroup;
+template <bool, bool> class Context;
 
 class CornerRays;
 class RayInterval;
-class Frustum;
 
 class BBox {
 public:
@@ -32,10 +32,6 @@ public:
 	bool Contains(const BBox &rhs) const {
 		return 	min.x <= rhs.min.x && min.y <= rhs.min.y && min.z <= rhs.min.z &&
 				max.x >= rhs.max.x && max.y >= rhs.max.y && max.z >= rhs.max.z;
-	}
-	bool Overlaps(const BBox &rhs) const {
-		return 	min.x <= rhs.max.x && min.y <= rhs.max.y && min.z <= rhs.max.z &&
-				max.x >= rhs.min.x && max.y >= rhs.min.y && max.z >= rhs.min.z;
 	}
 	bool Contains(const BBox &rhs,float t) const {
 		return BBox(Center()-Size()*0.5f*t,Center()+Size()*0.5f*t).Contains(rhs);
@@ -247,9 +243,10 @@ public:
 		return !ForAll( lmax < Real(0.0f) || lmin > Min(lmax, maxDist) || !mask );
 	}
 
-	bool TestCornerRays(const CornerRays&) const;
+	template <bool sharedOrigin, bool hasMask>
+	bool Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &lastActive) const;
+
 	bool TestInterval(const RayInterval&) const;
-	bool TestFrustum(const Frustum&) const;
 
 	Vec3f min, max;
 };
@@ -260,12 +257,6 @@ float BoxPointDistanceSq(const BBox &box,const Vec3f &point);
 
 inline BBox operator+(const BBox &a,const BBox &b) { BBox out(a); out+=b; return out; }
 inline BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out*=mat; return out; }
-
-class OBBox {
-public:
-	BBox box;
-	Vec3f ax0, ax1, ax2;
-};
 
 class OptBBox {
 public:

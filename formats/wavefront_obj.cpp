@@ -86,38 +86,43 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 		if(!is.getline(line,2000))
 			break;
 
-		sscanf(line,"%s",type);
+		sscanf(line, "%s", type);
 
 		if(strcmp(type,"o")==0) {
-			if(tris.size()>0) {
-				objects.push_back(BaseScene::Object(verts,uvs,normals,tris));
-				objects.back().name=strpbrk(line," \t")+1;
-				tris.clear();
-			}
+		//	if(tris.size()>0) {
+		//		objects.push_back(BaseScene::Object(verts,uvs,normals,tris));
+		//		objects.back().name = strpbrk(line," \t") + 1;
+		//		tris.clear();
+		//	}
 		}
 		else if(strcmp(type,"v")==0) {
 			Vec3f vert;
-			sscanf(line,"%s %f %f %f",type,&vert.x,&vert.y,&vert.z);
+			sscanf(line,"%s %f %f %f", type, &vert.x, &vert.y, &vert.z);
 			verts.push_back(vert);
 		}
 		else if(strcmp(type,"vt")==0) {
 			Vec2f uv; float w;
-			sscanf(line,"%s %f %f %f",type,&uv.x,&uv.y,&w);
+			sscanf(line,"%s %f %f %f", type, &uv.x, &uv.y, &w);
 			uvs.push_back(uv);
 		}
 		else if(strcmp(type,"vn")==0) {
 			Vec3f nrm;
-			sscanf(line,"%s %f %f %f",type,&nrm.x,&nrm.y,&nrm.z);
+			sscanf(line,"%s %f %f %f", type, &nrm.x, &nrm.y, &nrm.z);
 			normals.push_back(nrm);
 		}
 		else if(strcmp(type,"f")==0) {
-			char *p[3];
-			p[0]=strpbrk(line," \t")+1; while(p[0][0]==' ') p[0]++;
-			p[1]=strpbrk(p[0]," \t")+1; p[1][-1]=0;
-			p[2]=strpbrk(p[1]," \t")+1; p[2][-1]=0;
+			char *p[4];
+			p[0] = strpbrk(line, " \t") + 1; while(p[0][0]==' ') p[0]++;
+			p[1] = strpbrk(p[0], " \t") + 1; p[1][-1] = 0;
+			p[2] = strpbrk(p[1], " \t") + 1; p[2][-1] = 0;
+			p[3] = strpbrk(p[2], " \t");
+			if(p[3]) {
+				p[3]++; p[3][-1] = 0;
+				ThrowException("Quads in wavefront .obj are not (yet) supported");
+			}
 
 			BaseScene::IndexedTri tri;
-			tri.matId=lastMatId;
+			tri.matId = lastMatId;
 
 			for(int k = 0; k < 3; k++) {
 				tri.v[k] = atoi(p[k]);
@@ -125,16 +130,16 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 				if(tri.v[k] < 0) tri.v[k] = verts.size() + tri.v[k] + 1;
 				tri.vt[k] = tri.vn[k] = 0;
 				
-				char *puv = strchr(p[k],'/');
+				char *puv = strchr(p[k], '/');
 				
 				if(puv) {
-					char *pnrm = strchr(puv + 1,'/');
+					char *pnrm = strchr(puv + 1, '/');
 					if(pnrm != puv + 1) {
 						tri.vt[k] = atoi(puv + 1);
 						if(tri.vt[k] < 0) tri.vt[k] = uvs.size() + tri.vt[k];
 					}
 					if(pnrm && pnrm[1]) {
-						tri.vn[k] = atoi(pnrm+1);
+						tri.vn[k] = atoi(pnrm + 1);
 						if(tri.vn[k] < 0) tri.vn[k] = normals.size() + tri.vn[k];
 					}
 				}
@@ -142,8 +147,8 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 				tri.v[k]--;
 				tri.vt[k]--;
 				tri.vn[k]--;
-				
-				if(tri.v[k] >= int(verts.size())||tri.v[k]<0)
+
+				if(tri.v[k] >= int(verts.size()) || tri.v[k] < 0)
 					ThrowException("Wrong vertex index: ",tri.v[k],"/",int(verts.size()));
 				if(tri.vt[k] >= int(uvs.size()))
 					ThrowException("Wrong tex-coord index: ",tri.vt[k],"/",int(uvs.size()));
@@ -157,22 +162,12 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 			sscanf(line,"%s %s",type,a);
 			string matName=a;
 			std::map<string,int>::iterator it=matNames.find(matName);
-			if(it==matNames.end()) {
+			if(it == matNames.end()) {
 				lastMatId=matNames.size();
 				matNames[matName]=lastMatId;
 			}
 			else lastMatId=it->second;
 		}
-
-/*		else if(strcmp(type,"swap")==0) swap=1;
-		else if(strcmp(type,"flip")==0) flipSides=1;
-		else if(strcmp(type,"scale")==0) {
-			sscanf(line,"%s %s %s %s",type,a,b,c);
-			sx=sx*atof(a);
-			sy=sy*atof(b);
-			sz=sz*atof(c);
-		}*/
-
 	}
 
 
