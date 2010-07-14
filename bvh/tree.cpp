@@ -49,10 +49,12 @@ void BVH::UpdateCache() {
 }
 
 void BVH::FindSplit(int nNode, int first, int count, int depth) {
+	if(depth <= 4) { printf("%d ", depth); fflush(stdout); }
+
 	BBox bbox = nodes[nNode].bbox;
 	enum { useSah = 1 };
 
-	if(count <= 2) {
+	if(count <= 4) {
 	LEAF_NODE:
 		nodes[nNode].bbox = TriBox(elements[first]);
 		for(int n = 1; n < count; n++)
@@ -112,14 +114,14 @@ void BVH::FindSplit(int nNode, int first, int count, int depth) {
 				goto LEAF_NODE;
 		}
 
-		if(minAxis != 2)
-		std::nth_element(&elements.tris[first], &elements.tris[first + minIdx], &elements.tris[first + count],
-		[&elements, minAxis](const CompactTris::TriIdx &a, const CompactTris::TriIdx &b) {
-			float p1 = (&elements.verts[a.v1].x)[minAxis] + (&elements.verts[a.v2].x)[minAxis]
-								+ (&elements.verts[a.v3].x)[minAxis];
-			float p2 = (&elements.verts[b.v1].x)[minAxis] + (&elements.verts[b.v2].x)[minAxis]
-								+ (&elements.verts[b.v3].x)[minAxis];
-			return p1 < p2; } );
+		if(!useSah || minAxis != 2)
+			std::nth_element(&elements.tris[first], &elements.tris[first + minIdx], &elements.tris[first + count],
+			[&elements, minAxis](const CompactTris::TriIdx &a, const CompactTris::TriIdx &b) {
+				float p1 = (&elements.verts[a.v1].x)[minAxis] + (&elements.verts[a.v2].x)[minAxis]
+									+ (&elements.verts[a.v3].x)[minAxis];
+				float p2 = (&elements.verts[b.v1].x)[minAxis] + (&elements.verts[b.v2].x)[minAxis]
+									+ (&elements.verts[b.v3].x)[minAxis];
+				return p1 < p2; } );
 			
 		BBox leftBox(TriBox(elements[first]));
 		BBox rightBox(TriBox(elements[first + count - 1]));

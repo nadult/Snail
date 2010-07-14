@@ -23,57 +23,31 @@ void BVH::TraversePrimary0(Context<sharedOrigin, hasMask> &c, int firstNode) con
 		stats.LoopIteration();
 
 		if(nodes[nNode].IsLeaf()) {
+			int count = nodes[nNode].count, first = nodes[nNode].first & 0x7fffffff;
+			_mm_prefetch(&triCache[first + 0], _MM_HINT_T0);
+			_mm_prefetch(&triCache[first + 1], _MM_HINT_T0);
+			_mm_prefetch(&triCache[first + 2], _MM_HINT_T0);
+			_mm_prefetch(&triCache[first + 3], _MM_HINT_T0);
+
 			const BBox &box = nodes[nNode].bbox;
 			if(!box.TestInterval(interval))
 				continue;
-	
-			int count = nodes[nNode].count, first = nodes[nNode].first & 0x7fffffff;
-			if(count > 3) {
-				int firstA = c.Size(), lastA = 0;
-				Vec3f origin = ExtractN(c.Origin(0), 0);
-				Vec3f min = box.min - origin, max = box.max - origin;
-
-				for(int q = firstActive; q <= lastActive; q++) {
-					Vec3q idir = c.IDir(q);
-
-					floatq l1 = idir.x * floatq(min.x);
-					floatq l2 = idir.x * floatq(max.x);
-					floatq lmin = Min(l1, l2);
-					floatq lmax = Max(l1, l2);
-
-					l1 = idir.y * floatq(min.y);
-					l2 = idir.y * floatq(max.y);
-					lmin = Max(Min(l1, l2), lmin);
-					lmax = Min(Max(l1, l2), lmax);
-
-					l1 = idir.z * floatq(min.z);
-					l2 = idir.z * floatq(max.z);
-					lmin = Max(Min(l1, l2), lmin);
-					lmax = Min(Max(l1, l2), lmax);
-					lmax = Min(lmax, c.Distance(q));
-
-					if(ForAny(lmax >= 0.0f && lmin <= lmax)) {
-						firstA = Min(firstA, q);
-						lastA = Max(lastA, q);
+			if(box.Test(c, firstActive, lastActive))
+				for(int n = 0; n < count; n++) {
+					const Triangle &tri = triCache[first + n];
+					if(tri.TestCornerRays(crays)) {
+						tri.Collide(c, first + n, firstActive, lastActive);
+						stats.Intersection(lastActive - firstActive + 1);
 					}
 				}
-				if(firstA > lastA)
-					continue; 
-				firstActive = firstA;
-				lastActive = lastA;
-			}
-
-			for(int n = 0; n < count; n++) {
-				const Triangle &tri = triCache[first + n];
-				if(tri.TestCornerRays(crays)) {
-					tri.Collide(c, first + n, firstActive, lastActive);
-					stats.Intersection(lastActive - firstActive + 1);
-				}
-			}
 
 			continue;
 		}
 			
+		int child = nodes[nNode].subNode;
+		_mm_prefetch(&nodes[child], _MM_HINT_T0);
+		_mm_prefetch(&nodes[child + 1], _MM_HINT_T0);
+
 		bool test = 0; {
 			const BBox &box = nodes[nNode].bbox;
 			if(!box.TestInterval(interval))
@@ -83,7 +57,6 @@ void BVH::TraversePrimary0(Context<sharedOrigin, hasMask> &c, int firstNode) con
 
 		if(test) {
 			int firstNode = nodes[nNode].firstNode ^ sign[nodes[nNode].axis];
-			int child = nodes[nNode].subNode;
 			stack[stackPos++] = {child + (firstNode ^ 1), (short)firstActive, (short)lastActive};
 			nNode = child + firstNode;
 			goto CONTINUE;
@@ -120,57 +93,30 @@ void BVH::TraverseShadow0(Context<sharedOrigin, hasMask> &c, int firstNode) cons
 		stats.LoopIteration();
 
 		if(nodes[nNode].IsLeaf()) {
-			const BBox &box = nodes[nNode].bbox;
 
 			int count = nodes[nNode].count, first = nodes[nNode].first & 0x7fffffff;
+			_mm_prefetch(&triCache[first + 0], _MM_HINT_T0);
+			_mm_prefetch(&triCache[first + 1], _MM_HINT_T0);
+			_mm_prefetch(&triCache[first + 2], _MM_HINT_T0);
+			_mm_prefetch(&triCache[first + 3], _MM_HINT_T0);
 
-			if(count > 3) {
-				int firstA = c.Size(), lastA = 0;
-				Vec3f origin = ExtractN(c.Origin(0), 0);
-				Vec3f min = box.min - origin, max = box.max - origin;
-
-				for(int q = firstActive; q <= lastActive; q++) {
-					if(!c.Mask(q)) continue;
-
-					Vec3q idir = c.IDir(q);
-
-					floatq l1 = idir.x * floatq(min.x);
-					floatq l2 = idir.x * floatq(max.x);
-					floatq lmin = Min(l1, l2);
-					floatq lmax = Max(l1, l2);
-
-					l1 = idir.y * floatq(min.y);
-					l2 = idir.y * floatq(max.y);
-					lmin = Max(Min(l1, l2), lmin);
-					lmax = Min(Max(l1, l2), lmax);
-
-					l1 = idir.z * floatq(min.z);
-					l2 = idir.z * floatq(max.z);
-					lmin = Max(Min(l1, l2), lmin);
-					lmax = Min(Max(l1, l2), lmax);
-					lmax = Min(lmax, c.Distance(q));
-
-					if(ForAny(lmax >= 0.0f && lmin <= lmax)) {
-						firstA = Min(firstA, q);
-						lastA = Max(lastA, q);
+			const BBox &box = nodes[nNode].bbox;
+			if(!box.TestInterval(interval))
+				continue;
+			if(box.Test(c, firstActive, lastActive))
+				for(int n = 0; n < count; n++) {
+					const Triangle &tri = triCache[first + n];
+					if(tri.TestInterval(interval)) {
+						tri.CollideShadow(c, firstActive, lastActive);
+				//		c.shadowCache.Insert(first + n);
+						stats.Intersection(size);
 					}
 				}
-				if(firstA > lastA)
-					continue; 
-				firstActive = firstA;
-				lastActive = lastA;
-			}
-			//TODO: nowy interval
-			for(int n = 0; n < count; n++) {
-				const Triangle &tri = triCache[first + n];
-				if(tri.TestInterval(interval)) {
-					tri.CollideShadow(c, firstActive, lastActive);
-			//		c.shadowCache.Insert(first + n);
-					stats.Intersection(size);
-				}
-			}
-			continue;
+				continue;
 		}
+			
+		int child = nodes[nNode].subNode;
+		_mm_prefetch(&nodes[child], _MM_HINT_T0);
 			
 		bool test = 0; {
 			const BBox &box = nodes[nNode].bbox;
@@ -181,7 +127,6 @@ void BVH::TraverseShadow0(Context<sharedOrigin, hasMask> &c, int firstNode) cons
 
 		if(test) {
 			int firstNode = nodes[nNode].firstNode ^ sign[nodes[nNode].axis];
-			int child = nodes[nNode].subNode;
 			stack[stackPos++] = {child + (firstNode ^ 1), (short)firstActive, (short)lastActive};
 			nNode = child + firstNode;
 			goto CONTINUE;

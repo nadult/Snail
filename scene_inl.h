@@ -276,6 +276,16 @@ TreeStats<1> Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &
 				shTri = geometry.GetSElement(obj0, elem0);
 				shTriCache.SetId(hash, obj0, elem0);
 			}
+		//	enum { cacheSize = 128 * 1024 };
+		//	static __thread char shTriCache[cacheSize * sizeof(ShTriangle)];
+		//	static __thread int shTriCacheId[cacheSize];
+
+		//	int hash = elem0 & (cacheSize - 1);
+		//	ShTriangle &shTri = ((ShTriangle*)shTriCache)[hash];
+		//	if(shTriCacheId[hash] != elem0 + 33) {
+		//		shTri = geometry.GetSElement(obj0, elem0);
+		//		shTriCacheId[hash] = elem0 + 33;
+		//	}
 
 			int        tMatId           = shTri.matId >= matCount ? 0 : shTri.matId;
 			const bool flatNormals      = shTri.FlatNormals();
