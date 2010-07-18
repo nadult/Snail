@@ -188,13 +188,15 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 		tDistance[q] = Condition(rays.SSEMask(q), maxDist, -constant::inf);
 		tObject[q] = 0;
 	}
-	for(int q = 0; q < size; q++) stats.TracingRays(CountMaskBits(rays.Mask(q)));
+	for(int q = 0; q < size; q++)
+		stats.TracingRays(CountMaskBits(rays.Mask(q)));
 
 	Context<sharedOrigin, hasMask> tc(rays, tDistance, tObject, tElement, barycentric, &stats);
 	geometry.TraversePrimary(tc);
 	char selectorData[size + 4], reflSelData[size + 4];
 	RaySelector selector(selectorData, size), reflSel(reflSelData, size);
-	selector.SelectAll();
+	for(int n = 0; n < size; n++)
+		selector[n] = rays.Mask(n);
 	reflSel.Clear();
 
 	if(gVals[4]) {     //no shading

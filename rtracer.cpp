@@ -102,7 +102,7 @@ static const DBVH MakeDBVH(BVH *bvh) {
 	srand(0);
 	static float anim = 0; anim += 0.02f;
 
-	float scale = Length(bvh->GetBBox().Size()) * 0.05;
+	float scale = Length(bvh->GetBBox().Size()) * 0.025;
 
 	vector<ObjectInstance> instances;
 	for(int n = 0; n < 1000; n++) {
