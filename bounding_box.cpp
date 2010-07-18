@@ -58,12 +58,6 @@ const BBox &BBox::operator*=(const Matrix<Vec4f> &m) {
 	return *this;
 }
 
-const BBox &BBox::operator+=(const BBox &other) {
-	min=VMin(min,other.min);
-	max=VMax(max,other.max);
-	return *this;
-}
-
 template <bool sharedOrigin, bool hasMask>
 bool BBox::Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &lastActive) const {
 	bool ret = 0;

@@ -5,34 +5,29 @@
 #include "camera.h"
 
 #include "bvh/tree.h"
-//#include "bih/tree.h"
+#include "dbvh/tree.h"
+
 #include "gl_window.h"
 #include "formats/loader.h"
 #include "base_scene.h"
 #include "font.h"
 #include "render.h"
 
-#include <pthread.h>
-#include "quicklz/quicklz.h"
+#include "thread_pool.h"
 
 static i32x4 ConvColor(Vec3q rgb) {
 	i32x4 tr = Trunc(Clamp(rgb.x * 255.0f, floatq(0.0f), floatq(255.0f)));
 	i32x4 tg = Trunc(Clamp(rgb.y * 255.0f, floatq(0.0f), floatq(255.0f)));
 	i32x4 tb = Trunc(Clamp(rgb.z * 255.0f, floatq(0.0f), floatq(255.0f)));
 
-	return tr + Shl<8>(tg) + Shl<16>(tb);
+	return tb + Shl<8>(tg) + Shl<16>(tg);
 }
 
-struct Task {
-	virtual ~Task() { }
-	virtual void Work() = 0;
-};
-
 template <class AccStruct,int QuadLevels>
-struct RenderTask: public Task {
+struct RenderTask: public thread_pool::Task {
 	RenderTask() { }
 	RenderTask(const Scene<AccStruct> *sc, const Camera &cam, gfxlib::Texture *tOut,
-			const Options &opt, uint tx, uint ty, uint tw, uint th, uint rank, TreeStats<1> *outSt)
+			const Options &opt, uint tx, uint ty, uint tw, uint th, uint rank, TreeStats *outSt)
 		:scene(sc), camera(cam), out(tOut), options(opt), startX(tx), startY(ty),
 		width(tw), height(th), rank(rank), outStats(outSt) { }
 
@@ -40,7 +35,7 @@ struct RenderTask: public Task {
 	uint width, height;
 	uint rank;
 
-	TreeStats<1> *outStats;
+	TreeStats *outStats;
 	const Scene<AccStruct> *scene;
 	gfxlib::Texture *out;
 	Camera camera;
@@ -131,131 +126,15 @@ struct RenderTask: public Task {
 	}
 };
 
-struct CompressTask: public Task {
-	CompressTask(const gfxlib::Texture &image, CompressedPart *part) :image(&image), part(part) { }
-	void Work() {
-		char scratch[QLZ_SCRATCH_COMPRESS];
-		const char *src = (const char*)image->DataPointer() + part->info.y * image->Pitch();
-		part->info.size = qlz_compress(src, &part->data[0], part->info.size, scratch);
-	}
-
-	const gfxlib::Texture *image;
-	CompressedPart *part;
-};
-
-#include <iostream>
-
-enum { maxThreads = 32 };
-
-static pthread_t threads[maxThreads];
-static pthread_mutex_t mutexes[maxThreads];
-static pthread_cond_t sleeping[maxThreads];
-static pthread_spinlock_t spinlock;
-static volatile bool diePlease[maxThreads];
-static volatile int nextTask = 0, finished = 0;
-static vector<Task*> tasks;
-static int nThreads = 0;
-
-static void *InnerLoop(void *id_) {	
-	int id = (long long)id_;
-REPEAT:
-	while(true) {
-		Task *task;
-
-		pthread_spin_lock(&spinlock);
-		if(nextTask == tasks.size()) {
-			finished |= (1 << id);
-			pthread_spin_unlock(&spinlock);
-			break;
-		}
-		task = tasks[nextTask++];
-		pthread_spin_unlock(&spinlock);
-
-		task->Work();
-	}
-
-	if(id && !diePlease[id - 1]) {
-		pthread_mutex_lock(&mutexes[id - 1]);
-		pthread_cond_wait(&sleeping[id - 1], &mutexes[id - 1]);
-		pthread_mutex_unlock(&mutexes[id - 1]);
-		goto REPEAT;
-	}
-
-	return 0;
-}
-
-static void FreeThreads();
-
-static void ChangeThreads(int nThreads_) {
-	Assert(nThreads_ > 0 && nThreads_ < maxThreads);
-
-	static bool sinit = 0;
-	if(!sinit) {
-		pthread_spin_init(&spinlock, PTHREAD_PROCESS_PRIVATE);
-		atexit(FreeThreads);
-		sinit = 1;
-	}
-	nThreads_--;
-
-	for(; nThreads < nThreads_; nThreads++) {
-		diePlease[nThreads] = 0;
-		pthread_mutex_init(&mutexes[nThreads], 0);
-		pthread_cond_init(&sleeping[nThreads], 0);
-		pthread_create(&threads[nThreads], 0, InnerLoop, (void*)(nThreads + 1));
-	}
-	while(nThreads > nThreads_) {
-		nThreads--;
-		diePlease[nThreads] = 1;
-		pthread_cond_signal(&sleeping[nThreads]);
-		pthread_join(threads[nThreads], 0);
-		pthread_mutex_destroy(&mutexes[nThreads]);
-		pthread_cond_destroy(&sleeping[nThreads]);
-	}
-}
-
-void FreeThreads() {
-	ChangeThreads(1);
-	pthread_spin_destroy(&spinlock);
-}
-
-template <class TTask>
-static void Run(vector<TTask> &ttasks, int nThreads_) {
-	ChangeThreads(nThreads_);
-
-	pthread_spin_lock(&spinlock);
-		tasks.resize(ttasks.size());
-		for(int n = 0; n < ttasks.size(); n++)
-			tasks[n] = (Task*)&(ttasks[n]);
-		finished = 0;
-		nextTask = 0;
-	pthread_spin_unlock(&spinlock);
-
-	for(int n = 0; n < nThreads; n++)
-		pthread_cond_broadcast(&sleeping[n]);
-	InnerLoop(0);
-
-	bool end = 0;
-	while(!end) {
-		pthread_spin_lock(&spinlock);
-		if(finished == (1 << ((long long)(nThreads + 1))) - 1) {
-			end = 1;
-			tasks.clear();
-			nextTask = 0;
-		}
-		pthread_spin_unlock(&spinlock);
-		usleep(100);
-	}
-}
-
 template <int QuadLevels, class AccStruct>
-TreeStats<1> Render(const Scene<AccStruct> &scene, const Camera &camera,
+TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
 		gfxlib::Texture &image, const Options options, uint nThreads) {
 	enum { taskSize = 64 };
 	Assert(image.GetFormat().BytesPerPixel() == 4);
 
 	uint nTasks = ((image.Width() + taskSize - 1) / taskSize) * ((image.Height() + taskSize - 1) / taskSize);
 
-	vector<TreeStats<1> > taskStats(nTasks);
+	vector<TreeStats> taskStats(nTasks);
 	vector<RenderTask<AccStruct, QuadLevels>> tasks(nTasks);
 
 	uint num = 0;
@@ -268,22 +147,21 @@ TreeStats<1> Render(const Scene<AccStruct> &scene, const Camera &camera,
 	}
 	Run(tasks, nThreads);
 
-	TreeStats<1> stats;
+	TreeStats stats;
 	for(uint n = 0; n < nTasks; n++)
 		stats += taskStats[n];
 
 	return stats;
 }
 
-
 template <int QuadLevels,class AccStruct>
-TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,
+TreeStats Render(const Scene<AccStruct> &scene,const Camera &camera,
 		gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
 		const Options options, uint nThreads) {
 	enum { taskSize = 64 };
 	Assert(image.GetFormat().BytesPerPixel() == 4);
 
-	vector<TreeStats<1> > taskStats;
+	vector<TreeStats> taskStats;
 	vector<RenderTask<AccStruct, QuadLevels>> tasks;
 	tasks.reserve(1024);
 	taskStats.reserve(1024);
@@ -295,7 +173,7 @@ TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,
 			for(uint x = 0; x < image.Width(); x += taskSize) {
 				uint y = sy * strapHeight;
 
-				taskStats.push_back(TreeStats<1>());
+				taskStats.push_back(TreeStats());
 				tasks.push_back(
 					RenderTask<AccStruct,QuadLevels> (&scene, camera, &image, options,
 						x, y, Min((int)taskSize, int(image.Width() - x)),
@@ -304,9 +182,9 @@ TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,
 			}
 		}
 
-	Run(tasks, nThreads);
+	thread_pool::Run(tasks, nThreads);
 
-	TreeStats<1> stats;
+	TreeStats stats;
 	for(uint n=0;n < tasks.size();n++)
 		stats += taskStats[n];
 
@@ -314,7 +192,7 @@ TreeStats<1> Render(const Scene<AccStruct> &scene,const Camera &camera,
 }
 
 template <class AccStruct>
-TreeStats<1> Render(const Scene<AccStruct> &scene, const Camera &camera,
+TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
 				gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
 				const Options options, uint threads) {
 	return !gVals[0]?
@@ -323,43 +201,25 @@ TreeStats<1> Render(const Scene<AccStruct> &scene, const Camera &camera,
 }
 
 template <class AccStruct>
-TreeStats<1> Render(const Scene<AccStruct> &scene, const Camera &camera,
+TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
 				gfxlib::Texture &image, const Options options, uint threads) {
 	return !gVals[0]?
 		Render<2>(scene, camera, image, options, threads) :
 		Render<3>(scene, camera, image, options, threads);
 }
 
-template TreeStats<1> Render<BVH>(const Scene<BVH>&, const Camera&, gfxlib::Texture&,
+
+template TreeStats Render<BVH>(const Scene<BVH>&, const Camera&, gfxlib::Texture&,
 									uint, uint, uint, const Options, uint);
-template TreeStats<1> Render<BVH>(const Scene<BVH>&, const Camera&, gfxlib::Texture&,
+
+template TreeStats Render<BVH>(const Scene<BVH>&, const Camera&, gfxlib::Texture&,
 									const Options, uint);
 	
 
-int CompressParts(const gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
-				uint nThreads, vector<CompressedPart> &buffers) {
-	vector<CompressTask> tasks;
-	tasks.reserve(128);
-	int num = 0;
-	for(uint sy = 0; sy < (image.Height() + strapHeight - 1) / strapHeight; sy++)
-		if(sy % nRanks == rank)
-			num++;
-	if(buffers.size() < num)
-		buffers.resize(num);
-	num = 0;
+//template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, gfxlib::Texture&,
+//									uint, uint, uint, const Options, uint);
 
-	for(uint sy = 0; sy < (image.Height() + strapHeight - 1) / strapHeight; sy++)
-		if(sy % nRanks == rank) {
-			int height = Min(image.Height() - sy * strapHeight, strapHeight);
-			CompressedPart *part = &buffers[num++];
-			part->info.x = 0; part->info.w = image.Width(); part->info.y = sy * strapHeight;
-			part->info.h = Min(image.Height() - sy * strapHeight, strapHeight);
-			part->info.size = part->info.w * part->info.h * 4;
-			if(part->data.size() < part->info.size)
-				part->data.resize(part->info.size);
-			tasks.push_back(CompressTask(image, part));
-		}
+//template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, gfxlib::Texture&,
+//									const Options, uint);
+	
 
-	Run(tasks, nThreads);
-	return num;
-}

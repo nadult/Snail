@@ -35,7 +35,7 @@ public:
 			return ::Triangle(pos[0],pos[1],pos[2]);
 		}
 		operator ::ShTriangle() const {
-			return ::ShTriangle(pos[0],pos[1],pos[2],uv[0],uv[1],uv[2],nrm[0],nrm[1],nrm[2],matId);
+			return ::ShTriangle(uv[0],uv[1],uv[2],nrm[0],nrm[1],nrm[2],matId);
 		}
 		
 		Vec3f pos[3],nrm[3],fnrm;
@@ -102,7 +102,7 @@ public:
 		friend class BaseScene;
 	};
 	
-	std::map<string,int> matNames;
+	std::map<string, int> matNames;
 	vector<Object> objects;
 	BBox bbox;
 };

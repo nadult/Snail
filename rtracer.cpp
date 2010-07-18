@@ -9,6 +9,7 @@
 #include "shading/material.h"
 
 #include "bvh/tree.h"
+#include "dbvh/tree.h"
 
 #include "scene.h"
 #include "mesh.h"
@@ -16,10 +17,6 @@
 
 #include "font.h"
 #include "frame_counter.h"
-
-int TreeVisMain(const TriVector&);
-
-int gVals[16]={0,};
 
 using std::cout;
 using std::endl;
@@ -39,76 +36,26 @@ void PrintHelp() {
 typedef BVH StaticTree;
 
 template <class Scene>
-void SetMaterials(Scene &scene,const BaseScene &base,string texPath) {
-	scene.materials.clear();
-//	for(int n=0;n<128;n++)
-//		scene.materials.push_back(shading::NewMaterial(""));
-//	scene.materials[1]=shading::NewMaterial("data/ultradxt1.dds");
-//	return;
-
-/*	string names[]={ 	"data/tex316bit.dds",		"data/347.dds",
-						"data/1669.dds", 			"data/tex1.png",
-						"data/tex2.png",			"data/tex3dxt1.dds",
-						"data/ultradxt1.dds",		"", };
-	string tnames[]={
-		"",
-		"scenes/Toasters/Jaw.dds",
-		"scenes/Toasters/Head.dds",
-		"",
-		"scenes/Toasters/Pin.dds",
-		"scenes/Toasters/Key.dds",
-		"scenes/Toasters/Feet.dds",
-		"scenes/Toasters/Stone.dds" };
-	for(int n=0;n<sizeof(tnames)/sizeof(string);n++)
-		scene.materials.push_back(shading::NewMaterial(tnames[n]));
-	scene.materials[1]=shading::NewMaterial("data/ultradxt1.dds"); */
-/*
-	string pre="scenes/sponza/";
-	string snames[]={
-		"",
-		"00_skap.dds",
-		"01_S_ba.dds",
-		"01_S_kap.dds",
-		"01_St_kp.dds",
-		"01_STUB.dds",
-		"KAMEN.dds",
-		"KAMEN-stup.dds",
-		"prozor1.dds",
-		"reljef.dds",
-		"sky.dds",
-		"sp_luk.dds",
-		"vrata_ko.dds",
-		"vrata_kr.dds",
-		"x01_st.dds",
-		};
-	
-	vector<Ptr<shading::Material>> mats;
-	for(int n=0;n<sizeof(snames)/sizeof(string);n++)
-		mats.push_back(shading::NewMaterial(n==0?snames[n]:pre+snames[n]));
-//	int matid[]={ 0,11,1,0,5,5,2,4,5,14,1,6,0,9,11,6,2,6,8,12,13 };
-//	for(int n=0;n<sizeof(matid)/sizeof(int);n++)
-//		scene.materials.push_back(mats[matid[n]]);
-//	scene.materials.push_back(mats[0]);
-//	scene.materials.push_back(mats[6]); */
-
+void SetMaterials(Scene &scene, const BaseScene &base, const string &texPath) {
 	scene.materials.resize(base.matNames.size());
-	for(std::map<string,int>::const_iterator it=base.matNames.begin();it!=base.matNames.end();++it) {
-		string name=it->first==""?"":texPath+it->first;
+
+	for(auto it = base.matNames.begin(); it != base.matNames.end(); ++it) {
+		string name = it->first == ""? "" : texPath + it->first + ".dds";
 
 		try {
 		 	scene.materials[it->second]=typename Scene::PMaterial(shading::NewMaterial(name));
+			cout << "Mat: " << name << '\n';
 		}
 		catch(const Exception &ex) {
 			std::cout << ex.what() << '\n';
 			scene.materials[it->second]=scene.materials.front();
 		}
 	}
-//	scene.materials.back()=typename Scene::PMaterial(shading::NewMaterial("scenes/doom3/imp/texture.tga"));
 
-	if(scene.materials.size()>126) {
-		scene.materials[126]->flags|=shading::Material::fReflection;
-		scene.materials[ 70]->flags|=/*shading::Material::fRefraction|*/shading::Material::fReflection;
-	}
+/*	if(scene.materials.size()>126) {
+		scene.materials[126]->flags |= shading::Material::fReflection;
+		scene.materials[ 70]->flags |= shading::Material::fReflection;
+	} */
 }
 
 vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
@@ -132,9 +79,11 @@ static void MoveCamera(Camera &cam, GLWindow &window, float speed) {
 		float dx = window.MouseMove().x;
 		float dy = window.MouseMove().y;
 
-		if(dx) cam.Rotate(-dx * 0.01);
-		if(dy) cam.RotateY(dy * 0.01);
+		if(dx) cam.Rotate(-dx * 0.001);
+		if(dy) cam.RotateY(dy * 0.001);
+		window.GrabMouse(1);
 	}
+	else window.GrabMouse(0);
 
 	Vec3f move(0, 0, 0);
 	Vec3f right, up, front;
@@ -150,6 +99,39 @@ static void MoveCamera(Camera &cam, GLWindow &window, float speed) {
 	cam.Move(move * speed * (window.Key(Key_lshift)? 5.0f : 1.0f));
 }
 
+static const DBVH MakeDBVH(BVH *bvh) {
+	srand(0);
+	static float anim = 0; anim += 0.02f;
+
+	float scale = Length(bvh->GetBBox().Size()) * 0.0025;
+
+	vector<ObjectInstance> instances;
+	for(int n = 0; n < 0; n++) {
+		ObjectInstance inst;
+		inst.tree = bvh;
+		inst.translation = (Vec3f(rand() % 1000, rand() % 1000, rand() % 1000) - Vec3f(500, 500, 500))
+			* scale;
+		Matrix<Vec4f> rot = Rotate(
+				(rand() % 1000) * 0.002f * constant::pi + anim,
+				(rand() % 1000) * 0.002f * constant::pi + anim * 0.2f,
+				(rand() % 1000) * 0.002f * constant::pi + anim * 0.1f);
+		inst.rotation[0] = Vec3f(rot.x);
+		inst.rotation[1] = Vec3f(rot.y);
+		inst.rotation[2] = Vec3f(rot.z);
+		inst.ComputeBBox();
+		instances.push_back(inst);
+	}
+	ObjectInstance zero;
+	zero.tree = bvh;
+	zero.translation = Vec3f(0, 0, 0);
+	zero.rotation[0] = Vec3f(1, 0, 0);
+	zero.rotation[1] = Vec3f(0, 1, 0);
+	zero.rotation[2] = Vec3f(0, 0, 1);
+	zero.ComputeBBox();
+	instances.push_back(zero);
+
+	return DBVH(instances);
+}
 
 static int tmain(int argc, char **argv) {
 	printf("Snail v0.20 by nadult\n");
@@ -169,22 +151,20 @@ static int tmain(int argc, char **argv) {
 
 //	StaticTree meshTree;
 
-	int resx=1280, resy=720;
-#ifndef NDEBUG
-	resx /= 2; resy /= 2;
-#endif
+	int resx=1024, resy=1024;
 	bool fullscreen = 0;
 	int threads = 2;
 	const char *modelFile = "pompei.obj";//"doom3/admin.proc";
 
 	Options options;
 	bool flipNormals = 1;
-	bool rebuild = 0;
-	string texPath = "/mnt/data/data/doom3/";
+	bool rebuild = 0, slowBuild = 0;
+	string texPath = "scenes/";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
 		else if(string("-rebuild") == argv[n]) { rebuild = 1; }
+		else if(string("-slowBuild") == argv[n]) { rebuild = 1; slowBuild = 1; }
 		else if(string("-threads")==argv[n]&&n<argc-1) { threads=atoi(argv[n+1]); n+=1; }
 		else if(string("-fullscreen")==argv[n]) { fullscreen=1; }
 		else if(string("+flipNormals")==argv[n]) flipNormals=1;
@@ -196,14 +176,14 @@ static int tmain(int argc, char **argv) {
 		}
 	}
 
-	Scene<StaticTree> staticScene;
+	Scene<StaticTree> scene;
 	if(!rebuild) {
-		try { Loader(string("dump/") + modelFile) & staticScene.geometry; }
+		try { Loader(string("dump/") + modelFile) & scene.geometry; }
 		catch(...) { rebuild = 1; }
 	}
 	if(rebuild) {
 		printf("Loading...\n");
-		double buildTime = GetTime();
+		double loadingTime = GetTime();
 		BaseScene baseScene; {
 			string fileName = string("scenes/") + modelFile;
 			if(fileName.find(".proc") != string::npos)
@@ -223,20 +203,23 @@ static int tmain(int argc, char **argv) {
 			baseScene.GenNormals();
 		//	baseScene.Optimize();
 		}
+		loadingTime = GetTime() - loadingTime;
 		
-		staticScene.geometry.Construct(baseScene.ToCompactTris());
-	//	staticScene.geometry.Construct(baseScene.ToTriangleVector());
-		Saver(string("dump/") + modelFile) & staticScene.geometry;
+		double buildTime = GetTime();
+		scene.geometry.Construct(baseScene.ToCompactTris(), !slowBuild);
+		SetMaterials(scene, baseScene, texPath);
+	//	scene.geometry.Construct(baseScene.ToTriangleVector());
+		Saver(string("dump/") + modelFile) & scene.geometry;
 		buildTime = GetTime() - buildTime;
-		std::cout << "Build time: " << buildTime << '\n';
+		std::cout << "Loading time: " << loadingTime << "  Build time: " << buildTime << '\n';
 	}
-	staticScene.geometry.PrintInfo();
-	staticScene.materials.push_back(shading::NewMaterial(""));
-	staticScene.Update();
-	staticScene.geometry.UpdateCache();
+	scene.geometry.PrintInfo();
+	scene.materials.push_back(shading::NewMaterial(""));
+	scene.Update();
+	scene.geometry.UpdateCache();
 
 	float sceneScale; {
-		Vec3f size = staticScene.geometry.GetBBox().Size();
+		Vec3f size = scene.geometry.GetBBox().Size();
 		sceneScale = Length(size);
 	}
 
@@ -248,17 +231,18 @@ static int tmain(int argc, char **argv) {
 			
 	Camera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
-		cam.SetPos(staticScene.geometry.GetBBox().Center());
+		cam.SetPos(scene.geometry.GetBBox().Center());
 
 	bool lightsEnabled=1;
 	bool staticEnabled=0;
 	float speed; {
 	//	scene.geometry.Construct(builder.ExtractElements());
-		Vec3p size = staticScene.geometry.GetBBox().Size();
+		Vec3p size = scene.geometry.GetBBox().Size();
 		speed = (size.x + size.y + size.z) * 0.0025f;
 	}
 
 	FrameCounter frmCounter;
+
 
 	while(window.PollEvents()) {
 		frmCounter.NextFrame();
@@ -269,7 +253,7 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown('I')) options.rdtscShader^=1;
 		if(window.KeyDown('C')) {
 		//	if(staticEnabled)
-				cam.SetPos(staticScene.geometry.GetBBox().Center());
+				cam.SetPos(scene.geometry.GetBBox().Center());
 		//	else cam.pos=scene.geometry.GetBBox().Center();
 		}
 		if(window.KeyDown('P')) {
@@ -305,40 +289,24 @@ static int tmain(int argc, char **argv) {
 		static float animPos = 0;
 		if(window.Key(Key_space)) animPos+=0.025f;
 
-		double buildTime=GetTime(); /*{
-			SceneBuilder<StaticTree> temp=builder;
-		//	for(int n=0;n<temp.instances.size();n++) {
-		//		SceneBuilder<StaticTree>::Instance &inst=temp.instances[n];
-		//		inst.trans.w=inst.trans.w+Vec4f(0.0f,sin(animPos+n*n)*5.0f*speed,0.0f,0.0f);
-		//	}
-			mesh.Animate(meshAnim,animPos);
-			meshTree.Construct(mesh.triVec,1);
-	//		staticScene.geometry = meshTree;
-
-			temp.AddObject(&meshTree,Identity<>(),meshTree.GetBBox());
-			for(int x=-1;x<2;x++) for(int z=-1;z<2;z++)
-				temp.AddInstance(temp.objects.size()-1,
-						RotateY(3.1415f)*Translate(Vec3f(132 + x * 50, 0, z * 50 - 346)));
-			scene.geometry.Construct(temp.ExtractElements(),1);
-			BBox box=meshTree.GetBBox();
-
-					} */ buildTime=GetTime()-buildTime;
+		double buildTime = GetTime();
+			Scene<DBVH> dscene;
+			dscene.geometry = MakeDBVH(&scene.geometry);
+			dscene.materials.push_back(shading::NewMaterial(""));
+		buildTime = GetTime() - buildTime;
 
 		vector<Light> tLights = lightsEnabled?lights:vector<Light>();
 			for(int n=0;n<tLights.size();n++)
 				tLights[n].pos += Vec3f(sin(animPos+n*n),cos(animPos+n*n),
 					sin(animPos-n*n)*cos(animPos+n*n))*speed;
-		staticScene.lights /*= scene.lights*/ = tLights;
-		staticScene.Update();
-	//	scene.Update();
+		scene.lights = dscene.lights = tLights;
+		dscene.Update(); scene.Update();
 		
-		double time=GetTime();
-		TreeStats<1> stats;
-	//	if(staticEnabled)
-			stats = Render(staticScene, cam, image, options, threads);
-	//	else stats=Render(scene,cam,image,options,threads);
+		double time = GetTime();
+		TreeStats stats;
+		stats = Render(scene, cam, image, options, threads);
 
-		time=GetTime()-time;
+		time = GetTime() - time;
 		window.RenderImage(image);
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;

@@ -13,20 +13,10 @@ struct Options {
 };
 
 template <class AccStruct>
-TreeStats<1> Render(const Scene<AccStruct> &scene, const Camera &camera,
-					gfxlib::Texture &image, const Options options, uint threads);
-
-template <class AccStruct>
-TreeStats<1> Render(const Scene<AccStruct> &scene, const Camera &camera,
+TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
 					gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
 					const Options options, uint threads);
 
-struct CompressedPart {
-	struct Info {
-		int x, y, w, h, size;
-	} info;
-	vector<char> data;
-};
-
-int CompressParts(const gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
-				uint threads, vector<CompressedPart> &buffers);
+template <class AccStruct>
+TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
+					gfxlib::Texture &image, const Options options, uint threads);

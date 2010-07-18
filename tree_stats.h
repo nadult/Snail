@@ -35,12 +35,10 @@ private:
 	vector<int> data;
 };
 
-// disabled TreeStats are zero-sized, and all update functions do nothing
-template <bool enabled_>
 class TreeStats
 {
 public:
-	enum { enabled=enabled_&&stats::treeStatsEnabled, dataSize=enabled?10:0 };
+	enum { enabled = stats::treeStatsEnabled, dataSize = enabled? 10 : 1 };
 
 	inline TreeStats() { if(enabled) Init(); }
 	inline TreeStats(const TreeStats &rhs) { if(enabled) for(int n=0;n<dataSize;n++) data[n]=rhs.data[n]; }
@@ -66,10 +64,8 @@ public:
 	uint GetSkips() const { return enabled?data[9]:0; }
 	uint GetRays() const { return enabled?data[2] : 0; }
 
-	string GenInfo(int resx,int resy,double msRenderTime,double msBuildTime);
-
-	void PrintInfo(int resx,int resy,double msRenderTime,double msBuildTime)
-		{ printf("%s\n",GenInfo().c_str()); }
+	const string GenInfo(int resx,int resy,double msRenderTime,double msBuildTime) const;
+	void PrintInfo(int resx,int resy,double msRenderTime,double msBuildTime) const;
 
 	inline void Intersection(uint val=1) { if(enabled) data[0]+=val; }
 
@@ -88,7 +84,6 @@ public:
 
 private:
 	u32 data[dataSize];
-	u32 dummy;
 	// intersects		0
 	// iters			1
 	// tracedRays		2

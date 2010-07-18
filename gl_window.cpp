@@ -208,7 +208,7 @@ namespace
 			for(texW = 1; texW < image.Width(); texW *= 2);
 			for(texH = 1; texH < image.Height(); texH *= 2);
 			
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texW, texH, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texW, texH, 0, GL_BGRA, GL_UNSIGNED_BYTE, 0);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 			glDisable(GL_DEPTH_TEST);
@@ -218,7 +218,7 @@ namespace
 		glShadeModel(GL_FLAT);
 		glBindTexture(GL_TEXTURE_2D, texture);
 		glEnable(GL_TEXTURE_2D);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.Width(), image.Height(), GL_RGBA, GL_UNSIGNED_BYTE,
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.Width(), image.Height(), GL_BGRA, GL_UNSIGNED_BYTE,
 				image.DataPointer());
 		
 		float u = float(GetWidth()) / float(texW);

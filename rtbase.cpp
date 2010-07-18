@@ -1,5 +1,6 @@
 #include "rtbase.h"
 
+int gVals[16] = { 0, };
 
 std::ostream &operator<<(std::ostream &str, const floatq &v) {
 	return str << "[" << v[0] << ", " << v[1] << ", " << v[2] << ", " << v[3] << "]";
@@ -66,31 +67,26 @@ void ComputeMinMax(const Vec3q *vec, int size, Vec3f *outMin, Vec3f *outMax) {
 void ComputeMinMax(const Vec3q *vec, char *mask, int size, Vec3f *outMin, Vec3f *outMax) {
 	RaySelector sel(mask, size);
 
-	if(sel.All()) {
-		ComputeMinMax(vec, size, outMin, outMax);
+	Vec3q min, max;
+	int q = 0;
+	while(!sel[q] && q < size) q++;
+	if(q == size) {
+		*outMin = *outMax = Vec3f(0.0f, 0.0f, 0.0f);
+		return;
 	}
-	else {
-		Vec3q min, max;
-		int q = 0;
-		while(!sel[q] && q < size) q++;
-		if(q == size) {
-			*outMin = *outMax = Vec3f(0.0f, 0.0f, 0.0f);
-			return;
-		}
 
-		for(int k = 0; k < 4; k++) if(sel[q] & (1 << k)) {
-			max = min = (Vec3q)ExtractN(vec[q], k);
-			break;
-		}
-
-		for(;q < size; q++) {
-			f32x4b mask = GetSSEMaskFromBits(sel[q]);
-			min = Condition(mask, VMin(min, vec[q]), min);
-			max = Condition(mask, VMax(max, vec[q]), max);
-		}
-	
-		*outMin = Minimize(min);
-		*outMax = Maximize(max);
+	for(int k = 0; k < 4; k++) if(sel[q] & (1 << k)) {
+		max = min = (Vec3q)ExtractN(vec[q], k);
+		break;
 	}
+
+	for(;q < size; q++) {
+		f32x4b mask = sel.SSEMask(q);
+		min = Condition(mask, VMin(min, vec[q]), min);
+		max = Condition(mask, VMax(max, vec[q]), max);
+	}
+
+	*outMin = Minimize(min);
+	*outMax = Maximize(max);
 }
 

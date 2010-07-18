@@ -45,14 +45,14 @@ public:
 	vector<PMaterial> materials;
 
 	template <bool sharedOrigin, bool hasMask>
-	TreeStats<1> RayTrace(const RayGroup<sharedOrigin, hasMask>&, Cache&, Vec3q *outColor)
+	TreeStats RayTrace(const RayGroup<sharedOrigin, hasMask>&, Cache&, Vec3q *outColor)
 		const __attribute__((noinline));
 
 private:
-	TreeStats<1> TraceLight(RaySelector, const shading::Sample*, Vec3q*__restrict__, Vec3q*__restrict__, int)
+	TreeStats TraceLight(RaySelector, const shading::Sample*, Vec3q*__restrict__, Vec3q*__restrict__, int)
 							const __attribute__((noinline));
 
-	TreeStats<1> TraceReflection(RaySelector, const Vec3q*, const shading::Sample*, Cache&, Vec3q *__restrict__)
+	TreeStats TraceReflection(RaySelector, const Vec3q*, const shading::Sample*, Cache&, Vec3q *__restrict__)
 		const __attribute__((noinline));
 
 	vector<char> materialFlags;

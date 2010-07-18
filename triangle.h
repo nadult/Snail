@@ -252,6 +252,9 @@ public:
 	const Vec3f BoundMax() const {
 		return VMax(P1(), VMax(P2(), P3()));
 	}
+	const BBox GetBBox() const {
+		return BBox(BoundMin(), BoundMax());
+	}
 
 	template <class Vec>
 	const Vec Normal(const Vec &) const {
@@ -268,9 +271,6 @@ public:
 		return Collide <flags>(rOrig, rDir);
 	}
 
-	template <bool sharedOrigin, bool hasMask>
-	int Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActive, int lastActive, char*) const;
-	
 	template <bool sharedOrigin, bool hasMask>
 	void Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActive, int lastActive) const;
 	
@@ -314,11 +314,12 @@ public:
 
 		nrm  /= e1ce2Len;
 		t0 = e1ce2Len;
+		it0 = 1.0f / t0;
 		plane = Vec4f(nrm.x, nrm.y, nrm.z, nrm | a);
 	}
 
 	Vec3f a, ba, ca;
-	float t0; int temp[2];
+	float t0, it0; int temp[1];
 	Vec4f plane;
 };
 
@@ -374,27 +375,19 @@ public:
 	Vec3f nrm[3];
 	int   matId;
 
-	enum
-	{
+	enum {
 		fFlatNormals = 1,
 	};
 
-	float t0;
-	Vec3f ba, ca, a;
-	Vec3f normal;
 	int   flags;
 	u32   temp[2];
 
 //	Vec3f tangent,binormal;
 
 	ShTriangle() { }
-	ShTriangle(const Vec3f &p1, const Vec3p &p2, const Vec3f &p3, const Vec2f &uv1, const Vec2f &uv2, const Vec2f &uv3,
-			   const Vec3f &nrm1, const Vec3f &nrm2, const Vec3f &nrm3, int tMatId, bool flatNrm = 0) {
-		Vec3f pos[3];
-
-		pos[0] = p1;
-		pos[1] = p2;
-		pos[2] = p3;
+	ShTriangle(const Vec2f &uv1, const Vec2f &uv2, const Vec2f &uv3,
+			   const Vec3f &nrm1, const Vec3f &nrm2, const Vec3f &nrm3,
+			   int tMatId, bool flatNrm = 0) {
 		uv[0]  = uv1;
 		uv[1]  = uv2;
 		uv[2]  = uv3;
@@ -403,13 +396,6 @@ public:
 		nrm[2] = nrm3;
 		flags  = flatNrm ? fFlatNormals : 0;
 
-		normal  = (pos[1] - pos[0]) ^ (pos[2] - pos[0]);
-		t0      = Length(normal);
-		normal *= 1.0f / t0;
-
-		a     = pos[0];
-		ba    = pos[1] - a;
-		ca    = pos[2] - a;
 		matId = tMatId;
 
 		uv[1] -= uv[0];
@@ -445,36 +431,26 @@ public:
 		 * } */
 	}
 
-	void operator*=(const Matrix <Vec4f> &trans) {
-		nrm[0] = trans & nrm[0];
-		nrm[1] = trans & nrm[1];
-		nrm[2] = trans & nrm[2];
-		normal = trans & normal;
-		Vec3f c = ca + a, b = ba + a;
-		a  = trans * a;
-		b  = trans * b;
-		c  = trans * c;
-		ba = b - a;
-		ca = c - a;
+	static Vec3f Rot(const Vec3f *rot, const Vec3f vec) {
+		return Vec3f(
+				vec.x * rot[0].x + vec.y * rot[0].y + vec.z * rot[0].z,
+				vec.x * rot[1].x + vec.y * rot[1].y + vec.z * rot[1].z,
+				vec.x * rot[2].x + vec.y * rot[2].y + vec.z * rot[2].z);
+	}
+
+	void Transform(const Vec3f *rot, const Vec3f translation) {
+		nrm[1] += nrm[0]; nrm[2] += nrm[0];
+		nrm[0] = Rot(rot, nrm[0]);
+		nrm[1] = Rot(rot, nrm[1]);
+		nrm[2] = Rot(rot, nrm[2]);
+		nrm[1] -= nrm[0]; nrm[2] -= nrm[0];
 	}
 
 	bool FlatNormals() const {
 		return flags & fFlatNormals;
 	}
-
-	template <class Vec0, class Vec>
-	Vec2 <typename Vec::TScalar> Barycentric(const Vec0 &origin, const Vec &dir) const {
-		typedef typename Vec::TScalar Real;
-
-		auto det  = (dir | normal) * Real(t0);
-		auto idet = Inv(det);
-		Vec0 tvec = origin - Vec0(a);
-
-		return Vec2<Real>(dir | (tvec ^ Vec0(ca)), dir | (Vec0(ba) ^ tvec)) * idet;
-	}
 };
 
-static_assert(sizeof(ShTriangle) == 128, "blah");
 typedef vector <ShTriangle, AlignedAllocator <ShTriangle> >    ShTriVector;
 
 class BaseScene;
@@ -499,7 +475,7 @@ public:
 		const TriIdx &idx = tris[elem];
 		const Vert &  v1  = verts[idx.v1], &v2 = verts[idx.v2], &v3 = verts[idx.v3];
 
-		return ShTriangle(v1.pos, v2.pos, v3.pos, v1.uv, v2.uv, v3.uv, v1.nrm, v2.nrm, v3.nrm,
+		return ShTriangle(v1.uv, v2.uv, v3.uv, v1.nrm, v2.nrm, v3.nrm,
 						  idx.mat & 0x7ffffff, idx.mat & 0x80000000 ? 1 : 0);
 	}
 
@@ -577,7 +553,7 @@ public:
 		const TriIdx &idx = tris[elem];
 		const Vec2f uv(0.0f, 0.0f);
 
-		return ShTriangle(verts[idx.v1], verts[idx.v2], verts[idx.v3], uv, uv, uv, normals[idx.v1], normals[idx.v2],
+		return ShTriangle(uv, uv, uv, normals[idx.v1], normals[idx.v2],
 				normals[idx.v3], idx.mat & 0x7ffffff, idx.mat & 0x80000000 ? 1 : 0);
 	}
 

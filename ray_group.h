@@ -84,12 +84,6 @@ public:
 	RayGroup(const RayGroup<sharedOrigin, 1> &rhs, int offset)
 		:size(rhs.size - offset), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
 		iDir(rhs.iDir + offset) { }
-	RayGroup(const RayGroup &rhs, int offset, int newSize)
-		:size(newSize), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
-		iDir(rhs.iDir + offset) { }
-	RayGroup(const RayGroup<sharedOrigin, 1> &rhs, int offset, int newSize)
-		:size(newSize), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
-		iDir(rhs.iDir + offset) { }
 
 	const Vec3q &Dir(int n) const	{ return dir[n]; }
 	const Vec3q &Origin(int n) const{ return origin[sharedOrigin? 0 : n]; }
@@ -126,9 +120,6 @@ public:
 		:size(selector.Size()), origin(origin), dir(dir), iDir(iDir), mask(&selector[0]) { }
 	RayGroup(const RayGroup &rhs, int offset)
 		:size(rhs.size - offset), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
-		iDir(rhs.iDir + offset), mask(rhs.mask + offset) { }
-	RayGroup(const RayGroup &rhs, int offset, int newSize)
-		:size(newSize), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
 		iDir(rhs.iDir + offset), mask(rhs.mask + offset) { }
 
 	const Vec3q &Dir(int n) const	{ return dir[n]; }
@@ -174,6 +165,7 @@ public:
 	template <bool shared, bool hasMask>
 	explicit Frustum(const RayGroup<shared, hasMask> &gr) {
 		int majorAxis = MaxAxis(ExtractN(gr.Dir(0), 0));
+		static_assert(!hasMask, "masked groups not supported yet");
 
 	/*	for(int axis = 0; axis < 3; axis++) {
 			auto sign = floatq( ((&gr.Dir(0).x)[axis] < floatq(0.0f)).m );
@@ -197,7 +189,6 @@ public:
 			floatq minUSq = maxUSq;
 
 			for(int q = 1; q < gr.Size(); q++) {
-				if(!gr.Mask(q)) continue;
 				floatq slope = (&gr.Dir(q).x)[uAxis] * (&gr.IDir(q).x)[majorAxis];
 				maxUSq = Max(maxUSq, slope);
 				minUSq = Min(minUSq, slope);
@@ -206,7 +197,6 @@ public:
 			floatq maxVSq = (&gr.Dir(0).x)[vAxis] * (&gr.IDir(0).x)[majorAxis];
 			floatq minVSq = maxVSq;
 			for(int q = 1; q < gr.Size(); q++) {
-				if(!gr.Mask(q)) continue;
 				floatq slope = (&gr.Dir(q).x)[vAxis] * (&gr.IDir(q).x)[majorAxis];
 				maxVSq = Max(maxVSq, slope);
 				minVSq = Min(minVSq, slope);
@@ -335,8 +325,8 @@ private:
 template <bool sharedOrigin, bool hasMask>
 struct Context {
 	Context(const RayGroup<sharedOrigin, hasMask> &tRays, floatq *distance, i32x4 *object, i32x4 *element,
-			TreeStats<1> *stats = 0)
-		:rays(tRays), distance(distance), object(object), element(element), stats(stats) { }
+			TreeStats *stats = 0)
+		:rays(tRays), distance(distance), object(object), element(element), stats(stats), barycentric(0) { }
 
 	const Vec3q &Dir(int q) const { return rays.Dir(q); }
 	const Vec3q &IDir(int q) const { return rays.IDir(q); }
@@ -350,7 +340,7 @@ struct Context {
 	i32x4 &Element(int q) { return element[q]; }
 	int Size() const { return rays.Size(); }
 
-	void UpdateStats(const TreeStats<1> &st) { if(stats) *stats += st; }
+	void UpdateStats(const TreeStats &st) { if(stats) *stats += st; }
 
 	bool All() const { return rays.All(); }
 	bool Any() const { return rays.Any(); }
@@ -359,8 +349,9 @@ struct Context {
 	floatq * __restrict__ distance;
 	i32x4  * __restrict__ object;
 	i32x4  * __restrict__ element;
+	Vec2q * __restrict__ barycentric;
 	ShadowCache shadowCache;
-	TreeStats<1> *stats;
+	TreeStats *stats;
 };
 
 /*
@@ -391,14 +382,14 @@ struct FContext {
 	int   &Object  (int) { return object  [0]; }
 	int   &Element (int) { return element [0]; }
 	
-	void UpdateStats(const TreeStats<1> &st) { if(stats) *stats+=st; }
+	void UpdateStats(const TreeStats &st) { if(stats) *stats+=st; }
 
 	Vec3f origin,dir,iDir;
 	float *__restrict__ distance;
 	int   * __restrict__ object;
 	int   * __restrict__ element;
 	ShadowCache shadowCache;
-	TreeStats<1> *stats;
+	TreeStats *stats;
 };
 */
 

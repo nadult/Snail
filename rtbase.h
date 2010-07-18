@@ -40,6 +40,9 @@ const Vec Reflect(const Vec ray,const Vec nrm) {
 	return ray - nrm * (dot + dot);
 }
 
+template <class Vec>
+const Vec Normalize(const Vec v) { return v * RSqrt(v | v); }
+
 inline float Maximize(const floatq t) { return Max(Max(t[0], t[1]), Max(t[2], t[3])); }
 inline float Minimize(const floatq t) { return Min(Min(t[0], t[1]), Min(t[2], t[3])); }
 inline Vec2p Maximize(const Vec2q v) { return Vec2p(Maximize(v.x), Maximize(v.y)); }
@@ -160,8 +163,7 @@ private:
 	Int		object  [flags&isct::fObject  ?packetSize:0];
 	Int		element [flags&isct::fElement ?packetSize:0];
 
-	typedef TreeStats<flags&isct::fStats?1:0> TStats;
-	TStats stats;
+	TreeStats stats;
 
 public:
 	int lastShadowTri;
@@ -197,8 +199,8 @@ public:
 	const int LastShadowTri() const { return lastShadowTri; }
 	int &LastShadowTri() { return lastShadowTri; } 
 
-	TStats &Stats() { return stats; }
-	const TStats &Stats() const { return stats; }
+	TreeStats &Stats() { return stats; }
+	const TreeStats &Stats() const { return stats; }
 
 	template <int tflags>
 	void Insert(const Isct<Real,packetSize/4,tflags> &rhs,int pos) {

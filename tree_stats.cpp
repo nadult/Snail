@@ -22,8 +22,7 @@
 		}
 	} */
 
-	template <bool enabled>
-	string TreeStats<enabled>::GenInfo(int resx,int resy,double msRenderTime,double msBuildTime) {
+	const string TreeStats::GenInfo(int resx,int resy,double msRenderTime,double msBuildTime) const {
 		double raysPerSec = double(data[2]) * (1000.0 / msRenderTime);
 		double nPixels = double(resx*resy);
 
@@ -36,14 +35,15 @@
 
 		char buf[2048];
 		sprintf(buf,
-				/*"isct,iter:"*/"%5.2f %5.2f  ms:%6.2f  mrs:%5.2f (%d rays) %d"
+				/*"isct,iter:"*/"%5.2f %5.2f  ms:%6.2f  mrs:%5.2f (%d rays) build:%.2f"
 				/*"Coh:%.2f%% " "br:%.2f%% fa:%.2f%%" " Build:%6.2f"*/,
-				double(data[0]) / nPixels, double(data[1]) / nPixels, msRenderTime, raysPerSec * 0.000001, data[2],
-				data[9]
+				double(data[0]) / nPixels, double(data[1]) / nPixels, msRenderTime, raysPerSec * 0.000001,
+				data[2], msBuildTime
 				/*,GetCoherent()*100.0f, GetBreaking()*100.0f, GetIntersectFail()*100.0f, msBuildTime*/);
 		return string(buf);
 	}
-
-	template string TreeStats<0>::GenInfo(int,int,double,double);
-	template string TreeStats<1>::GenInfo(int,int,double,double);
+	
+	void TreeStats::PrintInfo(int resx,int resy,double msRenderTime,double msBuildTime) const {
+		printf("%s\n", GenInfo(resx, resy, msRenderTime, msBuildTime).c_str());
+	}
 

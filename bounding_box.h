@@ -17,8 +17,13 @@ public:
 	BBox(const Vec3f *verts,uint count,const Matrix<Vec4f>&);
 	
 	const BBox &operator*=(const Matrix<Vec4f>&);
-	const BBox &operator+=(const BBox &other);
 	
+	const BBox &operator+=(const BBox &other) {
+		min = VMin(min, other.min);
+		max = VMax(max, other.max);
+		return *this;
+	}
+
 	inline Vec3f Size() const { return max-min; }
 	inline Vec3f Center() const { return (max+min)*0.5f; }
 	float Width() const { return max.x-min.x; }

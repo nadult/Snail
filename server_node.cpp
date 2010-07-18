@@ -9,52 +9,63 @@
 #include "shading/material.h"
 
 #include "bvh/tree.h"
+#include "dbvh/tree.h"
 
 #include "scene.h"
 #include "mesh.h"
 
 #include <mpi.h>
+#include "comm.h"
 
-#include <boost/asio.hpp>
+using comm::Socket;
+using comm::MPINode;
+using comm::MPIAnyNode;
+using comm::Pod;
 
-using boost::asio::ip::tcp;
+#include "compression.h"
 
 using std::cout;
 using std::endl;
 
-int gVals[16]={0, };
-
 typedef BVH StaticTree;
 
-static vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
-	vector<Light> out;
-
-	float pos=float(gVals[5])*0.01f;
-
-	out.push_back(
-		/*Toasters*/ //Light(RotateY(pos)*Vec3f(0,400.5f,0),Vec3f(8,8,5),10000.f)
-		/*sponza*/  // Light(Vec3f(0,2,0),Vec3f(8,8,5),20.0f)
-		/*admin*/   Light(Vec3f(-78.0f,110.0f,-531.0f) * scale, Vec3f(1,1,0.7), power)
-	);
-//	out.push_back(Light(Vec3f(-600.0f,144.0f,-341.0f),Vec3f(0.3,0.6,1.0),800.0f));
-//	out.push_back(Light(Vec3f(407.0f,209.64f,1634.0f),Vec3f(1,1,1),1000.0f));
-
-	return out;
-}
-
-void ReadSocket(tcp::socket &socket, void *ptr, int size) {
-	int bytes = 0;
-	while(bytes < size) {
-		int len = socket.read_some(boost::asio::buffer((char*)ptr + bytes, size - bytes));
-		bytes += len;
-	}
-}
-
-void WriteSocket(tcp::socket &socket, void *ptr, int size) {
-	boost::asio::write(socket, boost::asio::buffer((char*)ptr, size));
-}
-
 static char sendbuf[1024 * 1024 * 4];
+
+static const DBVH MakeDBVH(BVH *bvh) {
+	srand(0);
+	static float anim = 0; anim += 0.02f;
+
+	float scale = Length(bvh->GetBBox().Size()) * 0.05f;
+
+	vector<ObjectInstance> instances;
+/*	for(int n = 0; n < 10000; n++) {
+		ObjectInstance inst;
+		inst.tree = bvh;
+		inst.translation = (Vec3f(rand() % 1000, rand() % 1000, rand() % 1000) - Vec3f(500, 500, 500))
+			* scale;
+		Matrix<Vec4f> rot = Rotate(
+				(rand() % 1000) * 0.002f * constant::pi + anim,
+				(rand() % 1000) * 0.002f * constant::pi + anim * 0.2f,
+				(rand() % 1000) * 0.002f * constant::pi + anim * 0.1f);
+
+		inst.rotation[0] = Vec3f(rot.x);
+		inst.rotation[1] = Vec3f(rot.y);
+		inst.rotation[2] = Vec3f(rot.z);
+		inst.ComputeBBox();
+		instances.push_back(inst);
+	} */
+	ObjectInstance zero;
+	zero.tree = bvh;
+	zero.translation = Vec3f(0, 0, 0);
+	zero.rotation[0] = Vec3f(1, 0, 0);
+	zero.rotation[1] = Vec3f(0, 1, 0);
+	zero.rotation[2] = Vec3f(0, 0, 1);
+	zero.ComputeBBox();
+	instances.push_back(zero);
+
+	return DBVH(instances);
+}
+
 
 static int server_main(int argc, char **argv) {
 	int rank, numNodes, maxNodes;
@@ -69,26 +80,19 @@ static int server_main(int argc, char **argv) {
 		lineHeight = 16,
 	};
 
-	vector<CompressedPart> parts;
+	vector<CompressedPart> parts(8);
 
 	while(true) {
 		if(rank == 0) {
-			boost::asio::io_service ioService;
-			tcp::acceptor acceptor(ioService, tcp::endpoint(tcp::v4(), 20000));
-			tcp::socket socket(ioService);
-			acceptor.accept(socket);
+			Socket socket;
+			socket.Accept(20000);
 
 			int resx, resy, threads = 2;
 			char sceneName[256];
-			ReadSocket(socket, &resx, sizeof(resx));
-			ReadSocket(socket, &resy, sizeof(resy));
-			ReadSocket(socket, sceneName, sizeof(sceneName));
+			socket >> Pod(resx) >> Pod(resy) >> Pod(sceneName);
 			
-			for(int r = 1; r < numNodes; r++) {
-				MPI_Send(&resx, sizeof(resx), MPI_CHAR, r, 0, MPI_COMM_WORLD);
-				MPI_Send(&resy, sizeof(resy), MPI_CHAR, r, 1, MPI_COMM_WORLD);
-				MPI_Send(&sceneName, sizeof(sceneName), MPI_CHAR, r, 2, MPI_COMM_WORLD);
-			}
+			for(int r = 1; r < numNodes; r++)
+				MPINode(r, 0) << Pod(resx) << Pod(resy) << Pod(sceneName);
 
 			Scene<StaticTree> scene;
 			//TODO: try catch
@@ -96,6 +100,10 @@ static int server_main(int argc, char **argv) {
 			scene.geometry.UpdateCache();
 			scene.materials.push_back(shading::NewMaterial(""));
 			scene.Update();
+
+			Vec3f sceneCenter = scene.geometry.GetBBox().Center();
+			Vec3f sceneSize = scene.geometry.GetBBox().Size();
+			socket << Pod(sceneCenter) << Pod(sceneSize);
 
 			gfxlib::Texture image(resx, resy, gfxlib::TI_A8B8G8R8);
 			vector<Light> lights;
@@ -106,9 +114,9 @@ static int server_main(int argc, char **argv) {
 
 			for(;;) {
 				bool finish;
-				ReadSocket(socket, &finish, sizeof(finish));
+				socket >> Pod(finish);
 				for(int r = 1; r < numNodes; r++)
-					MPI_Send(&finish, sizeof(finish), MPI_CHAR, r, 0, MPI_COMM_WORLD);
+					MPINode(r, 0) << Pod(finish);
 				if(finish) {
 					printf("Disconnected\n");
 					break;
@@ -116,53 +124,56 @@ static int server_main(int argc, char **argv) {
 
 				int nLights;
 
-				ReadSocket(socket, &cam, sizeof(cam));
-				ReadSocket(socket, &nLights, sizeof(nLights));
+				socket >> Pod(cam) >> Pod(nLights);
 				scene.lights.resize(nLights);
-				ReadSocket(socket, &scene.lights[0], nLights * sizeof(Light));
-				ReadSocket(socket, gVals, sizeof(gVals));
-				ReadSocket(socket, &threads, sizeof(threads));
+				socket >> comm::Data(&scene.lights[0], nLights * sizeof(Light));
+				socket >> Pod(gVals) >> Pod(threads);
 
 				double time = GetTime();
 				for(int r = 1; r < numNodes; r++) {
-					MPI_Send(&cam, sizeof(cam), MPI_CHAR, r, 1, MPI_COMM_WORLD);
-					MPI_Send(&nLights, sizeof(nLights), MPI_CHAR, r, 2, MPI_COMM_WORLD);
-					MPI_Send(&scene.lights[0], sizeof(Light) * nLights, MPI_CHAR, r, 3, MPI_COMM_WORLD);
-					MPI_Send(gVals, sizeof(gVals), MPI_CHAR, r, 4, MPI_COMM_WORLD);
-					MPI_Send(&threads, sizeof(threads), MPI_CHAR, r, 5, MPI_COMM_WORLD);
+					MPINode(r, 1) << comm::Pod(cam) << comm::Pod(nLights)
+						<< comm::Data(&scene.lights[0], sizeof(Light) * nLights)
+						<< comm::Data(gVals, sizeof(gVals)) << comm::Pod(threads);
 				}
 
+				double buildTime = GetTime();
+				Scene<DBVH> dscene;
+				dscene.geometry = MakeDBVH(&scene.geometry);
+				dscene.materials.push_back(shading::NewMaterial(""));
+				dscene.lights = scene.lights;
+				dscene.Update();
+				buildTime = GetTime() - buildTime;
+
 				int nPixels = w * h, received = 0;
-				TreeStats<1> stats = 
-					Render(scene, cam, image, rank, numNodes, lineHeight, options, threads);
-				int nParts = CompressParts(image, rank, numNodes, lineHeight, threads, parts);
+				TreeStats stats = 
+					Render(dscene, cam, image, rank, numNodes, lineHeight, options, threads);
+				int nParts = CompressParts(image, rank, numNodes, lineHeight, parts, threads);
+
 				for(int p = 0; p < nParts; p++) {
 					received += parts[p].info.w * parts[p].info.h;
-					WriteSocket(socket, &parts[p].info, sizeof(CompressedPart::Info));
-					WriteSocket(socket, &parts[p].data[0], parts[p].info.size);
+					socket	<< Pod(parts[p].info)
+							<< comm::Data(&parts[p].data[0], parts[p].info.size);
 				}
 
 				while(received < nPixels) {
-					MPI_Status status;
-					MPI_Recv(&parts[0].info, sizeof(CompressedPart::Info), MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+					int source;
+					MPIAnyNode(&source, 0) >> comm::Pod(parts[0].info);
 					received += parts[0].info.w * parts[0].info.h;
 					if(parts[0].data.size() < parts[0].info.size)
 						parts[0].data.resize(parts[0].info.size);
-					MPI_Recv(&parts[0].data[0], parts[0].info.size, MPI_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD, &status);
-					WriteSocket(socket, &parts[0].info, sizeof(CompressedPart::Info));
-					WriteSocket(socket, &parts[0].data[0], parts[0].info.size);
+					MPINode(source, 0) >> comm::Data(&parts[0].data[0], parts[0].info.size);
+
+					socket	<< Pod(parts[0].info)
+							<< comm::Data(&parts[0].data[0], parts[0].info.size);
 				}
+
 				for(int r = 1; r < numNodes; r++) {
-					TreeStats<1> nodeStats;
-					MPI_Status status;
-					MPI_Recv(&nodeStats, sizeof(nodeStats), MPI_CHAR, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &status);
+					TreeStats nodeStats;
+					MPIAnyNode(0, 1) >> comm::Pod(nodeStats);
 					stats += nodeStats;
 				}
-				WriteSocket(socket, &stats, sizeof(stats));
+				socket << Pod(stats) << Pod(buildTime);
 				time = GetTime() - time;
-
-				char dummy[1460];
-				WriteSocket(socket, dummy, sizeof(dummy));
 
 				printf("%s at %dx%d on %d nodes, each with %d threads: %.2f ms\n",
 						sceneName, resx, resy, numNodes, threads, time * 1000.0);
@@ -170,13 +181,9 @@ static int server_main(int argc, char **argv) {
 
 		}
 		else {
-			MPI_Status status;
-
 			int resx, resy, threads = 2;
 			char sceneName[256];
-			MPI_Recv(&resx, sizeof(resx), MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
-			MPI_Recv(&resy, sizeof(resy), MPI_CHAR, 0, 1, MPI_COMM_WORLD, &status);
-			MPI_Recv(&sceneName, sizeof(sceneName), MPI_CHAR, 0, 2, MPI_COMM_WORLD, &status);
+			MPINode(0, 0) >> Pod(resx) >> Pod(resy) >> Pod(sceneName);
 
 			Scene<StaticTree> scene;
 			Loader(string("dump/") + sceneName) & scene.geometry;
@@ -193,22 +200,29 @@ static int server_main(int argc, char **argv) {
 
 			for(;;) {
 				bool finish;
-				MPI_Recv(&finish, sizeof(finish), MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
+				MPINode(0, 0) >> Pod(finish);
 				if(finish) break;
 				int nLights;
 
-				MPI_Recv(&cam, sizeof(cam), MPI_CHAR, 0, 1, MPI_COMM_WORLD, &status);
-				MPI_Recv(&nLights, sizeof(nLights), MPI_CHAR, 0, 2, MPI_COMM_WORLD, &status);
+				MPINode(0, 1) >> Pod(cam) >> Pod(nLights);
 				scene.lights.resize(nLights);
-				MPI_Recv(&scene.lights[0], sizeof(Light) * nLights, MPI_CHAR, 0, 3, MPI_COMM_WORLD, &status);
-				MPI_Recv(gVals, sizeof(gVals), MPI_CHAR, 0, 4, MPI_COMM_WORLD, &status);
-				MPI_Recv(&threads, sizeof(threads), MPI_CHAR, 0, 5, MPI_COMM_WORLD, &status);
+				MPINode(0, 3) >> comm::Data(&scene.lights[0], sizeof(Light) * nLights)
+				   	>> Pod(gVals) >> Pod(threads);
 		
-				TreeStats<1> stats = 
-					Render(scene, cam, image, rank, numNodes, lineHeight, options, threads);
-				int nParts = CompressParts(image, rank, numNodes, lineHeight, threads, parts);
+				Scene<DBVH> dscene;
+				dscene.lights = scene.lights;
+				dscene.geometry = MakeDBVH(&scene.geometry);
+				dscene.materials.push_back(shading::NewMaterial(""));
+				dscene.lights = scene.lights;
+				dscene.Update();
 
-				for(int p = 0; p < parts.size(); p++) {
+				//TODO: rendering i kompresja razem: watek zaraz po zrenderowaniu
+				//dodaje do kolejki zadan nowe zadanie kompresji?
+				TreeStats stats = 
+					Render(dscene, cam, image, rank, numNodes, lineHeight, options, threads);
+				int nParts = CompressParts(image, rank, numNodes, lineHeight, parts, threads);
+
+				for(int p = 0; p < nParts; p++) {
 					MPI_Bsend(&parts[p].info, sizeof(CompressedPart::Info), MPI_CHAR, 0, 0, MPI_COMM_WORLD);
 					MPI_Bsend(&parts[p].data[0], parts[p].info.size, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
 				}

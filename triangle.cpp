@@ -32,61 +32,55 @@ namespace {
 
 template <bool sharedOrigin, bool hasMask>
 void Triangle::Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActive, int lastActive) const {
-	Vec3p nrm = Nrm();
-	Vec3q ta(a);
+	Vec3f nrm = Nrm(), tvec0, tvec1;
+	float tmul;
 
-	Vec3q sharedTVec;
-	if(sharedOrigin)
-		sharedTVec = c.Origin(0) - ta;
+	if(hasMask && !sharedOrigin)
+		exit(0); //TODO
 
-	for(int q = firstActive; q <= lastActive; q++) {
-		floatq det  = c.Dir(q) | nrm;
-		Vec3q  tvec = sharedOrigin? sharedTVec : c.Origin(q) - ta;
-
-		floatq u    = c.Dir(q) | (Vec3q(ba) ^ tvec);
-		floatq v    = c.Dir(q) | (tvec ^ Vec3q(ca));
-		f32x4b test = Min(u, v) >= 0.0f && u + v <= det * floatq(t0);
-
-		floatq dist = -(tvec | nrm) / det;
-		test = test && dist > floatq(0.0f) && dist < c.Distance(q);
-
-		c.Distance(q) = Condition(test, dist, c.Distance(q));
-		c.Object(q) = Condition(i32x4b(test), i32x4(idx), c.Object(q));
-	}
-}
-
-template <bool sharedOrigin, bool hasMask>
-int Triangle::Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActive, int lastActive, char *mask) const {
-	Vec3p nrm = Nrm();
-	Vec3q ta(a);
-
-	Vec3q sharedTVec;
-	if(sharedOrigin)
-		sharedTVec = c.Origin(0) - ta;
-
-	for(int q = firstActive; q <= lastActive; q++) {
-		if(!mask[q]) continue;
-
-		floatq det  = c.Dir(q) | nrm;
-		Vec3q  tvec = sharedOrigin? sharedTVec : c.Origin(q) - ta;
-
-		floatq u    = c.Dir(q) | (Vec3q(ba) ^ tvec);
-		floatq v    = c.Dir(q) | (tvec ^ Vec3q(ca));
-		f32x4b test = Min(u, v) >= 0.0f && u + v <= det * floatq(t0);
-
-		floatq dist = -(tvec | nrm) / det;
-		test = test && dist > floatq(0.0f) && dist < c.Distance(q);
-
-		c.Distance(q) = Condition(test, dist, c.Distance(q));
-		c.Object(q) = Condition(i32x4b(test), i32x4(idx), c.Object(q));
+	if(sharedOrigin) {
+		Vec3f tvec = ExtractN(c.Origin(0), 0) - a;
+		tvec0 = (ba ^ tvec) * it0;
+		tvec1 = (tvec ^ ca) * it0;
+		tmul = -(tvec | nrm);
 	}
 
-	return 0;
+	int count = lastActive - firstActive + 1;
+	for(int q = 0; q < count; q++) {
+		int tq = q + firstActive;
+
+		const Vec3q dir = c.Dir(tq);
+		floatq idet = Inv(dir.x * nrm.x + dir.y * nrm.y + dir.z * nrm.z);
+
+		floatq u, v, dist;
+		if(sharedOrigin) {
+			dist = idet * tmul;
+			v = (dir.x * tvec0.x + dir.y * tvec0.y + dir.z * tvec0.z) * idet;
+			u = (dir.x * tvec1.x + dir.y * tvec1.y + dir.z * tvec1.z) * idet;
+		}
+		else {
+			Vec3q tvec = c.Origin(tq) - Vec3q(a);
+			dist = -(tvec | nrm) * idet;
+			Vec3q tvec0 = Vec3q(ba) ^ tvec;
+			Vec3q tvec1 = tvec ^ Vec3q(ca);
+
+			idet *= it0;
+			v = (dir | tvec0) * idet;
+			u = (dir | tvec1) * idet;
+		}
+
+		f32x4b test = Min(u, v) >= 0.0f && u + v <= floatq(1.0f);
+		test = test && dist >= floatq(0.0f) && dist < c.Distance(tq);
+
+		c.Distance(tq) = Condition(test, dist, c.Distance(tq));
+		c.Object(tq) = Condition(i32x4b(test), i32x4(idx), c.Object(tq));
+		c.barycentric[tq] = Condition(test, Vec2q(u, v), c.barycentric[tq]);
+	}
 }
 
 template <bool sharedOrigin, bool hasMask>
 int Triangle::CollideShadow(Context<sharedOrigin, hasMask> &c, int firstActive, int lastActive) const {
-	Vec3p nrm = Nrm();
+	Vec3f nrm = Nrm();
 	Vec3q ta(a);
 
 	Vec3q sharedTVec;
@@ -116,11 +110,6 @@ template void Triangle::Collide<0, 0>(Context<0, 0>&, int, int, int) const;
 template void Triangle::Collide<0, 1>(Context<0, 1>&, int, int, int) const;
 template void Triangle::Collide<1, 0>(Context<1, 0>&, int, int, int) const;
 template void Triangle::Collide<1, 1>(Context<1, 1>&, int, int, int) const;
-
-template int Triangle::Collide<0, 0>(Context<0, 0>&, int, int, int, char*) const;
-template int Triangle::Collide<0, 1>(Context<0, 1>&, int, int, int, char*) const;
-template int Triangle::Collide<1, 0>(Context<1, 0>&, int, int, int, char*) const;
-template int Triangle::Collide<1, 1>(Context<1, 1>&, int, int, int, char*) const;
 
 template int Triangle::CollideShadow<0, 0>(Context<0, 0>&, int, int) const;
 template int Triangle::CollideShadow<0, 1>(Context<0, 1>&, int, int) const;

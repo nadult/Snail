@@ -7,9 +7,9 @@
 
 class BVH {
 public:
-	BVH(const CompactTris&);
+	BVH(const CompactTris&, bool fast = 1);
 	BVH() { }
-	void Construct(const CompactTris&);
+	void Construct(const CompactTris&, bool fast = 1);
 	void Serialize(Serializer&);
 	const BBox GetBBox() const { return nodes[0].bbox; }
 	void PrintInfo() const;
@@ -21,7 +21,7 @@ public:
 
 	enum { isComplex = 0 };
 	enum { isctFlags = CElement::isctFlags | isct::fObject | isct::fStats };
-	enum { maxDepth = 32 };
+	enum { maxDepth = 64 };
 
 	const ShTriangle GetSElement(int elem, int subElem) const {
 		return elements.GetSElement(elem, subElem);
@@ -41,6 +41,7 @@ public:
 
 protected:
 	void FindSplit(int nNode, int first, int count, int depth);
+	void FindSplitSweep(int nNode, int first, int count, int depth);
 	int depth;
 	
 public:
@@ -56,6 +57,7 @@ public:
 
 	CompactTris elements;
 	vector<Triangle> triCache;
+	vector<ShTriangle> shTriCache;
 	vector<Node, AlignedAllocator<Node> > nodes;
 };
 
