@@ -13,7 +13,6 @@ public:
 	void LoadDoom3Proc(const string &fileName);
 	void SaveWavefrontObj(const string &fileName) const;
 	
-	TriangleVector ToTriangleVector() const;
 	CompactTris ToCompactTris() const;
 	TriVector ToTriVector() const;
 	ShTriVector ToShTriVector() const;
@@ -60,7 +59,6 @@ public:
 		Triangle GetTriangle(uint n) const;
 
 		CompactTris ToCompactTris() const;
-		TriangleVector ToTriangleVector() const;
 		TriVector ToTriVector() const;
 		ShTriVector ToShTriVector() const;
 

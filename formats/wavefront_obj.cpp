@@ -82,7 +82,7 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 	int lastMatId=0;
 
 	for(;;) {
-		char line[2000],type[2000],a[2000],b[2000],c[2000],d[2000],e[2000],f[2000];
+		char line[2000], type[2000], a[2000], b[2000], c[2000], d[2000], e[2000], f[2000];
 		if(!is.getline(line,2000))
 			break;
 
@@ -116,13 +116,10 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 			p[1] = strpbrk(p[0], " \t") + 1; p[1][-1] = 0;
 			p[2] = strpbrk(p[1], " \t") + 1; p[2][-1] = 0;
 			p[3] = strpbrk(p[2], " \t");
-			if(p[3]) {
-				p[3]++; p[3][-1] = 0;
-				ThrowException("Quads in wavefront .obj are not (yet) supported");
-			}
 
 			BaseScene::IndexedTri tri;
 			tri.matId = lastMatId;
+	REPEAT_TRI:
 
 			for(int k = 0; k < 3; k++) {
 				tri.v[k] = atoi(p[k]);
@@ -148,8 +145,10 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 				tri.vt[k]--;
 				tri.vn[k]--;
 
-				if(tri.v[k] >= int(verts.size()) || tri.v[k] < 0)
+				if(tri.v[k] >= int(verts.size()) || tri.v[k] < 0) {
+					std::cout << line << '\n';
 					ThrowException("Wrong vertex index: ",tri.v[k],"/",int(verts.size()));
+				}
 				if(tri.vt[k] >= int(uvs.size()))
 					ThrowException("Wrong tex-coord index: ",tri.vt[k],"/",int(uvs.size()));
 				if(tri.vn[k] >= int(normals.size()))
@@ -157,6 +156,12 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 			}
 			
 			tris.push_back(tri);
+			if(p[3] && strpbrk(p[3], "0123456789")) {
+				p[1] = p[3];
+				Swap(p[0], p[2]);
+				p[3] = 0;
+				goto REPEAT_TRI;
+			}
 		}
 		else if(strcmp(type,"usemtl")==0) {
 			sscanf(line,"%s %s",type,a);

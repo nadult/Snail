@@ -10,7 +10,7 @@ _dummy := $(shell [ -d $(BUILD_DIR)/sampling ] || mkdir -p $(BUILD_DIR)/sampling
 _dummy := $(shell [ -d $(BUILD_DIR)/shading ] || mkdir -p $(BUILD_DIR)/shading)
 
 FILES=funcs render tree_stats bounding_box gl_window rtbase base_scene bvh/traverse thread_pool \
-	  camera mesh client server_node triangle font ray_generator frame_counter ray_group \
+	  camera client server_node triangle font ray_generator frame_counter ray_group \
 	  tex_handle bvh/tree sampling/point_sampler_dxt sampling/sampler sampling/sat_sampler \
 	shading/material sampling/bilinear_sampler sampling/point_sampler16bit obbox_fit rtracer \
 	sampling/point_sampler formats/loader formats/wavefront_obj formats/doom3_proc compression \

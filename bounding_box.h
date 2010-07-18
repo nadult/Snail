@@ -5,6 +5,7 @@
 
 template <bool,bool> class RayGroup;
 template <bool, bool> class Context;
+class ShadowContext;
 
 class CornerRays;
 class RayInterval;
@@ -250,6 +251,7 @@ public:
 
 	template <bool sharedOrigin, bool hasMask>
 	bool Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &lastActive) const;
+	bool Test(ShadowContext &context, int &firstActive, int &lastActive) const;
 
 	bool TestInterval(const RayInterval&) const;
 

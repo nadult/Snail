@@ -35,9 +35,6 @@ void Triangle::Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActi
 	Vec3f nrm = Nrm(), tvec0, tvec1;
 	float tmul;
 
-	if(hasMask && !sharedOrigin)
-		exit(0); //TODO
-
 	if(sharedOrigin) {
 		Vec3f tvec = ExtractN(c.Origin(0), 0) - a;
 		tvec0 = (ba ^ tvec) * it0;
@@ -71,6 +68,7 @@ void Triangle::Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActi
 
 		f32x4b test = Min(u, v) >= 0.0f && u + v <= floatq(1.0f);
 		test = test && dist >= floatq(0.0f) && dist < c.Distance(tq);
+//		if(hasMask) test = test && c.SSEMask(tq);
 
 		c.Distance(tq) = Condition(test, dist, c.Distance(tq));
 		c.Object(tq) = Condition(i32x4b(test), i32x4(idx), c.Object(tq));
@@ -78,31 +76,34 @@ void Triangle::Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActi
 	}
 }
 
-template <bool sharedOrigin, bool hasMask>
-int Triangle::CollideShadow(Context<sharedOrigin, hasMask> &c, int firstActive, int lastActive) const {
-	Vec3f nrm = Nrm();
-	Vec3q ta(a);
+bool Triangle::Collide(ShadowContext &c, int firstActive, int lastActive) const {
+	const Vec3f nrm = Nrm();
+	const Vec3f tvec = ExtractN(c.Origin(0), 0) - a;
+	const Vec3f tvec0 = (ba ^ tvec) * it0;
+	const Vec3f tvec1 = (tvec ^ ca) * it0;
+	const float tmul = -(tvec | nrm);
 
-	Vec3q sharedTVec;
-	if(sharedOrigin)
-		sharedTVec = c.Origin(0) - ta;
+	int count = lastActive - firstActive + 1;
+	bool full = count == c.Size();
 
-	for(int q = firstActive; q <= lastActive; q++) {
-		floatq det  = c.Dir(q) | nrm;
-		Vec3q  tvec = sharedOrigin? sharedTVec : c.Origin(q) - ta;
+	for(int q = 0; q < count; q++) {
+		int tq = q + firstActive;
 
-		floatq u    = c.Dir(q) | (Vec3q(ba) ^ tvec);
-		floatq v    = c.Dir(q) | (tvec ^ Vec3q(ca));
-		f32x4b test = Min(u, v) >= 0.0f && u + v <= det * floatq(t0);
+		const Vec3q dir = c.Dir(tq);
+		floatq det = dir.x * nrm.x + dir.y * nrm.y + dir.z * nrm.z;
 
-		floatq dist = -(tvec | nrm) / det;
-		test = test && dist > floatq(0.0f) && dist < c.Distance(q);
+		floatq dist = tmul * Inv(det);
+		floatq v = dir.x * tvec0.x + dir.y * tvec0.y + dir.z * tvec0.z;
+		floatq u = dir.x * tvec1.x + dir.y * tvec1.y + dir.z * tvec1.z;
+		
+		f32x4b test = Min(u, v) >= 0.0f && u + v <= det;
+		test = test && dist >= 0.0f && dist < c.Distance(tq);
+		full &= ForAll(test);
 
-		c.Distance(q) = Condition(test, dist, c.Distance(q));
-		if(hasMask) c.MaskPtr()[q] &= ~ForWhich(test);
+		c.Distance(tq) = Condition(test, -constant::inf, c.Distance(tq));
 	}
 
-	return 0;
+	return full;
 }
 
 
@@ -111,10 +112,13 @@ template void Triangle::Collide<0, 1>(Context<0, 1>&, int, int, int) const;
 template void Triangle::Collide<1, 0>(Context<1, 0>&, int, int, int) const;
 template void Triangle::Collide<1, 1>(Context<1, 1>&, int, int, int) const;
 
-template int Triangle::CollideShadow<0, 0>(Context<0, 0>&, int, int) const;
-template int Triangle::CollideShadow<0, 1>(Context<0, 1>&, int, int) const;
-template int Triangle::CollideShadow<1, 0>(Context<1, 0>&, int, int) const;
-template int Triangle::CollideShadow<1, 1>(Context<1, 1>&, int, int) const;
+static inline const floatq LoadXXYY(float x, float y) {
+	return _mm_shuffle_ps(_mm_set1_ps(x), _mm_set1_ps(y), 0);
+}
+
+static inline const floatq LoadXYXY(float x, float y) {
+	return _mm_unpacklo_ps(_mm_set1_ps(x), _mm_set1_ps(y));
+}
 
 bool Triangle::TestInterval(const RayInterval &i) const {
 	//TODO: min/max origin
@@ -127,10 +131,42 @@ bool Triangle::TestInterval(const RayInterval &i) const {
 	if(det < 0.0f)
 		return 0;
 
-	Vec3f tvec = i.minOrigin - a;
-	Vec3f c1 = ba ^ tvec, c2 = tvec ^ ca;
-	Vec3f c1a = i.minDir * c1, c1b = i.maxDir * c1;
-	Vec3f c2a = i.minDir * c2, c2b = i.maxDir * c2;
+	enum { sharedOrigin = 1 };
+	Vec3f c1a, c1b, c2a, c2b;
+	if(sharedOrigin) {
+		Vec3f tvec = i.minOrigin - a;
+		Vec3f c1 = ba ^ tvec, c2 = tvec ^ ca;
+
+		c1a = i.minDir * c1; c1b = i.maxDir * c1;
+		c2a = i.minDir * c2; c2b = i.maxDir * c2;
+	}
+	else {
+		Vec3f tvec1 = i.minOrigin - a, tvec2 = i.maxOrigin - a;
+
+		{
+			float xa1 = ba.y * tvec1.z, xb1 = ba.z * tvec1.y; float xa2 = ba.y * tvec2.z, xb2 = ba.z * tvec2.y;
+			float ya1 = ba.z * tvec1.x, yb1 = ba.x * tvec1.z; float ya2 = ba.z * tvec2.x, yb2 = ba.x * tvec2.z;
+			float za1 = ba.x * tvec1.y, zb1 = ba.y * tvec1.x; float za2 = ba.x * tvec2.y, zb2 = ba.y * tvec2.x;
+			c1a.x = Min(xa1, xa2) - Max(xb1, xb2); c1b.x = Max(xa1, xa2) - Min(xb1, xb2);
+			c1a.y = Min(ya1, ya2) - Max(yb1, yb2); c1b.y = Max(ya1, ya2) - Min(yb1, yb2);
+			c1a.z = Min(za1, za2) - Max(zb1, zb2); c1b.z = Max(za1, za2) - Min(zb1, zb2);
+		}
+		{
+			float xa1 = tvec1.y * ca.z, xb1 = tvec1.z * ca.y; float xa2 = tvec2.y * ca.z, xb2 = tvec2.z * ca.y;
+			float ya1 = tvec1.z * ca.x, yb1 = tvec1.x * ca.z; float ya2 = tvec2.z * ca.x, yb2 = tvec2.x * ca.z;
+			float za1 = tvec1.x * ca.y, zb1 = tvec1.y * ca.x; float za2 = tvec2.x * ca.y, zb2 = tvec2.y * ca.x;
+			c2a.x = Min(xa1, xa2) - Max(xb1, xb2); c2b.x = Max(xa1, xa2) - Min(xb1, xb2);
+			c2a.y = Min(ya1, ya2) - Max(yb1, yb2); c2b.y = Max(ya1, ya2) - Min(yb1, yb2);
+			c2a.z = Min(za1, za2) - Max(zb1, zb2); c2b.z = Max(za1, za2) - Min(zb1, zb2);
+		}
+		Vec3f t1, t2, t3, t4;
+		t1 = i.minDir * c1a; t2 = i.maxDir * c1b; 
+		t3 = i.maxDir * c1a; t4 = i.minDir * c1b; 
+		c1a = VMin(VMin(t1, t2), VMin(t3, t4)); c1b = VMax(VMax(t1, t2), VMax(t3, t4));
+		t1 = i.minDir * c2a; t2 = i.maxDir * c2b;
+		t3 = i.maxDir * c2a; t4 = i.minDir * c2b;
+		c2a = VMin(VMin(t1, t2), VMin(t3, t4)); c2b = VMax(VMax(t1, t2), VMax(t3, t4));
+	}
 
 	float u[2] = {
 		Min(c1a.x, c1b.x) + Min(c1a.y, c1b.y) + Min(c1a.z, c1b.z),
@@ -140,20 +176,6 @@ bool Triangle::TestInterval(const RayInterval &i) const {
 		Max(c2a.x, c2b.x) + Max(c2a.y, c2b.y) + Max(c2a.z, c2b.z) };
 	
 	return Min(u[1], v[1]) >= 0.0f && u[0] + v[0] <= det * t0;
-/*	// TODO: zleeee
-	Vec3<Interval> tvec(
-		Interval(i.minOrigin.x, i.maxOrigin.x) - a.x,
-		Interval(i.minOrigin.y, i.maxOrigin.y) - a.y,
-		Interval(i.minOrigin.z, i.maxOrigin.z) - a.z);
-
-	Vec3<Interval> c1 = Vec3<Interval>(ba) ^ tvec, c2 = tvec ^ Vec3<Interval>(ca);
-	Vec3<Interval> dir(
-			Interval(i.minDir.x, i.maxDir.x), Interval(i.minDir.y, i.maxDir.y), Interval(i.minDir.z, i.maxDir.z) );
-
-	InputAssert(t0 >= 0);
-	Interval u = c1 | dir, v = c2 | dir;
-
-	return Min(u.max, v.max) >= 0.0f && u.min + v.min <= det * t0; */
 }
 
 bool Triangle::TestFrustum(const Frustum &frustum) const {

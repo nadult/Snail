@@ -36,46 +36,6 @@ CompactTris BaseScene::ToCompactTris() const {
 	return out;
 }
 
-TriangleVector BaseScene::ToTriangleVector() const {
-	TriangleVector out;
-
-	for(int o=0;o<objects.size();o++) {
-		const Matrix<Vec4f> &trans=objects[o].trans;
-		int verts=out.verts.size();
-		int inds=out.tris.size();
-		
-		TriangleVector obj=objects[o].ToTriangleVector();
-		int newVerts=verts+obj.verts.size();
-
-		out.verts.resize(newVerts);
-
-		for(int n=0;n<obj.verts.size();n++) {
-			TriangleVector::Vert &vert=out.verts[n+verts];;
-			vert.pos=trans*obj.verts[n].pos;
-			vert.uv=obj.verts[n].uv;
-			vert.nrm=trans&obj.verts[n].nrm;
-		}
-
-		out.tris.resize(out.tris.size()+obj.tris.size());
-		for(int n=0;n<obj.tris.size();n++) {
-			TriangleVector::TriIdx &idx=out.tris[n+inds];
-			idx=obj.tris[n];
-
-			idx.v1+=verts;
-			idx.v2+=verts;
-			idx.v3+=verts;
-		}
-	}
-
-	out.triAccels.resize(out.tris.size());
-
-	for(int n=0;n<out.tris.size();n++) {
-		const TriangleVector::TriIdx &idx=out.tris[n];
-		out.triAccels[n]=TriAccel(out.verts[idx.v1].pos,out.verts[idx.v2].pos,out.verts[idx.v3].pos);
-	}
-	return out;
-}
-
 TriVector BaseScene::ToTriVector() const {
 	TriVector out;
 	
@@ -459,64 +419,6 @@ CompactTris BaseScene::Object::ToCompactTris() const {
 		bool flatNrm=	Same(out.normals[dst.v1], out.normals[dst.v2]) &&
 						Same(out.normals[dst.v1], out.normals[dst.v3]);
 		dst.mat = (src.matId & 0x7fffffff) + (flatNrm? 0x80000000 : 0);
-	}
-	
-	return out;
-}
-
-TriangleVector BaseScene::Object::ToTriangleVector() const {
-	TriangleVector out;
-	vector<Idx> inds;
-	inds.reserve(tris.size()*3);
-
-	Vec2f defaultUv(0.0f,0.0f);
-	Vec3f defaultNrm(0.0f,0.0f,0.0f);
-
-	for(int n=0;n<tris.size();n++) {
-		const IndexedTri &tri=tris[n];
-		for(int k=0;k<3;k++) inds.push_back(Idx(tri.v[k],tri.vt[k],tri.vn[k]));
-	}
-
-	{
-		std::sort(inds.begin(),inds.end());
-		vector<Idx>::iterator end=std::unique(inds.begin(),inds.end());
-		inds.resize(end-inds.begin());
-	}
-
-	out.verts.resize(inds.size());
-	out.tris.resize(tris.size());
-
-//	std::sort(inds.begin(),inds.end(),SortByPos(verts));
-
-	for(int n=0;n<inds.size();n++) {
-		TriangleVector::Vert &vert=out.verts[n];
-		vert.pos=verts[inds[n].v];
-		vert.uv=inds[n].u==-1?defaultUv:uvs[inds[n].u];
-		vert.nrm=inds[n].n==-1?defaultNrm:normals[inds[n].n];
-	}
-
-	for(int n=0;n<inds.size();n++) inds[n].dstIdx=n;
-	std::sort(inds.begin(),inds.end());
-	for(int n=0;n<tris.size();n++) {
-		const IndexedTri &src=tris[n];
-		TriangleVector::TriIdx &dst=out.tris[n];
-
-		u32 idx[3];
-		for(int k=0;k<3;k++)
-			idx[k]=std::lower_bound(inds.begin(),inds.end(),Idx(src.v[k],src.vt[k],src.vn[k]))-inds.begin();
-
-		dst.v1=inds[idx[0]].dstIdx;
-		dst.v2=inds[idx[1]].dstIdx;
-		dst.v3=inds[idx[2]].dstIdx;
-		bool flatNrm=	Same(out.verts[dst.v1].nrm,out.verts[dst.v2].nrm)&&
-						Same(out.verts[dst.v1].nrm,out.verts[dst.v3].nrm);
-		dst.mat=(src.matId&0x7fffffff)+(flatNrm?0x80000000:0);
-	}
-
-	out.triAccels.resize(out.tris.size());
-	for(int n=0;n<out.tris.size();n++) {
-		const TriangleVector::TriIdx &idx=out.tris[n];
-		out.triAccels[n]=TriAccel(out.verts[idx.v1].pos,out.verts[idx.v2].pos,out.verts[idx.v3].pos);
 	}
 	
 	return out;

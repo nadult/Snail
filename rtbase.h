@@ -82,6 +82,7 @@ inline int MaxAxis(Vec3f vec) {
 
 void ComputeMinMax(const Vec3q *vec, int size, Vec3f *outMin, Vec3f *outMax);
 void ComputeMinMax(const Vec3q *vec, char *mask, int size, Vec3f *outMin, Vec3f *outMax);
+void ComputeMinMax(const Vec3q *vec, const floatq *distMask, int size, Vec3f *outMin, Vec3f *outMax);
 
 
 std::ostream &operator<<(std::ostream&, const Vec3f&);

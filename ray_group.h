@@ -78,11 +78,11 @@ public:
 
 	RayGroup(const Vec3q *origin, const Vec3q *dir, const Vec3q *iDir, int size)
 		:size(size), origin(origin), dir(dir), iDir(iDir) { }
-	RayGroup(const RayGroup &rhs, int offset)
-		:size(rhs.size - offset), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
+	RayGroup(const RayGroup &rhs, int offset, int newSize)
+		:size(newSize), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
 		iDir(rhs.iDir + offset) { }
-	RayGroup(const RayGroup<sharedOrigin, 1> &rhs, int offset)
-		:size(rhs.size - offset), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
+	RayGroup(const RayGroup<sharedOrigin, 1> &rhs, int offset, int newSize)
+		:size(newSize), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
 		iDir(rhs.iDir + offset) { }
 
 	const Vec3q &Dir(int n) const	{ return dir[n]; }
@@ -118,8 +118,8 @@ public:
 		:size(size), origin(origin), dir(dir), iDir(iDir), mask(mask) { }
 	RayGroup(const Vec3q *origin, const Vec3q *dir, const Vec3q *iDir, RaySelector &selector)
 		:size(selector.Size()), origin(origin), dir(dir), iDir(iDir), mask(&selector[0]) { }
-	RayGroup(const RayGroup &rhs, int offset)
-		:size(rhs.size - offset), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
+	RayGroup(const RayGroup &rhs, int offset, int newSize)
+		:size(newSize), origin(rhs.origin + (sharedOrigin? 0 : offset)), dir(rhs.dir + offset),
 		iDir(rhs.iDir + offset), mask(rhs.mask + offset) { }
 
 	const Vec3q &Dir(int n) const	{ return dir[n]; }
@@ -279,6 +279,18 @@ public:
 class RayInterval {
 public:
 	RayInterval() { }
+	RayInterval(const RayGroup<1, 0> &rays, floatq *__restrict__ distanceMask) {
+		int size = rays.Size();
+
+		ComputeMinMax(rays.DirPtr(), distanceMask, size, &minDir, &maxDir);
+		ComputeMinMax(rays.IDirPtr(), distanceMask, size, &minIDir, &maxIDir);
+		minOrigin = maxOrigin = ExtractN(rays.Origin(0), 0);
+		
+		ix = floatq(minIDir.x, maxIDir.x, minIDir.x, maxIDir.x);
+		iy = floatq(minIDir.y, maxIDir.y, minIDir.y, maxIDir.y);
+		iz = floatq(minIDir.z, maxIDir.z, minIDir.z, maxIDir.z);
+	}
+	
 	template <bool shared, bool hasMask>
 	explicit RayInterval(const RayGroup<shared, hasMask> &rays) {
 		int size = rays.Size();
@@ -325,8 +337,8 @@ private:
 template <bool sharedOrigin, bool hasMask>
 struct Context {
 	Context(const RayGroup<sharedOrigin, hasMask> &tRays, floatq *distance, i32x4 *object, i32x4 *element,
-			TreeStats *stats = 0)
-		:rays(tRays), distance(distance), object(object), element(element), stats(stats), barycentric(0) { }
+			Vec2q *barycentric, TreeStats *stats = 0)
+		:rays(tRays), distance(distance), object(object), element(element), stats(stats), barycentric(barycentric) { }
 
 	const Vec3q &Dir(int q) const { return rays.Dir(q); }
 	const Vec3q &IDir(int q) const { return rays.IDir(q); }
@@ -350,9 +362,32 @@ struct Context {
 	i32x4  * __restrict__ object;
 	i32x4  * __restrict__ element;
 	Vec2q * __restrict__ barycentric;
+	TreeStats *stats;
+};
+
+// Rays with distance < 0 are masked
+struct ShadowContext {
+	ShadowContext(const RayGroup<1, 0> &tRays, floatq *distance, TreeStats *stats = 0)
+		:rays(tRays), distance(distance), stats(stats) { }
+
+	const Vec3q &Dir(int q) const { return rays.Dir(q); }
+	const Vec3q &IDir(int q) const { return rays.IDir(q); }
+	const Vec3q &Origin(int q) const { return rays.Origin(q); }
+
+	f32x4 &Distance(int q) { return distance[q]; }
+	int Size() const { return rays.Size(); }
+
+	void UpdateStats(const TreeStats &st) { if(stats) *stats += st; }
+
+	bool All() const { return rays.All(); }
+	bool Any() const { return rays.Any(); }
+
+	RayGroup<1, 0> rays;
+	floatq * __restrict__ distance;
 	ShadowCache shadowCache;
 	TreeStats *stats;
 };
+
 
 /*
 template <int flags_>

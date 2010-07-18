@@ -216,10 +216,10 @@ template TreeStats Render<BVH>(const Scene<BVH>&, const Camera&, gfxlib::Texture
 									const Options, uint);
 	
 
-//template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, gfxlib::Texture&,
-//									uint, uint, uint, const Options, uint);
+template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, gfxlib::Texture&,
+									uint, uint, uint, const Options, uint);
 
-//template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, gfxlib::Texture&,
-//									const Options, uint);
+template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, gfxlib::Texture&,
+									const Options, uint);
 	
 

@@ -63,7 +63,6 @@ void ComputeMinMax(const Vec3q *vec, int size, Vec3f *outMin, Vec3f *outMax) {
 }
 
 #include "ray_group.h"
-
 void ComputeMinMax(const Vec3q *vec, char *mask, int size, Vec3f *outMin, Vec3f *outMax) {
 	RaySelector sel(mask, size);
 
@@ -82,6 +81,30 @@ void ComputeMinMax(const Vec3q *vec, char *mask, int size, Vec3f *outMin, Vec3f 
 
 	for(;q < size; q++) {
 		f32x4b mask = sel.SSEMask(q);
+		min = Condition(mask, VMin(min, vec[q]), min);
+		max = Condition(mask, VMax(max, vec[q]), max);
+	}
+
+	*outMin = Minimize(min);
+	*outMax = Maximize(max);
+}
+
+void ComputeMinMax(const Vec3q *vec, const floatq *distMask, int size, Vec3f *outMin, Vec3f *outMax) {
+	Vec3q min, max;
+	int q = 0;
+	while(!ForAny(distMask[q] >= 0.0f) && q < size) q++;
+	if(q == size) {
+		*outMin = *outMax = Vec3f(0.0f, 0.0f, 0.0f);
+		return;
+	}
+
+	for(int k = 0; k < 4; k++) if(distMask[q][k] >= 0.0f) {
+		max = min = (Vec3q)ExtractN(vec[q], k);
+		break;
+	}
+
+	for(;q < size; q++) {
+		f32x4b mask = distMask[q] >= 0.0f;
 		min = Condition(mask, VMin(min, vec[q]), min);
 		max = Condition(mask, VMax(max, vec[q]), max);
 	}

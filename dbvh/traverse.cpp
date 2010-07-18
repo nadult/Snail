@@ -62,8 +62,7 @@ void DBVH::TraversePrimary0(Context<sharedOrigin, hasMask> &c, int firstNode) co
 		(*c.stats) += stats;
 }
 
-template <bool sharedOrigin, bool hasMask>
-void DBVH::TraverseShadow0(Context<sharedOrigin, hasMask> &c, int firstNode) const {
+void DBVH::TraverseShadow0(ShadowContext &c, int firstNode) const {
 	const int size = c.Size();
 
 	struct StackElem { int node; short firstActive, lastActive; };
@@ -184,7 +183,7 @@ void DBVH::TraversePrimary(Context<sharedOrigin, hasMask> &c) const {
 					newSel[q] = mask;
 				}
 				Context<sharedOrigin, 1> splitCtx(RayGroup<sharedOrigin, 1>(c.rays.OriginPtr(),
-								c.rays.DirPtr(), c.rays.IDirPtr(), size, buf), c.distance, c.object, c.element);
+								c.rays.DirPtr(), c.rays.IDirPtr(), size, buf), c.distance, c.object, c.element, c.barycentric);
 				TraversePrimary0(splitCtx);
 			}
 	//	}
@@ -199,10 +198,9 @@ void DBVH::TraversePrimary(Context<sharedOrigin, hasMask> &c) const {
 	}
 }
 
-template <bool sharedOrigin, bool hasMask>
-void DBVH::TraverseShadow(Context<sharedOrigin, hasMask> &c) const {
+void DBVH::TraverseShadow(ShadowContext &c) const {
 	TraverseShadow0(c);
-	return;
+/*	return;
 
 	const int size = c.Size();
 	bool split = 1;
@@ -276,7 +274,7 @@ void DBVH::TraverseShadow(Context<sharedOrigin, hasMask> &c) const {
 	}
 //	if(gVals[1]) {
 //		TraverseShadow0(c);
-/*		return;
+		return;
 	}
 	const int size = c.Size();
 	bool split = 1;
@@ -315,22 +313,12 @@ void DBVH::TraverseShadow(Context<sharedOrigin, hasMask> &c) const {
 	} */
 }
 
-//template void DBVH::TraversePrimary0<0, 0>(Context<0, 0>&, int) const;
-//template void DBVH::TraversePrimary0<0, 1>(Context<0, 1>&, int) const;
+template void DBVH::TraversePrimary0<0, 0>(Context<0, 0>&, int) const;
+template void DBVH::TraversePrimary0<0, 1>(Context<0, 1>&, int) const;
 template void DBVH::TraversePrimary0<1, 0>(Context<1, 0>&, int) const;
 //template void DBVH::TraversePrimary0<1, 1>(Context<1, 1>&, int) const;
 	
-//template void DBVH::TraversePrimary<0, 0>(Context<0, 0>&) const;
-//template void DBVH::TraversePrimary<0, 1>(Context<0, 1>&) const;
+template void DBVH::TraversePrimary<0, 0>(Context<0, 0>&) const;
+template void DBVH::TraversePrimary<0, 1>(Context<0, 1>&) const;
 template void DBVH::TraversePrimary<1, 0>(Context<1, 0>&) const;
 //template void DBVH::TraversePrimary<1, 1>(Context<1, 1>&) const;
-
-//template void DBVH::TraverseShadow0<0, 0>(Context<0, 0>&, int) const;
-//template void DBVH::TraverseShadow0<0, 1>(Context<0, 1>&, int) const;
-//template void DBVH::TraverseShadow0<1, 0>(Context<1, 0>&, int) const;
-template void DBVH::TraverseShadow0<1, 1>(Context<1, 1>&, int) const;
-	
-//template void DBVH::TraverseShadow<0, 0>(Context<0, 0>&) const;
-//template void DBVH::TraverseShadow<0, 1>(Context<0, 1>&) const;
-//template void DBVH::TraverseShadow<1, 0>(Context<1, 0>&) const;
-template void DBVH::TraverseShadow<1, 1>(Context<1, 1>&) const;

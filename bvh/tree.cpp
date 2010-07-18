@@ -10,9 +10,6 @@ void BVH::UpdateCache() {
 	triCache.resize(elements.size());
 	for(int n = 0; n < elements.size(); n++)
 		triCache[n] = elements[n];
-	shTriCache.resize(elements.size());
-	for(size_t n = 0; n < elements.size(); n++)
-		shTriCache[n] = elements.GetSElement(n, 0);
 }
 
 void BVH::FindSplitSweep(int nNode, int first, int count, int depth) {

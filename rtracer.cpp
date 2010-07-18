@@ -12,7 +12,6 @@
 #include "dbvh/tree.h"
 
 #include "scene.h"
-#include "mesh.h"
 #include "frame_counter.h"
 
 #include "font.h"
@@ -40,10 +39,10 @@ void SetMaterials(Scene &scene, const BaseScene &base, const string &texPath) {
 	scene.materials.resize(base.matNames.size());
 
 	for(auto it = base.matNames.begin(); it != base.matNames.end(); ++it) {
-		string name = it->first == ""? "" : texPath + it->first + ".dds";
+		string name = it->first == ""? "" : texPath + it->first;
 
 		try {
-		 	scene.materials[it->second]=typename Scene::PMaterial(shading::NewMaterial(name));
+		 	scene.materials[it->second] = typename Scene::PMaterial(shading::NewMaterial(name));
 			cout << "Mat: " << name << '\n';
 		}
 		catch(const Exception &ex) {
@@ -103,10 +102,10 @@ static const DBVH MakeDBVH(BVH *bvh) {
 	srand(0);
 	static float anim = 0; anim += 0.02f;
 
-	float scale = Length(bvh->GetBBox().Size()) * 0.0025;
+	float scale = Length(bvh->GetBBox().Size()) * 0.05;
 
 	vector<ObjectInstance> instances;
-	for(int n = 0; n < 0; n++) {
+	for(int n = 0; n < 1000; n++) {
 		ObjectInstance inst;
 		inst.tree = bvh;
 		inst.translation = (Vec3f(rand() % 1000, rand() % 1000, rand() % 1000) - Vec3f(500, 500, 500))
@@ -144,14 +143,7 @@ static int tmain(int argc, char **argv) {
 	CameraConfigs camConfigs;
 	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
 
-//	Mesh mesh;
-//	MeshAnim meshAnim;
-//	mesh.Load("scenes/doom3/imp/imp.md5mesh");
-//	meshAnim.Load("scenes/doom3/imp/walk1.md5anim");
-
-//	StaticTree meshTree;
-
-	int resx=1024, resy=1024;
+	int resx = 1024, resy = 1024;
 	bool fullscreen = 0;
 	int threads = 2;
 	const char *modelFile = "pompei.obj";//"doom3/admin.proc";
@@ -243,7 +235,6 @@ static int tmain(int argc, char **argv) {
 
 	FrameCounter frmCounter;
 
-
 	while(window.PollEvents()) {
 		frmCounter.NextFrame();
 
@@ -268,7 +259,7 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown('J')) {
 			Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
 
-			lights.push_back(Light(cam.Pos(), colors[rand()&3], 800.0f * 0.001f * sceneScale));
+			lights.push_back(Light(cam.Pos(), colors[rand()&3], 2000.0f * 0.001f * sceneScale));
 		}
 
 		MoveCamera(cam, window, speed);
@@ -304,7 +295,7 @@ static int tmain(int argc, char **argv) {
 		
 		double time = GetTime();
 		TreeStats stats;
-		stats = Render(scene, cam, image, options, threads);
+		stats = Render(dscene, cam, image, options, threads);
 
 		time = GetTime() - time;
 		window.RenderImage(image);

@@ -64,9 +64,9 @@ struct StatsShader
 	StatsShader(const TreeStats &tStats, int size) : stats(tStats), size(size) { }
 	Vec3q operator[](int) const {
 		return Vec3q(
-			   float(stats.GetIntersects()) * (0.01f / size),
-			   float(stats.GetLoopIters()) * (0.1f / size),
-			   float(stats.GetSkips() * 0.5f));
+			   float(stats.GetIntersects()) * (0.002f / size),
+			   float(stats.GetLoopIters()) * (0.02f / size),
+			   float(stats.GetSkips() * 0.25f));
 	}
 
 	const TreeStats &stats;
@@ -86,6 +86,7 @@ struct DistanceShader
 };
 
 
+
 template <class AccStruct>
 TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading::Sample *samples,
 		Vec3q *__restrict__ diffuse, Vec3q *__restrict__ specular, int idx) const {
@@ -98,17 +99,11 @@ TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading::Sam
 	Vec3p        lightPos = light.pos;
 
 	Vec3q  fromLight[size], idir[size];
-	floatq distance[size];
+	floatq distance[size], tDistance[size];
 	floatq dot[size];
-	f32x4b mask[size];
-
-	char selData[size + 4];
-	RaySelector sel(selData, size);
-	for(int n = 0; n < sel.Size4(); n++)
-		sel.Mask4(n) = inputSel.Mask4(n);
 
 	for(int q = 0; q < size; q++) {
-		if(!sel[q]) continue;
+		if(!inputSel[q]) continue;
 		const shading::Sample &s = samples[q];
 
 		Vec3q  lightVec = (s.position - Vec3q(lightPos));
@@ -120,66 +115,50 @@ TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading::Sam
 		idir[q]      = SafeInv(fromLight[q]);
 
 		dot[q]  = s.normal | fromLight[q];
-		mask[q] = dot[q] > 0.0f;
+		auto mask = inputSel.SSEMask(q) && dot[q] > 0.0f;
 
-		sel[q] &= ForWhich(mask[q]);
+		tDistance[q] = Condition(mask, distance[q] * 0.9999f, -constant::inf);
+		stats.TracingRays(CountMaskBits(ForWhich(mask)));
 	}
 
 	if(shadows) {
-		Vec3q  lPos(lightPos.x, lightPos.y, lightPos.z);
-		Vec3q  lColor(light.color.x, light.color.y, light.color.z);
-		floatq tDistance[size];
-		for(int q = 0; q < size; q++)
-			tDistance[q] = distance[q] * 0.99999f;
-
-		for(int q = 0; q < size; q++) stats.TracingRays(CountMaskBits(sel[q]));
-		Context<1, 1> c(RayGroup<1, 1>(&lPos, fromLight, idir, size, selData), tDistance, 0, 0, &stats);
+		Vec3q lPos(lightPos.x, lightPos.y, lightPos.z);
+		ShadowContext c(RayGroup<1, 0>(&lPos, fromLight, idir, size), tDistance, &stats);
 		geometry.TraverseShadow(c);
 
-		for(int q = 0; q < size; q++) {
-			if(!sel[q]) continue;
-
-			f32x4  dist = distance[q];
-			f32x4b msk  = mask[q] && dist - tDistance[q] <= dist * 0.0001f;
-
-			f32x4 atten = dist * light.iRadius;
-			atten = Max(f32x4(0.0f), ((floatq(1.0f) - atten) * 0.2f + FastInv(f32x4(16.0f) * atten * atten)) -
-						f32x4(0.0625f));
-
-			f32x4 diffMul = dot[q] * atten;
-			f32x4 specMul = dot[q];
-			specMul *= specMul;
-			specMul *= specMul;
-			specMul *= specMul;
-			specMul *= specMul;
-			specMul *= atten;
-
-			diffuse [q] += Condition(msk, lColor * diffMul);
-			specular[q] += Condition(msk, lColor * specMul);
-		}
+		// All pixels masked or in shadow?
+		f32x4 tdmax(-constant::inf);
+		int q = 0;
+		for(; q + 3 < size; q += 4)
+			tdmax = Max(tdmax,	Max( Max(tDistance[q + 0], tDistance[q + 1]),
+									 Max(tDistance[q + 2], tDistance[q + 3])) );
+		for(;q < size; q++)
+			tdmax = Max(tdmax, tDistance[q]);
+		if(ForAll(tdmax < 0.0f))
+			return stats;
 	}
-	else {
-		Vec3q lColor(light.color.x, light.color.y, light.color.z);
-		for(int q = 0; q < size; q++) {
-			if(!sel[q]) continue;
+	
+	Vec3q lPos(lightPos.x, lightPos.y, lightPos.z);
+	Vec3q lColor(light.color.x, light.color.y, light.color.z);
 
-			f32x4 dist = distance[q];
+	for(int q = 0; q < size; q++) {
+		f32x4  dist = distance[q];
+		f32x4b msk  = tDistance[q] > 0.0f;
 
-			f32x4 atten = dist * light.iRadius;
-			atten = Max(f32x4(0.0f), ((floatq(1.0f) - atten) * 0.2f +
-					FastInv(f32x4(16.0f) * atten * atten)) - f32x4(0.0625f));
+		f32x4 atten = dist * light.iRadius;
+		atten = Max(f32x4(0.0f), ((floatq(1.0f) - atten) * 0.2f + FastInv(f32x4(16.0f) * atten * atten)) -
+					f32x4(0.0625f));
 
-			f32x4 diffMul = dot[q] * atten;
-			f32x4 specMul = dot[q];
-			specMul *= specMul;
-			specMul *= specMul;
-			specMul *= specMul;
-			specMul *= specMul;
-			specMul *= atten;
+		f32x4 diffMul = dot[q] * atten;
+		f32x4 specMul = dot[q];
+		specMul *= specMul;
+		specMul *= specMul;
+		specMul *= specMul;
+		specMul *= specMul;
+		specMul *= atten;
 
-			diffuse [q] += Condition(mask[q], lColor * diffMul);
-			specular[q] += Condition(mask[q], lColor * specMul);
-		}
+		diffuse [q] += Condition(msk, lColor * diffMul);
+		specular[q] += Condition(msk, lColor * specMul);
 	}
 
 	return stats;
@@ -205,12 +184,14 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 	i32x4 tObject[size], tElement[size];
 	Vec2q barycentric[size];
 
-	for(int q = 0; q < size; q++) tDistance[q] = maxDist;
+	for(int q = 0; q < size; q++) {
+		tDistance[q] = Condition(rays.SSEMask(q), maxDist, -constant::inf);
+		tObject[q] = 0;
+	}
 	for(int q = 0; q < size; q++) stats.TracingRays(CountMaskBits(rays.Mask(q)));
 
-	Context<sharedOrigin, hasMask> tc(rays, tDistance, tObject, tElement, &stats);
-	tc.barycentric = barycentric;
-	geometry.TraversePrimary0(tc);
+	Context<sharedOrigin, hasMask> tc(rays, tDistance, tObject, tElement, barycentric, &stats);
+	geometry.TraversePrimary(tc);
 	char selectorData[size + 4], reflSelData[size + 4];
 	RaySelector selector(selectorData, size), reflSel(reflSelData, size);
 	selector.SelectAll();
@@ -230,10 +211,8 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 	Vec3q minPos(1.0f / 0.0f, 1.0f / 0.0f, 1.0f / 0.0f);
 	Vec3q maxPos(-1.0f / 0.0f, -1.0f / 0.0f, -1.0f / 0.0f);
 
-//	ShTriCache &shTriCache = cache.shTriCache;
 	shading::Sample samples[size];
 	int matCount = materials.size();
-	const vector<ShTriangle> &shTriCache = geometry.shTriCache;
 
 	for(uint b = 0, nBlocks = size / blockSize; b < nBlocks; b++) {
 		uint b4 = b << 2;
@@ -274,7 +253,7 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 				   (object[0] == obj0 && element[0] == elem0)))) {
 			const ShTriangle shTri = geometry.GetSElement(obj0, elem0);
 
-			int        tMatId           = shTri.matId >= matCount ? 0 : shTri.matId;
+			int        tMatId = shTri.matId >= matCount ? 0 : shTri.matId;
 			const bool flatNormals      = shTri.FlatNormals();
 			const bool computeTexCoords = materialFlags[tMatId] & shading::Material::fTexCoords;
 			reflSel.Mask4(b) = materialFlags[tMatId] & shading::Material::fReflection ? 0x0f0f0f0f : 0;
@@ -311,7 +290,7 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 				}
 			}
 
-			materials[tMatId]->Shade(s, RayGroup<sharedOrigin, hasMask>(rays, b4), cache.samplingCache);
+			materials[tMatId]->Shade(s, RayGroup<sharedOrigin, hasMask>(rays, b4, 4), cache.samplingCache);
 		}
 		else {
 			for(uint q = 0; q < 4; q++) {
@@ -393,7 +372,7 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 				reflSel.Mask4(b) = materialFlags[matId0 - 1] & shading::Material::fReflection ? 0x0f0f0f0f : 0;
 
 				if(EXPECT_TAKEN(matId0)) materials[matId0 - 1]->
-					Shade(samples + b4, RayGroup<sharedOrigin, 0>(rays, b4), cache.samplingCache);
+					Shade(samples + b4, RayGroup<sharedOrigin, 0>(rays, b4, 4), cache.samplingCache);
 			}
 			else {
 				static_assert(blockSize == 4, "If you want some other value, you will have to modify the code here");
@@ -429,15 +408,15 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 					mask[3] = matId[3] == id4;
 
 					materials[id - 1]->Shade(samples + b4, RayGroup<sharedOrigin, 1>( RayGroup<sharedOrigin, 1>(
-							rays.OriginPtr(), rays.DirPtr(), rays.IDirPtr(), size, selectorData), b4),
+							rays.OriginPtr(), rays.DirPtr(), rays.IDirPtr(), size, selectorData), b4, 4),
 											cache.samplingCache);
 				}
 			}
 		}
 	}
-//	reflSel = selector;
+	reflSel = selector;
 
-/*	if(reflSel.Any() && gVals[5] && cache.reflections < 1) {
+	if(reflSel.Any() && gVals[5] && cache.reflections < 1) {
 		cache.reflections++;
 		Vec3q reflColor[size];
 		stats += TraceReflection(reflSel, rays.DirPtr(), samples, cache, reflColor);
@@ -447,7 +426,7 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 			samples[q].diffuse = Condition(reflSel.SSEMask(q), samples[q].diffuse +
 					(reflColor[q] - samples[q].diffuse) * floatq(0.3f), samples[q].diffuse);
 		}
-	} */
+	}
 
 	Vec3q lDiffuse[size], lSpecular[size];
 	if(lights.size()) {
@@ -476,7 +455,7 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 		}
 	}
 	else for(int q = 0; q < size; q++)
-			outColor[q] = samples[q].diffuse;
+		outColor[q] = samples[q].diffuse;
 
 	if(gVals[2] && flags & isct::fPrimary) {
 		//TODO wywala sie tutaj jak sie uzywa DBVH

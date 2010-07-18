@@ -44,6 +44,64 @@ struct ObjectInstance {
 						p.x * rotation[0].z + p.y * rotation[1].z + p.z * rotation[2].z);
 	}
 
+	void CollidePrimary(Context<0, 0> &c, int idx, int firstActive, int lastActive) const {
+		int count = lastActive - firstActive + 1;
+		if(!count)
+			return;
+
+		Vec3q origins[count], dirs[count], idirs[count];
+		for(int n = 0; n < count; n++)
+			dirs[n] = ITransformVec(c.Dir(firstActive + n));
+		for(int n = 0; n < count; n++)
+			idirs[n] = SafeInv(dirs[n]);
+		for(int n = 0; n < count; n++)
+			origins[n] = ITransformPoint(c.Origin(firstActive + n));
+		i32x4 objects[count], temp[count];
+		for(int n = 0; n < count; n++)
+			objects[n] = i32x4(~0);
+
+		Context<0, 0> newContext(RayGroup<0, 0>(origins, dirs, idirs, count),
+				c.distance + firstActive, objects, 0, c.barycentric, c.stats);
+
+		// TODO: zwykle traverse bez corner raysow
+		tree->TraversePrimary(newContext);
+
+		for(int n = 0; n < count; n++) {
+			auto mask = objects[n] != i32x4(~0);
+			c.Object(n + firstActive) = Condition(mask, i32x4(idx), c.Object(n + firstActive));
+			c.Element(n + firstActive) = Condition(mask, objects[n], c.Element(n + firstActive));
+		}
+	}
+
+	void CollidePrimary(Context<0, 1> &c, int idx, int firstActive, int lastActive) const {
+		int count = lastActive - firstActive + 1;
+		if(!count)
+			return;
+
+		Vec3q origins[count], dirs[count], idirs[count];
+		for(int n = 0; n < count; n++)
+			dirs[n] = ITransformVec(c.Dir(firstActive + n));
+		for(int n = 0; n < count; n++)
+			idirs[n] = SafeInv(dirs[n]);
+		for(int n = 0; n < count; n++)
+			origins[n] = ITransformPoint(c.Origin(firstActive + n));
+		i32x4 objects[count], temp[count];
+		for(int n = 0; n < count; n++)
+			objects[n] = i32x4(~0);
+
+		Context<0, 1> newContext(RayGroup<0, 1>(origins, dirs, idirs, count, c.MaskPtr() + firstActive),
+				c.distance + firstActive, objects, 0, c.barycentric, c.stats);
+
+		// TODO: zwykle traverse bez corner raysow
+		tree->TraversePrimary(newContext);
+
+		for(int n = 0; n < count; n++) {
+			auto mask = objects[n] != i32x4(~0);
+			c.Object(n + firstActive) = Condition(mask, i32x4(idx), c.Object(n + firstActive));
+			c.Element(n + firstActive) = Condition(mask, objects[n], c.Element(n + firstActive));
+		}
+	}
+
 	void CollidePrimary(Context<1, 1> &c, int idx, int firstActive, int lastActive) const {
 		int count = lastActive - firstActive + 1;
 		if(!count)
@@ -60,7 +118,7 @@ struct ObjectInstance {
 		Vec3q origin = ITransformPoint(c.Origin(0));
 
 		Context<1, 1> newContext(RayGroup<1, 1>(&origin, dirs, idirs, count, c.MaskPtr() + firstActive),
-				c.distance + firstActive, objects, 0, c.stats);
+				c.distance + firstActive, objects, 0, c.barycentric, c.stats);
 
 		// TODO: zwykle traverse bez corner raysow
 		tree->TraversePrimary(newContext);
@@ -71,6 +129,7 @@ struct ObjectInstance {
 			c.Element(n + firstActive) = Condition(mask, objects[n], c.Element(n + firstActive));
 		}
 	}
+
 	void CollidePrimary(Context<1, 0> &c, int idx, int firstActive, int lastActive) const {
 		int count = lastActive - firstActive + 1;
 		if(!count)
@@ -87,7 +146,7 @@ struct ObjectInstance {
 		Vec3q origin = ITransformPoint(c.Origin(0));
 
 		Context<1, 0> newContext(RayGroup<1, 0>(&origin, dirs, idirs, count),
-				c.distance + firstActive, objects, 0, c.stats);
+				c.distance + firstActive, objects, 0, c.barycentric, c.stats);
 
 		tree->TraversePrimary(newContext);
 
@@ -98,7 +157,7 @@ struct ObjectInstance {
 		}
 	}
 
-	void CollideShadow(Context<1, 1> &c, int firstActive, int lastActive) const {
+	void CollideShadow(ShadowContext &c, int firstActive, int lastActive) const {
 		int count = lastActive - firstActive + 1;
 		if(!count)
 			return;
@@ -108,11 +167,9 @@ struct ObjectInstance {
 			dirs[n] = ITransformVec(c.Dir(firstActive + n));
 		for(int n = 0; n < count; n++)
 			idirs[n] = SafeInv(dirs[n]);
-		i32x4 objects[count], temp[count];
 		Vec3q origin = ITransformPoint(c.Origin(0));
 
-		Context<1, 1> newContext(RayGroup<1, 1>(&origin, dirs, idirs, count, c.MaskPtr() + firstActive),
-				c.distance + firstActive, objects, 0, c.stats);
+		ShadowContext newContext(RayGroup<1, 0>(&origin, dirs, idirs, count), c.distance + firstActive, c.stats);
 
 		tree->TraverseShadow(newContext);
 	}
@@ -151,14 +208,12 @@ public:
 	template <bool sharedOrigin, bool hasMask>
 	void TraversePrimary0(Context<sharedOrigin, hasMask> &c, int firstNode = 0) const;
 
-	template <bool sharedOrigin, bool hasMask>
-	void TraverseShadow0(Context<sharedOrigin, hasMask> &c, int firstNode = 0) const;
+	void TraverseShadow0(ShadowContext &c, int firstNode = 0) const;
 	
 	template <bool sharedOrigin, bool hasMask>
 	void TraversePrimary(Context<sharedOrigin, hasMask> &c) const;
 	
-	template <bool sharedOrigin, bool hasMask>
-	void TraverseShadow(Context<sharedOrigin, hasMask> &c) const;
+	void TraverseShadow(ShadowContext &c) const;
 
 protected:
 	void FindSplit(int nNode, int first, int count, int depth);

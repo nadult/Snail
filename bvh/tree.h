@@ -28,16 +28,13 @@ public:
 	}
 
 	template <bool sharedOrigin, bool hasMask>
-	void TraversePrimary0(Context<sharedOrigin, hasMask> &c, int firstNode = 0) const;
-
-	template <bool sharedOrigin, bool hasMask>
-	void TraverseShadow0(Context<sharedOrigin, hasMask> &c, int firstNode = 0) const;
+	void TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const;
 	
 	template <bool sharedOrigin, bool hasMask>
 	void TraversePrimary(Context<sharedOrigin, hasMask> &c) const;
 	
-	template <bool sharedOrigin, bool hasMask>
-	void TraverseShadow(Context<sharedOrigin, hasMask> &c) const;
+	void TraverseShadow(ShadowContext &c) const;
+	
 
 protected:
 	void FindSplit(int nNode, int first, int count, int depth);
@@ -57,7 +54,6 @@ public:
 
 	CompactTris elements;
 	vector<Triangle> triCache;
-	vector<ShTriangle> shTriCache;
 	vector<Node, AlignedAllocator<Node> > nodes;
 };
 

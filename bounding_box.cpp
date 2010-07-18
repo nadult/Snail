@@ -62,25 +62,28 @@ template <bool sharedOrigin, bool hasMask>
 bool BBox::Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &lastActive) const {
 	bool ret = 0;
 
-	//TODO: !sharedOrigin
-	Vec3f tmin = min - ExtractN(context.Origin(0), 0);
-	Vec3f tmax = max - ExtractN(context.Origin(0), 0);
+	Vec3f tmin, tmax;
+	if(sharedOrigin) {
+		tmin = min - ExtractN(context.Origin(0), 0);
+		tmax = max - ExtractN(context.Origin(0), 0);
+	}
 
-	for(int q = firstActive; q <= lastActive; q++) if(context.Mask(q)) {
+	for(int q = firstActive; q <= lastActive; q++) {
 		Vec3q idir = context.IDir(q);
+		Vec3q origin = context.Origin(q);
 
-		floatq l1 = idir.x * tmin.x;
-		floatq l2 = idir.x * tmax.x;
+		floatq l1 = idir.x * (sharedOrigin? tmin.x : min.x - origin.x);
+		floatq l2 = idir.x * (sharedOrigin? tmax.x : max.x - origin.x);
 		floatq lmin = Min(l1, l2);
 		floatq lmax = Max(l1, l2);
 
-		l1 = idir.y * tmin.y;
-		l2 = idir.y * tmax.y;
+		l1 = idir.y * (sharedOrigin? tmin.y : min.y - origin.y);
+		l2 = idir.y * (sharedOrigin? tmax.y : max.y - origin.y);
 		lmin = Max(Min(l1, l2), lmin);
 		lmax = Min(Max(l1, l2), lmax);
 
-		l1 = idir.z * tmin.z;
-		l2 = idir.z * tmax.z;
+		l1 = idir.z * (sharedOrigin? tmin.z : min.z - origin.z);
+		l2 = idir.z * (sharedOrigin? tmax.z : max.z - origin.z);
 		lmin = Max(Min(l1, l2), lmin);
 		lmax = Min(Max(l1, l2), lmax);
 
@@ -90,21 +93,22 @@ bool BBox::Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &
 			break;
 		}
 	}
-	for(int q = lastActive; q >= firstActive; q--) if(context.Mask(q)) {
+	for(int q = lastActive; q >= firstActive; q--) {
 		Vec3q idir = context.IDir(q);
+		Vec3q origin = context.Origin(q);
 
-		floatq l1 = idir.x * tmin.x;
-		floatq l2 = idir.x * tmax.x;
+		floatq l1 = idir.x * (sharedOrigin? tmin.x : min.x - origin.x);
+		floatq l2 = idir.x * (sharedOrigin? tmax.x : max.x - origin.x);
 		floatq lmin = Min(l1, l2);
 		floatq lmax = Max(l1, l2);
 
-		l1 = idir.y * tmin.y;
-		l2 = idir.y * tmax.y;
+		l1 = idir.y * (sharedOrigin? tmin.y : min.y - origin.y);
+		l2 = idir.y * (sharedOrigin? tmax.y : max.y - origin.y);
 		lmin = Max(Min(l1, l2), lmin);
 		lmax = Min(Max(l1, l2), lmax);
 
-		l1 = idir.z * tmin.z;
-		l2 = idir.z * tmax.z;
+		l1 = idir.z * (sharedOrigin? tmin.z : min.z - origin.z);
+		l2 = idir.z * (sharedOrigin? tmax.z : max.z - origin.z);
 		lmin = Max(Min(l1, l2), lmin);
 		lmax = Min(Max(l1, l2), lmax);
 
@@ -118,6 +122,63 @@ bool BBox::Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &
 	return ret;
 }
 
+bool BBox::Test(ShadowContext &context, int &firstActive, int &lastActive) const {
+	bool ret = 0;
+
+	Vec3f tmin = min - ExtractN(context.Origin(0), 0);
+	Vec3f tmax = max - ExtractN(context.Origin(0), 0);
+
+	for(int q = firstActive; q <= lastActive; q++) {
+		Vec3q idir = context.IDir(q);
+
+		floatq l1 = idir.x * tmin.x;
+		floatq l2 = idir.x * tmax.x;
+		floatq lmin = Min(l1, l2);
+		floatq lmax = Max(l1, l2);
+
+		l1 = idir.y * tmin.y;
+		l2 = idir.y * tmax.y;
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		l1 = idir.z * tmin.z;
+		l2 = idir.z * tmax.z;
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		if(ForAny( lmax >= 0.0f && lmin <= Min(lmax, context.Distance(q)))) {
+			firstActive = q;
+			ret = 1;
+			break;
+		}
+	}
+	for(int q = lastActive; q >= firstActive; q--) {
+		Vec3q idir = context.IDir(q);
+
+		floatq l1 = idir.x * tmin.x;
+		floatq l2 = idir.x * tmax.x;
+		floatq lmin = Min(l1, l2);
+		floatq lmax = Max(l1, l2);
+
+		l1 = idir.y * tmin.y;
+		l2 = idir.y * tmax.y;
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		l1 = idir.z * tmin.z;
+		l2 = idir.z * tmax.z;
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		if(ForAny( lmax >= 0.0f && lmin <= Min(lmax, context.Distance(q)))) {
+			lastActive = q;
+			ret = 1;
+			break;
+		}
+	}
+
+	return ret;
+}
 
 template bool BBox::Test<0, 0>(Context<0, 0>&, int&, int&) const;
 template bool BBox::Test<0, 1>(Context<0, 1>&, int&, int&) const;
