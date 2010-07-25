@@ -8,7 +8,7 @@ namespace shading {
 	template <bool NDotR = true>
 	class SimpleMaterial: public Material {
 	public:
-		SimpleMaterial(const Vec3f &col) :Material(0),color(col) { }
+		SimpleMaterial(const Vec3f &col) :Material(0), color(col) { }
 		SimpleMaterial() { }
 
 		template <bool sharedOrigin, bool hasMask>

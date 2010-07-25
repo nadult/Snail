@@ -65,6 +65,7 @@ namespace {
 
 		static bool sinit = 0;
 		if(!sinit) {
+			tasks.reserve(1024);
 			pthread_spin_init(&spinlock, PTHREAD_PROCESS_PRIVATE);
 			atexit(FreeThreads);
 			sinit = 1;

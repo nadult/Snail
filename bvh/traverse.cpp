@@ -49,22 +49,15 @@ void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 		int child = nodes[nNode].subNode;
 		_mm_prefetch(&nodes[child + 0], _MM_HINT_T0);
 		_mm_prefetch(&nodes[child + 1], _MM_HINT_T0);
-		const BBox &box = nodes[nNode].bbox;
-		bool test;
-
-	//	It helps on smaller scenes		
-		if(!box.TestI(c.Origin(firstActive), c.IDir(firstActive), c.Distance(firstActive)))
-			firstActive++;
-		else
-			goto HIT;
 			
-		test = 0;
-		if(!box.TestInterval(interval))
-			continue;
-		test = box.Test(c, firstActive, lastActive);
+		bool test = 0; {
+			const BBox &box = nodes[nNode].bbox;
+			if(!box.TestInterval(interval))
+				continue;
+			test = box.Test(c, firstActive, lastActive);
+		}
 
 		if(test) {
-HIT:
 			int firstNode = nodes[nNode].firstNode ^ sign[nodes[nNode].axis];
 			stack[stackPos++] = {child + (firstNode ^ 1), (short)firstActive, (short)lastActive};
 			nNode = child + firstNode;
@@ -110,7 +103,7 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 			if(box.Test(c, firstActive, lastActive))
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = triCache[first + n];
-					if(tri.TestInterval(interval)) {
+					if(1 || tri.TestInterval(interval)) {
 						if(tri.Collide(c, firstActive, lastActive)) {
 							stats.Skip();
 							if(c.stats) (*c.stats) += stats;
@@ -125,21 +118,15 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 		int child = nodes[nNode].subNode;
 		_mm_prefetch(&nodes[child + 0], _MM_HINT_T0);
 		_mm_prefetch(&nodes[child + 1], _MM_HINT_T0);
-		const BBox &box = nodes[nNode].bbox;
-		bool test;
 
-		if(!box.TestI(c.Origin(firstActive), c.IDir(firstActive), c.Distance(firstActive)))
-			firstActive++;
-		else
-			goto HIT;
-
-		test = 0;
-		if(!box.TestInterval(interval))
-			continue;
-		test = box.Test(c, firstActive, lastActive);
+		bool test = 0; {
+			const BBox &box = nodes[nNode].bbox;
+			if(!box.TestInterval(interval))
+				continue;
+			test = box.Test(c, firstActive, lastActive);
+		}
 
 		if(test) {
-HIT:
 			int firstNode = nodes[nNode].firstNode ^ sign[nodes[nNode].axis];
 			stack[stackPos++] = {child + (firstNode ^ 1), (short)firstActive, (short)lastActive};
 			nNode = child + firstNode;
@@ -153,19 +140,19 @@ HIT:
 
 template <bool sharedOrigin, bool hasMask>
 void BVH::TraversePrimary(Context<sharedOrigin, hasMask> &c) const {
-	if(sharedOrigin) {
+	const int size = c.Size();
+
+	if(sharedOrigin || size <= 4) {
 		TraversePrimaryN(c);
 		return;
 	}
-	
-	const int size = c.Size();
 
 	bool split = 1;
 	//TODO distant origins
 	floatq dot = 1.0f;
 	for(int q = 1; q < size; q++)
-		dot = Min(dot, c.Dir(0) | c.Dir(q));
-	split = ForAny(dot < 0.95);
+		dot = Condition(c.Distance(q) >= 0.0f, Min(dot, c.Dir(0) | c.Dir(q)), dot);
+	split = ForAny(dot < (size == 64?0.99f : 0.95f));
 
 	if(!split)
 		TraversePrimaryN(c);
@@ -175,7 +162,7 @@ void BVH::TraversePrimary(Context<sharedOrigin, hasMask> &c) const {
 		for(int k = 0; k < 4; k++) {
 			Context<sharedOrigin, hasMask> split(RayGroup<sharedOrigin, hasMask>(c.rays, k * size4, size4),
 					c.distance + k * size4, c.object + k * size4, c.element + k * size4, c.barycentric + k * size4);
-			TraversePrimaryN(split);
+			TraversePrimary(split);
 		}
 		if(c.stats) c.stats->Skip();
 	}

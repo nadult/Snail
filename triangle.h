@@ -243,10 +243,19 @@ class BaseScene;
 class CompactTris {
 public:
 	vector<Vec3f> verts;
-	vector<Vec3f> normals;
+
+	struct ShData {
+		ShData() { }
+		ShData(const Vec3f normal, const Vec2f uv) :normal(normal), uv(uv) { }
+
+		Vec3f normal;
+		Vec2f uv;
+	};
+
+	vector<ShData> shData;
 
 	void Serialize(Serializer &sr) {
-		sr &verts & normals & tris;
+		sr &verts & shData & tris;
 	}
 
 	typedef Triangle      CElement;
@@ -262,10 +271,10 @@ public:
 
 	const SElement GetSElement(int elem, int) const {
 		const TriIdx &idx = tris[elem];
-		const Vec2f uv(0.0f, 0.0f);
+		const ShData &sh1 = shData[idx.v1], &sh2 = shData[idx.v2], &sh3 = shData[idx.v3];
 
-		return ShTriangle(uv, uv, uv, normals[idx.v1], normals[idx.v2],
-				normals[idx.v3], idx.mat & 0x7ffffff, idx.mat & 0x80000000 ? 1 : 0);
+		return ShTriangle(sh1.uv, sh2.uv, sh3.uv, sh1.normal, sh2.normal, sh3.normal,
+				idx.mat & 0x7ffffff, idx.mat & 0x80000000 ? 1 : 0);
 	}
 
 	const Vec3f BoundMin(int n) const {
@@ -300,6 +309,7 @@ public:
 };
 
 SERIALIZE_AS_POD(CompactTris::TriIdx)
+SERIALIZE_AS_POD(CompactTris::ShData)
 
 
 

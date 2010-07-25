@@ -9,7 +9,7 @@ struct CompressedPart {
 	std::vector<char> data;
 };
 
-int CompressParts(const gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
+int CompressParts(gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
 				std::vector<CompressedPart> &parts, uint nThreads);
 
 void DecompressParts(gfxlib::Texture &image, const std::vector<CompressedPart> &parts,

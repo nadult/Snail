@@ -9,4 +9,7 @@ bug w BBox::TestInterval przy przedzialach dla promieni o roznych zrodlach
 
 kompatybilnosc z systemem kolejkowania
 
-BUG: zwiechy i spike-i
+Wywala sie serwer gdy uruchomimy najpierw w 1024^2 a potem w 1600x1200, albo
+gdy uruchomimy w rozdzialce > 1024^2 na 1 wezle
+
+Bugi w swiatlach / odbiciach na scenie z obracajacymi sie pudelkami

@@ -168,3 +168,4 @@ void DBVH::PrintInfo() const {
 	printf("~ %.0f bytes per instance\n", double(nodeBytes + objBytes) / double(elements.size()));
 	printf("Levels: %d\n\n", depth);
 }
+

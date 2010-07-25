@@ -218,8 +218,8 @@ namespace
 		glShadeModel(GL_FLAT);
 		glBindTexture(GL_TEXTURE_2D, texture);
 		glEnable(GL_TEXTURE_2D);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.Width(), image.Height(), GL_BGRA, GL_UNSIGNED_BYTE,
-				image.DataPointer());
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.Width(), image.Height(),
+				image.GetFormat().GlFormat(), image.GetFormat().GlType(), image.DataPointer());
 		
 		float u = float(GetWidth()) / float(texW);
 		float v = float(GetHeight()) / float(texH);

@@ -12,7 +12,6 @@
 #include "dbvh/tree.h"
 
 #include "scene.h"
-#include "mesh.h"
 
 #include <mpi.h>
 #include "comm.h"
@@ -29,16 +28,16 @@ using std::endl;
 
 typedef BVH StaticTree;
 
-static char sendbuf[1024 * 1024 * 4];
+static char sendbuf[2048 * 2048 * 4];
 
 static const DBVH MakeDBVH(BVH *bvh) {
 	srand(0);
 	static float anim = 0; anim += 0.02f;
 
-	float scale = Length(bvh->GetBBox().Size()) * 0.05f;
+	float scale = Length(bvh->GetBBox().Size()) * 0.02f;
 
 	vector<ObjectInstance> instances;
-/*	for(int n = 0; n < 10000; n++) {
+	for(int n = 0; n < 1000; n++) {
 		ObjectInstance inst;
 		inst.tree = bvh;
 		inst.translation = (Vec3f(rand() % 1000, rand() % 1000, rand() % 1000) - Vec3f(500, 500, 500))
@@ -53,7 +52,7 @@ static const DBVH MakeDBVH(BVH *bvh) {
 		inst.rotation[2] = Vec3f(rot.z);
 		inst.ComputeBBox();
 		instances.push_back(inst);
-	} */
+	}
 	ObjectInstance zero;
 	zero.tree = bvh;
 	zero.translation = Vec3f(0, 0, 0);
@@ -80,7 +79,7 @@ static int server_main(int argc, char **argv) {
 		lineHeight = 16,
 	};
 
-	vector<CompressedPart> parts(8);
+	vector<CompressedPart> parts(16);
 
 	while(true) {
 		if(rank == 0) {
@@ -88,24 +87,34 @@ static int server_main(int argc, char **argv) {
 			socket.Accept(20000);
 
 			int resx, resy, threads = 2;
-			char sceneName[256];
-			socket >> Pod(resx) >> Pod(resy) >> Pod(sceneName);
+			char tsceneName[256];
+			socket >> Pod(resx) >> Pod(resy) >> Pod(tsceneName);
+			string sceneName(tsceneName);
+			string texPath = sceneName; {
+				auto pos = texPath.rfind('/');
+				if(pos == string::npos) texPath = "";
+				else texPath.resize(pos + 1);
+			}
 			
 			for(int r = 1; r < numNodes; r++)
-				MPINode(r, 0) << Pod(resx) << Pod(resy) << Pod(sceneName);
+				MPINode(r, 0) << Pod(resx) << Pod(resy) << Pod(tsceneName);
 
 			Scene<StaticTree> scene;
 			//TODO: try catch
 			Loader(string("dump/") + sceneName) & scene.geometry;
 			scene.geometry.UpdateCache();
-			scene.materials.push_back(shading::NewMaterial(""));
-			scene.Update();
+			
+			if(sceneName.substr(sceneName.size() - 4) == ".obj")
+				scene.matDict = shading::LoadMaterials("scenes/" + sceneName.substr(0, sceneName.size() - 3) + "mtl",
+						"scenes/" + texPath);
+			scene.UpdateMaterials();
+			scene.geometry.UpdateMaterialIds(scene.GetMatIdMap());
 
 			Vec3f sceneCenter = scene.geometry.GetBBox().Center();
 			Vec3f sceneSize = scene.geometry.GetBBox().Size();
 			socket << Pod(sceneCenter) << Pod(sceneSize);
 
-			gfxlib::Texture image(resx, resy, gfxlib::TI_A8B8G8R8);
+			gfxlib::Texture image(resx, resy, gfxlib::TI_R8G8B8);
 			vector<Light> lights;
 			Camera cam;
 			Options options;
@@ -138,15 +147,15 @@ static int server_main(int argc, char **argv) {
 
 				double buildTime = GetTime();
 				Scene<DBVH> dscene;
-				dscene.geometry = MakeDBVH(&scene.geometry);
-				dscene.materials.push_back(shading::NewMaterial(""));
+			//	dscene.geometry = MakeDBVH(&scene.geometry);
 				dscene.lights = scene.lights;
-				dscene.Update();
 				buildTime = GetTime() - buildTime;
 
 				int nPixels = w * h, received = 0;
+				double renderTime = GetTime();
 				TreeStats stats = 
-					Render(dscene, cam, image, rank, numNodes, lineHeight, options, threads);
+					Render(scene, cam, image, rank, numNodes, lineHeight, options, threads);
+				renderTime = GetTime() - renderTime;
 				int nParts = CompressParts(image, rank, numNodes, lineHeight, parts, threads);
 
 				for(int p = 0; p < nParts; p++) {
@@ -167,31 +176,47 @@ static int server_main(int argc, char **argv) {
 							<< comm::Data(&parts[0].data[0], parts[0].info.size);
 				}
 
+				double renderTimes[32];
+				renderTimes[0] = renderTime;
+
 				for(int r = 1; r < numNodes; r++) {
 					TreeStats nodeStats;
-					MPIAnyNode(0, 1) >> comm::Pod(nodeStats);
+					MPIAnyNode(0, 1) >> Pod(nodeStats);
+					double renderTime;
+					MPINode(r, 2) >> Pod(renderTime);
+					if(r < 32) renderTimes[r] = renderTime;
 					stats += nodeStats;
 				}
-				socket << Pod(stats) << Pod(buildTime);
+				socket << Pod(stats) << Pod(buildTime) << Pod(numNodes) << Pod(renderTimes);
 				time = GetTime() - time;
 
 				printf("%s at %dx%d on %d nodes, each with %d threads: %.2f ms\n",
-						sceneName, resx, resy, numNodes, threads, time * 1000.0);
+						sceneName.c_str(), resx, resy, numNodes, threads, time * 1000.0);
 			}
 
 		}
 		else {
 			int resx, resy, threads = 2;
-			char sceneName[256];
-			MPINode(0, 0) >> Pod(resx) >> Pod(resy) >> Pod(sceneName);
-
+			char tsceneName[256];
+			MPINode(0, 0) >> Pod(resx) >> Pod(resy) >> Pod(tsceneName);
+			string sceneName = tsceneName;
+			string texPath = sceneName; {
+				auto pos = texPath.rfind('/');
+				if(pos == string::npos) texPath = "";
+				else texPath.resize(pos + 1);
+			}
+			
 			Scene<StaticTree> scene;
 			Loader(string("dump/") + sceneName) & scene.geometry;
 			scene.geometry.UpdateCache();
-			scene.materials.push_back(shading::NewMaterial(""));
-			scene.Update();
+			
+			if(sceneName.substr(sceneName.size() - 4) == ".obj")
+				scene.matDict = shading::LoadMaterials("scenes/" + sceneName.substr(0, sceneName.size() - 3) + "mtl",
+						"scenes/" + texPath);
+			scene.UpdateMaterials();
+			scene.geometry.UpdateMaterialIds(scene.GetMatIdMap());
 
-			gfxlib::Texture image(resx, resy, gfxlib::TI_A8B8G8R8);
+			gfxlib::Texture image(resx, resy, gfxlib::TI_R8G8B8);
 			vector<Light> lights;
 			Camera cam;
 			Options options;
@@ -211,15 +236,15 @@ static int server_main(int argc, char **argv) {
 		
 				Scene<DBVH> dscene;
 				dscene.lights = scene.lights;
-				dscene.geometry = MakeDBVH(&scene.geometry);
-				dscene.materials.push_back(shading::NewMaterial(""));
+			//	dscene.geometry = MakeDBVH(&scene.geometry);
 				dscene.lights = scene.lights;
-				dscene.Update();
 
 				//TODO: rendering i kompresja razem: watek zaraz po zrenderowaniu
 				//dodaje do kolejki zadan nowe zadanie kompresji?
+				double renderTime = GetTime();
 				TreeStats stats = 
-					Render(dscene, cam, image, rank, numNodes, lineHeight, options, threads);
+					Render(scene, cam, image, rank, numNodes, lineHeight, options, threads);
+				renderTime = GetTime() - renderTime;
 				int nParts = CompressParts(image, rank, numNodes, lineHeight, parts, threads);
 
 				for(int p = 0; p < nParts; p++) {
@@ -227,6 +252,7 @@ static int server_main(int argc, char **argv) {
 					MPI_Bsend(&parts[p].data[0], parts[p].info.size, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
 				}
 				MPI_Bsend(&stats, sizeof(stats), MPI_CHAR, 0, 1, MPI_COMM_WORLD);
+				MPI_Send(&renderTime, sizeof(renderTime), MPI_CHAR, 0, 2, MPI_COMM_WORLD);
 			}
 		}
 	}
@@ -244,9 +270,9 @@ int main(int argc,char **argv) {
 		MPI_Finalize();
 		return ret;
 	}
-	catch(const std::exception &ex) {
+	catch(const Exception &ex) {
 		MPI_Finalize();
-		std::cout << ex.what() << '\n';
+		std::cout << ex.what() << '\n' << CppFilterBacktrace(ex.Backtrace()) << '\n';
 		return 1;
 	}
 	catch(...) {

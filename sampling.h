@@ -36,7 +36,7 @@ namespace sampling {
 
 		virtual ~Sampler() { }
 
-		virtual void Sample(shading::Sample *samples,Cache&) const = 0;
+		virtual void Sample(shading::Sample *samples,Cache&,bool mipmapping = 1) const = 0;
 	};
 
 	typedef Ptr<Sampler> PSampler;

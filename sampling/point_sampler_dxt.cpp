@@ -197,7 +197,7 @@ namespace sampling {
 		return Vec3q(r,g,b)*f32x4(1.0f/(255.0f*3.0f));
 	}
 	
-	void PointSamplerDXT::Sample(shading::Sample *samples,Cache &c) const {
+	void PointSamplerDXT::Sample(shading::Sample *samples,Cache &c, bool mipmapping) const {
 		for(int k=0;k<shading::blockSize;k++) {
 			shading::Sample &s=samples[k];
 			s.temp1=operator()(s.texCoord,s.texDiff,c);

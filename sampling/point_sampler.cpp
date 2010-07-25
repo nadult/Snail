@@ -118,14 +118,14 @@ namespace sampling {
 	}
 
 	// bilinear filtering
-	void PointSampler::Sample(shading::Sample *samples, Cache &) const {
+	void PointSampler::Sample(shading::Sample *samples, Cache &, bool mipmapping) const {
 		for(int k = 0 + 0; k < 4; k++) {
 			shading::Sample &s = samples[k];
 
 			Vec2q pos = ClampTexCoord <i32x4>(s.texCoord) * Vec2q(wMul, hMul);
 
-			uint mip;
-			{
+			uint mip = 0;
+			if(mipmapping) {
 				floatq min = Min(s.texDiff.x * wMul, s.texDiff.y * hMul);
 				uint   pixels = uint(Minimize(min) * 0.6f);
 				mip = 0;
@@ -143,6 +143,10 @@ namespace sampling {
 			i32x4 x2 = x1 + i32x4(1), y2 = y1 + i32x4(1);
 
 			floatq dx = pos.x - floatq(x1), dy = pos.y - floatq(y1);
+
+			//TODO: wylaczyc odbicie w pionie
+			y1 = int(tex.Height()) - y1;
+			y2 = int(tex.Height()) - y2;
 
 			x1 >>= mip;
 			y1 >>= mip;
@@ -178,7 +182,7 @@ namespace sampling {
 				g[0] = floatq( Shr<8>(col0) & i32x4(255) );
 				b[0] = floatq( Shr<16>(col0) & i32x4(255) );
 
-				r[1+0] = floatq( col1 & i32x4(255) );
+				r[1] = floatq( col1 & i32x4(255) );
 				g[1] = floatq( Shr<8>(col1) & i32x4(255) );
 				b[1] = floatq( Shr<16>(col1) & i32x4(255) );
 

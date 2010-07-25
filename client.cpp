@@ -9,7 +9,6 @@
 #include "render.h"
 
 #include "scene.h"
-#include "mesh.h"
 #include "frame_counter.h"
 
 #include "font.h"
@@ -182,12 +181,13 @@ static int client_main(int argc, char **argv) {
 
 	Options options;
 	bool flipNormals = 1;
-	bool rebuild = 0;
+	bool rebuild = 0, slowBuild = 0;
 	string texPath = "scenes/";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
 		else if(string("-rebuild") == argv[n]) { rebuild = 1; }
+		else if(string("-slowBuild") == argv[n]) { rebuild = 1; slowBuild = 1; }
 		else if(string("-threads")==argv[n]&&n<argc-1) { threads=atoi(argv[n+1]); n+=1; }
 		else if(string("-fullscreen")==argv[n]) { fullscreen=1; }
 		else if(string("+flipNormals")==argv[n]) flipNormals=1;
@@ -228,7 +228,7 @@ static int client_main(int argc, char **argv) {
 		//	baseScene.Optimize();
 		}
 		
-		staticScene.geometry.Construct(baseScene.ToCompactTris());
+		staticScene.geometry.Construct(baseScene.ToCompactTris(), baseScene.matNames, !slowBuild);
 	//	staticScene.geometry.Construct(baseScene.ToTriangleVector());
 		Saver(string("dump/") + modelFile) & staticScene.geometry;
 		buildTime = GetTime() - buildTime;
@@ -241,7 +241,7 @@ static int client_main(int argc, char **argv) {
 	GLWindow window(resx, resy, fullscreen);
 	Font font;
 
-	gfxlib::Texture image(resx, resy, gfxlib::TI_A8B8G8R8);
+	gfxlib::Texture image(resx, resy, gfxlib::TI_R8G8B8);
 	vector<Light> lights;
 			
 	bool lightsEnabled = 1;
@@ -293,7 +293,8 @@ static int client_main(int argc, char **argv) {
 			Vec3f colors[4] = {
 				Vec3f(1,1,1), Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0) };
 
-			lights.push_back(Light(cam.Pos(), colors[rand()&3], 15000.0f * 0.001f * sceneScale));
+			srand(time(0));
+			lights.push_back(Light(cam.Pos(), colors[rand()&3], 1000.0f * 0.001f * sceneScale));
 		}
 
 		MoveCamera(cam, window, speed);
@@ -321,8 +322,8 @@ static int client_main(int argc, char **argv) {
 	//				sin(animPos-n*n)*cos(animPos+n*n)) * speed * 100.0f;
 		int w = image.Width(), h = image.Height();
 
-		int nBytes = 0;
-		double buildTime;
+		int nBytes = 0, numNodes;
+		double buildTime, renderTimes[32];
 		TreeStats stats; {
 			int nPixels = w * h, received = 0;
 			SendFrameRequest(socket, cam, tLights, threads, finish);
@@ -340,14 +341,14 @@ static int client_main(int argc, char **argv) {
 				nBytes += part.info.size;
 				received += part.info.w * part.info.h;
 
-				if(nParts >= 32) {
+				if(nParts >= 8) {
 					DecompressParts(image, parts, nParts, 2);
 					nParts = 0;
 				}
 			}
 				
 			DecompressParts(image, parts, nParts, 2);
-			socket >> Pod(stats) >> Pod(buildTime);
+			socket >> Pod(stats) >> Pod(buildTime) >> Pod(numNodes) >> Pod(renderTimes);
 		}
 
 		window.RenderImage(image);
@@ -360,10 +361,14 @@ static int client_main(int argc, char **argv) {
 			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, (GetTime() - frameTime) * 1000.0, buildTime * 1000.0f));
 			frameTime = GetTime();
 			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays, " KBytes/frame:", nBytes / 1024);
-			if(lightsEnabled && lights.size())
-				font.PrintAt(Vec2f(5, 45), "Lights: ",lightsEnabled?lights.size() : 0);
-			font.PrintAt(Vec2f(5, 85), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
+			font.PrintAt(Vec2f(5, 45), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
 					" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7]);
+			for(int n = 0; n < Min(32, numNodes); n++) {
+				char text[32]; snprintf(text, sizeof(text), "%.0f", renderTimes[n] * 1000);
+				font.PrintAt(Vec2f(5 + n * 32, 65), text);
+			}
+			if(lightsEnabled && lights.size())
+				font.PrintAt(Vec2f(5, 85), "Lights: ",lightsEnabled?lights.size() : 0);
 		font.FinishDrawing();
 		window.SwapBuffers();
 	}

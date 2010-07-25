@@ -1,9 +1,10 @@
 all: client node
 
-BUILD_DIR=/tmp/build
+BUILD_DIR=/tmp/rtbuild
 
 _dummy := $(shell [ -d $(BUILD_DIR) ] || mkdir -p $(BUILD_DIR))
 _dummy := $(shell [ -d $(BUILD_DIR)/bvh ] || mkdir -p $(BUILD_DIR)/bvh)
+_dummy := $(shell [ -d $(BUILD_DIR)/cell ] || mkdir -p $(BUILD_DIR)/cell)
 _dummy := $(shell [ -d $(BUILD_DIR)/dbvh ] || mkdir -p $(BUILD_DIR)/dbvh)
 _dummy := $(shell [ -d $(BUILD_DIR)/formats ] || mkdir -p $(BUILD_DIR)/formats)
 _dummy := $(shell [ -d $(BUILD_DIR)/sampling ] || mkdir -p $(BUILD_DIR)/sampling)
@@ -27,8 +28,8 @@ LINUX_LIBS=$(LIBS)
 INCLUDES=-I./
 
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
-FLAGS=-march=native --param inline-unit-growth=1000 -rdynamic -std=gnu++0x -O3 -ggdb \
-	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -fopenmp
+FLAGS=-march=native --param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdynamic \
+	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS)
 
 CXX=$(GCC45)/bin/g++
 
@@ -48,10 +49,14 @@ $(OBJECTS): $(BUILD_DIR)/%.o: pch.h.gch %.cpp
 
 node: $(SHARED_OBJECTS) $(BUILD_DIR)/server_node.o $(BUILD_DIR)/comm_mpi.o $(BUILD_DIR)/comm_tcp.o
 	$(CXX) $(FLAGS) $(INCLUDES) -o node $^ $(MPILIBS) $(LINUX_LIBS) -pthread
-#	rm $(BUILD_DIR)/comm_tcp.o
 
-client_no_link:$(SHARED_OBJECTS) $(BUILD_DIR)/gl_window.o \
-	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o
+node_ppc:
+	cd cell && make -j6
+	cp cell/node node_ppc
+
+nodes: node node_ppc
+	cp node_ppc ~/rtbin
+	cp node.sh ~/rtbin
 
 client: $(SHARED_OBJECTS) $(BUILD_DIR)/client.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/comm_tcp.o
@@ -65,15 +70,18 @@ rtracer: $(SHARED_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)/gl_window.o \
 
 clean:
 	-rm -f $(OBJECTS) $(DEPS) $(BUILD_DIR)/.depend pch.h.gch client node
-	-rmdir $(BUILD_DIR)/formats $(BUILD_DIR)/sampling $(BUILD_DIR)/shading $(BUILD_DIR)/bvh $(BUILD_DIR)/dbvh
+	-rmdir $(BUILD_DIR)/formats $(BUILD_DIR)/sampling $(BUILD_DIR)/shading $(BUILD_DIR)/bvh $(BUILD_DIR)/dbvh \
+		$(BUILD_DIR)/cell
 	-rmdir $(BUILD_DIR)
+	cd cell && make clean
 
 $(BUILD_DIR)/.depend: $(DEPS)
 	cat $(DEPS) > $(BUILD_DIR)/.depend
 
 depend: $(BUILD_DIR)/.depend
 
-.PHONY: clean depend client_no_link
+.PHONY: node_ppc nodes clean depend
+
 
 DEPEND_FILE=$(BUILD_DIR)/.depend
 DEP=$(wildcard $(DEPEND_FILE))

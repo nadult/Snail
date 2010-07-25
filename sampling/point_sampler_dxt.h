@@ -21,7 +21,7 @@ namespace sampling {
 		Vec3q operator()(const Vec2q &uv) const; // biggest mipmap will be used
 		Vec3q operator()(const Vec2q &uv,const Vec2q &diff) const;
 		Vec3q operator()(const Vec2q &uv,const Vec2q &diff,Cache&) const;
-		void Sample(shading::Sample*,Cache&) const;
+		void Sample(shading::Sample*,Cache&,bool) const;
 
 	protected:
 		void Init(const gfxlib::Texture&);

@@ -21,7 +21,7 @@ namespace sampling {
 		// It has to be full, otherwise ray differentials will be wrong
 		static Vec2f ComputeDiff(const Vec2q &uv) { return Maximize(uv)-Minimize(uv); }
 		
-		void Sample(shading::Sample *samples,Cache&) const {
+		void Sample(shading::Sample *samples,Cache&, bool) const {
 			for(int k=0;k<4;k++) {
 				shading::Sample &s=samples[k];
 				s.temp1=operator()(s.texCoord,s.texDiff);

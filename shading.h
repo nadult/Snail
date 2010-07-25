@@ -21,6 +21,7 @@ namespace shading {
 
 		Vec3q diffuse;
 		Vec3q specular;
+		floatq opacity;
 
 		Vec3q temp1;
 		Vec3q temp2;

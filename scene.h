@@ -6,14 +6,15 @@
 #include "shading.h"
 #include "formats/loader.h"
 #include "sampling.h"
+#include "shading/simple_material.h"
 
 typedef TriCache<ShTriangle> ShTriCache;
 
 class Cache {
 public:
-	Cache() :supersampling(0), reflections(0) { }
+	Cache() :supersampling(0), reflections(0), transp(0) { }
 
-	int reflections;
+	int reflections, transp;
 	ShTriCache shTriCache;
 	sampling::Cache samplingCache;
 	bool supersampling;
@@ -25,37 +26,48 @@ public:
 template <class AccStruct>
 class Scene {
 public:
-	typedef shading::PMaterial PMaterial;
-
-	Scene() {
-		materials.push_back(new shading::MaterialWrapper<shading::SimpleMaterial<1>>(Vec3f(1.0f,1.0f,1.0f)));
-		ambientLight=Vec3f(0.1f,0.1f,0.1f);
-	}
-
-	// Call this after changes made to any of the attributes
-	void Update() {
-		materialFlags.resize(materials.size());
-		for(int n = 0; n < materials.size(); n++)
-			materialFlags[n] = materials[n]->flags;
+	Scene() :defaultMat(Vec3f(1, 1, 1)) {
+		ambientLight = Vec3f(0.1f,0.1f,0.1f);
 	}
 
 	AccStruct geometry;
 	Vec3f ambientLight;
 	vector<Light> lights;
-	vector<PMaterial> materials;
+	vector<shading::PMaterial> materials;
+	shading::MatDict matDict;
+	shading::MaterialWrapper< shading::SimpleMaterial<true> > defaultMat;
+
+	void UpdateMaterials() {
+		materials.clear();
+		for(auto it = matDict.begin(); it != matDict.end(); ++it)
+			it->second->id = ~0;
+		for(auto it = matDict.begin(); it != matDict.end(); ++it) {
+			it->second->id = materials.size();
+			materials.push_back(it->second);
+		}
+	}
+
+	const std::map<string, int> GetMatIdMap() const {
+		std::map<string, int> out;
+		for(auto it = matDict.begin(); it != matDict.end(); ++it)
+			out[it->first] = it->second->id;
+		return out;
+	}
 
 	template <bool sharedOrigin, bool hasMask>
-	TreeStats RayTrace(const RayGroup<sharedOrigin, hasMask>&, Cache&, Vec3q *outColor)
+	const TreeStats RayTrace(const RayGroup<sharedOrigin, hasMask>&, Cache&, Vec3q *outColor)
 		const __attribute__((noinline));
 
 private:
-	TreeStats TraceLight(RaySelector, const shading::Sample*, Vec3q*__restrict__, Vec3q*__restrict__, int)
-							const __attribute__((noinline));
+	const TreeStats TraceLight(RaySelector, const shading::Sample*, Vec3q*__restrict__, Vec3q*__restrict__, int)
+							const NOINLINE;
 
-	TreeStats TraceReflection(RaySelector, const Vec3q*, const shading::Sample*, Cache&, Vec3q *__restrict__)
-		const __attribute__((noinline));
-
-	vector<char> materialFlags;
+	const TreeStats TraceReflection(RaySelector, const Vec3q*, const shading::Sample*, Cache&, Vec3q *__restrict__)
+		const NOINLINE;
+	
+	template <bool sharedOrigin, bool hasMask>
+	const TreeStats TraceTransparency(RaySelector, const RayGroup<sharedOrigin, hasMask>&, const floatq*,
+			Vec3q *__restrict__, Cache&) const NOINLINE;
 };
 
 #endif

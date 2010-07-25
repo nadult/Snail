@@ -14,11 +14,11 @@ CompactTris BaseScene::ToCompactTris() const {
 		CompactTris obj = objects[o].ToCompactTris();
 		int newVerts = verts + obj.verts.size();
 		out.verts.resize(newVerts);
-		out.normals.resize(newVerts);
+		out.shData.resize(newVerts);
 
 		for(size_t n = 0; n < obj.verts.size(); n++) {
 			out.verts[verts + n] = trans * obj.verts[n];
-			out.normals[verts + n] = trans & obj.normals[n];
+			out.shData[verts + n] = CompactTris::ShData(trans & obj.shData[n].normal, obj.shData[n].uv);
 		}
 
 		out.tris.resize(out.tris.size() + obj.tris.size());
@@ -374,8 +374,8 @@ CompactTris BaseScene::Object::ToCompactTris() const {
 	vector<Idx> inds;
 	inds.reserve(tris.size() * 3);
 
-	Vec2f defaultUv(0.0f,0.0f);
-	Vec3f defaultNrm(0.0f,0.0f,0.0f);
+	Vec2f defaultUv(0.0f, 0.0f);
+	Vec3f defaultNrm(0.0f, 0.0f, 0.0f);
 
 	for(size_t n = 0; n < tris.size(); n++) {
 		const IndexedTri &tri = tris[n];
@@ -390,21 +390,22 @@ CompactTris BaseScene::Object::ToCompactTris() const {
 	}
 
 	out.verts.resize(inds.size());
-	out.normals.resize(inds.size());
+	out.shData.resize(inds.size());
 	out.tris.resize(tris.size());
 
 //	std::sort(inds.begin(),inds.end(),SortByPos(verts));
 
 	for(int n=0;n<inds.size();n++) {
 		out.verts[n] = verts[inds[n].v];
-		out.normals[n] = inds[n].n == -1? defaultNrm : normals[inds[n].n];
+		out.shData[n].normal = inds[n].n == -1? defaultNrm : normals[inds[n].n];
+		out.shData[n].uv = inds[n].u == -1? defaultUv : uvs[inds[n].u]; 
 	}
 
 	for(int n = 0; n < inds.size(); n++)
 		inds[n].dstIdx = n;
 	std::sort(inds.begin(),inds.end());
 
-	for(int n=0;n<tris.size();n++) {
+	for(int n = 0; n < tris.size(); n++) {
 		const IndexedTri &src=tris[n];
 		CompactTris::TriIdx &dst = out.tris[n];
 
@@ -416,8 +417,8 @@ CompactTris BaseScene::Object::ToCompactTris() const {
 		dst.v1 = inds[idx[0]].dstIdx;
 		dst.v2 = inds[idx[1]].dstIdx;
 		dst.v3 = inds[idx[2]].dstIdx;
-		bool flatNrm=	Same(out.normals[dst.v1], out.normals[dst.v2]) &&
-						Same(out.normals[dst.v1], out.normals[dst.v3]);
+		bool flatNrm=	Same(out.shData[dst.v1].normal, out.shData[dst.v2].normal) &&
+						Same(out.shData[dst.v1].normal, out.shData[dst.v3].normal);
 		dst.mat = (src.matId & 0x7fffffff) + (flatNrm? 0x80000000 : 0);
 	}
 	

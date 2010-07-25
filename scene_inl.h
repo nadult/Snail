@@ -88,7 +88,7 @@ struct DistanceShader
 
 
 template <class AccStruct>
-TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading::Sample *samples,
+const TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading::Sample *samples,
 		Vec3q *__restrict__ diffuse, Vec3q *__restrict__ specular, int idx) const {
 	int size = inputSel.Size();
 	enum { shadows = 1 };
@@ -103,7 +103,10 @@ TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading::Sam
 	floatq dot[size];
 
 	for(int q = 0; q < size; q++) {
-		if(!inputSel[q]) continue;
+		if(!inputSel[q]) {
+			tDistance[q] = -constant::inf;
+			continue;
+		}
 		const shading::Sample &s = samples[q];
 
 		Vec3q  lightVec = (s.position - Vec3q(lightPos));
@@ -165,7 +168,7 @@ TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading::Sam
 }
 
 template <class AccStruct> template <bool sharedOrigin, bool hasMask>
-TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &rays, Cache &cache,
+const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &rays, Cache &cache,
 		Vec3q *__restrict__ outColor) const {
 	int size = rays.Size();
 
@@ -193,11 +196,11 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 
 	Context<sharedOrigin, hasMask> tc(rays, tDistance, tObject, tElement, barycentric, &stats);
 	geometry.TraversePrimary(tc);
-	char selectorData[size + 4], reflSelData[size + 4];
-	RaySelector selector(selectorData, size), reflSel(reflSelData, size);
+	char selectorData[size + 4], reflSelData[size + 4], transSelData[size + 4];
+	RaySelector selector(selectorData, size), reflSel(reflSelData, size), transSel(transSelData, size);
 	for(int n = 0; n < size; n++)
 		selector[n] = rays.Mask(n);
-	reflSel.Clear();
+	reflSel.Clear(); transSel.Clear();
 
 	if(gVals[4]) {     //no shading
 		for(int q = 0; q < size; q++) {
@@ -214,7 +217,7 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 	Vec3q maxPos(-1.0f / 0.0f, -1.0f / 0.0f, -1.0f / 0.0f);
 
 	shading::Sample samples[size];
-	int matCount = materials.size();
+//	int matCount = materials.size();
 
 	for(uint b = 0, nBlocks = size / blockSize; b < nBlocks; b++) {
 		uint b4 = b << 2;
@@ -238,7 +241,7 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 			maxPos     = Condition(mask[q], VMax(maxPos, s.position), maxPos);
 
 			s.diffuse = s.specular = Vec3q(0.0f, 0.0f, 0.0f);
-			matId[q]  = 0;
+			matId[q]  = ~0;
 		}
 
 		int mask4 = selector.Mask4(b);
@@ -254,11 +257,13 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 				  ((object[0] == object[2] && element[0] == element[2]) &&
 				   (object[0] == obj0 && element[0] == elem0)))) {
 			const ShTriangle shTri = geometry.GetSElement(obj0, elem0);
+			int tMatId = geometry.GetMaterialId(shTri.matId, obj0);
 
-			int        tMatId = shTri.matId >= matCount ? 0 : shTri.matId;
-			const bool flatNormals      = shTri.FlatNormals();
-			const bool computeTexCoords = materialFlags[tMatId] & shading::Material::fTexCoords;
-			reflSel.Mask4(b) = materialFlags[tMatId] & shading::Material::fReflection ? 0x0f0f0f0f : 0;
+			const bool flatNormals = shTri.FlatNormals();
+			const shading::Material *mat = tMatId == ~0? &defaultMat : &*materials[tMatId];
+			const bool computeTexCoords = mat->flags & shading::Material::fTexCoords;
+			reflSel.Mask4(b) = mat->flags & shading::Material::fReflection ? 0x0f0f0f0f : 0;
+			transSel.Mask4(b) = mat->flags & shading::Material::fTransparency ? 0x0f0f0f0f : 0;
 
 			if(!computeTexCoords) {
 				if(flatNormals) {
@@ -292,10 +297,10 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 				}
 			}
 
-			materials[tMatId]->Shade(s, RayGroup<sharedOrigin, hasMask>(rays, b4, 4), cache.samplingCache);
+			mat->Shade(s, RayGroup<sharedOrigin, hasMask>(rays, b4, 4), cache.samplingCache);
 		}
 		else {
-			for(uint q = 0; q < 4; q++) {
+			for(uint q = 0; q < blockSize; q++) {
 				uint tq = b4 + q;
 				if(!selector[tq]) continue;
 
@@ -308,39 +313,35 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 				if(EXPECT_TAKEN( i32x4(imask)[0] )) {
 					const ShTriangle shTri = geometry.GetSElement(obj0, elem0);
 
-					int tMatId = shTri.matId >= matCount ? 0 : shTri.matId;
-					matId[q] = Condition(imask, i32x4(tMatId + 1));
+					int tMatId = geometry.GetMaterialId(shTri.matId, obj0);
+					matId[q] = Condition(imask, i32x4(tMatId), matId[q]);
 
 					const Vec2q bar = barycentric[tq];
 
 					s.texCoord = Vec2q(shTri.uv[0].x, shTri.uv[0].y) +
 								 Vec2q(shTri.uv[1].x, shTri.uv[1].y) * bar.x +
 								 Vec2q(shTri.uv[2].x, shTri.uv[2].y) * bar.y;
-					Broadcast(Maximize(s.texCoord) - Minimize(s.texCoord), s.texDiff);
 
 					s.normal = Vec3q(shTri.nrm[0]) + Vec3q(shTri.nrm[1]) * bar.x + Vec3q(shTri.nrm[2]) * bar.y;
 				}
 
 				if(AccStruct::isctFlags & isct::fElement ?
-						ForAny(object[q] != obj0 || element[q] != elem0) :
-						ForAny(object[q] != obj0)) {
+						ForAny(object[q] != obj0 || element[q] != elem0) : ForAny(object[q] != obj0)) {
 
-					float texDiffX[4], texDiffY[4], texCoordX[4], texCoordY[4];
+					float texCoordX[4], texCoordY[4];
 					Vec3f normal[4];
-					Convert(s.texDiff.x, texDiffX);
-					Convert(s.texDiff.y, texDiffY);
 					Convert(s.texCoord.x, texCoordX);
 					Convert(s.texCoord.y, texCoordY);
 					Convert(s.normal, normal);
 
 					for(int k = 1; k < 4; k++) {
 						int obj = object[q][k], elem = element[q][k];
-						if(invBitMask & (1 << k) || (obj == obj0 && elem == elem0)) continue;
+						if((invBitMask & (1 << k)) || (obj == obj0 && elem == elem0)) continue;
 
 						const ShTriangle shTri = geometry.GetSElement(obj, elem);
 
-						int tMatId = shTri.matId >= matCount ? 0 : shTri.matId;
-						matId[q][k] = tMatId + 1;
+						int tMatId = geometry.GetMaterialId(shTri.matId, obj);
+						matId[q][k] = tMatId;
 
 						const Vec2q bar = barycentric[tq];
 
@@ -349,8 +350,6 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 									Vec2q(shTri.uv[2].x, shTri.uv[2].y) * bar.y;
 
 						Vec2f diff = Maximize(tex) - Minimize(tex);
-						texDiffX [k] = diff.x;
-						texDiffY [k] = diff.y;
 						texCoordX[k] = tex.x[k];
 						texCoordY[k] = tex.y[k];
 						Vec3f nrm = shTri.nrm[0] + shTri.nrm[1] * bar.x[k] + shTri.nrm[2] * bar.y[k];
@@ -360,63 +359,78 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 						normal[k].z = nrm.z;
 					}
 
-					Convert(texDiffX, s.texDiff.x);
-					Convert(texDiffY, s.texDiff.y);
 					Convert(texCoordX, s.texCoord.x);
 					Convert(texCoordY, s.texCoord.y);
 					Convert(normal, s.normal);
 				}
 			}
+			
+			//todo: moga byc problemy na krawedziach ktrojkatow o roznych materialach
+			for(int q = 0; q < blockSize; q++) {
+				shading::Sample &s = samples[q + b4];
+				Vec2f diff = Maximize(s.texCoord) - Minimize(s.texCoord);
+				s.texDiff = Vec2q(diff);
+			}
+
 			int matId0 = matId[0][0];
 
-			if(ForAll(((matId[0] == matId[1]) && (matId[2] == matId[3])) &&
-					  ((matId[0] == matId[2]) && (matId[1] == matId0)))) {
-				reflSel.Mask4(b) = materialFlags[matId0 - 1] & shading::Material::fReflection ? 0x0f0f0f0f : 0;
+			if(mask4 == 0x0f0f0f0f && 
+				ForAll( ( matId[0] == matId[1] && matId[2] == matId[3] ) &&
+					    ( matId[0] == matId[2] && matId[0] == matId0   ) )) {
+				const shading::Material *mat = matId0 == ~0? &defaultMat : &*materials[matId0];
+				reflSel.Mask4(b) = mat->flags & shading::Material::fReflection ? 0x0f0f0f0f : 0;
+				transSel.Mask4(b) = mat->flags & shading::Material::fTransparency ? 0x0f0f0f0f : 0;
 
-				if(EXPECT_TAKEN(matId0)) materials[matId0 - 1]->
-					Shade(samples + b4, RayGroup<sharedOrigin, 0>(rays, b4, 4), cache.samplingCache);
+				mat->Shade(s, RayGroup<sharedOrigin, 0>(rays, b4, 4), cache.samplingCache);
 			}
 			else {
-				static_assert(blockSize == 4, "If you want some other value, you will have to modify the code here");
-				i32x4 matIds[blockSize] = { i32x4(0), i32x4(0), i32x4(0), i32x4(0) };
+				static_assert(blockSize == 4, "4 is nice");
+				i32x4 matIds[blockSize] = { i32x4(~0), i32x4(~0), i32x4(~0), i32x4(~0) };
+				bool defaultUsed = 0;
 
-				uint   matIdCount = 0;
-				f32x4b mask[4];
-
+				uint matIdCount = 0;
 				for(int q = 0; q < blockSize; q++) {
-					const i32x4 &tMatId = matId[q];
+					const i32x4 tMatId = matId[q];
 
-					u8 reflMask = 0;
 					for(int k = 0; k < 4; k++) {
-						int   id = tMatId[k];
-						i32x4 kMatId(id);
-						reflMask |= id && materialFlags[id - 1] & shading::Material::fReflection ? 1 << k : 0;
+						int id = tMatId[k];
+						defaultUsed |= id == ~0;
 
-						if(ForAll((matIds[0] != kMatId && matIds[1] != kMatId) &&
-									(matIds[2] != kMatId && matIds[3] != kMatId))) {
+						i32x4 kMatId(id);
+						if( (selector[b4 + q] & (1 << k)) && 
+							ForAll(	matIds[0] != kMatId && matIds[1] != kMatId &&
+									matIds[2] != kMatId && matIds[3] != kMatId ) ) {
 							matIds[matIdCount >> 2][matIdCount & 3] = id;
 							matIdCount++;
 						}
 					}
-					reflSel[q + b4] = reflMask;
 				}
+				if(defaultUsed) matIdCount++;
 
 				for(uint n = 0; n < matIdCount; n++) {
-					uint  id = matIds[n >> 2][n & 3];
-					i32x4 id4(id);
-					mask[0] = matId[0] == id4;
-					mask[1] = matId[1] == id4;
-					mask[2] = matId[2] == id4;
-					mask[3] = matId[3] == id4;
+					uint id = matIds[n >> 2][n & 3];
 
-					materials[id - 1]->Shade(samples + b4, RayGroup<sharedOrigin, 1>( RayGroup<sharedOrigin, 1>(
-							rays.OriginPtr(), rays.DirPtr(), rays.IDirPtr(), size, selectorData), b4, 4),
-											cache.samplingCache);
+					char mask[4];
+					i32x4 id4(id);
+					mask[0] = ForWhich(matId[0] == id4) & selector[b4 + 0];
+					mask[1] = ForWhich(matId[1] == id4) & selector[b4 + 1];
+					mask[2] = ForWhich(matId[2] == id4) & selector[b4 + 2];
+					mask[3] = ForWhich(matId[3] == id4) & selector[b4 + 3];
+					const shading::Material *mat = id == ~0? &defaultMat : &*materials[id];
+					if(mat->flags & shading::Material::fReflection)
+						for(int q = 0; q < 4; q++)
+							reflSel[b4 + q] = mask[q];
+					if(mat->flags & shading::Material::fTransparency)
+						for(int q = 0; q < 4; q++)
+							transSel[b4 + q] = mask[q];
+
+					mat->Shade(samples + b4, RayGroup<sharedOrigin, 1>( rays.OriginPtr() +
+							(sharedOrigin? b4 : 0), rays.DirPtr() + b4, rays.IDirPtr() + b4, 4, mask),
+							cache.samplingCache);
 				}
 			}
 		}
 	}
-	reflSel = selector;
 
 	if(reflSel.Any() && gVals[5] && cache.reflections < 1) {
 		cache.reflections++;
@@ -427,6 +441,20 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 		for(int q = 0; q < size; q++) {
 			samples[q].diffuse = Condition(reflSel.SSEMask(q), samples[q].diffuse +
 					(reflColor[q] - samples[q].diffuse) * floatq(0.3f), samples[q].diffuse);
+		}
+	}
+	if(0 && transSel.Any()) {
+		Vec3q transColor[size];
+		for(int q = 0; q < size; q++)
+			transSel[q] &= ForWhich(samples[q].opacity < 1.0f);
+		if(transSel.Any()) {
+			cache.transp++;
+			stats += TraceTransparency(transSel, rays, tDistance, transColor, cache);
+			cache.transp--;
+
+			for(int q = 0; q < size; q++)
+				samples[q].diffuse = Condition(transSel.SSEMask(q),
+						VLerp(transColor[q], samples[q].diffuse, samples[q].opacity), samples[q].diffuse);
 		}
 	}
 
@@ -460,7 +488,6 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 		outColor[q] = samples[q].diffuse;
 
 	if(gVals[2] && flags & isct::fPrimary) {
-		//TODO wywala sie tutaj jak sie uzywa DBVH
 		Vec3q col = StatsShader(stats, size)[0];
 		for(int q = 0; q < size; q++)
 			outColor[q] = col;
@@ -470,7 +497,7 @@ TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask> &ray
 }
 
 template <class AccStruct>
-TreeStats Scene<AccStruct>::TraceReflection(RaySelector selector, const Vec3q *dir, const shading::Sample *samples,
+const TreeStats Scene<AccStruct>::TraceReflection(RaySelector selector, const Vec3q *dir, const shading::Sample *samples,
 		Cache &cache, Vec3q *__restrict__ outColor) const {
 	int size = selector.Size();
 	Vec3q reflDir[size], reflOrig[size], idir[size];
@@ -485,5 +512,22 @@ TreeStats Scene<AccStruct>::TraceReflection(RaySelector selector, const Vec3q *d
 		RayTrace(RayGroup<0, 0>(reflOrig, reflDir, idir, size), cache, outColor) :
 		RayTrace(RayGroup<0, 1>(reflOrig, reflDir, idir, size, &selector[0]), cache, outColor);
 }
+	
+template <class AccStruct>
+template <bool sharedOrigin, bool hasMask>
+const TreeStats Scene<AccStruct>::TraceTransparency(RaySelector selector,
+		const RayGroup<sharedOrigin, hasMask> &rays, const floatq *distance, Vec3q *__restrict__ out,
+		Cache &cache) const {
+
+	const int size = rays.Size();
+	Vec3q origin[size];
+	for(int q = 0; q < size; q++)
+		origin[q] = rays.Dir(q) * (distance[q] + 0.1f) + rays.Origin(q);
+
+	return selector.All()?
+		RayTrace(RayGroup<0, 0>(origin, rays.DirPtr(), rays.IDirPtr(), size), cache, out) :
+		RayTrace(RayGroup<0, 1>(origin, rays.DirPtr(), rays.IDirPtr(), size, &selector[0]), cache, out);
+}
+
 
 #endif

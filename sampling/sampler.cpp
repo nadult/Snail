@@ -58,7 +58,11 @@ namespace sampling {
 				return new PointSamplerDXT(Compress(tmp));
 				}
 			case gfxlib::TI_R8G8B8:
-				if(tex.Mips()==1) { tex.ReallocMips(0); tex.GenMips(); }
+				if(tex.Mips() == 1) {
+					tex.ReallocMips(0);
+					tex.GenMips();
+					printf("Generating mipmaps for %s\n", texName.c_str());
+				}
 				return new PointSampler(tex);
 				return new PointSamplerDXT(Compress(tex));
 			case gfxlib::TI_R5G6B5:

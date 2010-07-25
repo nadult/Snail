@@ -6,12 +6,6 @@ static float BoxSA(const BBox &box) {
 	return (box.Width() * (box.Depth() + box.Height()) + box.Depth() * box.Height()) * 2.0f;
 }
 
-void BVH::UpdateCache() {
-	triCache.resize(elements.size());
-	for(int n = 0; n < elements.size(); n++)
-		triCache[n] = elements[n];
-}
-
 void BVH::FindSplitSweep(int nNode, int first, int count, int depth) {
 	BBox bbox = nodes[nNode].bbox;
 	enum { useSah = 1 };
@@ -235,11 +229,11 @@ void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 	}
 }
 
-BVH::BVH(const CompactTris &elems, bool fast) {
-	Construct(elems, fast);
+BVH::BVH(const CompactTris &elems, const std::map<string, int> &matNames, bool fast) {
+	Construct(elems, matNames, fast);
 }
 
-void BVH::Construct(const CompactTris &tElements, bool fast) {
+void BVH::Construct(const CompactTris &tElements, const std::map<string, int> &tmatNames, bool fast) {
 	elements = tElements;
 	nodes.reserve(elements.size() * 2);
 	nodes.clear();
@@ -256,10 +250,21 @@ void BVH::Construct(const CompactTris &tElements, bool fast) {
 	else
 		FindSplitSweep(0, 0, elements.size(), 0);
 	InputAssert(depth <= maxDepth);
+
+	std::map<int, string> matNames;
+	for(auto it = tmatNames.begin(); it != tmatNames.end(); ++it)
+		matNames[it->second] = it->first;
+	materials.resize(matNames.size());
+
+	int idx = 0;
+	for(auto it = matNames.begin(); it != matNames.end(); ++it) {
+		InputAssert(it->first == idx);
+		materials[idx++].name = it->second;
+	}
 }
 
 void BVH::Serialize(Serializer &sr) {
-	sr & depth & elements & nodes;
+	sr & depth & elements & nodes & materials;
 }
 
 void BVH::PrintInfo() const {
@@ -271,3 +276,22 @@ void BVH::PrintInfo() const {
 	printf("~ %.0f bytes per triangle\n", double(nodeBytes + objBytes) / double(elements.size()));
 	printf("Levels: %d\n\n", depth);
 }
+
+void BVH::UpdateCache() {
+	triCache.resize(elements.size());
+	for(int n = 0; n < elements.size(); n++)
+		triCache[n] = elements[n];
+}
+
+void BVH::UpdateMaterialIds(const std::map<string, int> &dict) {
+	if(!materials.size()) {
+		materials.push_back(MatId());
+		return;
+	}
+
+	for(size_t n = 0; n < materials.size(); n++) {
+		auto it = dict.find(materials[n].name);
+		materials[n].id = it == dict.end() ? ~0 : it->second;
+	}
+}
+

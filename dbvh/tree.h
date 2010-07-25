@@ -230,6 +230,10 @@ public:
 		union { int subNode, first; };
 		union { struct { short axis, firstNode; }; int count; };
 	};
+	
+	int GetMaterialId(int idx, int elem) const {
+		return elements[elem].tree->GetMaterialId(idx, 0);
+	}
 
 	vector<ObjectInstance> elements;
 	vector<Node, AlignedAllocator<Node> > nodes;

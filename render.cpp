@@ -20,7 +20,40 @@ static i32x4 ConvColor(Vec3q rgb) {
 	i32x4 tg = Trunc(Clamp(rgb.y * 255.0f, floatq(0.0f), floatq(255.0f)));
 	i32x4 tb = Trunc(Clamp(rgb.z * 255.0f, floatq(0.0f), floatq(255.0f)));
 
-	return tb + Shl<8>(tg) + Shl<16>(tg);
+	return tb + Shl<8>(tg) + Shl<16>(tr);
+}
+
+template <int bpp>
+static void StorePixels(const Vec3q *src, u8 *dst, int width, int height, int pitch) {
+	static_assert(bpp == 4 || bpp == 3, "if(width & 3) { ... } needs to be modified for bpp < 3");
+	int lineDiff = pitch - width * bpp;
+
+	for(int ty = 0; ty < height; ty++) {
+		union { __m128i mi; int i4[4]; };
+		for(int tx = 0; tx + 3 < width; tx += 4) {
+			if(bpp == 4) {
+				_mm_storeu_si128((__m128i*)dst, ConvColor(*src++).m);
+			}
+			else {
+				mi = ConvColor(*src++).m;
+				*(int*)(dst + bpp * 0) = i4[0];
+				*(int*)(dst + bpp * 1) = i4[1];
+				*(int*)(dst + bpp * 2) = i4[2];
+				dst[bpp * 3 + 0] = i4[3] & 0xff;
+				dst[bpp * 3 + 1] = (i4[3] >> 8 ) & 0xff;
+				dst[bpp * 3 + 2] = (i4[3] >> 16) & 0xff;
+			}
+			dst += bpp * 4;
+		}
+		if(width & 3) {
+			mi = ConvColor(*src++).m;
+			*(int*)(dst + bpp * 0) = i4[0];
+			if((width & 3) > 1) *(int*)(dst + bpp * 1) = i4[0];
+			if((width & 3) > 2) *(int*)(dst + bpp * 2) = i4[0];
+			dst += bpp * 4;
+		}
+		dst += lineDiff;
+	}
 }
 
 template <class AccStruct,int QuadLevels>
@@ -54,8 +87,8 @@ struct RenderTask: public thread_pool::Task {
 		RayGenerator rayGen(QuadLevels, out->Width(), out->Height(), camera.plane_dist,
 							right, up, front);
 
-		uint pitch = out->Pitch();
-		u8 *outPtr = ((u8*)out->DataPointer()) + startY * pitch + startX * 4;
+		uint pitch = out->Pitch(), bpp = out->GetFormat().BytesPerPixel();
+		u8 *outPtr = ((u8*)out->DataPointer()) + startY * pitch + startX * bpp;
 
 		Cache cache;
 		Vec3q dir[NQuads], idir[NQuads];
@@ -70,24 +103,24 @@ struct RenderTask: public thread_pool::Task {
 
 				if(colorizeNodes && gVals[8]) {
 					Vec3f ncolors[] = {
-						Vec3f(1, 0, 0),
-						Vec3f(0, 1, 0),
-						Vec3f(0, 0, 1),
-						Vec3f(1, 1, 0),
-						Vec3f(1, 0, 1),
-						Vec3f(0, 1, 1),
-						Vec3f(1, 1, 1) };
+						Vec3f(1.0, 0.6, 0.6),
+						Vec3f(0.6, 1.0, 0.6),
+						Vec3f(0.6, 0.6, 1.0),
+						Vec3f(1.0, 1.0, 0.6),
+						Vec3f(1.0, 0.6, 1.0),
+						Vec3f(0.6, 1.0, 1.0),
+						Vec3f(1.0, 1.0, 1.0) };
 					Vec3q color(ncolors[rank % (sizeof(ncolors) / sizeof(Vec3f))]);
 					for(int q = 0; q < NQuads; q++)
 						colors[q] *= color;
 				}
 
 				if(NQuads == 1) {
-					exit(0); //TODO
+					throw 0; //TODO
 					union { __m128i icol; u8 c[16]; };
 					icol = ConvColor(colors[0]).m;
 
-					u8 *p1 = outPtr + y * pitch + x * 4;
+					u8 *p1 = outPtr + y * pitch + x * bpp;
 					u8 *p2 = p1 + pitch;
 
 					p1[ 0] = c[ 0]; p1[ 1] = c[ 1]; p1[ 2] = c[ 2];
@@ -97,28 +130,10 @@ struct RenderTask: public thread_pool::Task {
 				}
 				else {
 					rayGen.Decompose(colors, colors);
-
-					const Vec3q *src = colors;
-					u8 *dst = outPtr + x * 4 + y * pitch;
-					int lineDiff = pitch - PWidth * 4;
-
-					int ex = Min(width - x, PWidth), ey = Min(height - y, PHeight);
-					for(int ty = 0; ty < ey; ty++) {
-						for(int tx = 0; tx + 3 < ex; tx += 4) {
-							_mm_storeu_si128((__m128i*)dst, ConvColor(*src++).m);
-							dst += 16;
-						}
-						if(ex & 3) {
-							union { __m128i mi; int i4[4]; };
-							mi = ConvColor(*src++).m;
-							int *idst = (int*)dst;
-							idst[0] = i4[0];
-							if((ex & 3) > 1) idst[1] = i4[1];
-							if((ex & 3) > 2) idst[2] = i4[2];
-							dst += 16;
-						}
-						dst += lineDiff;
-					}
+					if(bpp == 3) StorePixels<3>(colors, outPtr + x * bpp + y * pitch, Min(width - x, PWidth),
+									Min(height - y, PHeight), pitch);
+					else  StorePixels<4>(colors, outPtr + x * bpp + y * pitch, Min(width - x, PWidth),
+									Min(height - y, PHeight), pitch);
 				}
 			}
 		}
@@ -130,7 +145,6 @@ template <int QuadLevels, class AccStruct>
 TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
 		gfxlib::Texture &image, const Options options, uint nThreads) {
 	enum { taskSize = 64 };
-	Assert(image.GetFormat().BytesPerPixel() == 4);
 
 	uint nTasks = ((image.Width() + taskSize - 1) / taskSize) * ((image.Height() + taskSize - 1) / taskSize);
 
@@ -159,7 +173,6 @@ TreeStats Render(const Scene<AccStruct> &scene,const Camera &camera,
 		gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
 		const Options options, uint nThreads) {
 	enum { taskSize = 64 };
-	Assert(image.GetFormat().BytesPerPixel() == 4);
 
 	vector<TreeStats> taskStats;
 	vector<RenderTask<AccStruct, QuadLevels>> tasks;

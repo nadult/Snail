@@ -19,7 +19,7 @@ namespace sampling {
 		Vec3q operator()(const Vec2q &uv,const Vec2q &diff) const;
 		INLINE Vec3q operator()(const Vec2q &uv,const Vec2q &diff,Cache&) const { return operator()(uv,diff); }
 
-		void Sample(shading::Sample*, Cache&) const;
+		void Sample(shading::Sample*, Cache&, bool mipmapping = 1) const;
 
 	protected:
 		void Update();

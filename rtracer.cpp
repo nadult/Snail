@@ -146,12 +146,12 @@ static int tmain(int argc, char **argv) {
 	int resx = 1024, resy = 1024;
 	bool fullscreen = 0;
 	int threads = 2;
-	const char *modelFile = "pompei.obj";//"doom3/admin.proc";
+	string sceneName = "pompei.obj";//"doom3/admin.proc";
 
 	Options options;
 	bool flipNormals = 1;
 	bool rebuild = 0, slowBuild = 0;
-	string texPath = "scenes/";
+	string texPath = "";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
@@ -164,20 +164,27 @@ static int tmain(int argc, char **argv) {
 		else if(string("-texPath")==argv[n]) { texPath=argv[n+1]; n++; }
 		else {
 			if(argv[n][0] == '-') printf("Unknown option: %s\n",argv[n]);
-			else modelFile = argv[n];
+			else sceneName = argv[n];
 		}
+	}
+
+	if(texPath == "") {
+		texPath = "scenes/" + sceneName;
+		auto pos = texPath.rfind('/');
+		if(pos == string::npos) texPath = "";
+		else texPath.resize(pos + 1);
 	}
 
 	Scene<StaticTree> scene;
 	if(!rebuild) {
-		try { Loader(string("dump/") + modelFile) & scene.geometry; }
+		try { Loader(string("dump/") + sceneName) & scene.geometry; }
 		catch(...) { rebuild = 1; }
 	}
 	if(rebuild) {
 		printf("Loading...\n");
 		double loadingTime = GetTime();
 		BaseScene baseScene; {
-			string fileName = string("scenes/") + modelFile;
+			string fileName = string("scenes/") + sceneName;
 			if(fileName.find(".proc") != string::npos)
 				baseScene.LoadDoom3Proc(fileName);
 			else if(fileName.find(".obj") != string::npos)
@@ -198,17 +205,19 @@ static int tmain(int argc, char **argv) {
 		loadingTime = GetTime() - loadingTime;
 		
 		double buildTime = GetTime();
-		scene.geometry.Construct(baseScene.ToCompactTris(), !slowBuild);
-		SetMaterials(scene, baseScene, texPath);
+		scene.geometry.Construct(baseScene.ToCompactTris(), baseScene.matNames, !slowBuild);
 	//	scene.geometry.Construct(baseScene.ToTriangleVector());
-		Saver(string("dump/") + modelFile) & scene.geometry;
+		Saver(string("dump/") + sceneName) & scene.geometry;
 		buildTime = GetTime() - buildTime;
 		std::cout << "Loading time: " << loadingTime << "  Build time: " << buildTime << '\n';
 	}
 	scene.geometry.PrintInfo();
-	scene.materials.push_back(shading::NewMaterial(""));
-	scene.Update();
 	scene.geometry.UpdateCache();
+
+	if(sceneName.substr(sceneName.size() - 4) == ".obj")
+		scene.matDict = shading::LoadMaterials("scenes/" + sceneName.substr(0, sceneName.size() - 3) + "mtl", texPath);
+	scene.UpdateMaterials();
+	scene.geometry.UpdateMaterialIds(scene.GetMatIdMap());
 
 	float sceneScale; {
 		Vec3f size = scene.geometry.GetBBox().Size();
@@ -218,15 +227,15 @@ static int tmain(int argc, char **argv) {
 	GLWindow window(resx, resy, fullscreen);
 	Font font;
 
-	gfxlib::Texture image(resx, resy, gfxlib::TI_A8B8G8R8);
+	gfxlib::Texture image(resx, resy, gfxlib::TI_A8R8G8B8);
 	vector<Light> lights;// = GenLights();
 			
 	Camera cam;
-	if(!camConfigs.GetConfig(string(modelFile),cam))
+	if(!camConfigs.GetConfig(string(sceneName),cam))
 		cam.SetPos(scene.geometry.GetBBox().Center());
 
-	bool lightsEnabled=1;
-	bool staticEnabled=0;
+	bool lightsEnabled = 1;
+	bool staticEnabled = 0;
 	float speed; {
 	//	scene.geometry.Construct(builder.ExtractElements());
 		Vec3p size = scene.geometry.GetBBox().Size();
@@ -240,15 +249,15 @@ static int tmain(int argc, char **argv) {
 
 		if(window.KeyUp(Key_esc)) break;
 		if(window.KeyDown('K')) Saver("out/output.dds") & image;
-		if(window.KeyDown('O')) options.reflections^=1;
-		if(window.KeyDown('I')) options.rdtscShader^=1;
+		if(window.KeyDown('O')) options.reflections ^= 1;
+		if(window.KeyDown('I')) options.rdtscShader ^= 1;
 		if(window.KeyDown('C')) {
 		//	if(staticEnabled)
 				cam.SetPos(scene.geometry.GetBBox().Center());
 		//	else cam.pos=scene.geometry.GetBBox().Center();
 		}
 		if(window.KeyDown('P')) {
-			camConfigs.AddConfig(string(modelFile),cam);
+			camConfigs.AddConfig(string(sceneName),cam);
 			Saver("scenes/cameras.dat") & camConfigs;
 			cam.Print();
 		}
@@ -281,17 +290,16 @@ static int tmain(int argc, char **argv) {
 		if(window.Key(Key_space)) animPos+=0.025f;
 
 		double buildTime = GetTime();
-			Scene<DBVH> dscene;
+	//		Scene<DBVH> dscene;
 	//		dscene.geometry = MakeDBVH(&scene.geometry);
-			dscene.materials.push_back(shading::NewMaterial(""));
+	//		dscene.materials = scene.materials;
 		buildTime = GetTime() - buildTime;
 
 		vector<Light> tLights = lightsEnabled?lights:vector<Light>();
 			for(int n=0;n<tLights.size();n++)
 				tLights[n].pos += Vec3f(sin(animPos+n*n),cos(animPos+n*n),
 					sin(animPos-n*n)*cos(animPos+n*n))*speed;
-		scene.lights = dscene.lights = tLights;
-		dscene.Update(); scene.Update();
+		scene.lights = /*dscene.lights =*/ tLights;
 		
 		double time = GetTime();
 		TreeStats stats;
@@ -305,7 +313,7 @@ static int tmain(int argc, char **argv) {
 
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));
-			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, time * 1000.0,buildTime * 1000.0));
+			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, time * 1000.0, buildTime * 1000.0));
 			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays);
 			if(lightsEnabled && lights.size())
 				font.PrintAt(Vec2f(5, 45), "Lights: ",lightsEnabled?lights.size() : 0);

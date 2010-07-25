@@ -14,11 +14,12 @@ namespace shading {
 			fTexCoords = 1,
 			fReflection = 2,
 			fRefraction = 4,
+			fTransparency = 8,
 		};
 
 		typedef sampling::Cache SCache;
 
-		Material(int f) :flags(f) { }
+		Material(int flags) :flags(flags) { }
 		virtual ~Material();
 
 		virtual void Shade(Sample*, const RayGroup<0, 0>&, SCache&) const = 0;
@@ -26,7 +27,8 @@ namespace shading {
 		virtual void Shade(Sample*, const RayGroup<1, 0>&, SCache&) const = 0;
 		virtual void Shade(Sample*, const RayGroup<1, 1>&, SCache&) const = 0;
 
-		char flags;	
+		int id;
+		int flags;
 	};
 
 	template <class MatClass>
@@ -48,8 +50,11 @@ namespace shading {
 	};
 
 	typedef Ptr<Material> PMaterial;
+	typedef std::map<string, PMaterial> MatDict;
 
-	Material *NewMaterial(const string &texName,bool nDotL = 1);
+	Material *NewMaterial(const string &texName, bool nDotL = 1);
+
+	const MatDict LoadMaterials(const string &fileName, const string &texPath);
 
 }
 

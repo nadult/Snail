@@ -47,8 +47,10 @@ public:
 			if(mask4[n] != 0x0f0f0f0f)
 				return 0;
 
-		int lastMask = mask4[size4 - 1] | (0x0f0f0f0f << (8 * (4 - (size4 * 4 - size))));
-		return lastMask == 0x0f0f0f0f;
+		for(int n = (size4 - 1) * 4; n < size; n++)
+			if(mask[n] != 0xf)
+				return 0;
+		return 1;
 	}
 	int Size() const { return size; }
 	int Size4() const { return size4; }

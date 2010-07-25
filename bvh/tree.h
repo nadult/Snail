@@ -7,9 +7,9 @@
 
 class BVH {
 public:
-	BVH(const CompactTris&, bool fast = 1);
+	BVH(const CompactTris&, const std::map<string, int> &matNames, bool fast = 1);
 	BVH() { }
-	void Construct(const CompactTris&, bool fast = 1);
+	void Construct(const CompactTris&, const std::map<string, int> &matNames, bool fast = 1);
 	void Serialize(Serializer&);
 	const BBox GetBBox() const { return nodes[0].bbox; }
 	void PrintInfo() const;
@@ -52,8 +52,24 @@ public:
 		union { struct { short axis, firstNode; }; int count; };
 	};
 
-	CompactTris elements;
+	struct MatId {
+		MatId() :id(~0) { }
+		void Serialize(Serializer &sr) { sr & name; }
+
+		string name;
+		int id;
+	};
+
+	void UpdateMaterialIds(const std::map<string, int>&);
+
+	int GetMaterialId(int idx, int) const {
+		return materials[idx].id;
+	}
+
 	vector<Triangle> triCache;
+	vector<MatId> materials;
+
+	CompactTris elements;
 	vector<Node, AlignedAllocator<Node> > nodes;
 };
 
