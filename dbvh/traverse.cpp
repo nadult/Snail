@@ -1,12 +1,22 @@
 #include "dbvh/tree.h"
 
+namespace {
+
+	struct StackElem {
+		StackElem(int node, short first, short last) :node(node), firstActive(first), lastActive(last) { }
+		StackElem() { }
+
+		int node; short firstActive, lastActive;
+	};
+
+}
+
 template <bool sharedOrigin, bool hasMask>
 void DBVH::TraversePrimary0(Context<sharedOrigin, hasMask> &c, int firstNode) const {
 	const int size = c.Size();
 
-	struct StackElem { int node; short firstActive, lastActive; };
 	StackElem stack[maxDepth + 2]; int stackPos = 0;
-	stack[stackPos++] = { firstNode, 0, (short)(size - 1)};
+	stack[stackPos++] = StackElem(firstNode, 0, size - 1);
 	TreeStats stats;
 
 	int sign[3] = { c.Dir(0).x[0] < 0.0f, c.Dir(0).y[0] < 0.0f, c.Dir(0).z[0] < 0.0f };
@@ -52,7 +62,7 @@ void DBVH::TraversePrimary0(Context<sharedOrigin, hasMask> &c, int firstNode) co
 
 		if(test) {
 			int firstNode = nodes[nNode].firstNode ^ sign[nodes[nNode].axis];
-			stack[stackPos++] = {child + (firstNode ^ 1), (short)firstActive, (short)lastActive};
+			stack[stackPos++] = StackElem(child + (firstNode ^ 1), firstActive, lastActive);
 			nNode = child + firstNode;
 			goto CONTINUE;
 		}
@@ -65,9 +75,8 @@ void DBVH::TraversePrimary0(Context<sharedOrigin, hasMask> &c, int firstNode) co
 void DBVH::TraverseShadow0(ShadowContext &c, int firstNode) const {
 	const int size = c.Size();
 
-	struct StackElem { int node; short firstActive, lastActive; };
 	StackElem stack[maxDepth + 2]; int stackPos = 0;
-	stack[stackPos++] = {firstNode, 0, (short)(size - 1) };
+	stack[stackPos++] = StackElem(firstNode, 0, size - 1);
 	TreeStats stats;
 
 	int sign[3] = { c.Dir(0).x[0] < 0.0f, c.Dir(0).y[0] < 0.0f, c.Dir(0).z[0] < 0.0f };
@@ -112,7 +121,7 @@ void DBVH::TraverseShadow0(ShadowContext &c, int firstNode) const {
 		if(test) {
 			int firstNode = nodes[nNode].firstNode ^ sign[nodes[nNode].axis];
 			int child = nodes[nNode].subNode;
-			stack[stackPos++] = {child + (firstNode ^ 1), (short)firstActive, (short)lastActive};
+			stack[stackPos++] = StackElem(child + (firstNode ^ 1), firstActive, lastActive);
 			nNode = child + firstNode;
 			goto CONTINUE;
 		}

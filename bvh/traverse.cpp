@@ -1,12 +1,21 @@
 #include "bvh/tree.h"
 
+namespace {
+
+	struct StackElem {
+		StackElem(int node, short first, short last) :node(node), firstActive(first), lastActive(last) { }
+		StackElem() { }
+
+		int node; short firstActive, lastActive;
+	};
+
+}
+
 template <bool sharedOrigin, bool hasMask>
 void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 	const int size = c.Size();
-
-	struct StackElem { int node; short firstActive, lastActive; };
 	StackElem stack[maxDepth + 2]; int stackPos = 0;
-	stack[stackPos++] = { 0, 0, (short)(size - 1)};
+	stack[stackPos++] = StackElem(0, 0, (short)(size - 1));
 	TreeStats stats;
 
 	int sign[3] = { c.Dir(0).x[0] < 0.0f, c.Dir(0).y[0] < 0.0f, c.Dir(0).z[0] < 0.0f };
@@ -59,7 +68,7 @@ void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 
 		if(test) {
 			int firstNode = nodes[nNode].firstNode ^ sign[nodes[nNode].axis];
-			stack[stackPos++] = {child + (firstNode ^ 1), (short)firstActive, (short)lastActive};
+			stack[stackPos++] = StackElem(child + (firstNode ^ 1), firstActive, lastActive);
 			nNode = child + firstNode;
 			goto CONTINUE;
 		}
@@ -73,9 +82,8 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 	const int size = c.Size();
 	TreeStats stats;
 
-	struct StackElem { int node; short firstActive, lastActive; };
 	StackElem stack[maxDepth + 2]; int stackPos = 0;
-	stack[stackPos++] = { 0, 0, (short)(size - 1) };
+	stack[stackPos++] = StackElem(0, 0, (short)(size - 1));
 
 	int sign[3] = { c.Dir(0).x[0] < 0.0f, c.Dir(0).y[0] < 0.0f, c.Dir(0).z[0] < 0.0f };
 	RayInterval interval(c.rays, c.distance);
@@ -128,7 +136,7 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 
 		if(test) {
 			int firstNode = nodes[nNode].firstNode ^ sign[nodes[nNode].axis];
-			stack[stackPos++] = {child + (firstNode ^ 1), (short)firstActive, (short)lastActive};
+			stack[stackPos++] = StackElem(child + (firstNode ^ 1), firstActive, lastActive);
 			nNode = child + firstNode;
 			goto CONTINUE;
 		}

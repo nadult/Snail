@@ -20,7 +20,7 @@ FILES=funcs render tree_stats bounding_box gl_window rtbase base_scene bvh/trave
 TFILES=client server_node gl_window tex_handle font rtracer comm_mpi comm_tcp
 SHARED_FILES=$(filter-out $(TFILES), $(FILES))
 
-LIBS=-lgfxlib -lbaselib -lpng -lz -lboost_system -lboost_regex
+LIBS=-lgfxlib -lbaselib -lpng -lz 
 
 MPILIBS=`$(HOME)/bin/mpicxx -showme:link`
 
@@ -29,7 +29,11 @@ INCLUDES=-I./
 
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
 FLAGS=-march=native --param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdynamic \
-	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS)
+	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread
+#	  -fno-signed-zeros -fgcse-sm -fgcse-las -funsafe-loop-optimizations -Wunsafe-loop-optimizations \
+	  -fipa-pta -ftree-loop-linear -floop-interchange -floop-strip-mine -floop-block -ftree-loop-distribution \
+	  -fivopts -ftree-vectorize  -fvect-cost-model -freorder-blocks-and-partition -fstrict-overflow \
+	  -funroll-loops
 
 CXX=$(GCC45)/bin/g++
 
@@ -48,7 +52,7 @@ $(OBJECTS): $(BUILD_DIR)/%.o: pch.h.gch %.cpp
 	$(CXX) $(FLAGS) $(INCLUDES) -c $*.cpp -o $@
 
 node: $(SHARED_OBJECTS) $(BUILD_DIR)/server_node.o $(BUILD_DIR)/comm_mpi.o $(BUILD_DIR)/comm_tcp.o
-	$(CXX) $(FLAGS) $(INCLUDES) -o node $^ $(MPILIBS) $(LINUX_LIBS) -pthread
+	$(CXX) $(FLAGS) $(INCLUDES) -o node $^ $(MPILIBS) $(LINUX_LIBS) -lboost_system -lboost_regex
 
 node_ppc:
 	cd cell && make -j6
@@ -61,12 +65,12 @@ nodes: node node_ppc
 client: $(SHARED_OBJECTS) $(BUILD_DIR)/client.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/comm_tcp.o
 	$(CXX) $(FLAGS) $(INCLUDES) -o client $^ -lglfw -lXrandr -lGL -lGLU \
-		$(LINUX_LIBS)  -pthread -pg -g
+		$(LINUX_LIBS) -lboost_system -lboost_regex -g
 
 rtracer: $(SHARED_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o
 	$(CXX) $(FLAGS) $(INCLUDES) -o rtracer $^ -lglfw -lXrandr -lGL -lGLU \
-		$(LINUX_LIBS)  -pthread -pg -g
+		$(LINUX_LIBS) -g
 
 clean:
 	-rm -f $(OBJECTS) $(DEPS) $(BUILD_DIR)/.depend pch.h.gch client node

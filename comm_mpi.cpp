@@ -1,6 +1,6 @@
 #include "comm.h"
 #include <mpi.h>
-
+#include <stdlib.h>
 
 namespace comm {
 

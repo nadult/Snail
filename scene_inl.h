@@ -110,15 +110,15 @@ const TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shadin
 		const shading::Sample &s = samples[q];
 
 		Vec3q  lightVec = (s.position - Vec3q(lightPos));
-		f32x4b close    = LengthSq(lightVec) < 0.0001f;
+		f32x4b close = LengthSq(lightVec) < 0.0001f;
 		lightVec = Condition(close, Vec3q(0.0f, 1.0f, 0.0f), lightVec);
 
-		distance[q]  = Sqrt(lightVec | lightVec);
+		distance[q] = Sqrt(lightVec | lightVec);
 		fromLight[q] = lightVec * Inv(distance[q]);
-		idir[q]      = SafeInv(fromLight[q]);
+		idir[q] = SafeInv(fromLight[q]);
 
-		dot[q]  = s.normal | fromLight[q];
-		auto mask = inputSel.SSEMask(q) && dot[q] > 0.0f;
+		dot[q] = s.normal | fromLight[q];
+		f32x4b mask = inputSel.SSEMask(q) && dot[q] > 0.0f;
 
 		tDistance[q] = Condition(mask, distance[q] * 0.9999f, -constant::inf);
 		stats.TracingRays(CountMaskBits(ForWhich(mask)));

@@ -34,29 +34,6 @@ void PrintHelp() {
 
 typedef BVH StaticTree;
 
-template <class Scene>
-void SetMaterials(Scene &scene, const BaseScene &base, const string &texPath) {
-	scene.materials.resize(base.matNames.size());
-
-	for(auto it = base.matNames.begin(); it != base.matNames.end(); ++it) {
-		string name = it->first == ""? "" : texPath + it->first;
-
-		try {
-		 	scene.materials[it->second] = typename Scene::PMaterial(shading::NewMaterial(name));
-			cout << "Mat: " << name << '\n';
-		}
-		catch(const Exception &ex) {
-			std::cout << ex.what() << '\n';
-			scene.materials[it->second]=scene.materials.front();
-		}
-	}
-
-/*	if(scene.materials.size()>126) {
-		scene.materials[126]->flags |= shading::Material::fReflection;
-		scene.materials[ 70]->flags |= shading::Material::fReflection;
-	} */
-}
-
 vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
 	vector<Light> out;
 
@@ -170,7 +147,7 @@ static int tmain(int argc, char **argv) {
 
 	if(texPath == "") {
 		texPath = "scenes/" + sceneName;
-		auto pos = texPath.rfind('/');
+		int pos = texPath.rfind('/');
 		if(pos == string::npos) texPath = "";
 		else texPath.resize(pos + 1);
 	}

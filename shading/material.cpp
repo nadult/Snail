@@ -39,6 +39,21 @@ namespace shading {
 		return out;	
 	}
 
+	struct Mat {
+		Vec3f ambient, diffuse, specular, emissive;
+		Vec3f transmission;
+		int illuminationModel;
+		float dissolveFactor;
+		float specularExponent;
+		int refractionIndex;
+
+		string ambientMap, diffuseMap;
+		string specularMap, emissiveMap;
+		string exponentMap, dissolveMap;
+
+		string name;
+	};
+
 	const MatDict LoadMaterials(const string &fileName, const string &texPath) {
 		std::filebuf fb;
 		if(!fb.open (fileName.c_str(),std::ios::in)) {
@@ -47,23 +62,7 @@ namespace shading {
 		}
 
 		std::istream is(&fb);
-	
 		std::map<string, PMaterial> out;
-
-		struct Mat {
-			Vec3f ambient, diffuse, specular, emissive;
-			Vec3f transmission;
-			int illuminationModel;
-			float dissolveFactor;
-			float specularExponent;
-			int refractionIndex;
-
-			string ambientMap, diffuseMap;
-			string specularMap, emissiveMap;
-			string exponentMap, dissolveMap;
-
-			string name;
-		};
 
 		vector<Mat> mats;
 		Mat newMat;

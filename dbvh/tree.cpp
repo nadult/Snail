@@ -18,9 +18,24 @@ void ObjectInstance::ComputeBBox() {
 	p0.z += x0 * rotation[2].x;
 	bbox = BBox(Minimize(VMin(p0, p1)) + translation, Maximize(VMax(p0, p1)) + translation);
 }
+namespace {
 
-static float BoxSA(const BBox &box) {
-	return (box.Width() * (box.Depth() + box.Height()) + box.Depth() * box.Height()) * 2.0f;
+	struct TestBoxes {
+		TestBoxes(int minAxis, int minIdx, float sub, float mul)
+			:minAxis(minAxis), minIdx(minIdx), sub(sub), mul(mul) { }
+
+		bool operator()(const ObjectInstance &box) const {
+			return int( (box.Center(minAxis) - sub) * mul ) < minIdx;
+		}
+
+		int minAxis, minIdx;
+		float sub, mul;
+	};
+
+	float BoxSA(const BBox &box) {
+		return (box.Width() * (box.Depth() + box.Height()) + box.Depth() * box.Height()) * 2.0f;
+	}
+
 }
 
 void DBVH::FindSplit(int nNode, int first, int count, int sdepth) {
@@ -98,9 +113,8 @@ void DBVH::FindSplit(int nNode, int first, int count, int sdepth) {
 		if(noSplitCost < minCost)
 			goto LEAF_NODE;
 		
-		auto it = std::partition(&elements[first], &elements[first + count],
-				[&elements, minAxis, minIdx, sub, mul](const ObjectInstance &a) {
-					return int( (a.Center(minAxis) - sub) * mul ) < minIdx; });
+		ObjectInstance *it =
+			std::partition(&elements[first], &elements[first + count], TestBoxes(minAxis, minIdx, sub, mul));
 
 		BBox leftBox = leftBoxes[minIdx - 1];
 		BBox rightBox = rightBoxes[minIdx];

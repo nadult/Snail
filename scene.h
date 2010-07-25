@@ -39,9 +39,9 @@ public:
 
 	void UpdateMaterials() {
 		materials.clear();
-		for(auto it = matDict.begin(); it != matDict.end(); ++it)
+		for(shading::MatDict::iterator it = matDict.begin(); it != matDict.end(); ++it)
 			it->second->id = ~0;
-		for(auto it = matDict.begin(); it != matDict.end(); ++it) {
+		for(shading::MatDict::iterator it = matDict.begin(); it != matDict.end(); ++it) {
 			it->second->id = materials.size();
 			materials.push_back(it->second);
 		}
@@ -49,7 +49,7 @@ public:
 
 	const std::map<string, int> GetMatIdMap() const {
 		std::map<string, int> out;
-		for(auto it = matDict.begin(); it != matDict.end(); ++it)
+		for(shading::MatDict::const_iterator it = matDict.begin(); it != matDict.end(); ++it)
 			out[it->first] = it->second->id;
 		return out;
 	}

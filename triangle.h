@@ -262,7 +262,7 @@ public:
 	typedef ShTriangle    SElement;
 
 	const CElement GetCElement(int elem) const {
-		auto tri = tris[elem];
+		const TriIdx tri = tris[elem];
 		return Triangle(verts[tri.v1], verts[tri.v2], verts[tri.v3]);
 	}
 	const CElement operator[](int elem) const {

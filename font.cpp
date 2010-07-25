@@ -6,11 +6,11 @@
 	}
 	
 	void Font::SetPos(const Vec2f &pos) {
-		font.SetPos({pos.x, pos.y - height});
+		font.SetPos(gfxlib::Vec2(pos.x, pos.y - height));
 	}
 
 	void Font::SetSize(const Vec2f &size) {
-		font.SetSize({size.x, size.y});
+		font.SetSize(gfxlib::Vec2(size.x, size.y));
 	}
 
 	void Font::BeginDrawing(int resx,int resy) {

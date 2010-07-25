@@ -130,10 +130,10 @@ struct RenderTask: public thread_pool::Task {
 				}
 				else {
 					rayGen.Decompose(colors, colors);
-					if(bpp == 3) StorePixels<3>(colors, outPtr + x * bpp + y * pitch, Min(width - x, PWidth),
-									Min(height - y, PHeight), pitch);
-					else  StorePixels<4>(colors, outPtr + x * bpp + y * pitch, Min(width - x, PWidth),
-									Min(height - y, PHeight), pitch);
+					if(bpp == 3) StorePixels<3>(colors, outPtr + x * bpp + y * pitch, Min(width - x, (uint)PWidth),
+									Min(height - y, (uint)PHeight), pitch);
+					else  StorePixels<4>(colors, outPtr + x * bpp + y * pitch, Min(width - x, (uint)PWidth),
+									Min(height - y, (uint)PHeight), pitch);
 				}
 			}
 		}

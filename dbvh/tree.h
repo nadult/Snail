@@ -67,7 +67,7 @@ struct ObjectInstance {
 		tree->TraversePrimary(newContext);
 
 		for(int n = 0; n < count; n++) {
-			auto mask = objects[n] != i32x4(~0);
+			i32x4b mask = objects[n] != i32x4(~0);
 			c.Object(n + firstActive) = Condition(mask, i32x4(idx), c.Object(n + firstActive));
 			c.Element(n + firstActive) = Condition(mask, objects[n], c.Element(n + firstActive));
 		}
@@ -96,7 +96,7 @@ struct ObjectInstance {
 		tree->TraversePrimary(newContext);
 
 		for(int n = 0; n < count; n++) {
-			auto mask = objects[n] != i32x4(~0);
+			i32x4b mask = objects[n] != i32x4(~0);
 			c.Object(n + firstActive) = Condition(mask, i32x4(idx), c.Object(n + firstActive));
 			c.Element(n + firstActive) = Condition(mask, objects[n], c.Element(n + firstActive));
 		}
@@ -124,7 +124,7 @@ struct ObjectInstance {
 		tree->TraversePrimary(newContext);
 
 		for(int n = 0; n < count; n++) {
-			auto mask = objects[n] != i32x4(~0);
+			i32x4b mask = objects[n] != i32x4(~0);
 			c.Object(n + firstActive) = Condition(mask, i32x4(idx), c.Object(n + firstActive));
 			c.Element(n + firstActive) = Condition(mask, objects[n], c.Element(n + firstActive));
 		}
@@ -151,7 +151,7 @@ struct ObjectInstance {
 		tree->TraversePrimary(newContext);
 
 		for(int n = 0; n < count; n++) {
-			auto mask = objects[n] != i32x4(~0);
+			i32x4b mask = objects[n] != i32x4(~0);
 			c.Object(n + firstActive) = Condition(mask, i32x4(idx), c.Object(n + firstActive));
 			c.Element(n + firstActive) = Condition(mask, objects[n], c.Element(n + firstActive));
 		}

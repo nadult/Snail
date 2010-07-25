@@ -2,8 +2,44 @@
 #include <algorithm>
 
 
-static float BoxSA(const BBox &box) {
-	return (box.Width() * (box.Depth() + box.Height()) + box.Depth() * box.Height()) * 2.0f;
+namespace {
+	struct OrderTris {
+		OrderTris(CompactTris &elements, int axis)
+			:elements(elements), axis(axis) { }
+
+		bool operator()(const CompactTris::TriIdx &a, const CompactTris::TriIdx &b) const {
+			float p1 = (&elements.verts[a.v1].x)[axis] + (&elements.verts[a.v2].x)[axis]
+								+ (&elements.verts[a.v3].x)[axis];
+			float p2 = (&elements.verts[b.v1].x)[axis] + (&elements.verts[b.v2].x)[axis]
+								+ (&elements.verts[b.v3].x)[axis];
+			return p1 < p2;
+		}
+
+		CompactTris &elements;
+		int axis;
+	};
+
+	struct TestTris {
+		TestTris(CompactTris &elements, int minAxis, int minIdx, float sub, float mul)
+			:elements(elements), minAxis(minAxis), minIdx(minIdx), sub(sub), mul(mul) { }
+
+		bool operator()(const CompactTris::TriIdx &tri) const {
+			float v1 = (&elements.verts[tri.v1].x)[minAxis];
+			float v2 = (&elements.verts[tri.v2].x)[minAxis];
+			float v3 = (&elements.verts[tri.v3].x)[minAxis];
+			float center = (Min(v1, Min(v2, v3)) + Max(v1, Max(v2, v3))) * 0.5f;
+			return int( (center - sub) * mul ) < minIdx;
+		}
+
+		CompactTris &elements;
+		int minAxis, minIdx;
+		float sub, mul;
+	};
+
+	float BoxSA(const BBox &box) {
+		return (box.Width() * (box.Depth() + box.Height()) + box.Depth() * box.Height()) * 2.0f;
+	}
+
 }
 
 void BVH::FindSplitSweep(int nNode, int first, int count, int depth) {
@@ -30,13 +66,7 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int depth) {
 			float noSplitCost = intersectCost * count * BoxSA(bbox);
 
 			for(int axis = 0; axis <= 2; axis++) {
-				std::sort(&elements.tris[first], &elements.tris[first + count],
-				[&elements, axis](const CompactTris::TriIdx &a, const CompactTris::TriIdx &b) {
-					float p1 = (&elements.verts[a.v1].x)[axis] + (&elements.verts[a.v2].x)[axis]
-										+ (&elements.verts[a.v3].x)[axis];
-					float p2 = (&elements.verts[b.v1].x)[axis] + (&elements.verts[b.v2].x)[axis]
-										+ (&elements.verts[b.v3].x)[axis];
-					return p1 < p2; } );
+				std::sort(&elements.tris[first], &elements.tris[first + count], OrderTris(elements, axis));
 
 				vector<float> leftSA(count), rightSA(count); {
 					rightSA[count - 1] = BoxSA(elements[first + count - 1].GetBBox());
@@ -72,12 +102,7 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int depth) {
 
 		if(!useSah || minAxis != 2)
 			std::nth_element(&elements.tris[first], &elements.tris[first + minIdx], &elements.tris[first + count],
-			[&elements, minAxis](const CompactTris::TriIdx &a, const CompactTris::TriIdx &b) {
-				float p1 = (&elements.verts[a.v1].x)[minAxis] + (&elements.verts[a.v2].x)[minAxis]
-									+ (&elements.verts[a.v3].x)[minAxis];
-				float p2 = (&elements.verts[b.v1].x)[minAxis] + (&elements.verts[b.v2].x)[minAxis]
-									+ (&elements.verts[b.v3].x)[minAxis];
-				return p1 < p2; } );
+					OrderTris(elements, minAxis));
 			
 		BBox leftBox(elements[first].GetBBox());
 		BBox rightBox(elements[first + count - 1].GetBBox());
@@ -186,14 +211,8 @@ void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 		if(noSplitCost < minCost)
 			goto LEAF_NODE;
 		
-		auto it = std::partition(&elements.tris[first], &elements.tris[first + count],
-				[&elements, minAxis, minIdx, sub, mul](const CompactTris::TriIdx &tri) {
-					float v1 = (&elements.verts[tri.v1].x)[minAxis];
-					float v2 = (&elements.verts[tri.v2].x)[minAxis];
-					float v3 = (&elements.verts[tri.v3].x)[minAxis];
-					float center = (Min(v1, Min(v2, v3)) + Max(v1, Max(v2, v3))) * 0.5f;
-					return int( (center - sub) * mul ) < minIdx;
-				});
+		CompactTris::TriIdx *it = std::partition(&elements.tris[first], &elements.tris[first + count],
+				TestTris(elements, minAxis, minIdx, sub, mul));
 
 		BBox leftBox = leftBoxes[minIdx - 1];
 		BBox rightBox = rightBoxes[minIdx];
@@ -252,12 +271,12 @@ void BVH::Construct(const CompactTris &tElements, const std::map<string, int> &t
 	InputAssert(depth <= maxDepth);
 
 	std::map<int, string> matNames;
-	for(auto it = tmatNames.begin(); it != tmatNames.end(); ++it)
+	for(std::map<string, int>::const_iterator it = tmatNames.begin(); it != tmatNames.end(); ++it)
 		matNames[it->second] = it->first;
 	materials.resize(matNames.size());
 
 	int idx = 0;
-	for(auto it = matNames.begin(); it != matNames.end(); ++it) {
+	for(std::map<int, string>::const_iterator it = matNames.begin(); it != matNames.end(); ++it) {
 		InputAssert(it->first == idx);
 		materials[idx++].name = it->second;
 	}
@@ -290,7 +309,7 @@ void BVH::UpdateMaterialIds(const std::map<string, int> &dict) {
 	}
 
 	for(size_t n = 0; n < materials.size(); n++) {
-		auto it = dict.find(materials[n].name);
+		std::map<string, int>::const_iterator it = dict.find(materials[n].name);
 		materials[n].id = it == dict.end() ? ~0 : it->second;
 	}
 }

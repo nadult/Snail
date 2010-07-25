@@ -91,7 +91,7 @@ static int server_main(int argc, char **argv) {
 			socket >> Pod(resx) >> Pod(resy) >> Pod(tsceneName);
 			string sceneName(tsceneName);
 			string texPath = sceneName; {
-				auto pos = texPath.rfind('/');
+				int pos = texPath.rfind('/');
 				if(pos == string::npos) texPath = "";
 				else texPath.resize(pos + 1);
 			}
@@ -201,7 +201,7 @@ static int server_main(int argc, char **argv) {
 			MPINode(0, 0) >> Pod(resx) >> Pod(resy) >> Pod(tsceneName);
 			string sceneName = tsceneName;
 			string texPath = sceneName; {
-				auto pos = texPath.rfind('/');
+				int pos = texPath.rfind('/');
 				if(pos == string::npos) texPath = "";
 				else texPath.resize(pos + 1);
 			}
