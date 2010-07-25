@@ -120,77 +120,6 @@ public:
 		return !ForAll( lmax<Real(0.0f)||lmin>Min(lmax,maxDist) );
 	}
 
-	template <int size,class Real,class Vec>
-	bool TestIP(const Vec &orig,const Vec *__restrict__ idir,const Real *__restrict__ maxDist) const {
-		Real l1,l2;
-		Real tx[2]={Real(min.x)-orig.x,Real(max.x)-orig.x};
-		Real ty[2]={Real(min.y)-orig.y,Real(max.y)-orig.y};
-		Real tz[2]={Real(min.z)-orig.z,Real(max.z)-orig.z};
-
-/*		Real l3,l4; Vec3q min=idir[0],max=idir[0];
-		for(int n=1;n<size;n++) {
-			min=VMin(min,idir[n]);
-			max=VMax(max,idir[n]);
-		}
-
-		l1=min.x*tx[0]; l3=max.x*tx[0];
-		l2=min.x*tx[1]; l4=max.x*tx[1];
-		Real lmin=Min(Min(l1,l2),Min(l3,l4));
-		Real lmax=Max(Max(l1,l2),Max(l3,l4));
-		
-		l1=min.y*ty[0]; l3=max.y*ty[0];
-		l2=min.y*ty[1]; l4=max.y*ty[1];
-		lmin=Min(lmin,Min(Min(l1,l2),Min(l3,l4)));
-		lmax=Max(lmax,Max(Max(l1,l2),Max(l3,l4)));
-		
-		l1=min.z*tz[0]; l3=max.z*tz[0];
-		l2=min.z*tz[1]; l4=max.z*tz[1];
-		lmin=Min(lmin,Min(Min(l1,l2),Min(l3,l4)));
-		lmax=Max(lmax,Max(Max(l1,l2),Max(l3,l4)));
-
-		return ForAny(lmax>=Real(0.0f)&&lmin<Min(lmax,maxDist[0])); */
-
-		l1=idir[0].x*tx[0];
-		l2=idir[0].x*tx[1];
-		Real lmin=Min(l1,l2);
-		Real lmax=Max(l1,l2);
-
-		l1=idir[0].y*ty[0];
-		l2=idir[0].y*ty[1];
-		lmin=Max(Min(l1,l2),lmin);
-		lmax=Min(Max(l1,l2),lmax);
-
-		l1=idir[0].z*tz[0];
-		l2=idir[0].z*tz[1];
-		lmin=Max(Min(l1,l2),lmin);
-		lmax=Min(Max(l1,l2),lmax);
-
-		typename Vec::TBool mask=( lmax>=Real(0.0f)&&lmin<Min(lmax,maxDist[0]) );
-		if(ForAny(mask)) return 1;
-	
-		for(int q=1;q<size;q++) {
-			l1=idir[q].x*tx[0];
-			l2=idir[q].x*tx[1];
-			Real lmin=Min(l1,l2);
-			Real lmax=Max(l1,l2);
-
-			l1=idir[q].y*ty[0];
-			l2=idir[q].y*ty[1];
-			lmin=Max(Min(l1,l2),lmin);
-			lmax=Min(Max(l1,l2),lmax);
-
-			l1=idir[q].z*tz[0];
-			l2=idir[q].z*tz[1];
-			lmin=Max(Min(l1,l2),lmin);
-			lmax=Min(Max(l1,l2),lmax);
-
-			mask=mask||( lmax>=Real(0.0f)&&lmin<Min(lmax,maxDist[q]) );
-			if(ForAny(mask)) return 1;
-		}
-
-		return 0;
-	}
-
 	template <class Real,class Vec>
 	char TestMask(Vec orig, Vec idir, Real maxDist = Real(constant::inf)) const {
 		Real l1 = idir.x * (Real(min.x) - orig.x);
@@ -210,6 +139,7 @@ public:
 
 		return ForWhich( lmax >= Real(0.0f) && lmin <= Min(lmax, maxDist) );
 	}
+
 	template <class Real,class Vec>
 	bool TestI(Vec orig, Vec idir, Real maxDist = Real(constant::inf)) const {
 		Real l1 = idir.x * (Real(min.x) - orig.x);
@@ -229,6 +159,7 @@ public:
 
 		return ForAny( lmax >= Real(0.0f) && lmin <= Min(lmax, maxDist) );
 	}
+
 	template <class Real,class Vec>
 	bool TestI(Vec orig, Vec idir, Real maxDist, f32x4b mask) const {
 		Real l1 = idir.x * (Real(min.x) - orig.x);

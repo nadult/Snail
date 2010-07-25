@@ -282,7 +282,7 @@ static int tmain(int argc, char **argv) {
 
 		double buildTime = GetTime();
 			Scene<DBVH> dscene;
-			dscene.geometry = MakeDBVH(&scene.geometry);
+	//		dscene.geometry = MakeDBVH(&scene.geometry);
 			dscene.materials.push_back(shading::NewMaterial(""));
 		buildTime = GetTime() - buildTime;
 
@@ -295,7 +295,7 @@ static int tmain(int argc, char **argv) {
 		
 		double time = GetTime();
 		TreeStats stats;
-		stats = Render(dscene, cam, image, options, threads);
+		stats = Render(scene, cam, image, options, threads);
 
 		time = GetTime() - time;
 		window.RenderImage(image);

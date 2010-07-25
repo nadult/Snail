@@ -49,15 +49,22 @@ void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 		int child = nodes[nNode].subNode;
 		_mm_prefetch(&nodes[child + 0], _MM_HINT_T0);
 		_mm_prefetch(&nodes[child + 1], _MM_HINT_T0);
+		const BBox &box = nodes[nNode].bbox;
+		bool test;
+
+	//	It helps on smaller scenes		
+		if(!box.TestI(c.Origin(firstActive), c.IDir(firstActive), c.Distance(firstActive)))
+			firstActive++;
+		else
+			goto HIT;
 			
-		bool test = 0; {
-			const BBox &box = nodes[nNode].bbox;
-			if(!box.TestInterval(interval))
-				continue;
-			test = box.Test(c, firstActive, lastActive);
-		}
+		test = 0;
+		if(!box.TestInterval(interval))
+			continue;
+		test = box.Test(c, firstActive, lastActive);
 
 		if(test) {
+HIT:
 			int firstNode = nodes[nNode].firstNode ^ sign[nodes[nNode].axis];
 			stack[stackPos++] = {child + (firstNode ^ 1), (short)firstActive, (short)lastActive};
 			nNode = child + firstNode;
@@ -118,15 +125,21 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 		int child = nodes[nNode].subNode;
 		_mm_prefetch(&nodes[child + 0], _MM_HINT_T0);
 		_mm_prefetch(&nodes[child + 1], _MM_HINT_T0);
+		const BBox &box = nodes[nNode].bbox;
+		bool test;
 
-		bool test = 0; {
-			const BBox &box = nodes[nNode].bbox;
-			if(!box.TestInterval(interval))
-				continue;
-			test = box.Test(c, firstActive, lastActive);
-		}
+		if(!box.TestI(c.Origin(firstActive), c.IDir(firstActive), c.Distance(firstActive)))
+			firstActive++;
+		else
+			goto HIT;
+
+		test = 0;
+		if(!box.TestInterval(interval))
+			continue;
+		test = box.Test(c, firstActive, lastActive);
 
 		if(test) {
+HIT:
 			int firstNode = nodes[nNode].firstNode ^ sign[nodes[nNode].axis];
 			stack[stackPos++] = {child + (firstNode ^ 1), (short)firstActive, (short)lastActive};
 			nNode = child + firstNode;
