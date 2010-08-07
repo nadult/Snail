@@ -9,8 +9,6 @@
 #include "render.h"
 
 #include "scene.h"
-#include "frame_counter.h"
-
 #include "font.h"
 #include "frame_counter.h"
 
@@ -38,79 +36,6 @@ static void PrintHelp() {
 }
 
 typedef BVH StaticTree;
-
-template <class Scene>
-static void SetMaterials(Scene &scene, const BaseScene &base, string texPath) {
-	scene.materials.clear();
-//	for(int n=0;n<128;n++)
-//		scene.materials.push_back(shading::NewMaterial(""));
-//	scene.materials[1]=shading::NewMaterial("data/ultradxt1.dds");
-//	return;
-
-/*	string names[]={ 	"data/tex316bit.dds",		"data/347.dds",
-						"data/1669.dds", 			"data/tex1.png",
-						"data/tex2.png",			"data/tex3dxt1.dds",
-						"data/ultradxt1.dds",		"", };
-	string tnames[]={
-		"",
-		"scenes/Toasters/Jaw.dds",
-		"scenes/Toasters/Head.dds",
-		"",
-		"scenes/Toasters/Pin.dds",
-		"scenes/Toasters/Key.dds",
-		"scenes/Toasters/Feet.dds",
-		"scenes/Toasters/Stone.dds" };
-	for(int n=0;n<sizeof(tnames)/sizeof(string);n++)
-		scene.materials.push_back(shading::NewMaterial(tnames[n]));
-	scene.materials[1]=shading::NewMaterial("data/ultradxt1.dds"); */
-/*
-	string pre="scenes/sponza/";
-	string snames[]={
-		"",
-		"00_skap.dds",
-		"01_S_ba.dds",
-		"01_S_kap.dds",
-		"01_St_kp.dds",
-		"01_STUB.dds",
-		"KAMEN.dds",
-		"KAMEN-stup.dds",
-		"prozor1.dds",
-		"reljef.dds",
-		"sky.dds",
-		"sp_luk.dds",
-		"vrata_ko.dds",
-		"vrata_kr.dds",
-		"x01_st.dds",
-		};
-	
-	vector<Ptr<shading::Material>> mats;
-	for(int n=0;n<sizeof(snames)/sizeof(string);n++)
-		mats.push_back(shading::NewMaterial(n==0?snames[n]:pre+snames[n]));
-//	int matid[]={ 0,11,1,0,5,5,2,4,5,14,1,6,0,9,11,6,2,6,8,12,13 };
-//	for(int n=0;n<sizeof(matid)/sizeof(int);n++)
-//		scene.materials.push_back(mats[matid[n]]);
-//	scene.materials.push_back(mats[0]);
-//	scene.materials.push_back(mats[6]); */
-
-	scene.materials.resize(base.matNames.size());
-	for(std::map<string,int>::const_iterator it=base.matNames.begin();it!=base.matNames.end();++it) {
-		string name=it->first==""?"":texPath+it->first;
-
-		try {
-		 	scene.materials[it->second]=typename Scene::PMaterial(shading::NewMaterial(name));
-		}
-		catch(const Exception &ex) {
-			std::cout << ex.what() << '\n';
-			scene.materials[it->second]=scene.materials.front();
-		}
-	}
-//	scene.materials.back()=typename Scene::PMaterial(shading::NewMaterial("scenes/doom3/imp/texture.tga"));
-
-	if(scene.materials.size()>126) {
-		scene.materials[126]->flags|=shading::Material::fReflection;
-		scene.materials[ 70]->flags|=/*shading::Material::fRefraction|*/shading::Material::fReflection;
-	}
-}
 
 static vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
 	vector<Light> out;
@@ -249,7 +174,7 @@ static int client_main(int argc, char **argv) {
 	FrameCounter frmCounter;
 		
 	Socket socket;
-	socket.Connect(host, "20000");
+	socket.Connect(host, "20002");
 
 	Vec3f sceneCenter, sceneSize;
 	{
@@ -265,7 +190,7 @@ static int client_main(int argc, char **argv) {
 	if(!camConfigs.GetConfig(string(modelFile),cam))
 		cam.SetPos(sceneCenter);
 
-	bool finish = 0;
+	bool finish = 0, displayEnabled = 1;
 	SendFrameRequest(socket, cam, lights, threads, finish);
 	vector<CompressedPart> parts;
 	double frameTime = GetTime();
@@ -285,6 +210,8 @@ static int client_main(int argc, char **argv) {
 			Saver("scenes/cameras.dat") & camConfigs;
 			cam.Print();
 		}
+		if(window.KeyDown('X')) displayEnabled ^= 1;
+
 		if(window.KeyDown('L')) {
 			printf("Lights %s\n", lightsEnabled? "disabled" : "enabled");
 			lightsEnabled ^= 1;
@@ -299,8 +226,8 @@ static int client_main(int argc, char **argv) {
 
 		MoveCamera(cam, window, speed);
 
-		for(int n = 1; n <= 8; n++) if(window.Key('0' + n))
-				{ threads = n; printf("Threads: %d\n", threads); }
+		for(int n = 0; n <= 9; n++) if(window.Key('0' + n))
+				{ threads = n == 0?32 : n == 9? 16 : n; printf("Threads: %d\n", threads); }
 
 		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Traversing from 8x8: %s\n", gVals[0]?"on" : "off"); }
 		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
@@ -324,7 +251,7 @@ static int client_main(int argc, char **argv) {
 
 		int nBytes = 0, numNodes;
 		double buildTime, renderTimes[32];
-		TreeStats stats; {
+		TreeStats stats; if(displayEnabled) {
 			int nPixels = w * h, received = 0;
 			SendFrameRequest(socket, cam, tLights, threads, finish);
 

@@ -33,19 +33,16 @@ namespace sampling {
 		return out;
 	}
 
-	Sampler *NewSampler(const string &texName) {
-		if(texName=="") return 0;
+	Sampler *NewSampler(PTexture tex) {
+		if(!tex) return 0;
 
-		gfxlib::Texture tex;
-		Loader(texName) & tex;
-
-		switch(tex.GetFormat().GetIdent()) {
+		switch(tex->GetFormat().GetIdent()) {
 			case gfxlib::TI_A8R8G8B8: {
-				gfxlib::Texture tmp(tex.Width(),tex.Height(),gfxlib::TI_R8G8B8,0);
-				int w=tex.Width(),h=tex.Height();
+				PTexture tmp = new gfxlib::Texture(tex->Width(),tex->Height(),gfxlib::TI_R8G8B8,0);
+				int w=tex->Width(),h=tex->Height();
 				for(int y=0;y<h;y++) {
-					u8 *src=(u8*)tex.DataPointer()+y*tex.Pitch();
-					u8 *dst=(u8*)tmp.DataPointer()+y*tmp.Pitch();
+					u8 *src=(u8*)tex->DataPointer()+y*tex->Pitch();
+					u8 *dst=(u8*)tmp->DataPointer()+y*tmp->Pitch();
 					for(int x=0;x<w;x++) {
 						dst[0]=src[0];
 						dst[1]=src[1];
@@ -53,25 +50,25 @@ namespace sampling {
 						dst+=3; src+=4;
 					}
 				}
-			 	tmp.GenMips();
+			 	tmp->GenMips();
 				return new PointSampler(tmp);
-				return new PointSamplerDXT(Compress(tmp));
-				}
+				return new PointSamplerDXT(Compress(*tmp));
+			}
 			case gfxlib::TI_R8G8B8:
-				if(tex.Mips() == 1) {
-					tex.ReallocMips(0);
-					tex.GenMips();
-					printf("Generating mipmaps for %s\n", texName.c_str());
+				if(tex->Mips() == 1) {
+					tex->ReallocMips(0);
+					tex->GenMips();
 				}
 				return new PointSampler(tex);
-				return new PointSamplerDXT(Compress(tex));
+				return new PointSamplerDXT(Compress(*tex));
 			case gfxlib::TI_R5G6B5:
-				return new PointSampler16bit(tex);
+				return new PointSampler16bit(*tex);
 			case gfxlib::TI_DXT1:
-				return new PointSamplerDXT(tex);
+				return new PointSamplerDXT(*tex);
 		}
 
-		ThrowException("Cannot create a sampler fron texture ",texName,": format is not supported");
+		ThrowException("Cannot create a sampler from texture ", "TODO: name",
+						": format is not supported");
 	}
 
 }

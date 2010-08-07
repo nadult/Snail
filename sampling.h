@@ -2,6 +2,7 @@
 #define RTRACER_SAMPLING_H
 
 #include "shading.h"
+#include <gfxlib_texture.h>
 
 namespace sampling {
 
@@ -39,9 +40,11 @@ namespace sampling {
 		virtual void Sample(shading::Sample *samples,Cache&,bool mipmapping = 1) const = 0;
 	};
 
+	typedef Ptr<gfxlib::Texture> PTexture;
+	typedef std::map<string, PTexture> TexDict;
 	typedef Ptr<Sampler> PSampler;
 
-	Sampler *NewSampler(const string &texName);
+	Sampler *NewSampler(PTexture);
 
 }
 

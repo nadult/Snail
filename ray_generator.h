@@ -1,14 +1,10 @@
 #ifndef RTRACER_RAY_GENERATOR_H
 #define RTRACER_RAY_GENERATOR_H
 
-#include "rtbase.h"
+#include "rtbase_math.h"
 
+/*
 extern const float bestCandidateSamples[4096][5];
-
-class GridSampler {
-public:
-	const Vec2f operator()(int x,int y) const { return Vec2f(x,y); }
-};
 
 class BestCandidateSampler {
 public:
@@ -17,6 +13,11 @@ public:
 		return Vec2f(	float(x) + bestCandidateSamples[offset][0],
 						float(y) + bestCandidateSamples[offset][1] );
 	}
+};
+*/
+
+struct GridSampler {
+	const Vec2f operator()(int x, int y) const { return Vec2f(x, y); }
 };
 
 /*!
@@ -41,7 +42,7 @@ public:
 		2:  x,y-1
 		3:  x-1,y-1
 	*/
-	void Generate(int pw,int ph,int x,int y,Vec3q *out) const;
+	void Generate(int pw, int ph, int x, int y, Vec3q *out) const;
 
 	/*!
 		Decomposes group of ray output data from
@@ -57,11 +58,11 @@ public:
 		. .  . .		. . . .
 		. .  . .		. . . .
 	*/
-	void Decompose(const Vec3q *in,Vec3q *out) const;
+	void Decompose(const Vec3q *in, Vec3q *out) const;
 private:
-	void Generate(int level,int pw,int ph,int x,int y,Vec3q *out) const;
+	void Generate(int level, int pw, int ph, int x, int y, Vec3q *out) const;
 
-	Vec3p tright, tup;
+	Vec3f tright, tup;
 	Vec3q txyz;
 
 	// invW is multiplied by ratio (w/h)

@@ -39,7 +39,6 @@ public:
 protected:
 	void FindSplit(int nNode, int first, int count, int depth);
 	void FindSplitSweep(int nNode, int first, int count, int depth);
-	int depth;
 	
 public:
 	struct Node {
@@ -49,7 +48,11 @@ public:
 
 		BBox bbox;
 		union { int subNode, first; };
+#ifdef __BIG_ENDIAN
+		union { struct { short firstNode, axis; }; int count; };
+#else
 		union { struct { short axis, firstNode; }; int count; };
+#endif
 	};
 
 	struct MatId {
@@ -71,6 +74,7 @@ public:
 
 	CompactTris elements;
 	vector<Node, AlignedAllocator<Node> > nodes;
+	int depth;
 };
 
 SERIALIZE_AS_POD(BVH::Node)

@@ -215,7 +215,7 @@ bool BBox::TestInterval(const RayInterval &i) const {
 
 	return lmax >= 0.0f && lmin <= lmax;
 }
-
+/*
 void GaussPointsFit(int iQuantity, const Vec3f* akPoint,Vec3f& rkCenter, Vec3f akAxis[3], float afExtent[3]);
 
 void TGaussPointsFit(int count,const Vec3f* points,Vec3f& center, Vec3f axis[3], float extent[3]) {
@@ -247,51 +247,5 @@ void TGaussPointsFit(int count,const Vec3f* points,Vec3f& center, Vec3f axis[3],
 	extent[0] = 0.5f*(fY0Max - fY0Min);
 	extent[1] = 0.5f*(fY1Max - fY1Min);
 	extent[2] = 0.5f*(fY2Max - fY2Min);
-}
-
-OptBBox::OptBBox(const BBox &b,const Matrix<Vec4f> &m) :box(b),trans(m),invTrans(Inverse(m)) {
-}
-OptBBox::OptBBox(const BBox &b,const Matrix<Vec4f> &m,const Matrix<Vec4f> &inv) :box(b),trans(m),invTrans(inv) {
-}
-
-OptBBox::OptBBox(const Vec3f *verts,uint count) {
-	Vec3f center,axis[3]; float ext[3];
-	TGaussPointsFit(count,verts,center,axis,ext);
-	
-	box=BBox(-Vec3f(ext[0],ext[1],ext[2]),Vec3f(ext[0],ext[1],ext[2]));
-	trans.x=Vec4f(axis[0].x,axis[0].y,axis[0].z,0.0f);
-	trans.y=Vec4f(axis[1].x,axis[1].y,axis[1].z,0.0f);
-	trans.z=Vec4f(axis[2].x,axis[2].y,axis[2].z,0.0f);
-	trans.w=Vec4f(center.x,center.y,center.z,1.0f);
-	invTrans=Inverse(trans);
-	
-/*{
-		Matrix<Vec4f> min,tr;
-		BBox minBBox;
-		float minSurf=1.0f/0.0f;
-		
-		for(int n=0;n<32;n++) {
-			float ang=ConstPI<float>()*0.5f*float(n)/31.0f;
-			tr=RotateY(ang);
-
-			BBox trBBox;
-			trBBox.min=trBBox.max=tr*verts[0];
-			for(int n=1;n<verts.size();n++) {
-				Vec3f vert=tr*verts[n];
-				trBBox.min=VMin(trBBox.min,vert);
-				trBBox.max=VMax(trBBox.max,vert);
-			}
-			
-			Vec3f size=trBBox.Size();
-			float surf=size.x*size.y+size.x*size.z+size.y*size.z;
-			if(surf<minSurf) { minSurf=surf; minBBox=trBBox; min=tr; }
-		}
-		optBBoxTrans=min;
-		optBBox=minBBox;
-	}*/	
-}
-
-OptBBox::operator BBox() const {
-	return box*trans;
-}	
+}*/
 

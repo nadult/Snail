@@ -2,14 +2,13 @@
 #define RTRACER_SAMPLING_POINT_SAMPLER_H
 
 #include "rtbase.h"
-#include <gfxlib_texture.h>
 #include "sampling.h"
 
 namespace sampling {
 
 	class PointSampler: public Sampler {
 	public:
-		PointSampler(const gfxlib::Texture&);
+		PointSampler(const PTexture);
 		PointSampler(const PointSampler&);
 		PointSampler() { }
 		void operator=(const PointSampler&);
@@ -24,7 +23,7 @@ namespace sampling {
 	protected:
 		void Update();
 
-		gfxlib::Texture tex;
+		PTexture tex;
 		uint mipPitch[16];
 		uint wMask, hMask, mips, w, h, wShift;
 		float hMul, wMul;

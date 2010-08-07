@@ -282,6 +282,7 @@ void BVH::Construct(const CompactTris &tElements, const std::map<string, int> &t
 	}
 }
 
+
 void BVH::Serialize(Serializer &sr) {
 	sr & depth & elements & nodes & materials;
 }

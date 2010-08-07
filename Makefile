@@ -13,16 +13,18 @@ _dummy := $(shell [ -d $(BUILD_DIR)/shading ] || mkdir -p $(BUILD_DIR)/shading)
 FILES=funcs render tree_stats bounding_box gl_window rtbase base_scene bvh/traverse thread_pool \
 	  camera client server_node triangle font ray_generator frame_counter ray_group \
 	  tex_handle bvh/tree sampling/point_sampler_dxt sampling/sampler sampling/sat_sampler \
-	shading/material sampling/bilinear_sampler sampling/point_sampler16bit obbox_fit rtracer \
+	shading/material sampling/bilinear_sampler sampling/point_sampler16bit rtracer \
 	sampling/point_sampler formats/loader formats/wavefront_obj formats/doom3_proc compression \
-	comm_mpi comm_tcp dbvh/tree dbvh/traverse quat
+	comm_mpi comm_tcp dbvh/tree dbvh/traverse scene scene_trace
 
+RFILES=render bvh/traverse dbvh/traverse ray_generator scene_trace
 TFILES=client server_node gl_window tex_handle font rtracer comm_mpi comm_tcp
-SHARED_FILES=$(filter-out $(TFILES), $(FILES))
+SHARED_FILES=$(filter-out $(RFILES), $(filter-out $(TFILES), $(FILES)))
 
 LIBS=-lgfxlib -lbaselib -lpng -lz 
 
-MPILIBS=`$(HOME)/bin/mpicxx -showme:link`
+MPILIBS=`mpicxx -showme:link`
+#MPILIBS=`$(HOME)/bin/mpicxx -showme:link`
 
 LINUX_LIBS=$(LIBS)
 INCLUDES=-I./
@@ -30,10 +32,6 @@ INCLUDES=-I./
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
 FLAGS=-march=native --param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdynamic \
 	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread
-#	  -fno-signed-zeros -fgcse-sm -fgcse-las -funsafe-loop-optimizations -Wunsafe-loop-optimizations \
-	  -fipa-pta -ftree-loop-linear -floop-interchange -floop-strip-mine -floop-block -ftree-loop-distribution \
-	  -fivopts -ftree-vectorize  -fvect-cost-model -freorder-blocks-and-partition -fstrict-overflow \
-	  -funroll-loops
 
 CXX=$(GCC45)/bin/g++
 
@@ -41,6 +39,7 @@ DEPS:=$(FILES:%=$(BUILD_DIR)/%.dep)
 SOURCES:=$(FILES:%=%.cpp)
 OBJECTS:=$(FILES:%=$(BUILD_DIR)/%.o)
 SHARED_OBJECTS:=$(SHARED_FILES:%=$(BUILD_DIR)/%.o)
+RENDER_OBJECTS:=$(RFILES:%=$(BUILD_DIR)/%.o)
 
 $(DEPS): $(BUILD_DIR)/%.dep: %.cpp
 	$(CXX) $(FLAGS) $(INCLUDES) -MM $< -MT $(BUILD_DIR)/$*.o > $@
@@ -51,26 +50,32 @@ pch.h.gch: pch.h
 $(OBJECTS): $(BUILD_DIR)/%.o: pch.h.gch %.cpp
 	$(CXX) $(FLAGS) $(INCLUDES) -c $*.cpp -o $@
 
-node: $(SHARED_OBJECTS) $(BUILD_DIR)/server_node.o $(BUILD_DIR)/comm_mpi.o $(BUILD_DIR)/comm_tcp.o
-	$(CXX) $(FLAGS) $(INCLUDES) -o node $^ $(MPILIBS) $(LINUX_LIBS) -lboost_system -lboost_regex
-
-node_ppc:
-	cd cell && make -j6
-	cp cell/node node_ppc
-
-nodes: node node_ppc
-	cp node_ppc ~/rtbin
-	cp node.sh ~/rtbin
+node: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/server_node.o $(BUILD_DIR)/comm_mpi.o \
+		$(BUILD_DIR)/comm_tcp.o
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(MPILIBS) $(LINUX_LIBS) -lboost_system -lboost_regex
 
 client: $(SHARED_OBJECTS) $(BUILD_DIR)/client.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/comm_tcp.o
-	$(CXX) $(FLAGS) $(INCLUDES) -o client $^ -lglfw -lXrandr -lGL -lGLU \
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lXrandr -lGL -lGLU \
 		$(LINUX_LIBS) -lboost_system -lboost_regex -g
 
-rtracer: $(SHARED_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)/gl_window.o \
+rtracer: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o
-	$(CXX) $(FLAGS) $(INCLUDES) -o rtracer $^ -lglfw -lXrandr -lGL -lGLU \
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lXrandr -lGL -lGLU \
 		$(LINUX_LIBS) -g
+
+ssh_all:
+	ssh blader 'cd /workspace1/rtracer && make -j6 node node_ppc'
+	ssh blader 'cp /workspace1/rtracer/node_ppc /home/guests/ibmeng/rtbin/'
+
+ssh_clean:
+	ssh blader 'cd /workspace1/rtracer && make -j6 clean node_ppc_clean'
+
+node_ppc: $(SOURCES) spu/*.cpp
+	ssh b1 'cd /workspace1/rtracer && make -f Makefile.cell -j4 node_ppc'
+
+node_ppc_clean:
+	ssh b1 'cd /workspace1/rtracer && make -f Makefile.cell -j4 clean'
 
 clean:
 	-rm -f $(OBJECTS) $(DEPS) $(BUILD_DIR)/.depend pch.h.gch client node
@@ -84,7 +89,7 @@ $(BUILD_DIR)/.depend: $(DEPS)
 
 depend: $(BUILD_DIR)/.depend
 
-.PHONY: node_ppc nodes clean depend
+.PHONY: clean depend ssh_all ssh_clean node_ppc_clean
 
 
 DEPEND_FILE=$(BUILD_DIR)/.depend

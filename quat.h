@@ -2,7 +2,6 @@
 #define RTRACER_QUAT_H
 
 #include "rtbase.h"
-#include <emmintrin.h>
 
 class AxisAngle
 {

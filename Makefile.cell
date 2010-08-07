@@ -1,0 +1,83 @@
+all: node_ppc node_ppc_copy
+
+BUILD_DIR=/tmp/rtbuild
+
+_dummy := $(shell [ -d $(BUILD_DIR) ] || mkdir -p $(BUILD_DIR))
+_dummy := $(shell [ -d $(BUILD_DIR)/bvh ] || mkdir -p $(BUILD_DIR)/bvh)
+_dummy := $(shell [ -d $(BUILD_DIR)/spu ] || mkdir -p $(BUILD_DIR)/spu)
+_dummy := $(shell [ -d $(BUILD_DIR)/cell ] || mkdir -p $(BUILD_DIR)/cell)
+_dummy := $(shell [ -d $(BUILD_DIR)/dbvh ] || mkdir -p $(BUILD_DIR)/dbvh)
+_dummy := $(shell [ -d $(BUILD_DIR)/formats ] || mkdir -p $(BUILD_DIR)/formats)
+_dummy := $(shell [ -d $(BUILD_DIR)/sampling ] || mkdir -p $(BUILD_DIR)/sampling)
+_dummy := $(shell [ -d $(BUILD_DIR)/shading ] || mkdir -p $(BUILD_DIR)/shading)
+
+FILES=funcs render tree_stats bounding_box rtbase base_scene bvh/traverse thread_pool \
+	  camera server_node triangle ray_generator ray_group bvh/tree sampling/point_sampler_dxt \
+	  sampling/sampler shading/material sampling/bilinear_sampler sampling/point_sampler16bit \
+	sampling/point_sampler formats/loader formats/wavefront_obj formats/doom3_proc compression \
+	comm_mpi dbvh/tree dbvh/traverse scene scene_trace spu/context
+
+SPUFILES=trace compression
+
+LIBS=-lgfxlib -lbaselib -lpng -lz -lspe2
+
+MPILIBS=`$(HOME)/cell/bin/mpicxx -showme:link`
+
+LINUX_LIBS=$(LIBS)
+INCLUDES=-I./
+
+NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
+FLAGS=--param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdynamic -fmodulo-sched \
+		  -funroll-loops -ffast-math -DNDEBUG -mabi=altivec -maltivec $(NICE_FLAGS) -pthread \
+
+SPUFLAGS=--param inline-unit-growth=1000 -O3 -ffast-math -fmodulo-sched  -DNDEBUG \
+		 -funroll-loops -fno-exceptions $(NICE_FLAGS)
+
+SXX=spu-g++
+CXX=ppu-g++43
+
+DEPS:=$(FILES:%=$(BUILD_DIR)/%.dep)
+SOURCES:=$(FILES:%=%.cpp)
+OBJECTS:=$(FILES:%=$(BUILD_DIR)/%.o)
+SPUOBJECTS:=$(SPUFILES:%=$(BUILD_DIR)/spu/%.spu)
+SPUOBJECTS2:=$(SPUFILES:%=$(BUILD_DIR)/spu/%.o)
+
+$(DEPS): $(BUILD_DIR)/%.dep: %.cpp
+	$(CXX) $(FLAGS) $(INCLUDES) -MM $< -MT $(BUILD_DIR)/$*.o > $@
+
+$(OBJECTS): $(BUILD_DIR)/%.o: %.cpp
+	$(CXX) $(FLAGS) $(INCLUDES) -c $*.cpp -o $@
+
+$(SPUOBJECTS): $(BUILD_DIR)/spu/%.spu: spu/%.cpp
+	$(SXX) $(SPUFLAGS) $(INCLUDES) $< -o $@
+
+$(SPUOBJECTS2): $(BUILD_DIR)/spu/%.o: $(BUILD_DIR)/spu/%.spu
+	ppu-embedspu spe_$* $^ $@
+
+node_ppc: $(OBJECTS) $(SPUOBJECTS2)
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(MPILIBS) $(LINUX_LIBS)
+
+node_ppc_copy: node_ppc
+	cp node_ppc $(HOME)/rtbin/
+
+clean:
+	-rm -f $(OBJECTS) $(SPUOBJECTS) $(SPUOBJECTS2) $(DEPS) $(BUILD_DIR)/.depend node_ppc
+	-rmdir $(BUILD_DIR)/formats $(BUILD_DIR)/sampling $(BUILD_DIR)/shading \
+		$(BUILD_DIR)/bvh $(BUILD_DIR)/dbvh $(BUILD_DIR)/spu
+	-rmdir $(BUILD_DIR)
+	cd cell && make clean
+
+$(BUILD_DIR)/.depend: $(DEPS)
+	cat $(DEPS) > $(BUILD_DIR)/.depend
+
+depend: $(BUILD_DIR)/.depend
+
+.PHONY: clean depend node_ppc_copy
+
+
+DEPEND_FILE=$(BUILD_DIR)/.depend
+DEP=$(wildcard $(DEPEND_FILE))
+ifneq "$(DEP)" ""
+include $(DEP)
+endif
+

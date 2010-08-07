@@ -2,14 +2,14 @@
 
 namespace sampling {
 
-	PointSampler::PointSampler(const gfxlib::Texture &tex) : tex(tex) {
-		if(tex.Width() & (tex.Width() - 1) || tex.Height() & (tex.Height() - 1))
+	PointSampler::PointSampler(const PTexture tex) : tex(tex) {
+		if(tex->Width() & (tex->Width() - 1) || tex->Height() & (tex->Height() - 1))
 			ThrowException("Texture width & height must be a power of 2");
-		if(tex.GetFormat().GetIdent() != gfxlib::TI_R8G8B8)
+		if(tex->GetFormat().GetIdent() != gfxlib::TI_R8G8B8)
 			ThrowException("For now only R8G8B8 textures are supported");
-		if(tex.Width() > 65536 || tex.Height() > 65536)
+		if(tex->Width() > 65536 || tex->Height() > 65536)
 			ThrowException("Maximum width / height of a texture is: 65536");
-//		if(tex.Mips()>1&&tex.Width()!=tex.Height())
+//		if(tex->Mips()>1&&tex->Width()!=tex->Height())
 //			ThrowException("Mipmapped textures must have width same as height");
 		Update();
 	}
@@ -24,19 +24,19 @@ namespace sampling {
 	}
 
 	void PointSampler::Update() {
-		wMask  = tex.Width() - 1;
-		hMask  = tex.Height() - 1;
-		wMul   = tex.Width() - 1;
-		hMul   = tex.Height() - 1;
-		mips   = tex.Mips();
-		w      = tex.Width();
-		h      = tex.Height();
+		wMask  = tex->Width() - 1;
+		hMask  = tex->Height() - 1;
+		wMul   = tex->Width() - 1;
+		hMul   = tex->Height() - 1;
+		mips   = tex->Mips();
+		w      = tex->Width();
+		h      = tex->Height();
 		wShift = 1;
 		while((1 << wShift) < w)
 			wShift++;
 
 		for(int n = 0; n < 16; n++)
-			mipPitch[n] = tex.Pitch(n);
+			mipPitch[n] = tex->Pitch(n);
 	}
 
 	template <class Int, class Vec2>
@@ -52,7 +52,7 @@ namespace sampling {
 		Vec2f pos = coord * Vec2f(wMul, hMul);
 		int   x1(pos.x), y1(pos.y);
 
-		const u8 *data = (u8 *)tex.DataPointer();
+		const u8 *data = (u8 *)tex->DataPointer();
 		int pitch = mipPitch[0];
 
 		x1 &= wMask;
@@ -71,7 +71,7 @@ namespace sampling {
 		y1 &= i32x4(hMask);
 		x1  = x1 + x1 + x1;
 
-		const u8 *data = (u8 *)tex.DataPointer();
+		const u8 *data = (u8 *)tex->DataPointer();
 		int      pitch = mipPitch[0];
 
 		y1 *= pitch;
@@ -96,10 +96,10 @@ namespace sampling {
 				mip++;
 				pixels >>= 1;
 			}
-			mip = Min(mip, tex.Mips() - 1);
+			mip = Min(mip, tex->Mips() - 1);
 		}
 
-		const u8 *data = (u8 *)tex.DataPointer(mip);
+		const u8 *data = (u8 *)tex->DataPointer(mip);
 		int pitch = mipPitch[mip];
 
 		x >>= mip;
@@ -133,10 +133,10 @@ namespace sampling {
 					mip++;
 					pixels >>= 1;
 				}
-				mip = Min(mip, tex.Mips() - 1);
+				mip = Min(mip, tex->Mips() - 1);
 			}
 
-			const u8 *data = (u8 *)tex.DataPointer(mip);
+			const u8 *data = (u8 *)tex->DataPointer(mip);
 			int pitch = mipPitch[mip];
 
 			i32x4 x1(pos.x), y1(pos.y);
@@ -145,8 +145,8 @@ namespace sampling {
 			floatq dx = pos.x - floatq(x1), dy = pos.y - floatq(y1);
 
 			//TODO: wylaczyc odbicie w pionie
-			y1 = int(tex.Height()) - y1;
-			y2 = int(tex.Height()) - y2;
+			y1 = int(tex->Height()) - y1;
+			y2 = int(tex->Height()) - y2;
 
 			x1 >>= mip;
 			y1 >>= mip;
@@ -211,10 +211,10 @@ namespace sampling {
 	        floatq min = Min(samples[0].texDiff.x * wMul, samples[0].texDiff.y * hMul);
 	        uint pixels = uint(Minimize(min));
 	        mip = 0; while(pixels) { mip++; pixels>>=1; }
-	        mip = Min(mip, tex.Mips()-1);
+	        mip = Min(mip, tex->Mips()-1);
 	    }
 	    
-		const u8 *data=(u8*)tex.DataPointer(mip);
+		const u8 *data=(u8*)tex->DataPointer(mip);
 	    int pitch=mipPitch[mip];
 	    
 		for(int k=0;k<4;k++) {

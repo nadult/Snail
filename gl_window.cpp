@@ -1,5 +1,7 @@
 #include <memory.h>
+#define GL_GLEXT_PROTOTYPES 1
 #include <GL/glfw.h>
+#include <GL/glext.h>
 #include "gl_window.h"
 
 
@@ -197,29 +199,40 @@ namespace
 	}
 
 	void GLWindow::RenderImage(const gfxlib::Texture &image) {
-		static GLuint texture, texW = 0, texH = 0;
-		Assert(image.GetFormat() == gfxlib::TI_A8R8G8B8 ||
-				image.GetFormat() == gfxlib::TI_A8B8G8R8);
+		static GLuint texture = 0, texW = 0, texH = 0;
+		static GLuint pbo = 0;
+		InputAssert(image.GetFormat() == gfxlib::TI_R8G8B8);
 		
 		if(image.Width() > texW || image.Height() > texH) {
-			if(!texW && !texH) glGenTextures(1, &texture);
+			if(!pbo) {
+				glGenTextures(1, &texture);
+				glGenBuffers(1, &pbo);
+
+			}
 			glBindTexture(GL_TEXTURE_2D, texture);
 			
 			for(texW = 1; texW < image.Width(); texW *= 2);
 			for(texH = 1; texH < image.Height(); texH *= 2);
-			
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texW, texH, 0, GL_BGRA, GL_UNSIGNED_BYTE, 0);
+				
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texW, texH, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+			glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, pbo);
+			glBufferData(GL_PIXEL_UNPACK_BUFFER_ARB, texW * texH * 3, 0, GL_STREAM_DRAW);
 			glDisable(GL_DEPTH_TEST);
 		}
 	
-		// TODO: PBO?	
-		glShadeModel(GL_FLAT);
 		glBindTexture(GL_TEXTURE_2D, texture);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, pbo);
+		char *mem = (char*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY);
+		memcpy(mem, image.DataPointer(), image.Width() * image.Height() * 3);
+		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER_ARB);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.Width(), image.Height(), GL_RGB,
+							GL_UNSIGNED_BYTE, 0);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+		glShadeModel(GL_FLAT);
 		glEnable(GL_TEXTURE_2D);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.Width(), image.Height(),
-				image.GetFormat().GlFormat(), image.GetFormat().GlType(), image.DataPointer());
 		
 		float u = float(GetWidth()) / float(texW);
 		float v = float(GetHeight()) / float(texH);

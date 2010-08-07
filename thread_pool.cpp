@@ -3,18 +3,32 @@
 #include <baselib.h>
 #include "thread_pool.h"
 
-//TODO tu gdzies jest bug, bo podczas renderowania na > 1 watku czasami
-//sie zwiesza
-enum { maxThreads = 16 };
+enum { maxThreads = 32 };
+
+#if defined(__PPC) || defined(__PPC__)
+#else
+#define USE_SPINLOCKS
+#endif
+
 
 namespace thread_pool {
 
 namespace {
 
+#if defined(__PPC) || defined(__PPC__)
+	SPEContext speContext[maxThreads];
+	SPEGangContext speGang;
+	spe_program_handle_t *speProgram[maxThreads];
+#endif
 	pthread_t threads[maxThreads];
 	pthread_mutex_t mutexes[maxThreads];
 	pthread_cond_t sleeping[maxThreads];
+
+#ifdef USE_SPINLOCKS
 	pthread_spinlock_t spinlock;
+#else
+	pthread_mutex_t lock;
+#endif
 	volatile bool diePlease[maxThreads];
 	volatile int nextTask = 0;
 	volatile int nFinished = 0;
@@ -40,12 +54,27 @@ namespace {
 		Task *task = 0;
 	REPEAT:
 		while(true) {
+#ifdef USE_SPINLOCKS
 			pthread_spin_lock(&spinlock);
 			task = GetTask(id, task);
 			pthread_spin_unlock(&spinlock);
+#else
+			pthread_mutex_lock(&lock);
+			task = GetTask(id, task);
+			pthread_mutex_unlock(&lock);
+#endif
 			if(!task) break;
 
+#if defined(__PPC) || defined(__PPC__)
+			if(task->preload && speProgram[id] != task->preload) {
+				speProgram[id] = task->preload;
+				speContext[id].Load(task->preload);
+			}
+			speProgram[id] = task->preload;
+			task->Work(&speContext[id]);
+#else
 			task->Work();
+#endif
 		}
 
 		if(id && !diePlease[id]) {
@@ -66,7 +95,15 @@ namespace {
 		static bool sinit = 0;
 		if(!sinit) {
 			tasks.reserve(1024);
+#if defined(__PPC) || defined(__PPC__)
+			speGang.Create();
+#endif
+
+#ifdef USE_SPINLOCKS
 			pthread_spin_init(&spinlock, PTHREAD_PROCESS_PRIVATE);
+#else
+			pthread_mutex_init(&lock, 0);
+#endif
 			atexit(FreeThreads);
 			sinit = 1;
 		}
@@ -75,6 +112,10 @@ namespace {
 			diePlease[nThreads] = 0;
 			pthread_mutex_init(&mutexes[nThreads], 0);
 			pthread_cond_init(&sleeping[nThreads], 0);
+#if defined(__PPC) || defined(__PPC__)
+			speContext[nThreads].Create(&speGang);
+			speProgram[nThreads] = 0;
+#endif
 			if(nThreads) pthread_create(&threads[nThreads], 0, InnerLoop, (void*)nThreads);
 		}
 		while(nThreads > nThreads_) {
@@ -86,12 +127,22 @@ namespace {
 			}
 			pthread_mutex_destroy(&mutexes[nThreads]);
 			pthread_cond_destroy(&sleeping[nThreads]);
+#if defined(__PPC) || defined(__PPC__)
+			speContext[nThreads].Destroy();
+#endif
 		}
 	}
 
 	void FreeThreads() {
 		ChangeThreads(0);
+#ifdef USE_SPINLOCKS
 		pthread_spin_destroy(&spinlock);
+#else
+		pthread_mutex_destroy(&lock);
+#endif
+#if defined(__PPC) || defined(__PPC__)
+		speGang.Destroy();
+#endif
 	}
 
 }
@@ -99,13 +150,21 @@ namespace {
 	void Run(void *ptasks, int nTasks, int stride, int nThreads_) {
 		ChangeThreads(nThreads_);
 
+#ifdef USE_SPINLOCKS
 		pthread_spin_lock(&spinlock);
+#else
+		pthread_mutex_lock(&lock);
+#endif
 			tasks.resize(nTasks);
 			for(int n = 0; n < nTasks; n++)
 				tasks[n] = (Task*)(((char*)ptasks) + stride * n);
 			nFinished = 0;
 			nextTask = 0;
+#ifdef USE_SPINLOCKS
 		pthread_spin_unlock(&spinlock);
+#else
+		pthread_mutex_unlock(&lock);
+#endif
 
 		for(int n = 1; n < nThreads; n++)
 			pthread_cond_broadcast(&sleeping[n]);

@@ -136,20 +136,17 @@ BaseScene::Object::Object(const vector<Vec3f> &tverts,const vector<Vec2f> &tuvs,
 	
 	trans=Identity<>();
 	bbox=BBox(&verts[0],verts.size());
-	optBBox=OptBBox(bbox,Identity<>());
 }
 
 void BaseScene::Object::TransformData(const Matrix<Vec4f> &mat) {
 	for(int n=0;n<verts.size();n++) verts[n]=mat*verts[n];
 	for(int n=0;n<normals.size();n++) normals[n]=mat&normals[n];
 	bbox=BBox(&verts[0],verts.size(),trans);
-	optBBox=OptBBox(bbox,Inverse(trans));
 }
 
 void BaseScene::Object::Transform(const Matrix<Vec4f> &mat) {
 	trans=mat*trans;
 	bbox=BBox(&verts[0],verts.size());
-	optBBox=OptBBox(bbox,Inverse(trans));
 }
 
 void BaseScene::Object::Repair() {
@@ -284,7 +281,6 @@ void BaseScene::Object::BreakToElements(vector<Object> &out) const {
 
 void BaseScene::Object::Optimize() {
 	FindOptimalTrans();
-//	optBBox=OptBBox(&verts[0],verts.size());
 	bbox=BBox(&verts[0],verts.size(),trans);
 }
 
@@ -366,7 +362,6 @@ void BaseScene::Object::Join(const Object &rhs) {
 	std::copy(rhs.uvs.begin(),rhs.uvs.end(),uvs.begin()+lastU);
 	std::copy(rhs.normals.begin(),rhs.normals.end(),normals.begin()+lastN);
 	bbox=BBox(&verts[0],verts.size(),trans);
-	optBBox=OptBBox(bbox,Inverse(trans));
 }
 
 CompactTris BaseScene::Object::ToCompactTris() const {

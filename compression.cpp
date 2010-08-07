@@ -150,7 +150,15 @@ static void filter_coeffs(short *data, int w, int h, int tmax) {
 	}
 }
 
-#define DWT_ENABLED
+#define COMPRESSION_ENABLED
+//#define SPU_COMPRESSION
+//#define DWT_ENABLED
+
+#if defined(__PPC) || defined(__PPC__)
+#include "spu/context.h"
+#include "spu/compression.h"
+#endif
+
 
 
 namespace {
@@ -165,12 +173,33 @@ namespace {
 	//TODO: pitch moze byc nierowne w * bpp
 	struct CompressTask: public thread_pool::Task {
 		CompressTask(gfxlib::Texture &image, CompressedPart *part)
-			:image(&image), part(part) { }
+			:image(&image), part(part) {
+#if defined(SPU_COMPRESSION) && (defined(__PPC__) || defined(__PPC))
+				preload = &spe_compression;
+#endif
+			}
+#if defined(__PPC) || defined(__PPC__)
+		void Work(SPEContext *context) {
+#else
 		void Work() {
-			char scratch[QLZ_SCRATCH_COMPRESS];
-			const u8 *src = (const u8*)image->DataPointer() + part->info.y * image->Pitch();
+#endif
 			int bpp = image->GetFormat().BytesPerPixel();
+#ifdef COMPRESSION_ENABLED
+			const u8 *src = (const u8*)image->DataPointer() + part->info.y * image->Pitch();
 
+#if defined(SPU_COMPRESSION) && (defined(__PPC) || defined(__PPC__))
+			TaskInfo info ALIGN256;
+			char tdata[1024 * 16 * 4 + 400] ALIGN256;
+			memcpy(tdata, src, part->info.w * part->info.h * bpp);
+
+			info.w = part->info.w; info.h = part->info.h;
+			info.bpp = bpp;
+			info.data = (unsigned long long)tdata;
+			context->Run(&info, 0);
+			memcpy(&part->data[0], tdata, info.outSize);
+			part->info.size = info.outSize;
+#else
+			char scratch[QLZ_SCRATCH_COMPRESS];
 			if(bpp == 3) {
 				int w = part->info.w, h = part->info.h, nPixels = w * h;
 				pix buf[w * h * 3];
@@ -182,17 +211,25 @@ namespace {
 					channel[1][n] = src[n * 3 + 1] - src[n * 3 + 0];
 					channel[2][n] = src[n * 3 + 2] - src[n * 3 + 0];
 				}
-#ifdef DWT_ENABLED
+	#ifdef DWT_ENABLED
 				for(int c = 0; c < 3; c++) {
 					dwt_transform(channel[c], w, h);
 					filter_coeffs(channel[c], w, h, 32);	
 				}
-#endif
+	#endif
 				part->info.size = qlz_compress(buf, &part->data[0], part->info.size * sizeof(pix), scratch);
 			}
 			else {
 				part->info.size = qlz_compress(src, &part->data[0], part->info.size, scratch);
 			}
+#endif
+#else
+			for(int y = 0; y < part->info.h; y++)
+				memcpy(	&part->data[y * part->info.w * bpp],
+						(u8*)image->DataPointer() + (part->info.y + y) * image->Pitch(),
+						part->info.w * bpp);
+			part->info.size = part->info.w * part->info.h * bpp;
+#endif
 		}
 
 		const gfxlib::Texture *image;
@@ -203,9 +240,14 @@ namespace {
 		DecompressTask() { }
 		DecompressTask(gfxlib::Texture &image, const CompressedPart *part)
 			:image(&image), part(part) { }
+#if defined(__PPC) || defined(__PPC__)
+		void Work(SPEContext*) {
+#else
 		void Work() {
-			char scratch[QLZ_SCRATCH_DECOMPRESS];
+#endif
 			int bpp = image->GetFormat().BytesPerPixel();
+#ifdef COMPRESSION_ENABLED
+			char scratch[QLZ_SCRATCH_DECOMPRESS];
 			Assert(part->info.x == 0 && part->info.w == image->Width());
 			Assert(qlz_size_decompressed(&part->data[0]) == part->info.w * part->info.h * bpp);
 			u8 *dst = (u8*)image->DataPointer() + part->info.y * image->Pitch();
@@ -236,6 +278,11 @@ namespace {
 			else {
 				qlz_decompress(&part->data[0], dst, scratch);
 			}
+#else
+			for(int y = 0; y < part->info.h; y++)
+				memcpy(	(u8*)image->DataPointer() + (part->info.y + y) * image->Pitch(),
+						&part->data[y * part->info.w * bpp], part->info.w * bpp);
+#endif
 		}
 
 		gfxlib::Texture *image;

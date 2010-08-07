@@ -24,7 +24,7 @@ public:
 	void GetRotation(Vec3f &right, Vec3f &up, Vec3f &front) const;
 
 	float plane_dist;
-private:
+//private:
 	float ang, pitch;
 	Vec3f pos;
 };

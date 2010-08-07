@@ -75,7 +75,7 @@ const Vec3f Camera::Pos() const {
 
 void Camera::GetRotation(Vec3f &oRight, Vec3f &oUp, Vec3f &oFront) const {
 	Vec3f x[2], y[2], z[2];
-	
+
 	::Rotate(Vec3f(0, 1, 0), ang, x[0], y[0], z[0]);
 	::Rotate(Vec3f(1, 0, 0), pitch, x[1], y[1], z[1]);
 

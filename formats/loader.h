@@ -6,11 +6,11 @@
 
 struct ShadingData {
 	ShadingData() { }
-	ShadingData(const Vec3p &a,const Vec3p &b,const Vec3p &c) {
+	ShadingData(const Vec3f &a,const Vec3f &b,const Vec3f &c) {
 		nrm[0]=a; nrm[1]=b; nrm[2]=c;
 		uv[0]=uv[1]=uv[2]=Vec2f(0,0);
 	}
-	Vec3p nrm[3]; // for every vertex
+	Vec3f nrm[3]; // for every vertex
 	Vec2f uv[3];
 };
 

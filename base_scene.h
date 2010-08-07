@@ -76,9 +76,6 @@ public:
 		// transform included
 		inline BBox GetBBox() const { return bbox; }
 		
-		// transform not included
-		inline OptBBox GetOptBBox() const { return optBBox; }
-
 		inline Matrix<Vec4f> GetTrans() const { return trans; }
 		
 		const string &GetName() const { return name; }
@@ -92,7 +89,6 @@ public:
 		
 		BBox bbox;
 		string name;
-		OptBBox optBBox;
 		Matrix<Vec4f> trans;
 		
 		void FindOptimalTrans();

@@ -1,56 +1,91 @@
 #ifndef RTBASE_H
 #define RTBASE_H
 
-#define VECLIB_SSE_VER 0x20
-
 #include <baselib.h>
-#include <veclib.h>
 #include "allocator.h"
 #include <cassert>
-#include <math.h>
 
-
-#define EXPECT_TAKEN(a)         __builtin_expect(!!(a), 1)
-#define EXPECT_NOT_TAKEN(a)   	__builtin_expect(!!(a), 0)
-//#define EXPECT_TAKEN(a)			a
-//#define EXPECT_NOT_TAKEN(a)		a
-
-#define NOINLINE __attribute__((noinline))
+#include "rtbase_math.h"
 
 using namespace baselib;
-using namespace veclib;
 
 extern int gVals[16];
 
-typedef Vec2<float> Vec2f;
-typedef Vec3<float> Vec3f;
-typedef Vec4<float> Vec4f;
-typedef pvec2f32	Vec2p;
-typedef pvec3f32	Vec3p;
-typedef pvec4f32	Vec4p;
-typedef vec2f32x4	Vec2q;
-typedef vec3f32x4	Vec3q;
-typedef vec4f32x4	Vec4q;
-typedef f32x4		floatq;
-typedef i32x4		intq;
 
-template <class Vec>
-const Vec Reflect(const Vec ray,const Vec nrm) {
-	typename Vec::TScalar dot = (nrm | ray);
-	return ray - nrm * (dot + dot);
+inline unsigned short ByteSwap(unsigned short v) {
+	return ((v & 0xff) << 8) | ((v & 0xff00) >> 8);
 }
 
-template <class Vec>
-const Vec Normalize(const Vec v) { return v * RSqrt(v | v); }
+inline unsigned short ByteSwap(short v) {
+	return ((v & 0xff) << 8) | ((v & 0xff00) >> 8);
+}
 
-inline float Maximize(const floatq t) { return Max(Max(t[0], t[1]), Max(t[2], t[3])); }
-inline float Minimize(const floatq t) { return Min(Min(t[0], t[1]), Min(t[2], t[3])); }
-inline Vec2p Maximize(const Vec2q v) { return Vec2p(Maximize(v.x), Maximize(v.y)); }
-inline Vec2p Minimize(const Vec2q v) { return Vec2p(Minimize(v.x), Minimize(v.y)); }
-inline Vec3p Maximize(const Vec3q v) { return Vec3p(Maximize(v.x), Maximize(v.y), Maximize(v.z)); }
-inline Vec3p Minimize(const Vec3q v) { return Vec3p(Minimize(v.x), Minimize(v.y), Minimize(v.z)); }
+inline double ByteSwap(double v) {
+	union { double d; char c[8]; };
+	d = v;
+	for(int k = 0; k < 4; k++)
+		{ char t = c[k]; c[k] = c[7 - k]; c[7 - k] = t; }
+	return d;
+}
 
-inline Vec3f ExtractN(const Vec3q v, int n) { return Vec3f(v.x[n], v.y[n], v.z[n]); }
+inline int ByteSwap(int i) {
+	return __builtin_bswap32(i);
+}
+
+inline unsigned int ByteSwap(unsigned int i) {
+	return __builtin_bswap32(i);
+}
+
+inline float ByteSwap(float i) {
+	return BitCast<float>(__builtin_bswap32(BitCast<int>(i)));
+}
+
+inline const Vec2f ByteSwap(const Vec2f v)
+	{ return Vec2f(ByteSwap(v.x), ByteSwap(v.y)); }
+
+inline const Vec3f ByteSwap(const Vec3f v)
+	{ return Vec3f(ByteSwap(v.x), ByteSwap(v.y), ByteSwap(v.z)); }
+
+inline const Vec4f ByteSwap(const Vec4f v)
+	{ return Vec4f(ByteSwap(v.x), ByteSwap(v.y), ByteSwap(v.z), ByteSwap(v.w)); }
+
+inline void ByteSwap(unsigned short *v) {
+	*v = ((*v & 0xff) << 8) | ((*v & 0xff00) >> 8); //TODO: check for correctness
+}
+
+inline void ByteSwap(short *v) {
+	*v = ((*v & 0xff) << 8) | ((*v & 0xff00) >> 8);
+}
+
+inline void ByteSwap(double *v) {
+	union { double d; char c[8]; };
+	d = *v;
+	for(int k = 0; k < 4; k++)
+		{ char t = c[k]; c[k] = c[7 - k]; c[7 - k] = t; }
+	*v = d;
+}
+
+inline void ByteSwap(int *v) {
+	*v = __builtin_bswap32(*v);
+}
+
+inline void ByteSwap(unsigned int *v) {
+	*v = __builtin_bswap32(*v);
+}
+
+inline void ByteSwap(float *v) {
+	*v = BitCast<float>(__builtin_bswap32(BitCast<int>(*v)));
+}
+
+inline void ByteSwap(Vec2f *v)
+	{ *v = Vec2f(ByteSwap(v->x), ByteSwap(v->y)); }
+
+inline void ByteSwap(Vec3f *v)
+	{ *v = Vec3f(ByteSwap(v->x), ByteSwap(v->y), ByteSwap(v->z)); }
+
+inline void ByteSwap(Vec4f *v)
+	{ *v = Vec4f(ByteSwap(v->x), ByteSwap(v->y), ByteSwap(v->z), ByteSwap(v->w)); }
+
 
 bool isnan(float t);
 bool IsNan(const Vec3f f);

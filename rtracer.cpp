@@ -204,7 +204,7 @@ static int tmain(int argc, char **argv) {
 	GLWindow window(resx, resy, fullscreen);
 	Font font;
 
-	gfxlib::Texture image(resx, resy, gfxlib::TI_A8R8G8B8);
+	gfxlib::Texture image(resx, resy, gfxlib::TI_R8G8B8);
 	vector<Light> lights;// = GenLights();
 			
 	Camera cam;
@@ -215,7 +215,7 @@ static int tmain(int argc, char **argv) {
 	bool staticEnabled = 0;
 	float speed; {
 	//	scene.geometry.Construct(builder.ExtractElements());
-		Vec3p size = scene.geometry.GetBBox().Size();
+		Vec3f size = scene.geometry.GetBBox().Size();
 		speed = (size.x + size.y + size.z) * 0.0025f;
 	}
 

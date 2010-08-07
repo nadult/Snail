@@ -49,12 +49,33 @@ namespace shading {
 			{ MatClass::Shade_(samples, rays, sc); }
 	};
 
+	struct MaterialDesc {
+		Vec3f ambient, diffuse, specular, emissive;
+		Vec3f transmission;
+		int illuminationModel;
+		float dissolveFactor;
+		float specularExponent;
+		int refractionIndex;
+
+		string ambientMap, diffuseMap;
+		string specularMap, emissiveMap;
+		string exponentMap, dissolveMap;
+
+		string name;
+	};
+
+	const vector<MaterialDesc> LoadMaterialDescs(const string &fileName);
+
+	using sampling::TexDict;
+	using sampling::PTexture;
+
 	typedef Ptr<Material> PMaterial;
 	typedef std::map<string, PMaterial> MatDict;
 
-	Material *NewMaterial(const string &texName, bool nDotL = 1);
+	Material *NewMaterial(PTexture tex, bool nDotL = 1);
 
-	const MatDict LoadMaterials(const string &fileName, const string &texPath);
+	const TexDict LoadTextures(const vector<MaterialDesc> &matDescs, const string &texPath);
+	const MatDict MakeMaterials(const vector<MaterialDesc> &matDescs, const TexDict &texDict);
 
 }
 

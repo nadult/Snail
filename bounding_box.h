@@ -70,7 +70,7 @@ public:
 	template <int size,bool sharedOrigin>
 	void UpdateMinMaxDist(	const RayGroup<size,sharedOrigin> &rays,int dirMask,
 							floatq *__restrict__ tMin,floatq *__restrict__ tMax) const {
-		Vec3p rMin = min, rMax = max;
+		Vec3f rMin = min, rMax = max;
 
 		if(dirMask&1) Swap(rMin.x,rMax.x);
 		if(dirMask&2) Swap(rMin.y,rMax.y);
@@ -264,29 +264,5 @@ float BoxPointDistanceSq(const BBox &box,const Vec3f &point);
 
 inline BBox operator+(const BBox &a,const BBox &b) { BBox out(a); out+=b; return out; }
 inline BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out*=mat; return out; }
-
-class OptBBox {
-public:
-	inline OptBBox() { }
-	OptBBox(const BBox&,const Matrix<Vec4f>&);
-	OptBBox(const BBox&,const Matrix<Vec4f>&,const Matrix<Vec4f>&inv);
-	OptBBox(const Vec3f *verts,uint count);
-	operator BBox() const;
-
-	inline const Matrix<Vec4f> &GetTrans() const { return trans; }
-	inline const BBox &GetBBox() const { return box; }
-	
-	template <class Real,class Vec>
-	bool Test(const Vec &rayOrig,const Vec &rayDir,const Real &maxDist=Real(1.0f/0.0f)) const {
-		return box.Test(invTrans*rayOrig,invTrans&rayDir,maxDist);
-	}
-	
-	
-private:
-	BBox box;
-	Matrix<Vec4f> trans,invTrans;
-};
-
-
 
 #endif

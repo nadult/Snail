@@ -10,8 +10,8 @@ namespace shading {
 
 	Material::~Material() { }
 
-	Material *NewMaterial(const string &texName, bool NDotL) {
-		PSampler sampler = sampling::NewSampler(texName);
+	Material *NewMaterial(PTexture tex, bool NDotL) {
+		PSampler sampler = sampling::NewSampler(tex);
 
 		return sampler?
 					NDotL?	(Material*)new MaterialWrapper< TexMaterial<1> >(sampler):
@@ -39,33 +39,16 @@ namespace shading {
 		return out;	
 	}
 
-	struct Mat {
-		Vec3f ambient, diffuse, specular, emissive;
-		Vec3f transmission;
-		int illuminationModel;
-		float dissolveFactor;
-		float specularExponent;
-		int refractionIndex;
-
-		string ambientMap, diffuseMap;
-		string specularMap, emissiveMap;
-		string exponentMap, dissolveMap;
-
-		string name;
-	};
-
-	const MatDict LoadMaterials(const string &fileName, const string &texPath) {
+	const vector<MaterialDesc> LoadMaterialDescs(const string &fileName) {
 		std::filebuf fb;
 		if(!fb.open (fileName.c_str(),std::ios::in)) {
 			std::cout << "Error while opening: " << fileName << '\n';
-			return MatDict();
+			return vector<MaterialDesc>();
 		}
-
 		std::istream is(&fb);
-		std::map<string, PMaterial> out;
 
-		vector<Mat> mats;
-		Mat newMat;
+		vector<MaterialDesc> mats;
+		MaterialDesc newMat;
 
 		while(is.good()) {
 			string line;
@@ -83,7 +66,7 @@ namespace shading {
 			if(token == "newmtl") {
 				if(newMat.name != "") {
 					mats.push_back(newMat);
-					newMat = Mat();
+					newMat = MaterialDesc();
 				}
 				ss >> newMat.name;
 			}
@@ -121,22 +104,60 @@ namespace shading {
 		if(newMat.name != "")
 			mats.push_back(newMat);
 
-		for(size_t n = 0; n < mats.size(); n++) {
-			const Mat &mat = mats[n];
-			PMaterial newMat;
-			try {
-				if(mat.dissolveMap != "") {
-					PSampler col = sampling::NewSampler(texPath + mat.diffuseMap);
-					PSampler trans = sampling::NewSampler(texPath + mat.dissolveMap);
+		return mats;
+	}
 
-					newMat = new MaterialWrapper<TransparentMaterial<1>>(col, trans);
-				}
-				else
-					newMat = NewMaterial(texPath + mat.diffuseMap, 1);
+	static void LoadTex(const string &name, const string &path, TexDict &dict) {
+		if(name != "" && dict.find(name) == dict.end()) {
+			try {
+				PTexture tex = new gfxlib::Texture;
+				Loader(path + name) & *tex;
+				dict[name] = tex;
 			}
 			catch(const Exception &ex) {
 				std::cout << ex.what() << '\n';
-				newMat = NewMaterial("");
+			}
+		}
+	}
+
+	const TexDict LoadTextures(const vector<MaterialDesc> &matDescs, const string &texPath) {
+		TexDict texDict;
+
+		for(size_t n = 0; n < matDescs.size(); n++) {
+			const MaterialDesc &mat = matDescs[n];
+			LoadTex(mat.dissolveMap, texPath, texDict);
+			LoadTex(mat.diffuseMap, texPath, texDict);
+			LoadTex(mat.dissolveMap, texPath, texDict);
+			LoadTex(mat.ambientMap, texPath, texDict);
+			LoadTex(mat.specularMap, texPath, texDict);
+			LoadTex(mat.emissiveMap, texPath, texDict);
+			LoadTex(mat.exponentMap, texPath, texDict);
+		}
+
+		return texDict;
+	}
+
+	const MatDict MakeMaterials(const vector<MaterialDesc> &matDescs, const TexDict &texDict) {
+		std::map<string, PMaterial> out;
+
+		for(size_t n = 0; n < matDescs.size(); n++) {
+			const MaterialDesc &mat = matDescs[n];
+			PMaterial newMat;
+			try {
+				TexDict::const_iterator it1 = texDict.find(mat.diffuseMap);
+				TexDict::const_iterator it2 = texDict.find(mat.dissolveMap);
+				PTexture diff  = it1 == texDict.end()? (PTexture)0 : it1->second;
+				PTexture trans = it2 == texDict.end()? (PTexture)0 : it2->second;
+
+				if(diff && trans)
+					newMat = new MaterialWrapper<TransparentMaterial<1>>(
+								sampling::NewSampler(diff), sampling::NewSampler(trans));
+				else
+					newMat = NewMaterial(diff);
+			}
+			catch(const Exception &ex) {
+				std::cout << ex.what() << '\n';
+				newMat = NewMaterial(0);
 			}
 
 			out[mat.name] = newMat;

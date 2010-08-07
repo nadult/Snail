@@ -20,9 +20,10 @@ namespace comm {
 			*rank = status.MPI_SOURCE;
 	}
 
-	void MPIAnyNode::Write(void *data, size_t size) {
-		//TODO: test
-		exit(0);
+	void MPIBcast::Write(const void *data, size_t size) {
+		MPI_Bcast((void*)data, size, MPI_CHAR, 0, MPI_COMM_WORLD);
+	}
+	void MPIBcast::Read(void *data, size_t size) {
 		MPI_Bcast(data, size, MPI_CHAR, 0, MPI_COMM_WORLD);
 	}
 

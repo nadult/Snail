@@ -34,10 +34,10 @@ void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 		if(nodes[nNode].IsLeaf()) {
 			int count = nodes[nNode].count, first = nodes[nNode].first & 0x7fffffff;
 
-			_mm_prefetch(&triCache[first + 0], _MM_HINT_T0);
-			_mm_prefetch(&triCache[first + 1], _MM_HINT_T0);
-			_mm_prefetch(&triCache[first + 2], _MM_HINT_T0);
-			_mm_prefetch(&triCache[first + 3], _MM_HINT_T0);
+			__builtin_prefetch(&triCache[first + 0], 0, 3);
+			__builtin_prefetch(&triCache[first + 1], 0, 3);
+			__builtin_prefetch(&triCache[first + 2], 0, 3);
+			__builtin_prefetch(&triCache[first + 3], 0, 3);
 
 			const BBox &box = nodes[nNode].bbox;
 			if(!box.TestInterval(interval))
@@ -56,8 +56,8 @@ void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 		}
 			
 		int child = nodes[nNode].subNode;
-		_mm_prefetch(&nodes[child + 0], _MM_HINT_T0);
-		_mm_prefetch(&nodes[child + 1], _MM_HINT_T0);
+		__builtin_prefetch(&nodes[child + 0], 0, 3);
+		__builtin_prefetch(&nodes[child + 1], 0, 3);
 			
 		bool test = 0; {
 			const BBox &box = nodes[nNode].bbox;
@@ -99,10 +99,10 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 		if(nodes[nNode].IsLeaf()) {
 			int count = nodes[nNode].count, first = nodes[nNode].first & 0x7fffffff;
 
-			_mm_prefetch(&triCache[first + 0], _MM_HINT_T0);
-			_mm_prefetch(&triCache[first + 1], _MM_HINT_T0);
-			_mm_prefetch(&triCache[first + 2], _MM_HINT_T0);
-			_mm_prefetch(&triCache[first + 3], _MM_HINT_T0);
+			__builtin_prefetch(&triCache[first + 0], 0, 3);
+			__builtin_prefetch(&triCache[first + 1], 0, 3);
+			__builtin_prefetch(&triCache[first + 2], 0, 3);
+			__builtin_prefetch(&triCache[first + 3], 0, 3);
 
 			const BBox &box = nodes[nNode].bbox;
 			if(!box.TestInterval(interval))
@@ -124,8 +124,8 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 		}
 			
 		int child = nodes[nNode].subNode;
-		_mm_prefetch(&nodes[child + 0], _MM_HINT_T0);
-		_mm_prefetch(&nodes[child + 1], _MM_HINT_T0);
+		__builtin_prefetch(&nodes[child + 0], 0, 3);
+		__builtin_prefetch(&nodes[child + 1], 0, 3);
 
 		bool test = 0; {
 			const BBox &box = nodes[nNode].bbox;

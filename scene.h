@@ -26,33 +26,18 @@ public:
 template <class AccStruct>
 class Scene {
 public:
-	Scene() :defaultMat(Vec3f(1, 1, 1)) {
-		ambientLight = Vec3f(0.1f,0.1f,0.1f);
-	}
+	Scene();
 
 	AccStruct geometry;
 	Vec3f ambientLight;
 	vector<Light> lights;
 	vector<shading::PMaterial> materials;
 	shading::MatDict matDict;
-	shading::MaterialWrapper< shading::SimpleMaterial<true> > defaultMat;
+	shading::TexDict texDict;
+	shading::MaterialWrapper<shading::SimpleMaterial<true> > defaultMat;
 
-	void UpdateMaterials() {
-		materials.clear();
-		for(shading::MatDict::iterator it = matDict.begin(); it != matDict.end(); ++it)
-			it->second->id = ~0;
-		for(shading::MatDict::iterator it = matDict.begin(); it != matDict.end(); ++it) {
-			it->second->id = materials.size();
-			materials.push_back(it->second);
-		}
-	}
-
-	const std::map<string, int> GetMatIdMap() const {
-		std::map<string, int> out;
-		for(shading::MatDict::const_iterator it = matDict.begin(); it != matDict.end(); ++it)
-			out[it->first] = it->second->id;
-		return out;
-	}
+	void UpdateMaterials();
+	const std::map<string, int> GetMatIdMap() const;
 
 	template <bool sharedOrigin, bool hasMask>
 	const TreeStats RayTrace(const RayGroup<sharedOrigin, hasMask>&, Cache&, Vec3q *outColor)

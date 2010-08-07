@@ -91,7 +91,7 @@ public:
 	const Vec3q &Origin(int n) const{ return origin[sharedOrigin? 0 : n]; }
 	const Vec3q &IDir(int n) const	{ return iDir[n]; }
 	char Mask(int n) const			{ return 15; }
-	const f32x4b SSEMask(int n)const{ return _mm_set1_ps(UValue(~0).f); }
+	const f32x4b SSEMask(int n)const{ return f32x4b(true); }
 
 	const Vec3q *DirPtr() const		{ return dir; }
 	const Vec3q *OriginPtr() const	{ return origin; }

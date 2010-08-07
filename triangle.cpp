@@ -112,14 +112,6 @@ template void Triangle::Collide<0, 1>(Context<0, 1>&, int, int, int) const;
 template void Triangle::Collide<1, 0>(Context<1, 0>&, int, int, int) const;
 template void Triangle::Collide<1, 1>(Context<1, 1>&, int, int, int) const;
 
-static inline const floatq LoadXXYY(float x, float y) {
-	return _mm_shuffle_ps(_mm_set1_ps(x), _mm_set1_ps(y), 0);
-}
-
-static inline const floatq LoadXYXY(float x, float y) {
-	return _mm_unpacklo_ps(_mm_set1_ps(x), _mm_set1_ps(y));
-}
-
 bool Triangle::TestInterval(const RayInterval &i) const {
 	//TODO: min/max origin
 	Vec3f nrm = Nrm();

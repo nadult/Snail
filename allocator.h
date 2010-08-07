@@ -4,8 +4,7 @@
 #include <limits>
 #include <veclib.h>
 
-
-	template <class T,int alignment=64>
+	template <class T,int alignment = 64>
 	class AlignedAllocator
 	{
 	public:
@@ -19,17 +18,33 @@
 
 		template <class U> struct rebind { typedef AlignedAllocator<T,alignment> other; };
 
-		template <class U> inline bool operator==(const AlignedAllocator &other) { return true; }
-		template <class U> inline bool operator!=(const AlignedAllocator &other) { return false; }
+		template <class U> bool operator==(const AlignedAllocator &other) { return true; }
+		template <class U> bool operator!=(const AlignedAllocator &other) { return false; }
 
-		inline pointer address(reference r) const				{ return &r; }
-		inline const_pointer address(const_reference c)			{ return &c; }
-		inline size_type max_size() const						{ return std::numeric_limits<size_t>::max() / sizeof(T); }
+		pointer address(reference r) const				{ return &r; }
+		const_pointer address(const_reference c)			{ return &c; }
+		size_type max_size() const						{ return std::numeric_limits<size_t>::max() / sizeof(T); }
 
-		inline pointer allocate(size_type n,const void *t=0)	{ return (pointer)_mm_malloc(sizeof(T)*n,alignment); }
-		inline void deallocate(pointer p,size_type n) 			{ _mm_free(p); }
-		inline void construct(pointer p,const_reference c)		{ new( reinterpret_cast<void*>(p) ) T(c); }
-		inline void destroy(pointer p)							{ (p)->~T(); }
+		pointer allocate(size_type n, const void* = 0) {
+			size_t size = n * sizeof(T);
+
+			char *ptr = (char *)malloc(size + alignment + sizeof(int));
+			if(!ptr) throw std::bad_alloc();
+
+			char *ptr2 = ptr + sizeof(int);
+			char *aligned_ptr = ptr2 + (alignment - ((size_t)ptr2 & (alignment - 1)));
+
+			ptr2 = aligned_ptr - sizeof(int);
+			*((int*)ptr2)=(int)(aligned_ptr - ptr);
+
+			return (pointer)aligned_ptr;
+		}
+
+		void deallocate(pointer ptr, size_type n) {
+			free((char*)ptr - ((int*)ptr)[-1]);
+		}
+		void construct(pointer p,const_reference c)	{ new( reinterpret_cast<void*>(p) ) T(c); }
+		void destroy(pointer p)						{ (p)->~T(); }
 	};
 
 

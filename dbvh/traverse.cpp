@@ -50,8 +50,10 @@ void DBVH::TraversePrimary0(Context<sharedOrigin, hasMask> &c, int firstNode) co
 		}
 			
 		int child = nodes[nNode].subNode;
+#ifdef VECLIB_SSE_VER
 		_mm_prefetch(&nodes[child + 0], _MM_HINT_T0);
 		_mm_prefetch(&nodes[child + 1], _MM_HINT_T0);
+#endif
 			
 		bool test = 1; {
 			const BBox &box = nodes[nNode].bbox;
