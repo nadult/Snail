@@ -3,21 +3,18 @@
 #include "camera.h"
 
 #include "gl_window.h"
-#include "formats/loader.h"
-#include "base_scene.h"
-#include "bvh/tree.h"
-#include "render.h"
-
 #include "scene.h"
 #include "font.h"
 #include "frame_counter.h"
-
 #include "compression.h"
 #include "comm.h"
+#include "tree_stats.h"
 
 #include <GL/gl.h>
 
+
 using comm::Socket;
+using comm::PSocket;
 using comm::Pod;
 
 using std::cout;
@@ -25,6 +22,7 @@ using std::endl;
 
 static void PrintHelp() {
 	printf("Synopsis:    rtracer model_file [options]\nOptions:\n\t-res x y   - set rendering resolution [512 512]\n\t");
+	printf("TODO: update me\n");
 	printf("-fullscreen\n\t-toFile   - renders to file out/output.tga\n\t-threads n   - set threads number to n\n\t");
 	printf("\nExamples:\n\t./rtracer -res 1280 800 abrams.obj\n\t./rtracer pompei.obj -res 800 600 -fullscreen\n\n");
 	printf("Interactive control:\n\tA,W,S,D R,F - move the camera\n\tN,M - rotate camera\n\t");
@@ -34,8 +32,6 @@ static void PrintHelp() {
 	printf("F1 - toggle shadow caching\n\t");
 	printf("esc - exit\n\n");
 }
-
-typedef BVH StaticTree;
 
 static vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
 	vector<Light> out;
@@ -53,7 +49,41 @@ static vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
 	return out;
 }
 
-static void MoveCamera(Camera &cam, GLWindow &window, float speed) {
+static void MoveCamera(OrbitingCamera &cam, GLWindow &window, float speed) {
+	if(window.Key(Key_lshift)) speed *= 5.f;
+	if(window.MouseKey(0)) {
+		window.GrabMouse(1);
+		float dx = window.MouseMove().x;
+		float dy = window.MouseMove().y;
+
+		if(dx) cam.Rotate(-dx * 0.005);
+		if(dy) cam.RotateY(dy * 0.005);
+	}
+	else window.GrabMouse(0);
+		
+	if(window.Key(Key_left)) cam.Rotate(0.01);
+	if(window.Key(Key_right)) cam.Rotate(-0.01);
+	
+	float zoom = 0;
+	zoom = window.MouseMove().z * 4;
+	if(window.Key('R')) zoom = 1;
+	if(window.Key('F')) zoom = -1;
+
+	if(zoom)
+		cam.Zoom(-zoom * Clamp(sqrtf(cam.dist), 0.5f, 10.0f) * 0.1 * speed);
+
+	Vec3f move(0, 0, 0);
+	Camera tcam = (Camera)cam;
+
+	if(window.Key('W')) move += tcam.front;
+	if(window.Key('S')) move -= tcam.front;
+	if(window.Key('A')) move -= tcam.right;
+	if(window.Key('D')) move += tcam.right;
+
+	cam.SetPos(cam.pos + move * speed);
+}
+static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
+	if(window.Key(Key_lshift)) speed *= 5.f;
 	if(window.MouseKey(0)) {
 		window.GrabMouse(1);
 		float dx = window.MouseMove().x;
@@ -65,31 +95,29 @@ static void MoveCamera(Camera &cam, GLWindow &window, float speed) {
 	else window.GrabMouse(0);
 
 	Vec3f move(0, 0, 0);
-	Vec3f right, up, front;
-	cam.GetRotation(right, up, front);
+	Camera tcam = (Camera)cam;
 
-	if(window.Key('W')) move += front;
-	if(window.Key('S')) move -= front;
-	if(window.Key('A')) move -= right;
-	if(window.Key('D')) move += right;
-	if(window.Key('R')) move += up;
-	if(window.Key('F')) move -= up;
+	if(window.Key('W')) move += tcam.front;
+	if(window.Key('S')) move -= tcam.front;
+	if(window.Key('A')) move -= tcam.right;
+	if(window.Key('D')) move += tcam.right;
+	if(window.Key('R')) move += tcam.up;
+	if(window.Key('F')) move -= tcam.up;
 
-	cam.Move(move * speed * (window.Key(Key_lshift)? 5.0f : 1.0f));
+	cam.Move(move * speed);
 }
 
-void SendFrameRequest(Socket &socket, Camera &cam, vector<Light> &lights,
-					int threads, bool finish) {
+void SendFrameRequest(PSocket sock, Camera cam, vector<Light> &lights, int threads, bool finish) {
 	int size = lights.size();
 
-	socket << Pod(finish) << Pod(cam) << Pod(size);
-	socket << comm::Data(&lights[0], size * sizeof(Light));
-	socket << Pod(gVals) << Pod(threads);
+	sock << finish << Pod(cam) << size;
+	sock << comm::Data(&lights[0], size * sizeof(Light));
+	sock << Pod(gVals) << threads;
 }
 
 static int client_main(int argc, char **argv) {
 	printf("Snail v0.20 by nadult\n");
-	if(argc>=2&&string("--help")==argv[1]) {
+	if(argc >= 2 && string("--help") == argv[1]) {
 		PrintHelp();
 		return 0;
 	}
@@ -98,27 +126,28 @@ static int client_main(int argc, char **argv) {
 	CameraConfigs camConfigs;
 	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
 
-	int resx=1024, resy=1024;
+	int resx = 1024, resy = 1024;
 	bool fullscreen = 0;
 	int threads = 2;
 	const char *modelFile = "foot.obj";
 	const char *host = "blader";
 
-	Options options;
-	bool flipNormals = 1;
-	bool rebuild = 0, slowBuild = 0;
+//	Options options;
+	bool flipNormals = 1, swapYZ = 0;
+	int rebuild = 0;
 	string texPath = "scenes/";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
-		else if(string("-rebuild") == argv[n]) { rebuild = 1; }
-		else if(string("-slowBuild") == argv[n]) { rebuild = 1; slowBuild = 1; }
-		else if(string("-threads")==argv[n]&&n<argc-1) { threads=atoi(argv[n+1]); n+=1; }
-		else if(string("-fullscreen")==argv[n]) { fullscreen=1; }
-		else if(string("+flipNormals")==argv[n]) flipNormals=1;
-		else if(string("-flipNormals")==argv[n]) flipNormals=0;
-		else if(string("-texPath")==argv[n]) { texPath=argv[n+1]; n++; }
-		else if(string("-host")==argv[n]) { host=argv[n+1]; n++; }
+		else if(string("-rebuild") == argv[n]) rebuild = 1;
+		else if(string("-slowBuild") == argv[n]) rebuild = 2;
+		else if(string("-threads") == argv[n] && n < argc - 1) { threads=atoi(argv[n+1]); n+=1; }
+		else if(string("-fullscreen") == argv[n]) fullscreen = 1;
+		else if(string("+flipNormals") == argv[n]) flipNormals = 1;
+		else if(string("-flipNormals") == argv[n]) flipNormals = 0;
+		else if(string("-swapYZ") == argv[n]) swapYZ = 1;
+		else if(string("-texPath") == argv[n]) { texPath=argv[n+1]; n++; }
+		else if(string("-host") == argv[n]) { host=argv[n+1]; n++; }
 		else {
 			if(argv[n][0] == '-') {
 				printf("Unknown option: %s\n",argv[n]);
@@ -127,41 +156,6 @@ static int client_main(int argc, char **argv) {
 			else modelFile = argv[n];
 		}
 	}
-
-	if(rebuild) {
-		Scene<StaticTree> staticScene;
-
-		printf("Loading...\n");
-		double buildTime = GetTime();
-		BaseScene baseScene; {
-			string fileName = string("scenes/") + modelFile;
-			if(fileName.find(".proc") != string::npos)
-				baseScene.LoadDoom3Proc(fileName);
-			else if(fileName.find(".obj") != string::npos)
-				baseScene.LoadWavefrontObj(fileName);
-			else ThrowException("Unrecognized format: ", fileName);
-
-			int tris = 0;
-			for(int n = 0; n < baseScene.objects.size(); n++)
-				tris += baseScene.objects[n].tris.size();
-			printf("Tris: %d\n",tris);
-
-			if(flipNormals) baseScene.FlipNormals();
-		//	for(int n = 0; n < baseScene.objects.size(); n++)
-		//		baseScene.objects[n].Repair();
-			baseScene.GenNormals();
-		//	baseScene.Optimize();
-		}
-		
-		staticScene.geometry.Construct(baseScene.ToCompactTris(), baseScene.matNames, !slowBuild);
-	//	staticScene.geometry.Construct(baseScene.ToTriangleVector());
-		Saver(string("dump/") + modelFile) & staticScene.geometry;
-		buildTime = GetTime() - buildTime;
-		std::cout << "Build time: " << buildTime << '\n';
-	
-		staticScene.geometry.PrintInfo();
-	}
-
 
 	GLWindow window(resx, resy, fullscreen);
 	Font font;
@@ -175,25 +169,36 @@ static int client_main(int argc, char **argv) {
 		
 	Socket socket;
 	socket.Connect(host, "20002");
+	socket.NoDelay(1);
+	PSocket sock(socket);
 
 	Vec3f sceneCenter, sceneSize;
 	{
-		char model[256]; snprintf(model, 256, "%s", modelFile);
-		socket << Pod(resx) << Pod(resy) << Pod(model);		
+		comm::LoadNewModel lm;
+		lm.name = modelFile; lm.resx = resx; lm.resy = resy;
+		lm.rebuild = rebuild; lm.flipNormals = flipNormals;
+		lm.swapYZ = swapYZ;
+		sock << lm;
 		printf("Waiting for server..\n");
-		socket >> Pod(sceneCenter) >> Pod(sceneSize);
+		sock >> sceneCenter >> sceneSize;
 	}
 	float speed = (sceneSize.x + sceneSize.y + sceneSize.z) * 0.0025f;
 	float sceneScale = Length(sceneSize);
 
-	Camera cam;
+	FPSCamera cam;
 	if(!camConfigs.GetConfig(string(modelFile),cam))
 		cam.SetPos(sceneCenter);
+	OrbitingCamera ocam;
 
-	bool finish = 0, displayEnabled = 1;
-	SendFrameRequest(socket, cam, lights, threads, finish);
-	vector<CompressedPart> parts;
+	bool finish = 0, orbiting = 0;
+	SendFrameRequest(sock, (Camera)cam, lights, threads, finish);
 	double frameTime = GetTime();
+
+	vector<DecompressBuffer> buffers(2);
+
+	double fpsMin = constant::inf, fpsMax = 0, fpsSum = 0;
+	long long nFrames = 0, nRays = 0;
+	double startTime = GetTime();
 
 	while(!finish) {
 		if(!window.PollEvents() || window.KeyUp(Key_esc)) finish = 1;
@@ -201,8 +206,8 @@ static int client_main(int argc, char **argv) {
 		
 		if(window.KeyDown('K'))
 			Saver("out/output.dds") & image;
-		if(window.KeyDown('I'))
-			options.rdtscShader ^= 1;
+//		if(window.KeyDown('I'))
+//			options.rdtscShader ^= 1;
 		if(window.KeyDown('C'))
 			cam.SetPos(sceneCenter);
 		if(window.KeyDown('P')) {
@@ -210,7 +215,26 @@ static int client_main(int argc, char **argv) {
 			Saver("scenes/cameras.dat") & camConfigs;
 			cam.Print();
 		}
-		if(window.KeyDown('X')) displayEnabled ^= 1;
+		if(window.KeyDown('O')) {
+			if(orbiting) cam.SetPos(ocam.pos);
+			else ocam.SetPos(cam.pos);
+			orbiting ^= 1;
+		}
+		if(window.KeyDown('X')) {
+			printf("Clearing stats\n");
+			fpsMin = constant::inf;
+			fpsMax = fpsSum = 0;
+			nFrames = nRays = 0;
+			startTime = GetTime();
+		}
+		if(window.KeyDown('Z')) {
+			printf("Stats:\n");
+			double workTime = GetTime() - startTime;
+			double fpsAvg = fpsSum / double(nFrames);
+			double mraysPerSec = (double(nRays) / workTime) / 1000000;
+			printf("Min FPS: %f\nMax FPS: %f\nAvg FPS: %f\nMRays/sec: %f\n",
+					fpsMin, fpsMax, fpsAvg, mraysPerSec);
+		}
 
 		if(window.KeyDown('L')) {
 			printf("Lights %s\n", lightsEnabled? "disabled" : "enabled");
@@ -220,14 +244,25 @@ static int client_main(int argc, char **argv) {
 			Vec3f colors[4] = {
 				Vec3f(1,1,1), Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0) };
 
+			Vec3f pos = (orbiting?(Camera)ocam : (Camera)cam).pos;
 			srand(time(0));
-			lights.push_back(Light(cam.Pos(), colors[rand()&3], 1000.0f * 0.001f * sceneScale));
+			lights.push_back(Light(pos, colors[rand() & 3], 1000.0f * 0.001f * sceneScale));
 		}
 
-		MoveCamera(cam, window, speed);
+		if(orbiting)
+			MoveCamera(ocam, window, speed);
+		else
+			MoveCamera(cam, window, speed);
 
-		for(int n = 0; n <= 9; n++) if(window.Key('0' + n))
-				{ threads = n == 0?32 : n == 9? 16 : n; printf("Threads: %d\n", threads); }
+		int lastThreads = threads;
+		for(int n = 0; n <= 9; n++) if(window.Key('0' + n)) {
+			int newThreads = n == 0?32 : n == 9? 16 : n;
+			if(newThreads != lastThreads) {
+				threads = newThreads;
+				printf("Threads: %d\n", threads);
+				break;
+			}
+		}
 
 		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Traversing from 8x8: %s\n", gVals[0]?"on" : "off"); }
 		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
@@ -247,59 +282,76 @@ static int client_main(int argc, char **argv) {
 	//		for(int n=0;n<tLights.size();n++)
 	//			tLights[n].pos += Vec3f(sin(animPos+n*n),cos(animPos+n*n),
 	//				sin(animPos-n*n)*cos(animPos+n*n)) * speed * 100.0f;
-		int w = image.Width(), h = image.Height();
 
-		int nBytes = 0, numNodes;
-		double buildTime, renderTimes[32];
-		TreeStats stats; if(displayEnabled) {
-			int nPixels = w * h, received = 0;
-			SendFrameRequest(socket, cam, tLights, threads, finish);
+		int nBytes = 0, nBuffers = 0, numNodes;
+		double buildTime, decompressTime = 0, renderTimes[32];
+		TreeStats stats;
+		SendFrameRequest(sock, orbiting?(Camera)ocam : (Camera)cam, tLights, threads, finish);
 
-			int nParts = 0;
-			while(received < nPixels) {
-				if(parts.size() < nParts + 1)
-					parts.push_back(CompressedPart());
+		while(true) {
+			DecompressBuffer &buffer = buffers[nBuffers++];
 
-				CompressedPart &part = parts[nParts++];
-				socket >> Pod(part.info);
-				if(part.data.size() < part.info.size)
-					part.data.resize(part.info.size);
-				socket >> comm::Data(&part.data[0], part.info.size);
-				nBytes += part.info.size;
-				received += part.info.w * part.info.h;
-
-				if(nParts >= 8) {
-					DecompressParts(image, parts, nParts, 2);
-					nParts = 0;
-				}
+			sock >> buffer.comprSize;
+			if(buffer.comprSize == 0) {
+				nBuffers--;
+				break;
 			}
-				
-			DecompressParts(image, parts, nParts, 2);
-			socket >> Pod(stats) >> Pod(buildTime) >> Pod(numNodes) >> Pod(renderTimes);
+
+			nBytes += Abs(buffer.comprSize);
+			if(buffer.comprData.size() < Abs(buffer.comprSize))
+				buffer.comprData.resize(Abs(buffer.comprSize));
+			sock >> comm::Data(&buffer.comprData[0], Abs(buffer.comprSize));
+
+			if(nBuffers == buffers.size()) {
+				double tTime = GetTime();
+				DecompressParts(image, buffers, nBuffers, 2);
+				decompressTime += GetTime() - tTime;
+				nBuffers = 0;
+			}
 		}
 
+		{
+			double tTime = GetTime();
+			DecompressParts(image, buffers, nBuffers, 2);
+			decompressTime += GetTime() - tTime;
+		}
+		sock >> Pod(stats) >> buildTime >> numNodes >> Pod(renderTimes);
+
+//		glClear(GL_COLOR_BUFFER_BIT);
+//		TODO: jest duzy spadek wydajnosci miedzy 1376x1024 a 1344x1024
 		window.RenderImage(image);
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 		double mrays = double(unsigned(frmCounter.FPS() * stats.GetRays() * 0.0001)) * 0.01;
 
+		nFrames++;
+		nRays += stats.GetRays();
+		fpsMin = Min(fpsMin, frmCounter.FPS());
+		fpsMax = Max(fpsMax, frmCounter.FPS());
+		fpsSum += frmCounter.FPS();
+
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));
 			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, (GetTime() - frameTime) * 1000.0, buildTime * 1000.0f));
 			frameTime = GetTime();
-			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays, " KBytes/frame:", nBytes / 1024);
-			font.PrintAt(Vec2f(5, 45), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
-					" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7]);
+			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays, " KBytes/frame:", nBytes / 1024,
+							" Dec.time:", double((int)(decompressTime * 100000.0)) * 0.01);
 			for(int n = 0; n < Min(32, numNodes); n++) {
 				char text[32]; snprintf(text, sizeof(text), "%.0f", renderTimes[n] * 1000);
-				font.PrintAt(Vec2f(5 + n * 32, 65), text);
+				font.PrintAt(Vec2f(5 + n * 32, 45), text);
 			}
 			if(lightsEnabled && lights.size())
-				font.PrintAt(Vec2f(5, 85), "Lights: ",lightsEnabled?lights.size() : 0);
+				font.PrintAt(Vec2f(5, 65), "Lights: ",lightsEnabled?lights.size() : 0);
 		font.FinishDrawing();
 		window.SwapBuffers();
 	}
 
+	double workTime = GetTime() - startTime;
+	double fpsAvg = fpsSum / double(nFrames);
+	double mraysPerSec = (double(nRays) / workTime) / 1000000;
+
+	printf("Min FPS: %f\nMax FPS: %f\nAvg FPS: %f\nMRays/sec: %f\n",
+			fpsMin, fpsMax, fpsAvg, mraysPerSec);
 	return 0;
 }
 

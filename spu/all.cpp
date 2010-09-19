@@ -1,0 +1,6 @@
+#include "spu/trace.cpp"
+#include "spu/triangle.cpp"
+#include "spu/bbox.cpp"
+#include "spu/texture.cpp"
+#include "spu/compression.cpp"
+#include "spu/base.cpp"

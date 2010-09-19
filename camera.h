@@ -5,12 +5,37 @@
 #include <stdio.h>
 #include <map>
 
+struct Camera {
+	Camera() { }
+	Camera(const Vec3f &pos, const Vec3f &right, const Vec3f &up, const Vec3f &front, float plane_dist)
+		:plane_dist(plane_dist), pos(pos), right(right), up(up), front(front) { }
 
-class Camera
+	float plane_dist;
+	Vec3f pos, right, up, front;
+};
+
+class OrbitingCamera {
+public:
+	OrbitingCamera();
+	operator const Camera() const;
+
+	void Rotate(float);
+	void RotateY(float);
+	void Zoom(float);
+	void SetPos(const Vec3f&);
+
+	float plane_dist;
+	float ang, pitch, dist;
+	Vec3f pos;
+};
+
+class FPSCamera
 {
 public:
-	Camera(const Vec3f pos, float angle, float pitch);
-	Camera();
+	FPSCamera(const Vec3f pos, float angle, float pitch);
+	FPSCamera();
+
+	operator const Camera() const;
 
 	void Print();
 	void Serialize(Serializer&);
@@ -21,7 +46,6 @@ public:
 	void SetPos(const Vec3f);
 
 	const Vec3f Pos() const;
-	void GetRotation(Vec3f &right, Vec3f &up, Vec3f &front) const;
 
 	float plane_dist;
 //private:
@@ -31,11 +55,11 @@ public:
 
 class CameraConfigs {
 public:
-	void AddConfig(const string &fileName, const Camera&);
-	bool GetConfig(const string &fileName, Camera&) const;
+	void AddConfig(const string &fileName, const FPSCamera&);
+	bool GetConfig(const string &fileName, FPSCamera&) const;
 	void Serialize(Serializer&);
 
-	std::map<string, Camera> data;
+	std::map<string, FPSCamera> data;
 };
 
 

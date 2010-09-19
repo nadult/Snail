@@ -9,10 +9,20 @@ struct CompressedPart {
 	std::vector<char> data;
 };
 
-int CompressParts(gfxlib::Texture &image, uint rank, uint nRanks, uint strapHeight,
+void TransformData(unsigned char *ptr, uint w, uint h, uint pitch);
+void ITransformData(unsigned char *ptr, uint w, uint h, uint pitch);
+
+void CompressParts(gfxlib::Texture &image, const std::vector<int> &coords,
 				std::vector<CompressedPart> &parts, uint nThreads);
 
-void DecompressParts(gfxlib::Texture &image, const std::vector<CompressedPart> &parts,
+struct DecompressBuffer {
+	int comprSize;		// if < 0 then data is not compressed
+	std::vector<unsigned char> data;
+	std::vector<unsigned char> comprData;
+};
+
+// returns number of decompressed pixels
+void DecompressParts(gfxlib::Texture &image, std::vector<DecompressBuffer> &parts,
 				uint nParts, uint nThreads);
 
 #endif

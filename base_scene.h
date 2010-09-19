@@ -14,8 +14,8 @@ public:
 	void SaveWavefrontObj(const string &fileName) const;
 	
 	CompactTris ToCompactTris() const;
-	TriVector ToTriVector() const;
-	ShTriVector ToShTriVector() const;
+	ATriVector ToTriVector() const;
+	AShTriVector ToShTriVector() const;
 
 	BBox GetBBox() const;
 	
@@ -23,6 +23,7 @@ public:
 	void TransformData(const Matrix<Vec4f> &mat);
 	void GenNormals();
 	void FlipNormals();
+	void SwapYZ();
 
 	void Optimize();
 
@@ -59,10 +60,11 @@ public:
 		Triangle GetTriangle(uint n) const;
 
 		CompactTris ToCompactTris() const;
-		TriVector ToTriVector() const;
-		ShTriVector ToShTriVector() const;
+		ATriVector ToTriVector() const;
+		AShTriVector ToShTriVector() const;
 
 		void FlipNormals();
+		void SwapYZ();
 		
 		void TransformData(const Matrix<Vec4f> &mat);
 		void Transform(const Matrix<Vec4f> &mat);

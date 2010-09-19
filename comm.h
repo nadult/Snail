@@ -14,11 +14,24 @@ namespace comm {
 		void Connect(const char *host, const char *port);
 		void Write(const void*, size_t);
 		void Read(void*, size_t);
+		void NoDelay(bool);
 
 	private:
 		Socket(const Socket&);
 		void operator=(const Socket&);
 
+		void *sock, *serv;
+		friend class PSocket;
+	};
+
+	struct PSocket {
+		PSocket(Socket&);
+		PSocket();
+
+		void Write(const void*, size_t);
+		void Read(void*, size_t);
+
+	private:
 		void *sock, *serv;
 	};
 
@@ -47,7 +60,6 @@ namespace comm {
 		int rank, tag;
 	};
 
-	// Handle for reading from any / writing to all MPI nodes
 	class MPIAnyNode {
 	public:
 		MPIAnyNode(int *rank = 0, int tag = 0) :rank(rank), tag(tag) { }
@@ -79,6 +91,7 @@ namespace comm {
 		static_assert(
 				std::tr1::is_same<T, MPINode>::value ||
 				std::tr1::is_same<T, MPIAnyNode>::value ||
+				std::tr1::is_same<T, PSocket>::value ||
 				std::tr1::is_same<T, MPIBcast>::value, "burp");
 		sock.Read(data.data, data.size);
 		return sock;
@@ -88,6 +101,7 @@ namespace comm {
 	inline const T operator<<(T sock, const Data data) {
 		static_assert(
 				std::tr1::is_same<T, MPINode>::value ||
+				std::tr1::is_same<T, PSocket>::value ||
 				std::tr1::is_same<T, MPIBcast>::value, "burp");
 		sock.Write(data.data, data.size);
 		return sock;
@@ -97,7 +111,17 @@ namespace comm {
 		{ return node << Data(&i, sizeof(i)); }
 	template <class T> inline T operator>>(T node, float &i)
 		{ return node >> Data(&i, sizeof(i)); }
+
+	template <class T> inline T operator<<(T node, double i)
+		{ return node << Data(&i, sizeof(i)); }
+	template <class T> inline T operator>>(T node, double &i)
+		{ return node >> Data(&i, sizeof(i)); }
 	
+	template <class T> inline T operator<<(T node, bool i)
+		{ return node << Data(&i, sizeof(i)); }
+	template <class T> inline T operator>>(T node, bool &i)
+		{ return node >> Data(&i, sizeof(i)); }
+
 	template <class T> inline T operator<<(T node, int i)
 		{ return node << Data(&i, sizeof(i)); }
 	template <class T> inline T operator>>(T node, int &i)
@@ -113,6 +137,24 @@ namespace comm {
 		{ return node << Data(&i, sizeof(i)); }
 	template <class T> inline T operator>>(T node, Vec3f &i)
 		{ return node >> Data(&i, sizeof(i)); }
+
+}
+
+#include "camera.h"
+#include "light.h"
+
+namespace comm {
+
+	struct LoadNewModel {
+		string name;
+		int resx, resy;
+		int rebuild; // 2 :rebuild slow
+		bool flipNormals;
+		bool swapYZ;
+	};
+
+	PSocket operator<<(PSocket sock, const LoadNewModel&);
+	PSocket operator>>(PSocket sock, LoadNewModel&);
 
 }
 

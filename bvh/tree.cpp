@@ -1,37 +1,46 @@
 #include "bvh/tree.h"
 #include <algorithm>
-
+#include "base_scene.h"
 
 namespace {
 	struct OrderTris {
-		OrderTris(CompactTris &elements, int axis)
-			:elements(elements), axis(axis) { }
+		OrderTris(const ATriVector &tris, int axis)
+			:tris(tris), axis(axis) { }
 
-		bool operator()(const CompactTris::TriIdx &a, const CompactTris::TriIdx &b) const {
-			float p1 = (&elements.verts[a.v1].x)[axis] + (&elements.verts[a.v2].x)[axis]
-								+ (&elements.verts[a.v3].x)[axis];
-			float p2 = (&elements.verts[b.v1].x)[axis] + (&elements.verts[b.v2].x)[axis]
-								+ (&elements.verts[b.v3].x)[axis];
-			return p1 < p2;
+		bool operator()(int i1, int i2) const {
+			//Usuniecie tego ifa powoduje wywalanie sie programu 
+			if(i1 >= tris.size() || i2 >= tris.size()) {
+				printf("!!! %d %d > %d\n", i1, i2, tris.size());
+			}
+
+			const Triangle &tri1 = tris[i1], &tri2 = tris[i2];
+
+			Vec3f p1 = tri1.P1() + tri1.P2() + tri1.P3();
+			Vec3f p2 = tri2.P1() + tri2.P2() + tri2.P3();
+			return (&p1.x)[axis] < (&p2.x)[axis];
 		}
 
-		CompactTris &elements;
+		const ATriVector &tris;
 		int axis;
 	};
 
 	struct TestTris {
-		TestTris(CompactTris &elements, int minAxis, int minIdx, float sub, float mul)
-			:elements(elements), minAxis(minAxis), minIdx(minIdx), sub(sub), mul(mul) { }
+		TestTris(const ATriVector &tris, int minAxis, int minIdx, float sub, float mul)
+			:tris(tris), minAxis(minAxis), minIdx(minIdx), sub(sub), mul(mul) { }
 
-		bool operator()(const CompactTris::TriIdx &tri) const {
-			float v1 = (&elements.verts[tri.v1].x)[minAxis];
-			float v2 = (&elements.verts[tri.v2].x)[minAxis];
-			float v3 = (&elements.verts[tri.v3].x)[minAxis];
-			float center = (Min(v1, Min(v2, v3)) + Max(v1, Max(v2, v3))) * 0.5f;
+		bool operator()(int idx) const {
+			const Triangle &tri = tris[idx];
+
+			Vec3f v1 = tri.P1(), v2 = tri.P2(), v3 = tri.P3();
+			float f1 = (&v1.x)[minAxis];
+			float f2 = (&v2.x)[minAxis];
+			float f3 = (&v3.x)[minAxis];
+
+			float center = (Min(f1, Min(f2, f3)) + Max(f1, Max(f2, f3))) * 0.5f;
 			return int( (center - sub) * mul ) < minIdx;
 		}
 
-		CompactTris &elements;
+		const ATriVector &tris;
 		int minAxis, minIdx;
 		float sub, mul;
 	};
@@ -42,75 +51,89 @@ namespace {
 
 }
 
-void BVH::FindSplitSweep(int nNode, int first, int count, int depth) {
+void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
 	BBox bbox = nodes[nNode].bbox;
 	enum { useSah = 1 };
 
 	if(count <= 1) {
 	LEAF_NODE:
-		nodes[nNode].bbox = elements[first].GetBBox();
+		nodes[nNode].bbox = tris[first].GetBBox();
 		for(int n = 1; n < count; n++)
-			nodes[nNode].bbox += elements[first + n].GetBBox();
-		depth = Max(depth, depth);
+			nodes[nNode].bbox += tris[first + n].GetBBox();
+		depth = Max(depth, sdepth);
 		nodes[nNode].first = first | 0x80000000;
 		nodes[nNode].count = count;
 	}
 	else {
-		int minIdx = count / 2, minAxis = MaxAxis(bbox.Size());
-	
-		if(useSah) {
-			const float traverseCost = 0.0;
-			const float intersectCost = 1.0;
-			float minCost = constant::inf;
-			float nodeSA = BoxSA(bbox);
-			float noSplitCost = intersectCost * count * BoxSA(bbox);
+		int minIdx = count / 2, minAxis = MaxAxis(bbox.Size()); {
+			vector<int> indices(count);
+			for(int n = 0; n < count; n++)
+				indices[n] = first + n;
+		
+			if(useSah) {
+				const float traverseCost = 0.0;
+				const float intersectCost = 1.0;
+				float minCost = constant::inf;
+				float nodeSA = BoxSA(bbox);
+				float noSplitCost = intersectCost * count * BoxSA(bbox);
 
-			for(int axis = 0; axis <= 2; axis++) {
-				std::sort(&elements.tris[first], &elements.tris[first + count], OrderTris(elements, axis));
+				for(int axis = 0; axis <= 2; axis++) {
+					std::sort(&indices[0], &indices[count], OrderTris(tris, axis));
 
-				vector<float> leftSA(count), rightSA(count); {
-					rightSA[count - 1] = BoxSA(elements[first + count - 1].GetBBox());
-					leftSA [0] = BoxSA(elements[first].GetBBox());
+					vector<float> leftSA(count), rightSA(count); {
+						rightSA[count - 1] = BoxSA(tris[indices[count - 1]].GetBBox());
+						leftSA [0] = BoxSA(tris[indices[0]].GetBBox());
 
-					BBox lastBox = elements[first].GetBBox();
+						BBox lastBox = tris[indices[0]].GetBBox();
+						for(size_t n = 1; n < count; n++) {
+							lastBox += tris[indices[n]].GetBBox();
+							leftSA[n] = BoxSA(lastBox);
+						}
+
+						lastBox = tris[indices[count - 1]].GetBBox();
+						for(int n = count - 2; n >= 0; n--) {
+							lastBox += tris[indices[n]].GetBBox();
+							rightSA[n] = BoxSA(lastBox);
+						}
+					}
+
 					for(size_t n = 1; n < count; n++) {
-						lastBox += elements[first + n].GetBBox();
-						leftSA[n] = BoxSA(lastBox);
-					}
-
-					lastBox = elements[first + count - 1].GetBBox();
-					for(int n = count - 2; n >= 0; n--) {
-						lastBox += elements[first + n].GetBBox();
-						rightSA[n] = BoxSA(lastBox);
+						float cost = leftSA[n - 1] * n + rightSA[n] * (count - n);
+						if(cost < minCost) {
+							minCost = cost;
+							minIdx = n;
+							minAxis = axis;
+						}
 					}
 				}
 
-				for(size_t n = 1; n < count; n++) {
-					float cost = leftSA[n - 1] * n + rightSA[n] * (count - n);
-					if(cost < minCost) {
-						minCost = cost;
-						minIdx = n;
-						minAxis = axis;
-					}
-				}
+				minCost = traverseCost + intersectCost * minCost;
+				if(noSplitCost < minCost)
+					goto LEAF_NODE;
 			}
 
-			minCost = traverseCost + intersectCost * minCost;
-			if(noSplitCost < minCost)
-				goto LEAF_NODE;
+			if(!useSah || minAxis != 2)
+				std::nth_element(&indices[0], &indices[minIdx], &indices[count],
+									OrderTris(tris, minAxis));
+			vector<Triangle> ttemp(count);
+			vector<ShTriangle> stemp(count);
+			for(int n = 0; n < count; n++) {
+				ttemp[n] = tris[indices[n]];
+				stemp[n] = shTris[indices[n]];
+			}
+			for(int n = 0; n < count; n++) {
+				tris[first + n] = ttemp[n];
+				shTris[first + n] = stemp[n];
+			}
 		}
 
-		if(!useSah || minAxis != 2)
-			std::nth_element(&elements.tris[first], &elements.tris[first + minIdx], &elements.tris[first + count],
-					OrderTris(elements, minAxis));
-			
-		BBox leftBox(elements[first].GetBBox());
-		BBox rightBox(elements[first + count - 1].GetBBox());
+		BBox leftBox(tris[first].GetBBox());
+		BBox rightBox(tris[first + count - 1].GetBBox());
 
 		for(size_t n = 1; n < minIdx; n++)
-			leftBox  += elements[first + n].GetBBox();
+			leftBox += tris[first + n].GetBBox();
 		for(size_t n = minIdx; n < count; n++)
-			rightBox += elements[first + n].GetBBox();
+			rightBox += tris[first + n].GetBBox();
 
 		int subNode = nodes.size();
 		nodes[nNode].subNode = subNode;
@@ -131,8 +154,8 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int depth) {
 		nodes.push_back(Node(leftBox));
 		nodes.push_back(Node(rightBox));
 
-		FindSplitSweep(subNode + 0, first, minIdx, depth + 1);
-		FindSplitSweep(subNode + 1, first + minIdx, count - minIdx, depth + 1);
+		FindSplitSweep(subNode + 0, first, minIdx, sdepth + 1);
+		FindSplitSweep(subNode + 1, first + minIdx, count - minIdx, sdepth + 1);
 	}
 }
 
@@ -144,8 +167,11 @@ void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 		depth = Max(depth, sdepth);
 		nodes[nNode].first = first | 0x80000000;
 		nodes[nNode].count = count;
+		return;
 	}
-	else {
+	
+	int subNode, leftCount, rightCount;
+	{
 		int minAxis = MaxAxis(bbox.Size());
 		const float traverseCost = 0.0;
 		const float intersectCost = 1.0;
@@ -168,7 +194,7 @@ void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 		float sub = (&bbox.min.x)[minAxis];
 
 		for(int n = 0; n < count; n++) {
-			const BBox &box = elements.GetBBox(first + n);
+			const BBox &box = tris[first + n].GetBBox();
 			float c = ((&box.max.x)[minAxis] + (&box.min.x)[minAxis]) * 0.5f;
 			int nBin = int( (c - sub) * mul );
 			bins[nBin].count++;
@@ -210,29 +236,43 @@ void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 		minCost = traverseCost + intersectCost * minCost;
 		if(noSplitCost < minCost)
 			goto LEAF_NODE;
+
+		vector<int> indices(count);
+		for(int n = 0; n < count; n++)
+			indices[n] = first + n;
 		
-		CompactTris::TriIdx *it = std::partition(&elements.tris[first], &elements.tris[first + count],
-				TestTris(elements, minAxis, minIdx, sub, mul));
+		std::partition(&indices[0], &indices[count], TestTris(tris, minAxis, minIdx, sub, mul));
+
+		vector<Triangle> ttemp(count);
+		vector<ShTriangle> stemp(count);
+		for(int n = 0; n < count; n++) {
+			ttemp[n] = tris[indices[n]];
+			stemp[n] = shTris[indices[n]];
+		}
+		for(int n = 0; n < count; n++) {
+			tris[first + n] = ttemp[n];
+			shTris[first + n] = stemp[n];
+		}
 
 		BBox leftBox = leftBoxes[minIdx - 1];
 		BBox rightBox = rightBoxes[minIdx];
-		int leftCount = leftCounts[minIdx - 1];
-		int rightCount = rightCounts[minIdx];
+		leftCount = leftCounts[minIdx - 1];
+		rightCount = rightCounts[minIdx];
 
 		if(leftCount == 0 || rightCount == 0) {
 			minIdx = count / 2;
-			leftBox = elements.GetBBox(first);
-			rightBox = elements.GetBBox(first + count - 1);
+			leftBox = tris[first].GetBBox();
+			rightBox = tris[first + count - 1].GetBBox();
 
 			for(size_t n = 1; n < minIdx; n++)
-				leftBox  += elements.GetBBox(first + n);
+				leftBox  += tris[first + n].GetBBox();
 			for(size_t n = minIdx; n < count; n++)
-				rightBox += elements.GetBBox(first + n);
+				rightBox += tris[first + n].GetBBox();
 			leftCount = minIdx;
 			rightCount = count - leftCount;
 		}
 			
-		int subNode = nodes.size();
+		subNode = nodes.size();
 		nodes[nNode].subNode = subNode;
 
 		nodes[nNode].axis = minAxis;
@@ -242,36 +282,40 @@ void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 
 		nodes.push_back(Node(leftBox));
 		nodes.push_back(Node(rightBox));
-
-		FindSplit(subNode + 0, first, leftCount, sdepth + 1);
-		FindSplit(subNode + 1, first + leftCount, rightCount, sdepth + 1);
 	}
+
+	FindSplit(subNode + 0, first, leftCount, sdepth + 1);
+	FindSplit(subNode + 1, first + leftCount, rightCount, sdepth + 1);
 }
 
-BVH::BVH(const CompactTris &elems, const std::map<string, int> &matNames, bool fast) {
-	Construct(elems, matNames, fast);
+BVH::BVH(const BaseScene &elems, bool fast) {
+	Construct(elems, fast);
 }
 
-void BVH::Construct(const CompactTris &tElements, const std::map<string, int> &tmatNames, bool fast) {
-	elements = tElements;
-	nodes.reserve(elements.size() * 2);
+void BVH::Construct(const BaseScene &scene, bool fast) {
+	tris = scene.ToTriVector();
+	shTris = scene.ToShTriVector();
+	InputAssert(shTris.size() == tris.size());
+
+	nodes.reserve(tris.size() * 2);
 	nodes.clear();
 	
 	depth = 0;
 
-	BBox bbox(elements.GetBBox(0));
-	for(size_t n = 1; n < elements.size(); n++)
-		bbox +=	elements.GetBBox(n);
+	BBox bbox(tris[0].GetBBox());
+	for(size_t n = 1; n < tris.size(); n++)
+		bbox +=	tris[n].GetBBox();
 
 	nodes.push_back(Node(bbox));
 	if(fast)
-		FindSplit(0, 0, elements.size(), 0);
+		FindSplit(0, 0, tris.size(), 0);
 	else
-		FindSplitSweep(0, 0, elements.size(), 0);
+		FindSplitSweep(0, 0, tris.size(), 0);
 	InputAssert(depth <= maxDepth);
 
 	std::map<int, string> matNames;
-	for(std::map<string, int>::const_iterator it = tmatNames.begin(); it != tmatNames.end(); ++it)
+	const std::map<string, int> &tnames = scene.matNames;
+	for(std::map<string, int>::const_iterator it = tnames.begin(); it != tnames.end(); ++it)
 		matNames[it->second] = it->first;
 	materials.resize(matNames.size());
 
@@ -284,23 +328,17 @@ void BVH::Construct(const CompactTris &tElements, const std::map<string, int> &t
 
 
 void BVH::Serialize(Serializer &sr) {
-	sr & depth & elements & nodes & materials;
+	sr & depth & tris & shTris & nodes & materials;
 }
 
 void BVH::PrintInfo() const {
 	double nodeBytes = nodes.size() * sizeof(Node);
-	double objBytes = elements.MemSize();
+	int objBytes = (sizeof(Triangle) + sizeof(ShTriangle)) * tris.size();
 
-	printf("Triangles: %d (%.2fMB)\n", (int)elements.size(), objBytes * 0.000001);
+	printf("Triangles: %d (%.2fMB)\n", (int)tris.size(), objBytes * 0.000001);
 	printf("Nodes: %8d * %2d = %6.2fMB\n", (int)nodes.size(), (int)sizeof(Node), nodeBytes * 0.000001);
-	printf("~ %.0f bytes per triangle\n", double(nodeBytes + objBytes) / double(elements.size()));
+	printf("~ %.0f bytes per triangle\n", double(nodeBytes + objBytes) / double(tris.size()));
 	printf("Levels: %d\n\n", depth);
-}
-
-void BVH::UpdateCache() {
-	triCache.resize(elements.size());
-	for(int n = 0; n < elements.size(); n++)
-		triCache[n] = elements[n];
 }
 
 void BVH::UpdateMaterialIds(const std::map<string, int> &dict) {

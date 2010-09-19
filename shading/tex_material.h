@@ -33,6 +33,8 @@ namespace shading {
 				}
 			}
 		}
+		
+		const gfxlib::Texture *GetTexture() const { return sampler->GetTexture(); }
 
 	private:
 		sampling::PSampler sampler;

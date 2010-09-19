@@ -197,39 +197,42 @@ namespace
 		if(flag) glfwEnable(GLFW_MOUSE_CURSOR);
 		else glfwDisable(GLFW_MOUSE_CURSOR);
 	}
+		
 
 	void GLWindow::RenderImage(const gfxlib::Texture &image) {
 		static GLuint texture = 0, texW = 0, texH = 0;
-		static GLuint pbo = 0;
+		static GLuint pbo[2] = {0, 0};
+		static int pindex = 0;
+
 		InputAssert(image.GetFormat() == gfxlib::TI_R8G8B8);
 		
-		if(image.Width() > texW || image.Height() > texH) {
-			if(!pbo) {
+		if(image.Width() != texW || image.Height() != texH) {
+			if(!pbo[0]) {
 				glGenTextures(1, &texture);
-				glGenBuffers(1, &pbo);
-
+				glGenBuffers(2, pbo);
 			}
+
+			texW = image.Width(); texH = image.Height();
 			glBindTexture(GL_TEXTURE_2D, texture);
 			
-			for(texW = 1; texW < image.Width(); texW *= 2);
-			for(texH = 1; texH < image.Height(); texH *= 2);
-				
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texW, texH, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-			glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, pbo);
+			glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[0]);
+			glBufferData(GL_PIXEL_UNPACK_BUFFER_ARB, texW * texH * 3, 0, GL_STREAM_DRAW);
+			glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[1]);
 			glBufferData(GL_PIXEL_UNPACK_BUFFER_ARB, texW * texH * 3, 0, GL_STREAM_DRAW);
 			glDisable(GL_DEPTH_TEST);
 		}
 	
 		glBindTexture(GL_TEXTURE_2D, texture);
-		glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, pbo);
-		char *mem = (char*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY);
-		memcpy(mem, image.DataPointer(), image.Width() * image.Height() * 3);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[pindex++ % 2]);
+
+		char *memBuf = (char*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY);
+		memcpy(memBuf, image.DataPointer(), image.Width() * image.Height() * 3);
 		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER_ARB);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.Width(), image.Height(), GL_RGB,
-							GL_UNSIGNED_BYTE, 0);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texW, texH, GL_BGR, GL_UNSIGNED_BYTE, 0);
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glShadeModel(GL_FLAT);
 		glEnable(GL_TEXTURE_2D);
@@ -244,3 +247,4 @@ namespace
 			glTexCoord2f(u  , 0.0); glVertex3f(1.0, -1.0, 0.0);
 		glEnd();
 	}
+

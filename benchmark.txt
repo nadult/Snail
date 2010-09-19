@@ -1,0 +1,104 @@
+foot: 1060Ktris
+colosseum: 420Ktris
+heart: 1824Ktris
+abrams: 116Ktris
+thai: 10Mtris
+
+IRT 1120x624, 1 light ---------------------------------------------------------
+
+scene			nodes		fps_min		fps_max		fps_avg		MRays/sec
+foot.bvh		1			19			31			28			25
+				2			31			60			45			40
+				4			52			112			80			72
+				8			97			180			140			126
+
+colosseum.bvh	1			20			28			23			25
+				2			36			58			45			49
+				4			42			72			55			60
+				8			75			120			100			110
+
+heart.obj		1			9.5			15			13			13
+				2			18			25			21			21
+				4			26			40			32			32
+				8			52			87			65			65
+
+0.9, 1.1, 1.0
+
+IRT 1120x624, 1 light, remotely -----------------------------------------------
+
+scene			nodes		fps_max		fps_avg		MRays/sec
+foot.obj		1			33			25			22
+				2			59			41			37
+				4			62			53			47
+				8			61			50			45
+
+colosseum.bvh	1			32			25			27.5
+				2			49			37			40
+				4			49			39			43
+				8			49			39			43
+
+heart.bvh		1			16			12.5		12.5
+				2			25.5		20.5		20.5
+				4			41			33			33
+				8			49			43			43
+
+
+SNAIL 1120x640, 1 light, single cell based blade ------------------------------
+scene			nodes/watki	fps_min		fps_max		fps_avg		MRays/sec
+foot.obj		1 x 16		30			50			39			32
+				1 x 8		12			24			15			13
+				1 x 4		8.5			17.5		11.5		9.5
+				1 x 2		4.5			7			5.5			5
+				1 x 1		1.7			3.7			2.4			2	
+
+SNAIL 1120x640, 1 light, single opteron based blade ---------------------------
+foot.obj		1 x 4		8.5			15.5		12.5		9.5	
+				1 x 3		5			12.5		9.5			7
+				1 x 2		4.5			8.5			6			4.5
+				1 x 1		2.5			4.5			3.5			2.5
+foot.obj		3 x 4		21			59.5		31			24	
+				3 x 1		6.5			14			10			7.5
+
+SNAIL 1120x640, 1 light -------------------------------------------------------
+scene			nodes		fps_min		fps_max		fps_avg		MRays/sec
+foot.obj		1			31			56			43			35
+(80-190KB per	2			56			97			72			60
+  frame)		4			81			136			110			94
+
+colosseum.obj	1			18.5		23			21			22.5
+(6i00-900KB per	2			30			39			35			38
+  frame)		4			43			56			50			54
+
+heart.obj		1			20			30			23.5		24
+(370-690KB per	2			30			59			42			45
+  frame)		4			49			97			73			77
+
+thai.obj		1			16			32.5		22.5		17
+(95-144KB per	2			27			53			39			31
+  frame)		4			38			74			54			44
+
+
+SNAIL 1024x1024, 1 light ------------------------------------------------------
+scene			nodes		fps_min		fps_max		fps_avg		MRays/sec
+foot.obj		1			23			36.5		28.5		35.5
+(170-300KB per	2			37			60			48			64
+  frame)		4			68			98			81			109
+
+SNAIL 1600x1216, 1 light ------------------------------------------------------
+scene			nodes		fps_min		fps_max		fps_avg		MRays/sec
+foot.obj		1			15			25.5		19			44
+(290-550KB per	2			28			39			34			80
+  frame)		4			34			38			36			83
+
+SNAIL 1024x1024, 4 lights, 4x antialiasing ------------------------------------
+scene			nodes		fps_min		fps_max		fps_avg		MRays/sec
+foot.obj		1			5.5			8			7			51
+(300-500KB per	2			10			17.5		12			93
+  frame)		4			16			24			20			165
+				8			27			38			31			248
+
+abrams.obj		1			8.5			10			9.5			93
+(190-280KB per	2			16.5		23			20			181	
+  frame)		4			27			45			33			312
+				8			41			51			46			413
+

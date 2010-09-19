@@ -38,6 +38,7 @@ namespace sampling {
 		virtual ~Sampler() { }
 
 		virtual void Sample(shading::Sample *samples,Cache&,bool mipmapping = 1) const = 0;
+		virtual const gfxlib::Texture *GetTexture() const { return 0; }
 	};
 
 	typedef Ptr<gfxlib::Texture> PTexture;

@@ -5,15 +5,17 @@
 #include "tree_stats.h"
 #include "triangle.h"
 
+class BaseScene;
+	
+
 class BVH {
 public:
-	BVH(const CompactTris&, const std::map<string, int> &matNames, bool fast = 1);
+	BVH(const BaseScene&, bool fast = 1);
 	BVH() { }
-	void Construct(const CompactTris&, const std::map<string, int> &matNames, bool fast = 1);
+	void Construct(const BaseScene&, bool fast = 1);
 	void Serialize(Serializer&);
 	const BBox GetBBox() const { return nodes[0].bbox; }
 	void PrintInfo() const;
-	void UpdateCache();
 
 public:
 	typedef Triangle   CElement;
@@ -23,8 +25,8 @@ public:
 	enum { isctFlags = CElement::isctFlags | isct::fObject | isct::fStats };
 	enum { maxDepth = 64 };
 
-	const ShTriangle GetSElement(int elem, int subElem) const {
-		return elements.GetSElement(elem, subElem);
+	const ShTriangle &GetSElement(int elem, int subElem) const {
+		return shTris[elem];
 	}
 
 	template <bool sharedOrigin, bool hasMask>
@@ -69,11 +71,11 @@ public:
 		return materials[idx].id;
 	}
 
-	vector<Triangle> triCache;
-	vector<MatId> materials;
+	ATriVector tris;
+	AShTriVector shTris;
+	vector<Node, AlignedAllocator<Node, 256> > nodes;
 
-	CompactTris elements;
-	vector<Node, AlignedAllocator<Node> > nodes;
+	vector<MatId> materials;
 	int depth;
 };
 

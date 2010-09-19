@@ -19,6 +19,7 @@ namespace sampling {
 		INLINE Vec3q operator()(const Vec2q &uv,const Vec2q &diff,Cache&) const { return operator()(uv,diff); }
 
 		void Sample(shading::Sample*, Cache&, bool mipmapping = 1) const;
+		const gfxlib::Texture *GetTexture() const { return &*tex; }
 
 	protected:
 		void Update();

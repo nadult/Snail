@@ -11,6 +11,7 @@ using namespace baselib;
 
 extern int gVals[16];
 
+void FileModTime(const string &path, time_t*);
 
 inline unsigned short ByteSwap(unsigned short v) {
 	return ((v & 0xff) << 8) | ((v & 0xff00) >> 8);

@@ -1,5 +1,17 @@
 #include "rtbase.h"
 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <dirent.h>
+
+void FileModTime(const string &path, time_t *out) {
+	struct stat attrib;
+	stat(path.c_str(), &attrib);
+	*out = attrib.st_mtime;
+}
+
+
+
 int gVals[16] = { 0, };
 
 std::ostream &operator<<(std::ostream &str, const floatq &v) {

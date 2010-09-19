@@ -50,8 +50,10 @@ public:
 
 	inline const TreeStats &operator+=(const TreeStats &rhs) {
 		if(enabled) {
-			for(int n=0;n<dataSize;n++)
-				data[n]+=rhs.data[n];
+			for(int n = 0; n < dataSize; n++)
+				data[n] += rhs.data[n];
+			for(int n = 0; n < sizeof(timers) / sizeof(int); n++)
+				timers[n] += rhs.timers[n];
 		}
 		return *this;
 	}
@@ -81,7 +83,7 @@ public:
 
 	inline void TracingRays(uint val=1) { if(enabled) { data[2]+=val; } }
 
-
+	int timers[enabled?8 : 1];
 private:
 	u32 data[dataSize];
 	// intersects		0

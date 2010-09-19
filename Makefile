@@ -11,20 +11,19 @@ _dummy := $(shell [ -d $(BUILD_DIR)/sampling ] || mkdir -p $(BUILD_DIR)/sampling
 _dummy := $(shell [ -d $(BUILD_DIR)/shading ] || mkdir -p $(BUILD_DIR)/shading)
 
 FILES=funcs render tree_stats bounding_box gl_window rtbase base_scene bvh/traverse thread_pool \
-	  camera client server_node triangle font ray_generator frame_counter ray_group \
+	  camera client server node triangle font ray_generator frame_counter ray_group \
 	  tex_handle bvh/tree sampling/point_sampler_dxt sampling/sampler sampling/sat_sampler \
 	shading/material sampling/bilinear_sampler sampling/point_sampler16bit rtracer \
 	sampling/point_sampler formats/loader formats/wavefront_obj formats/doom3_proc compression \
-	comm_mpi comm_tcp dbvh/tree dbvh/traverse scene scene_trace
+	comm_data comm_mpi comm_tcp dbvh/tree dbvh/traverse scene scene_trace
 
 RFILES=render bvh/traverse dbvh/traverse ray_generator scene_trace
-TFILES=client server_node gl_window tex_handle font rtracer comm_mpi comm_tcp
+TFILES=client server node gl_window tex_handle font rtracer comm_mpi comm_tcp comm_data
 SHARED_FILES=$(filter-out $(RFILES), $(filter-out $(TFILES), $(FILES)))
 
 LIBS=-lgfxlib -lbaselib -lpng -lz 
 
-MPILIBS=`mpicxx -showme:link`
-#MPILIBS=`$(HOME)/bin/mpicxx -showme:link`
+MPILIBS=`$(HOME)/bin/mpicxx -showme:link`
 
 LINUX_LIBS=$(LIBS)
 INCLUDES=-I./
@@ -50,12 +49,12 @@ pch.h.gch: pch.h
 $(OBJECTS): $(BUILD_DIR)/%.o: pch.h.gch %.cpp
 	$(CXX) $(FLAGS) $(INCLUDES) -c $*.cpp -o $@
 
-node: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/server_node.o $(BUILD_DIR)/comm_mpi.o \
-		$(BUILD_DIR)/comm_tcp.o
+node: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/server.o $(BUILD_DIR)/node.o \
+		$(BUILD_DIR)/comm_mpi.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o
 	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(MPILIBS) $(LINUX_LIBS) -lboost_system -lboost_regex
 
 client: $(SHARED_OBJECTS) $(BUILD_DIR)/client.o $(BUILD_DIR)/gl_window.o \
-	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/comm_tcp.o
+	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o
 	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lXrandr -lGL -lGLU \
 		$(LINUX_LIBS) -lboost_system -lboost_regex -g
 
@@ -66,13 +65,13 @@ rtracer: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)
 
 ssh_all:
 	ssh blader 'cd /workspace1/rtracer && make -j6 node node_ppc'
-	ssh blader 'cp /workspace1/rtracer/node_ppc /home/guests/ibmeng/rtbin/'
 
 ssh_clean:
 	ssh blader 'cd /workspace1/rtracer && make -j6 clean node_ppc_clean'
 
-node_ppc: $(SOURCES) spu/*.cpp
+node_ppc: render_spu.cpp $(SOURCES) spu/*.cpp
 	ssh b1 'cd /workspace1/rtracer && make -f Makefile.cell -j4 node_ppc'
+	cp node_ppc /home/guests/ibmeng/rtbin/
 
 node_ppc_clean:
 	ssh b1 'cd /workspace1/rtracer && make -f Makefile.cell -j4 clean'

@@ -36,11 +36,11 @@ CompactTris BaseScene::ToCompactTris() const {
 	return out;
 }
 
-TriVector BaseScene::ToTriVector() const {
-	TriVector out;
+ATriVector BaseScene::ToTriVector() const {
+	ATriVector out;
 	
 	for(int o=0;o<objects.size();o++) {
-		const Object &obj=objects[o];
+		const Object &obj = objects[o];
 		
 		for(int t=0;t<obj.tris.size();t++)
 			out.push_back(obj.GetTriangle(t));
@@ -49,11 +49,11 @@ TriVector BaseScene::ToTriVector() const {
 	return out;
 }
 
-ShTriVector BaseScene::ToShTriVector() const {
-	ShTriVector out;
+AShTriVector BaseScene::ToShTriVector() const {
+	AShTriVector out;
 
 	for(int o=0;o<objects.size();o++) {
-		ShTriVector t=objects[o].ToShTriVector();
+		AShTriVector t = objects[o].ToShTriVector();
 		for(int n=0;n<t.size();n++) out.push_back(t[n]);
 	}
 
@@ -63,6 +63,11 @@ ShTriVector BaseScene::ToShTriVector() const {
 void BaseScene::FlipNormals() {
 	for(int o=0;o<objects.size();o++)
 		objects[o].FlipNormals();
+}
+
+void BaseScene::SwapYZ() {
+	for(int o = 0; o < objects.size(); o++)
+		objects[o].SwapYZ();
 }
 
 BBox BaseScene::GetBBox() const {
@@ -313,8 +318,15 @@ void BaseScene::Object::FlipNormals() {
 		normals[n]=-normals[n];
 }
 
-TriVector BaseScene::Object::ToTriVector() const {
-	TriVector out;
+void BaseScene::Object::SwapYZ() {
+	for(int n = 0; n < normals.size(); n++)
+		Swap(normals[n].y, normals[n].z);
+	for(int n = 0; n < verts.size(); n++)
+		Swap(verts[n].y, verts[n].z);
+}
+
+ATriVector BaseScene::Object::ToTriVector() const {
+	ATriVector out;
 	for(int t=0;t<tris.size();t++)
 		out.push_back(GetTriangle(t));
 	return out;
@@ -420,8 +432,8 @@ CompactTris BaseScene::Object::ToCompactTris() const {
 	return out;
 }
 
-ShTriVector BaseScene::Object::ToShTriVector() const {
-	ShTriVector out;
+AShTriVector BaseScene::Object::ToShTriVector() const {
+	AShTriVector out;
 	for(int t=0;t<tris.size();t++)
 		out.push_back(GetTriangle(t));
 	return out;

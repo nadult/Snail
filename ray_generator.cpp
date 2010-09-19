@@ -9,7 +9,7 @@ RayGenerator::RayGenerator(int level, int tw, int th, float pd, Vec3f right, Vec
 
 	tright = right * invW;
 	tup = up * invH;	
-	txyz = Vec3q(tright) * taddx + Vec3q(tup) * taddy + front * planeDist;
+	txyz = Vec3q(tright) * taddx + Vec3q(tup) * taddy + Vec3q(front * planeDist);
 }
 
 void RayGenerator::Generate(int pw,int ph,int x,int y,Vec3q *out) const {
@@ -20,6 +20,21 @@ static const int tx[16] = { 0, 2, 0, 2, 4, 6, 4, 6, 0, 2, 0, 2, 4, 6, 4, 6 };
 static const int ty[16] = { 0, 0, 2, 2, 0, 0, 2, 2, 4, 4, 6, 6, 4, 4, 6, 6 };
 
 void RayGenerator::Generate(int level,int pw,int ph,int x,int y, Vec3q *out) const {
+	/*{
+		GridSampler sampler;
+		Vec3q right(tright), up(tup), tadd = txyz;
+		floatq xoff(x + 0, x + 0, x + 2, x + 2);
+		floatq yoff(y + 0, y + 0, y - 1, y - 1);
+
+		for(int ty = 0; ty < 16; ty++) 
+			for(int tx = 0; tx < 16; tx += 4) {
+				Vec2q tpos(floatq(tx) + xoff, floatq(ty) + yoff);
+				Vec3q points = right * tpos.x + up * tpos.y + tadd;
+				out[(tx >> 2) + ty * 4] = points * RSqrt(points | points);
+			}
+		return;
+	}*/
+
 	if(level > 2) {
 		int npw = pw >> 1, nph = ph >> 1, nl = level - 1;
 
@@ -55,6 +70,8 @@ void RayGenerator::Generate(int level,int pw,int ph,int x,int y, Vec3q *out) con
 }
 
 void RayGenerator::Decompose(const Vec3q *in, Vec3q *out) const {
+//	return;
+
 	const int nQuads = 1 << (level * 2);
 
 	if(level >= 1) {

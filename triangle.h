@@ -180,20 +180,10 @@ const Vec3 <typename Vec::TScalar> Triangle::Barycentric(VecO rOrig, Vec rDir, R
 	return out;
 }
 
-typedef vector <Triangle, AlignedAllocator <Triangle> > TriVector;
-
 class ShTriangle {
 public:
 	Vec2f uv[3];
 	Vec3f nrm[3];
-	int   matId;
-
-	enum {
-		fFlatNormals = 1,
-	};
-
-	int   flags;
-	u32   temp[2];
 
 	ShTriangle() { }
 	ShTriangle(const Vec2f &uv1, const Vec2f &uv2, const Vec2f &uv3,
@@ -205,9 +195,8 @@ public:
 		nrm[0] = nrm1;
 		nrm[1] = nrm2;
 		nrm[2] = nrm3;
-		flags  = flatNrm ? fFlatNormals : 0;
 
-		matId = tMatId;
+		matId = tMatId | (flatNrm? 0x80000000 : 0);
 
 		uv[1] -= uv[0];
 		uv[2] -= uv[0];
@@ -232,11 +221,17 @@ public:
 	}
 
 	bool FlatNormals() const {
-		return flags & fFlatNormals;
+		return matId & 0x80000000;
 	}
+	int MatId() const {
+		return matId & 0x7fffffff;
+	}
+	
+protected:
+	int matId;
 };
 
-typedef vector <ShTriangle, AlignedAllocator <ShTriangle> >    ShTriVector;
+SERIALIZE_AS_POD(ShTriangle)
 
 class BaseScene;
 
@@ -312,7 +307,6 @@ SERIALIZE_AS_POD(CompactTris::TriIdx)
 SERIALIZE_AS_POD(CompactTris::ShData)
 
 
-
 // After changing the element, you have to set the id because it will be trashed
 template <class Tri, int tsize = 64>
 class TriCache {
@@ -320,10 +314,8 @@ public:
 	enum { size = tsize };
 
 	TriCache() {
-		for(int n = 0; n < size; n++) {
-			data[n].temp[0] = ~0;
-			data[n].temp[1] = ~0;
-		}
+		for(int n = 0; n < size; n++)
+			ids[n] = Id(~0, ~0);
 	}
 
 	uint Hash(u32 objId, u32 elemId) const {
@@ -338,22 +330,32 @@ public:
 	}
 
 	bool SameId(uint idx, u32 objId, u32 elemId) const {
-		const Tri &d = data[idx];
-
-		return d.temp[0] == objId && d.temp[1] == elemId;
+		return ids[idx] == Id(objId, elemId);
 	}
 
 	void SetId(uint idx, u32 objId, u32 elemId) {
-		Tri &d = data[idx];
-
-		d.temp[0] = objId;
-		d.temp[1] = elemId;
+		ids[idx] = Id(objId, elemId);
 	}
 
 private:
+	struct Id {
+		Id() { }
+		Id(int obj, int elem)
+			:id((((unsigned long long)obj) << 32) + elem) { }
+
+		bool operator==(const Id rhs)
+			{ return id == rhs.id; }
+
+		unsigned long long id;
+	};
+
 	Tri data[size];
+	Id ids[size];
 };
 
-typedef TriCache<Triangle, 64> TriangleCache;
+typedef vector<Triangle> TriVector;
+typedef vector<ShTriangle> ShTriVector;
+typedef vector<Triangle, AlignedAllocator<Triangle, 256> > ATriVector;
+typedef vector<ShTriangle, AlignedAllocator<ShTriangle, 256> > AShTriVector;
 
 #endif

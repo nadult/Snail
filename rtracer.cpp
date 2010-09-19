@@ -50,7 +50,7 @@ vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
 	return out;
 }
 
-static void MoveCamera(Camera &cam, GLWindow &window, float speed) {
+static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 	if(window.MouseKey(0)) {
 		float dx = window.MouseMove().x;
 		float dy = window.MouseMove().y;
@@ -62,15 +62,14 @@ static void MoveCamera(Camera &cam, GLWindow &window, float speed) {
 	else window.GrabMouse(0);
 
 	Vec3f move(0, 0, 0);
-	Vec3f right, up, front;
-	cam.GetRotation(right, up, front);
+	Camera tcam(cam);
 
-	if(window.Key('W')) move += front;
-	if(window.Key('S')) move -= front;
-	if(window.Key('A')) move -= right;
-	if(window.Key('D')) move += right;
-	if(window.Key('R')) move += up;
-	if(window.Key('F')) move -= up;
+	if(window.Key('W')) move += tcam.front;
+	if(window.Key('S')) move -= tcam.front;
+	if(window.Key('A')) move -= tcam.right;
+	if(window.Key('D')) move += tcam.right;
+	if(window.Key('R')) move += tcam.up;
+	if(window.Key('F')) move -= tcam.up;
 
 	cam.Move(move * speed * (window.Key(Key_lshift)? 5.0f : 1.0f));
 }
@@ -182,17 +181,22 @@ static int tmain(int argc, char **argv) {
 		loadingTime = GetTime() - loadingTime;
 		
 		double buildTime = GetTime();
-		scene.geometry.Construct(baseScene.ToCompactTris(), baseScene.matNames, !slowBuild);
+		scene.geometry.Construct(baseScene, !slowBuild);
 	//	scene.geometry.Construct(baseScene.ToTriangleVector());
 		Saver(string("dump/") + sceneName) & scene.geometry;
 		buildTime = GetTime() - buildTime;
 		std::cout << "Loading time: " << loadingTime << "  Build time: " << buildTime << '\n';
 	}
 	scene.geometry.PrintInfo();
-	scene.geometry.UpdateCache();
 
-	if(sceneName.substr(sceneName.size() - 4) == ".obj")
-		scene.matDict = shading::LoadMaterials("scenes/" + sceneName.substr(0, sceneName.size() - 3) + "mtl", texPath);
+	vector<shading::MaterialDesc> matDescs;
+	if(sceneName.substr(sceneName.size() - 4) == ".obj") {
+		string mtlFile = "scenes/" + sceneName.substr(0, sceneName.size() - 3) + "mtl";
+		matDescs = shading::LoadMaterialDescs(mtlFile);
+	}
+
+	scene.texDict = LoadTextures(matDescs, "scenes/" + texPath);
+	scene.matDict = shading::MakeMaterials(matDescs, scene.texDict);
 	scene.UpdateMaterials();
 	scene.geometry.UpdateMaterialIds(scene.GetMatIdMap());
 
@@ -207,7 +211,7 @@ static int tmain(int argc, char **argv) {
 	gfxlib::Texture image(resx, resy, gfxlib::TI_R8G8B8);
 	vector<Light> lights;// = GenLights();
 			
-	Camera cam;
+	FPSCamera cam;
 	if(!camConfigs.GetConfig(string(sceneName),cam))
 		cam.SetPos(scene.geometry.GetBBox().Center());
 

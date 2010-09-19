@@ -11,57 +11,73 @@ _dummy := $(shell [ -d $(BUILD_DIR)/formats ] || mkdir -p $(BUILD_DIR)/formats)
 _dummy := $(shell [ -d $(BUILD_DIR)/sampling ] || mkdir -p $(BUILD_DIR)/sampling)
 _dummy := $(shell [ -d $(BUILD_DIR)/shading ] || mkdir -p $(BUILD_DIR)/shading)
 
-FILES=funcs render tree_stats bounding_box rtbase base_scene bvh/traverse thread_pool \
-	  camera server_node triangle ray_generator ray_group bvh/tree sampling/point_sampler_dxt \
+FILES=funcs render_spu tree_stats bounding_box rtbase base_scene bvh/traverse thread_pool \
+	  camera server node triangle ray_generator ray_group bvh/tree sampling/point_sampler_dxt \
 	  sampling/sampler shading/material sampling/bilinear_sampler sampling/point_sampler16bit \
 	sampling/point_sampler formats/loader formats/wavefront_obj formats/doom3_proc compression \
 	comm_mpi dbvh/tree dbvh/traverse scene scene_trace spu/context
 
-SPUFILES=trace compression
+SPUFILES=trace compression base triangle bbox texture
 
 LIBS=-lgfxlib -lbaselib -lpng -lz -lspe2
 
 MPILIBS=`$(HOME)/cell/bin/mpicxx -showme:link`
 
 LINUX_LIBS=$(LIBS)
-INCLUDES=-I./
+
+INCLUDES=-I./ -I/opt/cell/sdk/usr/include
+SPUINCLUDES=-I./ -I/opt/cell/sdk/usr/spu/include
 
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
 FLAGS=--param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdynamic -fmodulo-sched \
-		  -funroll-loops -ffast-math -DNDEBUG -mabi=altivec -maltivec $(NICE_FLAGS) -pthread \
+	  -funroll-loops -ffast-math -DNDEBUG -mabi=altivec -maltivec $(NICE_FLAGS) -pthread \
 
+#SPUFLAGS=-O3 -ffast-math -DNDEBUG -funroll-loops -fno-exceptions -D__SPU__ -I/workspace1/libs/veclib
 SPUFLAGS=--param inline-unit-growth=1000 -O3 -ffast-math -fmodulo-sched  -DNDEBUG \
-		 -funroll-loops -fno-exceptions $(NICE_FLAGS)
+		   -funroll-loops -fno-exceptions $(NICE_FLAGS)
 
-SXX=spu-g++
-CXX=ppu-g++43
+SXX=spu-g++43
+PXX=ppu-g++43
 
 DEPS:=$(FILES:%=$(BUILD_DIR)/%.dep)
 SOURCES:=$(FILES:%=%.cpp)
 OBJECTS:=$(FILES:%=$(BUILD_DIR)/%.o)
-SPUOBJECTS:=$(SPUFILES:%=$(BUILD_DIR)/spu/%.spu)
-SPUOBJECTS2:=$(SPUFILES:%=$(BUILD_DIR)/spu/%.o)
+SPUOBJECTS:=$(SPUFILES:%=$(BUILD_DIR)/spu/%.o)
 
 $(DEPS): $(BUILD_DIR)/%.dep: %.cpp
-	$(CXX) $(FLAGS) $(INCLUDES) -MM $< -MT $(BUILD_DIR)/$*.o > $@
+	$(PXX) $(FLAGS) $(INCLUDES) -MM $< -MT $(BUILD_DIR)/$*.o > $@
 
 $(OBJECTS): $(BUILD_DIR)/%.o: %.cpp
-	$(CXX) $(FLAGS) $(INCLUDES) -c $*.cpp -o $@
+	$(PXX) $(FLAGS) $(INCLUDES) -c $*.cpp -o $@
 
-$(SPUOBJECTS): $(BUILD_DIR)/spu/%.spu: spu/%.cpp
-	$(SXX) $(SPUFLAGS) $(INCLUDES) $< -o $@
+$(SPUOBJECTS): $(BUILD_DIR)/spu/%.o: spu/%.cpp
+	$(SXX) -std=c++0x $(SPUFLAGS) $(SPUINCLUDES) $< -c -o $@
 
-$(SPUOBJECTS2): $(BUILD_DIR)/spu/%.o: $(BUILD_DIR)/spu/%.spu
-	ppu-embedspu spe_$* $^ $@
+$(BUILD_DIR)/spu/all.o: spu/*.cpp
+	$(SXX) -std=c++0x $(SPUFLAGS) $(SPUINCLUDES) spu/all.cpp -c -o $@
 
-node_ppc: $(OBJECTS) $(SPUOBJECTS2)
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(MPILIBS) $(LINUX_LIBS)
+$(BUILD_DIR)/spu/main.o: spu/main.cpp
+	spu-g++ $(SPUFLAGS) $(SPUINCLUDES) $< -c -o $@
+
+#$(BUILD_DIR)/spu/trace.spu: $(BUILD_DIR)/spu/all.o $(BUILD_DIR)/spu/main.o
+#	spu-g++ $(SPUFLAGS) $^ -o $@
+#	cp $@ $(HOME)/rtbin/spu/
+
+$(BUILD_DIR)/spu/trace.spu: $(SPUOBJECTS) $(BUILD_DIR)/spu/main.o
+	spu-g++ $(SPUFLAGS) $^ -o $@
+	cp $@ $(HOME)/rtbin/spu/
+
+$(BUILD_DIR)/spu/trace.espu: $(BUILD_DIR)/spu/trace.spu
+	ppu-embedspu spe_trace $(BUILD_DIR)/spu/trace.spu $(BUILD_DIR)/spu/trace.espu
+
+node_ppc: $(OBJECTS) $(BUILD_DIR)/spu/trace.espu
+	$(PXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(MPILIBS) $(LINUX_LIBS)
 
 node_ppc_copy: node_ppc
 	cp node_ppc $(HOME)/rtbin/
 
 clean:
-	-rm -f $(OBJECTS) $(SPUOBJECTS) $(SPUOBJECTS2) $(DEPS) $(BUILD_DIR)/.depend node_ppc
+	-rm -f $(OBJECTS) $(SPUOBJECTS) $(BUILD_DIR)/spu/trace.espu $(DEPS) $(BUILD_DIR)/.depend node_ppc
 	-rmdir $(BUILD_DIR)/formats $(BUILD_DIR)/sampling $(BUILD_DIR)/shading \
 		$(BUILD_DIR)/bvh $(BUILD_DIR)/dbvh $(BUILD_DIR)/spu
 	-rmdir $(BUILD_DIR)

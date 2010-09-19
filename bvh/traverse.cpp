@@ -34,10 +34,10 @@ void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 		if(nodes[nNode].IsLeaf()) {
 			int count = nodes[nNode].count, first = nodes[nNode].first & 0x7fffffff;
 
-			__builtin_prefetch(&triCache[first + 0], 0, 3);
-			__builtin_prefetch(&triCache[first + 1], 0, 3);
-			__builtin_prefetch(&triCache[first + 2], 0, 3);
-			__builtin_prefetch(&triCache[first + 3], 0, 3);
+			__builtin_prefetch(&tris[first + 0], 0, 3);
+			__builtin_prefetch(&tris[first + 1], 0, 3);
+			__builtin_prefetch(&tris[first + 2], 0, 3);
+			__builtin_prefetch(&tris[first + 3], 0, 3);
 
 			const BBox &box = nodes[nNode].bbox;
 			if(!box.TestInterval(interval))
@@ -45,7 +45,7 @@ void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 
 			if(box.Test(c, firstActive, lastActive))
 				for(int n = 0; n < count; n++) {
-					const Triangle &tri = triCache[first + n];
+					const Triangle &tri = tris[first + n];
 					if(sharedOrigin?tri.TestInterval(interval):1/*tri.TestCornerRays(crays)*/) {
 						tri.Collide(c, first + n, firstActive, lastActive);
 						stats.Intersection(lastActive - firstActive + 1);
@@ -99,10 +99,10 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 		if(nodes[nNode].IsLeaf()) {
 			int count = nodes[nNode].count, first = nodes[nNode].first & 0x7fffffff;
 
-			__builtin_prefetch(&triCache[first + 0], 0, 3);
-			__builtin_prefetch(&triCache[first + 1], 0, 3);
-			__builtin_prefetch(&triCache[first + 2], 0, 3);
-			__builtin_prefetch(&triCache[first + 3], 0, 3);
+			__builtin_prefetch(&tris[first + 0], 0, 3);
+			__builtin_prefetch(&tris[first + 1], 0, 3);
+			__builtin_prefetch(&tris[first + 2], 0, 3);
+			__builtin_prefetch(&tris[first + 3], 0, 3);
 
 			const BBox &box = nodes[nNode].bbox;
 			if(!box.TestInterval(interval))
@@ -110,7 +110,7 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 
 			if(box.Test(c, firstActive, lastActive))
 				for(int n = 0; n < count; n++) {
-					const Triangle &tri = triCache[first + n];
+					const Triangle &tri = tris[first + n];
 					if(1 || tri.TestInterval(interval)) {
 						if(tri.Collide(c, firstActive, lastActive)) {
 							stats.Skip();

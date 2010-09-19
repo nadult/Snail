@@ -177,7 +177,7 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 				  ((object[0] == object[2] && element[0] == element[2]) &&
 				   (object[0] == obj0 && element[0] == elem0)))) {
 			const ShTriangle shTri = geometry.GetSElement(obj0, elem0);
-			int tMatId = geometry.GetMaterialId(shTri.matId, obj0);
+			int tMatId = geometry.GetMaterialId(shTri.MatId(), obj0);
 
 			const bool flatNormals = shTri.FlatNormals();
 			const shading::Material *mat = tMatId == ~0? &defaultMat : &*materials[tMatId];
@@ -233,7 +233,7 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 				if(EXPECT_TAKEN( i32x4(imask)[0] )) {
 					const ShTriangle shTri = geometry.GetSElement(obj0, elem0);
 
-					int tMatId = geometry.GetMaterialId(shTri.matId, obj0);
+					int tMatId = geometry.GetMaterialId(shTri.MatId(), obj0);
 					matId[q] = Condition(imask, i32x4(tMatId), matId[q]);
 
 					const Vec2q bar = barycentric[tq];
@@ -260,7 +260,7 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 
 						const ShTriangle shTri = geometry.GetSElement(obj, elem);
 
-						int tMatId = geometry.GetMaterialId(shTri.matId, obj);
+						int tMatId = geometry.GetMaterialId(shTri.MatId(), obj);
 						matId[q][k] = tMatId;
 
 						const Vec2q bar = barycentric[tq];

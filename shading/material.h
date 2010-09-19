@@ -27,6 +27,8 @@ namespace shading {
 		virtual void Shade(Sample*, const RayGroup<1, 0>&, SCache&) const = 0;
 		virtual void Shade(Sample*, const RayGroup<1, 1>&, SCache&) const = 0;
 
+		virtual const gfxlib::Texture *GetTexture() const { return 0; }
+
 		int id;
 		int flags;
 	};

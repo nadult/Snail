@@ -22,7 +22,10 @@ namespace comm {
 	void Socket::Accept(int port) {
 		tcp::acceptor acceptor(*(io_service*)serv, tcp::endpoint(tcp::v4(), port));
 		acceptor.accept(*(tcp::socket*)sock);
-		((tcp::socket*)sock)->set_option(tcp::no_delay(true));
+	}
+
+	void Socket::NoDelay(bool val) {
+		((tcp::socket*)sock)->set_option(tcp::no_delay(val));
 	}
 
 	void Socket::Connect(const char *host, const char *port) {
@@ -58,6 +61,24 @@ namespace comm {
 		delete (tcp::socket*)sock;
 		delete (io_service*)serv;
 	}
+
+	PSocket::PSocket(Socket &sock) :sock(sock.sock), serv(sock.serv) { }
+	PSocket::PSocket() :sock(0), serv(0) { }
+
+	void PSocket::Write(const void *data, size_t size) {
+		assert(sock);
+		boost::asio::write(*((tcp::socket*)sock), boost::asio::buffer(data, size));
+	}
+
+	void PSocket::Read(void *data, size_t size) {
+		assert(sock);
+		int bytes = 0;
+		while(bytes < size) {
+			int len = ((tcp::socket*)sock)->read_some(boost::asio::buffer(((char*)data) + bytes, size - bytes));
+			bytes += len;
+		}
+	}
+
 
 
 }

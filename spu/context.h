@@ -5,7 +5,6 @@
 #include "rtbase.h"
 
 extern spe_program_handle_t spe_trace;
-extern spe_program_handle_t spe_compression;
 
 struct SPEGangContext {
 	SPEGangContext();
