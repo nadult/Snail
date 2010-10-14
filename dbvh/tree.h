@@ -175,6 +175,11 @@ struct ObjectInstance {
 	}
 	void ComputeBBox();
 
+	const Vec3f GetNormal(int elem) const {
+		ThrowException("Write me!");
+		return Vec3f(0, 1, 0);
+	}
+
 	Vec3f rotation[3];
 	Vec3f translation;
 	BVH *tree;
@@ -203,6 +208,9 @@ public:
 		ShTriangle out = elements[elem].tree->GetSElement(subElem, 0);
 		out.Transform(elements[elem].rotation, elements[elem].translation);
 		return out;
+	}
+	const Vec3f GetNormal(int elem, int subElem) const {
+		return elements[elem].GetNormal(subElem);
 	}
 
 	template <bool sharedOrigin, bool hasMask>

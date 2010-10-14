@@ -38,13 +38,30 @@ private:
 class TreeStats
 {
 public:
-	enum { enabled = stats::treeStatsEnabled, dataSize = enabled? 10 : 1 };
+	enum {
+		enabled = stats::treeStatsEnabled,
+		dataSize = enabled? 10 : 1,
+		timersSize = enabled? 8 : 1
+   	};
 
 	inline TreeStats() { if(enabled) Init(); }
-	inline TreeStats(const TreeStats &rhs) { if(enabled) for(int n=0;n<dataSize;n++) data[n]=rhs.data[n]; }
-	inline void Init() { if(enabled) for(int n=0;n<dataSize;n++) data[n]=0; }
+	inline TreeStats(const TreeStats &rhs) {
+		if(enabled) {
+			for(int n = 0; n < dataSize; n++) data[n] = rhs.data[n];
+			for(int n = 0; n < timersSize; n++) timers[n] = rhs.timers[n]; 
+		}
+	}
+	inline void Init() {
+		if(enabled) {
+			for(int n = 0; n < dataSize; n++) data[n] = 0;
+			for(int n = 0; n < timersSize; n++) timers[n] = 0;
+		}
+	}
 	inline const TreeStats &operator=(const TreeStats &rhs) {
-		if(enabled) { for(int n=0;n<dataSize;n++) data[n]=rhs.data[n]; }
+		if(enabled) {
+			for(int n = 0;n < dataSize; n++) data[n]=rhs.data[n];
+			for(int n = 0; n < timersSize; n++) timers[n] = rhs.timers[n];
+		}
 		return *this;
 	}
 
@@ -61,9 +78,9 @@ public:
 	double GetBreaking() const		{ return enabled?double(data[5])/double(data[5]+data[6]):0.0; }
 	double GetIntersectFail() const	{ return enabled?double(data[8])/double(data[7]+data[8]):0.0; }
 
-	uint GetIntersects() const { return enabled?data[0]:0; }
-	uint GetLoopIters() const { return enabled?data[1]:0; }
-	uint GetSkips() const { return enabled?data[9]:0; }
+	uint GetIntersects() const { return enabled?data[0] : 0; }
+	uint GetLoopIters() const { return enabled?data[1] : 0; }
+	uint GetSkips() const { return enabled?data[9] : 0; }
 	uint GetRays() const { return enabled?data[2] : 0; }
 
 	const string GenInfo(int resx,int resy,double msRenderTime,double msBuildTime) const;
@@ -83,7 +100,7 @@ public:
 
 	inline void TracingRays(uint val=1) { if(enabled) { data[2]+=val; } }
 
-	int timers[enabled?8 : 1];
+	int timers[timersSize];
 private:
 	u32 data[dataSize];
 	// intersects		0

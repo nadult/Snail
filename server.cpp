@@ -186,22 +186,21 @@ int server_main(int argc, char **argv) {
 	InputAssert(rank == 0);
 
 	printf("Snail v 0.20 server %d / %d\n", rank, numNodes);
+	if(numNodes == 1) {
+		printf("No rendering nodes avaliable!\n");
+		return 1;
+	}
 
 	MPI_Buffer_attach(sendbuf, sizeof(sendbuf));
 
 	vector<unsigned char> tdata;
-
-	enum {
-		blockWidth = 16,
-		blockHeight = 64,
-	};
 
 	while(true) {
 		Socket socket;
 		socket.Accept(20002);
 		PSocket sock(socket);
 
-		int resx, resy, threads = 2;
+		int resx, resy, threads = 2, nActiveNodes;
 		comm::LoadNewModel lm;
 		sock >> lm;
 		string texPath = lm.name; {
@@ -210,6 +209,9 @@ int server_main(int argc, char **argv) {
 			else texPath.resize(pos + 1);
 		}
 		resx = lm.resx; resy = lm.resy;
+		nActiveNodes = lm.nNodes == -1? numNodes - 1 : Clamp(lm.nNodes, 1, numNodes - 1);
+		printf("Active rendering nodes: %d\n", nActiveNodes);
+
 		if(resx % blockWidth || resy % blockHeight) {
 			printf("Image width / height should be a multiply of %d / %d\n",
 					blockWidth, blockHeight);
@@ -217,19 +219,20 @@ int server_main(int argc, char **argv) {
 		}
 
 		vector<int> partCoords;
-		vector<vector<int> > nodeParts; if(numNodes > 1) {
+		vector<vector<int> > nodeParts; {
 			partCoords = DivideImage(resx, resy, blockWidth, blockHeight);
-			nodeParts.resize(numNodes - 1);
-			vector<int> order(numNodes - 1);
-			for(int n = 0; n < numNodes - 1; n++)
+			nodeParts.resize(nActiveNodes);
+			vector<int> order(nActiveNodes);
+
+			for(int n = 0; n < nActiveNodes; n++)
 				order[n] = n;
 
 			vector<int> taskMap((resx / blockWidth) * (resy / blockHeight));
 
 			for(int n = 0; n < partCoords.size() / 4; n++) {
-				if(n % (numNodes - 1) == 0)
+				if(n % nActiveNodes == 0)
 					std::random_shuffle(order.begin(), order.end());
-				taskMap[n] = order[n % (numNodes - 1)];
+				taskMap[n] = order[n % nActiveNodes];
 			}
 
 			//TODO: lepiej rozlozyc kawalki obrazka na wezly
@@ -296,9 +299,17 @@ int server_main(int argc, char **argv) {
 			
 		MPIBcast() << resx << resy;
 
-		for(int n = 1; n < numNodes; n++)
-			MPINode(n, 0)	<< int(nodeParts[n - 1].size() / 4)
-							<< comm::Data(&nodeParts[n - 1][0], nodeParts[n - 1].size() * 4);
+		//TODO: moze sie zdazyc ze niektore nodey nie beda mialy kawalkow
+		//choc sa aktywne
+		for(int n = 1; n < numNodes; n++) {
+			if(n - 1 >= nActiveNodes) {
+				int zero = 0; MPINode(n, 0) << zero;
+				continue;
+			}
+
+			MPINode(n, 0) << int(nodeParts[n - 1].size() / 4);
+			MPINode(n, 1) << comm::Data(&nodeParts[n - 1][0], nodeParts[n - 1].size() * 4);
+		}
 
 		scene.geometry.PrintInfo();
 		
@@ -359,11 +370,9 @@ int server_main(int argc, char **argv) {
 			buildTime = GetTime() - buildTime;
 			*/
 			double buildTime = 0.0;
-
-			int workerNodes = numNodes - 1;
 			int nFinished = 0;
 
-			while(nFinished < workerNodes) {
+			while(nFinished < nActiveNodes) {
 				int source, size;
 				MPIAnyNode(&source, 0) >> size;
 				if(size == 0) {
@@ -380,23 +389,23 @@ int server_main(int argc, char **argv) {
 			double renderTimes[32];
 			TreeStats stats;
 
-			for(int r = 1; r < numNodes; r++) {
+			for(int r = 1; r <= nActiveNodes; r++) {
 				TreeStats nodeStats;
 				int rank;
 				MPIAnyNode(&rank, 1) >> Pod(nodeStats);
 				double renderTime;
 				MPINode(rank, 2) >> renderTime;
-				if(rank < 32) renderTimes[rank - 1] = renderTime;
+				if(rank <= 32) renderTimes[rank - 1] = renderTime;
 				stats += nodeStats;
 			}
 			for(int k = 0; k < sizeof(stats.timers) / sizeof(stats.timers[0]); k++)
 				stats.timers[k] /= partCoords.size();
 
-			sock << Pod(stats) << buildTime << workerNodes << Pod(renderTimes);
+			sock << Pod(stats) << buildTime << nActiveNodes << Pod(renderTimes);
 			time = GetTime() - time;
 
 		//	printf("%s at %dx%d on %d nodes, each with %d threads: %.2f ms\n",
-		//			lm.name.c_str(), resx, resy, workerNodes, threads, time * 1000.0);
+		//			lm.name.c_str(), resx, resy, nActiveNodes, threads, time * 1000.0);
 		}
 	}
 

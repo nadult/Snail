@@ -230,7 +230,7 @@ static TreeStats RenderAndSend(const Scene<AccStruct> &scene,const Camera &camer
 		newTask.reflections = gVals[7];
 		newTask.shading = gVals[6];
 		newTask.statsVis = gVals[5];
-		newTask.compress = !gVals[4];
+		newTask.compress = 1;//!gVals[4];
 
 		_mutex_lock(tinfo.mutex);
 		memcpy((void*)(tasks + tinfo.nTasks++), &newTask, sizeof(TaskInfo));

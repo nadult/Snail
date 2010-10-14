@@ -151,8 +151,10 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 				}
 				if(tri.vt[k] >= int(uvs.size()))
 					ThrowException("Wrong tex-coord index: ",tri.vt[k],"/",int(uvs.size()));
-				if(tri.vn[k] >= int(normals.size()))
-					ThrowException("Wrong normal index",tri.vn[k],"/",int(normals.size()));
+				if(tri.vn[k] >= int(normals.size())) {
+					tri.vn[k] = -1; //TODO
+				//	ThrowException("Wrong normal index",tri.vn[k],"/",int(normals.size()));
+				}
 			}
 			
 			tris.push_back(tri);

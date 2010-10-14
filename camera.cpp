@@ -46,7 +46,6 @@ FPSCamera::FPSCamera(const Vec3f p, float ang, float pitch)
 	:pos(pos), ang(ang), pitch(pitch), plane_dist(1.0) { }
 
 
-
 void FPSCamera::Print() {
 	printf("FPSCamera(Vec3f(%.4f, %.4f, %.4f), %.4f, %.4f);\n",
 			pos.x, pos.y, pos.z, ang, pitch);
@@ -61,6 +60,9 @@ FPSCamera::operator const Camera() const {
 	Vec3f right = Vec3f(x[1] | x[0], x[1] | y[0], x[1] | z[0]);
 	Vec3f up    = Vec3f(y[1] | x[0], y[1] | y[0], y[1] | z[0]);
 	Vec3f front = Vec3f(z[1] | x[0], z[1] | y[0], z[1] | z[0]);
+//	Vec3f right = x[1] * x[0].x + y[1] * x[0].y + z[1] * x[0].z;
+//	Vec3f up    = x[1] * y[0].x + y[1] * y[0].y + z[1] * y[0].z;
+//	Vec3f front = y[1] * z[0].x + y[1] * z[0].y + z[1] * z[0].z;
 
 	return Camera(pos, right, up, front, plane_dist);
 }
@@ -90,39 +92,51 @@ const Vec3f FPSCamera::Pos() const {
 }
 
 OrbitingCamera::OrbitingCamera()
-	:pos(0, 0, 0), ang(0), pitch(0), plane_dist(1.0) { }
+	:pos(0, 0, -100), target(0, 0, 0), right(1, 0, 0), plane_dist(1.0) { }
 	
 OrbitingCamera::operator const Camera() const {
-	Vec3f x[2], y[2], z[2];
+	Vec3f front = Normalize(target - pos);
+	Vec3f up = front ^ right;
 
-	::Rotate(Vec3f(0, 1, 0), ang, x[0], y[0], z[0]);
-	::Rotate(Vec3f(1, 0, 0), pitch, x[1], y[1], z[1]);
-
-	Vec3f right = Vec3f(x[1] | x[0], x[1] | y[0], x[1] | z[0]);
-	Vec3f up    = Vec3f(y[1] | x[0], y[1] | y[0], y[1] | z[0]);
-	Vec3f front = Vec3f(z[1] | x[0], z[1] | y[0], z[1] | z[0]);
-
-	return Camera(pos - front * dist, right, up, front, plane_dist);
+	return Camera(pos, right, up, front, plane_dist);
 }
 
+void OrbitingCamera::Reset(Vec3f newPos, float newDist) {
+	target = newPos;
+	pos = newPos + Vec3f(0, 0, -newDist);
+	right = Vec3f(1, 0, 0);
+	Rotate(0.001);
+}
 
 void OrbitingCamera::Rotate(float a) {
-	ang += a;
+	float dist = Length(target - pos);
+
+	Vec3f oldFront = Normalize(target - pos);
+	Vec3f up = oldFront ^ right;
+	pos += right * a * dist;
+	Vec3f front = Normalize(target - pos);
+	right = up ^ front;
+
+	pos = target - front * dist;
 }
 
 void OrbitingCamera::RotateY(float p) {
-	pitch = Clamp(pitch + p, -constant::pi / 2.0f, constant::pi / 2.0f);
+	float dist = Length(target - pos);
+
+	Vec3f oldFront = Normalize(target - pos);
+	Vec3f up = oldFront ^ right;
+	pos += up * p * dist;
+	Vec3f front = Normalize(target - pos);
+	up = front ^ right;
+
+	pos = target - front * dist;
 }
 
 void OrbitingCamera::Zoom(float z) {
-	dist += z;
-	if(dist < 0) dist = 0;
+	float dist = Length(target - pos);
+	Vec3f front = Normalize(target - pos);
+	pos += front * float(log(dist) * z);
 }
-
-void OrbitingCamera::SetPos(const Vec3f &newPos) {
-	pos = newPos;
-}
-
 
 void CameraConfigs::AddConfig(const string &str,const FPSCamera &cam) {
 	data[str] = cam;

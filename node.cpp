@@ -204,6 +204,10 @@ static void ReceiveBVH(BVH *tree) {
 
 int server_main(int, char**);
 
+#if defined(__PPC) || defined(__PPC__)
+void KillSPURenderingThreads();
+#endif
+
 int node_main(int argc, char **argv) {
 	int rank, numNodes, maxNodes;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -240,10 +244,12 @@ int node_main(int argc, char **argv) {
 			ByteSwap(&nCoords);
 #endif
 			partCoords.resize(nCoords * 4);
-			MPINode(0, 1) >> comm::Data(&partCoords[0], nCoords * 16);
+			if(nCoords) {
+				MPINode(0, 1) >> comm::Data(&partCoords[0], nCoords * 16);
 #ifdef __BIG_ENDIAN
-			SwapDwords(&partCoords[0], partCoords.size());
+				SwapDwords(&partCoords[0], partCoords.size());
 #endif
+			}
 		}
 		int nParts = partCoords.size() / 4;
 		if(parts.size() < nParts)
@@ -263,7 +269,7 @@ int node_main(int argc, char **argv) {
 		Camera cam;
 		Options options;
 		vector<unsigned char, AlignedAllocator<unsigned char, 16> > data(nParts * 16 + 16);
-		vector<int> partOffsets(nParts); {
+		vector<int> partOffsets(nParts); if(nParts) {
 			*((int*)&data[0]) = nParts;
 			memcpy(&data[4], &partCoords[0], nParts * 16);
 			memset(&data[nParts * 16 + 4], 0, 12);
@@ -284,7 +290,13 @@ int node_main(int argc, char **argv) {
 		for(;;) {
 			bool finish;
 			MPIBcast() >> finish;
-			if(finish) break;
+			if(finish) {
+#if defined(__PPC) || defined(__PPC__)
+				KillSPURenderingThreads();
+#endif
+				break;
+			}
+
 			int nLights;
 
 			MPIBcast() >> Pod(cam) >> nLights;
@@ -296,6 +308,9 @@ int node_main(int argc, char **argv) {
 			scene.lights.resize(nLights);
 			MPIBcast()	>> comm::Data(&scene.lights[0], sizeof(Light) * nLights)
 						>> Pod(gVals) >> Pod(threads);
+			if(nParts == 0)
+				continue;
+
 #ifdef __BIG_ENDIAN
 			SwapDwords(&scene.lights[0], (sizeof(Light) * nLights) / 4);
 			SwapDwords(gVals, sizeof(gVals) / 4);
@@ -306,16 +321,14 @@ int node_main(int argc, char **argv) {
 			dscene.lights = scene.lights;
 		//	dscene.geometry = MakeDBVH(&scene.geometry);
 
+			TreeStats stats;
+			double renderTime = GetTime();
 #if defined(__PPC) || defined(__PPC__)
-			double renderTime = GetTime();
-			TreeStats stats = RenderAndSend(scene, cam, resx, resy, &data[0], &comprData[0],
+			stats = RenderAndSend(scene, cam, resx, resy, &data[0], &comprData[0],
 						partCoords, partOffsets, options, rank, threads);
-			renderTime = GetTime() - renderTime;
 #else
-			double renderTime = GetTime();
-			TreeStats stats = 
-				Render(scene, cam, resx, resy, &data[0], partCoords, partOffsets, options, rank, threads);
-			renderTime = GetTime() - renderTime;
+			stats = Render(scene, cam, resx, resy, &data[0], partCoords, partOffsets,
+						options, rank, threads);
 			for(int n = 0; n < sizeof(stats.timers) / sizeof(int); n++)
 				stats.timers[n] = 0;
 
@@ -325,6 +338,7 @@ int node_main(int argc, char **argv) {
 			}
 			MPINode(0, 0) << comprSize << comm::Data(&comprData[0], comprSize);
 #endif
+			renderTime = GetTime() - renderTime;
 			int zero = 0; MPI_Bsend(&zero, sizeof(zero), MPI_CHAR, 0, 0, MPI_COMM_WORLD);
 
 #ifdef __BIG_ENDIAN

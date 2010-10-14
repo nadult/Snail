@@ -20,49 +20,89 @@
 using std::cout;
 using std::endl;
 
-void PrintHelp() {
-	printf("Synopsis:    rtracer model_file [options]\nOptions:\n\t-res x y   - set rendering resolution [512 512]\n\t");
-	printf("-fullscreen\n\t-toFile   - renders to file out/output.tga\n\t-threads n   - set threads number to n\n\t");
-	printf("\nExamples:\n\t./rtracer -res 1280 800 abrams.obj\n\t./rtracer pompei.obj -res 800 600 -fullscreen\n\n");
-	printf("Interactive control:\n\tA,W,S,D R,F - move the camera\n\tN,M - rotate camera\n\t");
-	printf("k - save image to out/output.tga\n\to - toggle reflections\n\tl - toggle lights\n\t");
-	printf("j - toggle lights movement\n\tp - print camera position; save camera configuration\n\t");
-	printf("c - center camera position in the scene\n\t");
-	printf("F1 - toggle shadow caching\n\t");
-	printf("esc - exit\n\n");
+static void PrintHelp() {
+	printf("Synopsis:    rtracer model_file [options]\nOptions:\n"
+			"\t-res x y     - set rendering resolution [1024 1024]\n"
+			"\t-fullscreen\n"
+			"\t-rebuild     - rebuild BVH tree (using faster algorithm)\n"
+			"\t-slowBuild   - rebuild BVH tree (using slower algorithm)\n"
+			"\t-flipNormals - flip normals of triangles when rebuilding\n"
+			"\t-swapYZ      - swap Y, Z axes when rebuilding\n"
+			"\n\n"
+			"Interactive control:\n"
+			"\tA,W,S,D R,F         - move the camera\n"
+			"\tmouse + left button - rotate camera\n"
+			"\tmouse wheel         - zoom in/out camera (works only in orbit mode)\n"
+			"\tright mouse button  - flip mouse axes (works only in orbit mode)\n"
+			"\tshift               - faster movement / zooming\n"
+			"\tk   - save image to out/output.tga\n"
+			"\to   - toggle reflections\n"
+			"\tl   - toggle lights\n"
+			"\tj   - add new light in the camera position\n"
+			"\tp   - print camera position and save camera configuration\n"
+			"\tc   - center camera position in the scene\n"
+			"\tF6  - toggle scene complexity visualization\n"
+			"\tF7  - toggle advanced shading\n"
+			"\tF8  - toggle reflections\n"
+			"\tF9  - toggle node tasks visaulization\n"
+			"\tF10 - toggle antialiasing\n"
+			"\t1-8 - set number of threads to 1 - 8\n"
+			"\t9   - set number of threads to 16\n"
+			"\t0   - set number of threads to 32\n"
+			"\tesc - exit\n\n"
+		);
 }
 
-typedef BVH StaticTree;
+static void MoveCamera(OrbitingCamera &cam, GLWindow &window, float speed) {
+	if(window.Key(Key_lshift)) speed *= 5.f;
+	if(window.MouseKey(0) || window.MouseKey(1)) {
+		float flip = window.MouseKey(1)? -1 : 1;
 
-vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
-	vector<Light> out;
+		window.GrabMouse(1);
+		float dx = window.MouseMove().x * flip;
+		float dy = window.MouseMove().y * flip;
 
-	float pos=float(gVals[5])*0.01f;
+		if(dx) cam.Rotate(-dx * 0.005);
+		if(dy) cam.RotateY(dy * 0.005);
+	}
+	else window.GrabMouse(0);
+		
+	if(window.Key(Key_left)) cam.Rotate(0.01);
+	if(window.Key(Key_right)) cam.Rotate(-0.01);
+	
+	float zoom = 0;
+	zoom = window.MouseMove().z * 4;
+	if(window.Key('R')) zoom = 1;
+	if(window.Key('F')) zoom = -1;
 
-	out.push_back(
-		/*Toasters*/ //Light(RotateY(pos)*Vec3f(0,400.5f,0),Vec3f(8,8,5),10000.f)
-		/*sponza*/  // Light(Vec3f(0,2,0),Vec3f(8,8,5),20.0f)
-		/*admin*/   Light(Vec3f(-78.0f,110.0f,-531.0f) * scale, Vec3f(1,1,0.7), power)
-	);
-//	out.push_back(Light(Vec3f(-600.0f,144.0f,-341.0f),Vec3f(0.3,0.6,1.0),800.0f));
-//	out.push_back(Light(Vec3f(407.0f,209.64f,1634.0f),Vec3f(1,1,1),1000.0f));
+	if(zoom)
+		cam.Zoom(zoom * speed);
 
-	return out;
+	Vec3f move(0, 0, 0);
+	Camera tcam = (Camera)cam;
+
+	if(window.Key('W')) move += tcam.front;
+	if(window.Key('S')) move -= tcam.front;
+	if(window.Key('A')) move -= tcam.right;
+	if(window.Key('D')) move += tcam.right;
+
+	cam.target += move * speed;
+	cam.pos += move * speed;
 }
-
 static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
+	if(window.Key(Key_lshift)) speed *= 5.f;
 	if(window.MouseKey(0)) {
+		window.GrabMouse(1);
 		float dx = window.MouseMove().x;
 		float dy = window.MouseMove().y;
 
-		if(dx) cam.Rotate(-dx * 0.001);
-		if(dy) cam.RotateY(dy * 0.001);
-		window.GrabMouse(1);
+		if(dx) cam.Rotate(-dx * 0.005);
+		if(dy) cam.RotateY(dy * 0.005);
 	}
 	else window.GrabMouse(0);
 
 	Vec3f move(0, 0, 0);
-	Camera tcam(cam);
+	Camera tcam = (Camera)cam;
 
 	if(window.Key('W')) move += tcam.front;
 	if(window.Key('S')) move -= tcam.front;
@@ -71,7 +111,7 @@ static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 	if(window.Key('R')) move += tcam.up;
 	if(window.Key('F')) move -= tcam.up;
 
-	cam.Move(move * speed * (window.Key(Key_lshift)? 5.0f : 1.0f));
+	cam.Move(move * speed);
 }
 
 static const DBVH MakeDBVH(BVH *bvh) {
@@ -125,25 +165,27 @@ static int tmain(int argc, char **argv) {
 	string sceneName = "pompei.obj";//"doom3/admin.proc";
 
 	Options options;
-	bool flipNormals = 1;
+	bool flipNormals = 1, swapYZ = 0;
 	bool rebuild = 0, slowBuild = 0;
 	string texPath = "";
 
-	for(int n=1;n<argc;n++) {
-			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
-		else if(string("-rebuild") == argv[n]) { rebuild = 1; }
+	for(int n = 1; n < argc; n++) {
+			 if(string("-res") == argv[n] && n < argc-2) { resx = atoi(argv[n+1]); resy = atoi(argv[n+2]); n += 2; }
+		else if(string("-rebuild") == argv[n]) rebuild = 1;
 		else if(string("-slowBuild") == argv[n]) { rebuild = 1; slowBuild = 1; }
-		else if(string("-threads")==argv[n]&&n<argc-1) { threads=atoi(argv[n+1]); n+=1; }
-		else if(string("-fullscreen")==argv[n]) { fullscreen=1; }
-		else if(string("+flipNormals")==argv[n]) flipNormals=1;
-		else if(string("-flipNormals")==argv[n]) flipNormals=0;
-		else if(string("-texPath")==argv[n]) { texPath=argv[n+1]; n++; }
+		else if(string("-threads") == argv[n] && n < argc - 1) { threads=atoi(argv[n+1]); n+=1; }
+		else if(string("-fullscreen") == argv[n]) fullscreen = 1;
+		else if(string("-flipNormals") == argv[n]) flipNormals = 0;
+		else if(string("-swapYZ") == argv[n]) swapYZ = 1;
 		else {
-			if(argv[n][0] == '-') printf("Unknown option: %s\n",argv[n]);
+			if(argv[n][0] == '-') {
+				printf("Unknown option: %s\n",argv[n]);
+				exit(0);
+			}
 			else sceneName = argv[n];
 		}
 	}
-
+	
 	if(texPath == "") {
 		texPath = "scenes/" + sceneName;
 		int pos = texPath.rfind('/');
@@ -151,7 +193,7 @@ static int tmain(int argc, char **argv) {
 		else texPath.resize(pos + 1);
 	}
 
-	Scene<StaticTree> scene;
+	Scene<BVH> scene;
 	if(!rebuild) {
 		try { Loader(string("dump/") + sceneName) & scene.geometry; }
 		catch(...) { rebuild = 1; }
@@ -173,6 +215,7 @@ static int tmain(int argc, char **argv) {
 			printf("Tris: %d\n",tris);
 
 			if(flipNormals) baseScene.FlipNormals();
+			if(swapYZ) baseScene.SwapYZ();
 		//	for(int n = 0; n < baseScene.objects.size(); n++)
 		//		baseScene.objects[n].Repair();
 			baseScene.GenNormals();
@@ -182,7 +225,6 @@ static int tmain(int argc, char **argv) {
 		
 		double buildTime = GetTime();
 		scene.geometry.Construct(baseScene, !slowBuild);
-	//	scene.geometry.Construct(baseScene.ToTriangleVector());
 		Saver(string("dump/") + sceneName) & scene.geometry;
 		buildTime = GetTime() - buildTime;
 		std::cout << "Loading time: " << loadingTime << "  Build time: " << buildTime << '\n';
@@ -194,9 +236,10 @@ static int tmain(int argc, char **argv) {
 		string mtlFile = "scenes/" + sceneName.substr(0, sceneName.size() - 3) + "mtl";
 		matDescs = shading::LoadMaterialDescs(mtlFile);
 	}
-
-	scene.texDict = LoadTextures(matDescs, "scenes/" + texPath);
+		
+	scene.texDict = LoadTextures(matDescs, texPath);
 	scene.matDict = shading::MakeMaterials(matDescs, scene.texDict);
+		
 	scene.UpdateMaterials();
 	scene.geometry.UpdateMaterialIds(scene.GetMatIdMap());
 
@@ -204,6 +247,7 @@ static int tmain(int argc, char **argv) {
 		Vec3f size = scene.geometry.GetBBox().Size();
 		sceneScale = Length(size);
 	}
+	Vec3f sceneCenter = scene.geometry.GetBBox().Center();
 
 	GLWindow window(resx, resy, fullscreen);
 	Font font;
@@ -213,10 +257,11 @@ static int tmain(int argc, char **argv) {
 			
 	FPSCamera cam;
 	if(!camConfigs.GetConfig(string(sceneName),cam))
-		cam.SetPos(scene.geometry.GetBBox().Center());
+		cam.SetPos(sceneCenter);
+	OrbitingCamera ocam;
 
 	bool lightsEnabled = 1;
-	bool staticEnabled = 0;
+	bool staticEnabled = 0, orbiting = 0;
 	float speed; {
 	//	scene.geometry.Construct(builder.ExtractElements());
 		Vec3f size = scene.geometry.GetBBox().Size();
@@ -230,12 +275,20 @@ static int tmain(int argc, char **argv) {
 
 		if(window.KeyUp(Key_esc)) break;
 		if(window.KeyDown('K')) Saver("out/output.dds") & image;
-		if(window.KeyDown('O')) options.reflections ^= 1;
-		if(window.KeyDown('I')) options.rdtscShader ^= 1;
+
 		if(window.KeyDown('C')) {
-		//	if(staticEnabled)
-				cam.SetPos(scene.geometry.GetBBox().Center());
-		//	else cam.pos=scene.geometry.GetBBox().Center();
+			if(orbiting) ocam.Reset(sceneCenter, sceneScale);
+			else cam.SetPos(sceneCenter);
+		}
+		if(window.KeyDown('P')) {
+			camConfigs.AddConfig(string(sceneName),cam);
+			Saver("cameras.dat") & camConfigs;
+			cam.Print();
+		}
+		if(window.KeyDown('O')) {
+			if(orbiting) cam.SetPos(ocam.pos);
+			else ocam.Reset(cam.pos, -sceneScale);
+			orbiting ^= 1;
 		}
 		if(window.KeyDown('P')) {
 			camConfigs.AddConfig(string(sceneName),cam);
@@ -249,23 +302,29 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown('J')) {
 			Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
 
-			lights.push_back(Light(cam.Pos(), colors[rand()&3], 2000.0f * 0.001f * sceneScale));
+			Vec3f pos = (orbiting?(Camera)ocam : (Camera)cam).pos;
+			lights.push_back(Light(pos, colors[rand()&3], 2000.0f * 0.001f * sceneScale));
 		}
 
-		MoveCamera(cam, window, speed);
+		if(orbiting)
+			MoveCamera(ocam, window, speed);
+		else
+			MoveCamera(cam, window, speed);
 
 		for(int n = 1; n <= 8; n++) if(window.Key('0' + n))
 				{ threads = n; printf("Threads: %d\n", threads); }
 
+		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 0 %s\n", gVals[0]?"on" : "off"); }
+		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 1 %s\n", gVals[1]?"on" : "off"); }
+		if(window.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 2 %s\n", gVals[2]?"on" : "off"); }
+		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 3 %s\n", gVals[3]?"on" : "off"); }
+		if(window.KeyDown(Key_f5)) { gVals[4]^=1; printf("Val 4 %s\n", gVals[4]?"on" : "off"); }
+		if(window.KeyDown(Key_f6)) { gVals[5]^=1; printf("Scene complexity visualization %s\n",gVals[5]?"on":"off"); }
+		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Advanced shading %s\n",gVals[6]?"on":"off"); }
+		if(window.KeyDown(Key_f8)) { gVals[7]^=1; printf("Reflections 7 %s\n",gVals[7]?"on":"off"); }
+		if(window.KeyDown(Key_f9)) { gVals[8]^=1; printf("Node tasks visualization 8 %s\n",gVals[8]?"on":"off"); }
+		if(window.KeyDown(Key_f10)) { gVals[9]^=1; printf("Antialiasing 4x %s\n",gVals[9]?"on":"off"); }
 		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Traversing from 8x8: %s\n", gVals[0]?"on" : "off"); }
-		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
-		if(window.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
-		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
-		if(window.KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
-		if(window.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"on":"off"); }
-		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Val 6 %s\n",gVals[6]?"on":"off"); }
-		if(window.KeyDown(Key_f8)) { gVals[7]^=1; printf("Val 7 %s\n",gVals[7]?"on":"off"); }
-
 
 		static float animPos = 0;
 		if(window.Key(Key_space)) animPos+=0.025f;
@@ -284,7 +343,7 @@ static int tmain(int argc, char **argv) {
 		
 		double time = GetTime();
 		TreeStats stats;
-		stats = Render(scene, cam, image, options, threads);
+		stats = Render(scene, orbiting?(Camera)ocam : (Camera)cam, image, options, threads);
 
 		time = GetTime() - time;
 		window.RenderImage(image);

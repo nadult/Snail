@@ -28,6 +28,9 @@ public:
 	const ShTriangle &GetSElement(int elem, int subElem) const {
 		return shTris[elem];
 	}
+	const Vec3f GetNormal(int elem, int subElem) const {
+		return tris[elem].Nrm();
+	}
 
 	template <bool sharedOrigin, bool hasMask>
 	void TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const;

@@ -56,18 +56,52 @@ struct RenderTask: public thread_pool::Task {
 		};
 		u8 *outPtr = out;
 		Vec3q origin; Broadcast(camera.pos, origin);
-		RayGenerator rayGen(QuadLevels, resx, resy, camera.plane_dist, camera.right, camera.up, camera.front);
+	
+		float scale = gVals[9]? 2 : 1;
+		RayGenerator rayGen(QuadLevels, resx * scale, resy * scale,
+							camera.plane_dist, camera.right, camera.up, camera.front);
 
 		Cache cache;
 		Vec3q dir[NQuads], idir[NQuads];
 
 		for(int y = 0; y < height; y += PHeight) {
 			for(int x = 0; x < width; x += PWidth) {
-				rayGen.Generate(PWidth, PHeight, startX + x, startY + y, dir);
-				for(int n = 0; n < NQuads; n++) idir[n] = SafeInv(dir[n]);
-			
 				Vec3q colors[NQuads];	
-				*outStats += scene->RayTrace(RayGroup<1, 0>(&origin, dir, idir, NQuads), cache, colors);
+
+				if(gVals[9]) {
+					int offx[4] = { 0, PWidth, 0, PWidth }, offy[4] = { 0, 0, PHeight, PHeight };
+					int coff[4] = { 0, NQuads / 4, NQuads / 4 * 2, NQuads / 4 * 3 };
+
+					for(int k = 0; k < 4; k++) {
+						rayGen.Generate(PWidth, PHeight, (startX + x) * 2 + offx[k],
+								(startY + y) * 2 + offy[k], dir);
+						for(int n = 0; n < NQuads; n++) idir[n] = SafeInv(dir[n]);
+					
+						Vec3q tcolors[NQuads];
+						*outStats += scene->RayTrace(RayGroup<1, 0>(&origin, dir, idir, NQuads), cache, tcolors);
+						float *dstx = (float*)&colors[coff[k]].x[0];
+						float *dsty = (float*)&colors[coff[k]].y[0];
+						float *dstz = (float*)&colors[coff[k]].z[0];
+
+						for(int q = 0; q < NQuads; q += 4) {
+							for(int i = 0; i < 4; i++) {
+								const Vec3q col = tcolors[q + i];
+								dstx[i] = col.x[0] + col.x[1] + col.x[2] + col.x[3];
+								dsty[i] = col.y[0] + col.y[1] + col.y[2] + col.y[3];
+								dstz[i] = col.z[0] + col.z[1] + col.z[2] + col.z[3];
+							}
+							dstx += 12; dsty += 12; dstz += 12;
+						}
+					}
+					for(int q = 0; q < NQuads; q++)
+						colors[q] *= floatq(0.25f);
+				}
+				else {
+					rayGen.Generate(PWidth, PHeight, startX + x, startY + y, dir);
+					for(int n = 0; n < NQuads; n++) idir[n] = SafeInv(dir[n]);
+			
+					*outStats += scene->RayTrace(RayGroup<1, 0>(&origin, dir, idir, NQuads), cache, colors);
+				}
 
 				if(colorizeNodes && gVals[8]) {
 					Vec3f ncolors[] = {
@@ -123,10 +157,10 @@ struct RenderTask: public thread_pool::Task {
 						}
 					}
 					else {
+						int lineDiff = pitch - PWidth * 3;
 						unsigned char *dst = outPtr + x * 3 + y * pitch;
 						int pheight = Min(height - y, (uint)PHeight);
 						int pwidth = Min(width - x, (uint)PWidth);
-						int lineDiff = pitch - pwidth * 3;
 
 						for(int ty = 0; ty < pheight; ty++) {
 							i32x4 ccol;

@@ -97,8 +97,8 @@ public:
 		Vec3f nrm1 = nrm * minDir, nrm2 = nrm * maxDir;
 
 		float det = Max(nrm1.x, nrm2.x) + Max(nrm1.y, nrm2.y) + Max(nrm1.z, nrm2.z);
-		if(det < 0.0f)
-			return 0;
+	//	if(det < 0.0f)
+	//		return 0;
 
 		Vec3f tvec = origin - a;
 

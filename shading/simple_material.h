@@ -17,7 +17,7 @@ namespace shading {
 				Sample &s = samples[q];
 
 				Vec3q diffuse(color), specular(0.0f,0.0f,0.0f);
-				if(NDotR) diffuse *= rays.Dir(q) | s.normal;
+				if(NDotR) diffuse *= Abs(rays.Dir(q) | s.normal);
 
 				if(hasMask) {
 					s.diffuse = Condition(rays.SSEMask(q), diffuse, s.diffuse);

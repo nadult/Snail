@@ -70,6 +70,9 @@ namespace sampling {
 		x1 &= i32x4(wMask);
 		y1 &= i32x4(hMask);
 		x1  = x1 + x1 + x1;
+			
+		//TODO: wylaczyc odbicie w pionie
+		y1 = int(tex->Height()) -1 - y1;
 
 		const u8 *data = (u8 *)tex->DataPointer();
 		int      pitch = mipPitch[0];
@@ -80,14 +83,14 @@ namespace sampling {
 		floatq g = floatq(data[x1[0] + y1[0] + 1], data[x1[1] + y1[1] + 1], data[x1[2] + y1[2] + 1], data[x1[3] + y1[3] + 1]);
 		floatq b = floatq(data[x1[0] + y1[0] + 2], data[x1[1] + y1[1] + 2], data[x1[2] + y1[2] + 2], data[x1[3] + y1[3] + 2]);
 
-		return Vec3q(b, g, r) * f32x4(1.0f / 255.0f);
+		return Vec3q(r, g, b) * f32x4(1.0f / 255.0f);
 	}
 
 	Vec3q PointSampler::operator()(const Vec2q &coord, const Vec2q &diff) const {
 		Vec2q pos = (coord) * Vec2q(wMul, hMul);
 		i32x4 x(pos.x), y(pos.y);
 
-		uint mip;
+		uint mip = 0;
 		{
 			floatq min    = Min(diff.x * wMul, diff.y * hMul);
 			uint   pixels = uint(Minimize(min));
@@ -114,7 +117,7 @@ namespace sampling {
 		floatq g = floatq(data[x[0] + y[0] + 1], data[x[1] + y[1] + 1], data[x[2] + y[2] + 1], data[x[3] + y[3] + 1]);
 		floatq b = floatq(data[x[0] + y[0] + 2], data[x[1] + y[1] + 2], data[x[2] + y[2] + 2], data[x[3] + y[3] + 2]);
 
-		return Vec3q(b, g, r) * f32x4(1.0f / 255.0f);
+		return Vec3q(r, g, b) * f32x4(1.0f / 255.0f);
 	}
 
 	// bilinear filtering
@@ -200,7 +203,7 @@ namespace sampling {
 			}
 #undef DATA
 
-			s.temp1 = Vec3q(blue, green, red) * f32x4(1.0f / 255.0f);
+			s.temp1 = Vec3q(red, green, blue) * f32x4(1.0f / 255.0f);
 		}
 	}
 

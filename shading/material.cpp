@@ -1,6 +1,7 @@
 #include "shading/material.h"
 #include "shading/simple_material.h"
 #include "shading/tex_material.h"
+#include "shading/uber_material.h"
 #include "shading/transparent_material.h"
 #include <sstream>
 #include <fstream>
@@ -16,8 +17,8 @@ namespace shading {
 		return sampler?
 					NDotL?	(Material*)new MaterialWrapper< TexMaterial<1> >(sampler):
 							(Material*)new MaterialWrapper< TexMaterial<0> >(sampler)
-				:	NDotL?	(Material*)new MaterialWrapper< SimpleMaterial<1> >(Vec3f(1.0f,1.0f,1.0f)):
-							(Material*)new MaterialWrapper< SimpleMaterial<0> >(Vec3f(1.0f,1.0f,1.0f)) ;
+				:	NDotL?	(Material*)new MaterialWrapper< SimpleMaterial<1> >(Vec3f(1.0f, 1.0f, 1.0f)):
+							(Material*)new MaterialWrapper< SimpleMaterial<0> >(Vec3f(1.0f, 1.0f, 1.0f));
 	}
 
 	static const Vec3f ReadColor(std::stringstream &ss) {
@@ -152,8 +153,9 @@ namespace shading {
 				if(diff && trans)
 					newMat = new MaterialWrapper<TransparentMaterial<1>>(
 								sampling::NewSampler(diff), sampling::NewSampler(trans));
-				else
-					newMat = NewMaterial(diff);
+				else {
+					newMat = diff?NewMaterial(diff) : new MaterialWrapper<UberMaterial>(mat);
+				}
 			}
 			catch(const Exception &ex) {
 				std::cout << ex.what() << '\n';

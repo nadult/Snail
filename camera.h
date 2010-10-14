@@ -22,11 +22,10 @@ public:
 	void Rotate(float);
 	void RotateY(float);
 	void Zoom(float);
-	void SetPos(const Vec3f&);
+	void Reset(Vec3f pos, float dist);
 
-	float plane_dist;
-	float ang, pitch, dist;
-	Vec3f pos;
+	double plane_dist;
+	Vec3f target, pos, right;
 };
 
 class FPSCamera

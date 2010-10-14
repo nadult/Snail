@@ -53,7 +53,7 @@ const Vec3q SampleTexture(int texId, Vec2q uv) {
 	if(EXPECT_NOT_TAKEN(texInfo.dataPtr == 0))
 		return Vec3q(1, 1, 1);
 
-	uv *= Vec2q(float(texInfo.width), float(texInfo.height));
+	uv *= Vec2q(float(texInfo.width - 1), float(texInfo.height - 1));
 	i32x4 x4(uv.x), y4(uv.y);
 	x4 &= i32x4(texInfo.wMask);
 	y4 &= i32x4(texInfo.hMask);

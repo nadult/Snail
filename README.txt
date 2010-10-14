@@ -11,8 +11,9 @@ oraz teksturki jesli sa dostepne. Nastepnie serwer rozsyla te dane do kazdego z
 wezlow.
 
 Obrazek dzielony jest na kawalki, wszystkie o takiej samej wielkosci (aktualnie
-16x64) ktore sa rozdzielane losowo, ale rownomiernie pomiedzy wezly renderujace.
-Przydzialy te nie zmieniaja sie az do nastepnego polaczenia.
+16x64, testy (benchmark.txt) robione na wersji 32x32) ktore sa rozdzielane losowo,
+ale rownomiernie pomiedzy wezly renderujace. Przydzialy te nie zmieniaja sie az do
+nastepnego polaczenia.
 
 Teraz serwer, wezly i klient wchodza w glowna petle:
 - Serwer odbiera konfiguracje klatki od klienta i rozsyla ja do wezlow, nastepnie
@@ -28,8 +29,7 @@ Teraz serwer, wezly i klient wchodza w glowna petle:
   kawalki:
 
 	Jesli nie dziala odpowiednia liczba watkow SPU, to tworzone sa nowe
-	Dopoki sa nieobsluzone kawalki obrazka
-		Wrzuc informacje o kawalku obrazka do zrenderowania do puli
+	Wrzuc informacje o kawalkach obrazka do zrenderowania do puli
 
 	Dopoki nie obsluzono (zrenderowano, skompresowano i wyslano) wszystkich kawalkow
 		Jesli zrenederowano packetSize kawalkow
@@ -41,7 +41,6 @@ Teraz serwer, wezly i klient wchodza w glowna petle:
 	
 	Watki na SPU dzialaja caly czas, ew. zawieszaja sie na odpowiednich zmiennych
 	warunkowych jesli w puli nie ma zadan do zrenderowania.
-
 
 	Petla renderingu na SPU:
 		
@@ -60,6 +59,16 @@ Teraz serwer, wezly i klient wchodza w glowna petle:
 			Skonwertuj kolor na R8G8B8 i zapisz w tablicach red, green, blue
 		Skopiuj dane koloru z tablic red, green, blue do pamieci zewnetrznej
 
+Uzyte techniki zwiekszajace wydajnosc:
+- Budowanie drzewa z wykorzystaniem SAH (Surface Area Heuristic)
+- Szybkie budowanie drzewa za pomoca algorytmu kubelkowego
+- Sledzenie pakietow promieni
+- Szybkie testy pakiet - bbox z uzyciem arytmetyki przedzialowej
+- Wektoryzacja, rozwijanie petli (testowanie promienia z 4 trojkatami na raz)
 
-Szczegolowy opis BVH i roznych algorytmow z nim zwiazanych:
+Szczegolowy opis BVH (i nie tylko) i roznych algorytmow z nim zwiazanych:
 http://www.mpi-inf.mpg.de/~guenther/STAR-RTAS/index.html	
+
+Zrodlo modeli:
+http://graphics.stanford.edu/data/3Dscanrep/
+

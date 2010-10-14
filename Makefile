@@ -13,7 +13,7 @@ _dummy := $(shell [ -d $(BUILD_DIR)/shading ] || mkdir -p $(BUILD_DIR)/shading)
 FILES=funcs render tree_stats bounding_box gl_window rtbase base_scene bvh/traverse thread_pool \
 	  camera client server node triangle font ray_generator frame_counter ray_group \
 	  tex_handle bvh/tree sampling/point_sampler_dxt sampling/sampler sampling/sat_sampler \
-	shading/material sampling/bilinear_sampler sampling/point_sampler16bit rtracer \
+	shading/material sampling/bilinear_sampler sampling/point_sampler16bit shading/uber_material rtracer \
 	sampling/point_sampler formats/loader formats/wavefront_obj formats/doom3_proc compression \
 	comm_data comm_mpi comm_tcp dbvh/tree dbvh/traverse scene scene_trace
 
@@ -26,13 +26,13 @@ LIBS=-lgfxlib -lbaselib -lpng -lz
 MPILIBS=`$(HOME)/bin/mpicxx -showme:link`
 
 LINUX_LIBS=$(LIBS)
-INCLUDES=-I./
+INCLUDES=-I$(HOME)/include/ -I./
 
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
 FLAGS=-march=native --param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdynamic \
 	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread
 
-CXX=$(GCC45)/bin/g++
+CXX=g++
 
 DEPS:=$(FILES:%=$(BUILD_DIR)/%.dep)
 SOURCES:=$(FILES:%=%.cpp)
@@ -56,7 +56,7 @@ node: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/server.o $(BUILD_DIR)/nod
 client: $(SHARED_OBJECTS) $(BUILD_DIR)/client.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o
 	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lXrandr -lGL -lGLU \
-		$(LINUX_LIBS) -lboost_system -lboost_regex -g
+		$(LINUX_LIBS) -lboost_system -lboost_regexs -g
 
 rtracer: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o

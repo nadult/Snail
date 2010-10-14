@@ -1,0 +1,27 @@
+Kompilacja:
+Openmpi powinno byc skompilowane jako heterogeniczne (--enable-heterogeneous), i na PPC
+kompilowane za pomoca ppu-g++ i ppu-gcc. W celu przyspieszenia kompilacji mozna dodac opcje:
+--disable-mpi-f77 --disable-mpi-f90.
+
+Cala aplikacja sklada sie z 3 binarek: node node_ppc i client. Wszystkie binarki wymagaja
+bibliotek: baselib, gfxlib, veclib, libpng. node i client komunikuja sie za pomoca boost::asio,
+wiec oprocz bibliotek bazowych wymagaja skompilowanego boosta. node moze byc kompilowany tylko
+na x86. client jako frameworka do OpenGL uzywa glfw.
+
+Uruchamianie:
+Serwer uruchamia sie przez mpirun wywolujac node.sh, ktore uruchamia node lub node_ppc
+zaleznie od platformy. Jedynie wezel glowny musi miec dostep do danych, wezly renderujace otrzymuja
+dane od wezla glownego, same nic nie czytaja z dysku.
+
+Domyslnie serwer uruchamia sie z katalogu $(HOME)/rtbin. Jesli dany wezel jest uruchaminany
+na x86 to node.sh przechodzi do katalogu /workspace1/rtracer i tam uruchamia node; na ppc
+node.sh uruchamia node_ppc znajdujacy sie w katalogu rtbin. Dodatkowo w katalogu rtbin/spu
+znajduje sie binarka programu na spu, ktora mozna podmienic i zaladowac (klawisz F4 wlacza
+automatyczne przeladowywanie co jakis czas) w dzialajacym programie.
+
+Po uruchomieniu wezel glowny czeka na polaczenia od klienta. Klient domyslnie laczy sie z
+bladerem, mozna to zmienic parametrem -host.
+
+Jesli renderujemy na cellach, to zdecydowanie lepiej jest uruchamiac 4 wezly logiczne na
+jednym fizycznym, dzieki temu kompresja (ktora dziala na 1 watku na PPU) bedzie sie liczyc
+wspolbieznie.

@@ -145,9 +145,12 @@ namespace comm {
 
 namespace comm {
 
+	//Dont forget to update operators << >> after modifying
+	//this structure
 	struct LoadNewModel {
 		string name;
 		int resx, resy;
+		int nNodes;
 		int rebuild; // 2 :rebuild slow
 		bool flipNormals;
 		bool swapYZ;

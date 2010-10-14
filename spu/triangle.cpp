@@ -89,10 +89,10 @@ void MultiCollide(const Triangle &tri0, const Triangle &tri1, const Triangle &tr
 		};
 		
 		
-		test[0] = test[0] && idet[0] > zero && dist[0] >= zero;
-		test[1] = test[1] && idet[1] > zero && dist[1] >= zero;
-		test[2] = test[2] && idet[2] > zero && dist[2] >= zero;
-		test[3] = test[3] && idet[3] > zero && dist[3] >= zero;
+		test[0] = test[0] /*&& idet[0] > zero*/ && dist[0] >= zero;
+		test[1] = test[1] /*&& idet[1] > zero*/ && dist[1] >= zero;
+		test[2] = test[2] /*&& idet[2] > zero*/ && dist[2] >= zero;
+		test[3] = test[3] /*&& idet[3] > zero*/ && dist[3] >= zero;
 		
 		f32x4 minDist = distance;
 		minDist = Condition(test[0] && dist[0] < minDist, dist[0], minDist);
@@ -163,10 +163,10 @@ void MultiCollide(const Triangle &tri0, const Triangle &tri1, const Triangle &tr
 		};
 		
 		
-		test[0] = test[0] && idet[0] > zero && dist[0] >= zero;
-		test[1] = test[1] && idet[1] > zero && dist[1] >= zero;
-		test[2] = test[2] && idet[2] > zero && dist[2] >= zero;
-		test[3] = test[3] && idet[3] > zero && dist[3] >= zero;
+		test[0] = test[0] /*&& idet[0] > zero*/ && dist[0] >= zero;
+		test[1] = test[1] /*&& idet[1] > zero*/ && dist[1] >= zero;
+		test[2] = test[2] /*&& idet[2] > zero*/ && dist[2] >= zero;
+		test[3] = test[3] /*&& idet[3] > zero*/ && dist[3] >= zero;
 		
 		f32x4 minDist = distance;
 		minDist = Condition(test[0] && dist[0] < minDist, dist[0], minDist);
@@ -239,10 +239,10 @@ void MultiCollide(const Triangle &tri0, const Triangle &tri1, const Triangle &tr
 		};
 		
 		
-		test[0] = test[0] && idet[0] > zero && dist[0] >= zero;
-		test[1] = test[1] && idet[1] > zero && dist[1] >= zero;
-		test[2] = test[2] && idet[2] > zero && dist[2] >= zero;
-		test[3] = test[3] && idet[3] > zero && dist[3] >= zero;
+		test[0] = test[0] && /*idet[0] > zero &&*/ dist[0] >= zero;
+		test[1] = test[1] && /*idet[1] > zero &&*/ dist[1] >= zero;
+		test[2] = test[2] && /*idet[2] > zero &&*/ dist[2] >= zero;
+		test[3] = test[3] && /*idet[3] > zero &&*/ dist[3] >= zero;
 		
 		f32x4 minDist = distance;
 		minDist = Condition(test[0] && dist[0] < minDist, dist[0], minDist);
@@ -295,7 +295,7 @@ void Triangle::Collide(PrimaryContext &ctx, int idx, int first, int last) const 
 		f32x4 distance[4] = { ctx.distance[q + 0], ctx.distance[q + 1], ctx.distance[q + 2], ctx.distance[q + 3] };
 
 		floatq idet[4] = { Inv(dir[0] | tnrm), Inv(dir[1] | tnrm), Inv(dir[2] | tnrm), Inv(dir[3] | tnrm) };
-		f32x4b test[4] = { idet[0] > zero, idet[1] > zero, idet[2] > zero, idet[3] > zero };
+		f32x4b test[4] = { true, true, true, true };//idet[0] > zero, idet[1] > zero, idet[2] > zero, idet[3] > zero };
 		floatq dist[4] = { idet[0] * tmul, idet[1] * tmul, idet[2] * tmul, idet[3] * tmul };
 
 		floatq v[4] = {
@@ -354,7 +354,7 @@ void Triangle::Collide(PrimaryContext &ctx, int idx, int first, int last) const 
 		floatq u = (dir | tvec1) * idet;
 
 		f32x4b test = Min(u, v) >= zero && u + v <= one;
-		test = test && idet > zero && dist >= zero && dist < distance;
+		test = test && /*idet > zero &&*/ dist >= zero && dist < distance;
 
 		ctx.distance[q] = Condition(test, dist, distance);
 		ctx.normals[q] = Condition(test, tnrm, normals);
@@ -392,13 +392,21 @@ void Triangle::Collide(ShadowContext &ctx, int idx, int first, int last) const {
 			dist[2] >= zero && dist[2] < distance[2]/* && det[2] >= zero*/,
 			dist[3] >= zero && dist[3] < distance[3]/* && det[3] >= zero*/ };
 
-		floatq tv[4] = { dir[0] | tvec0, dir[1] | tvec0, dir[2] | tvec0, dir[3] | tvec0 };
-		floatq tu[4] = { dir[0] | tvec1, dir[1] | tvec1, dir[2] | tvec1, dir[3] | tvec1 };
+		floatq tv[4] = {
+			(dir[0] | tvec0) * idet[0],
+			(dir[1] | tvec0) * idet[1],
+			(dir[2] | tvec0) * idet[2],
+			(dir[3] | tvec0) * idet[3] };
+		floatq tu[4] = {
+			(dir[0] | tvec1) * idet[0],
+			(dir[1] | tvec1) * idet[1],
+			(dir[2] | tvec1) * idet[2],
+			(dir[3] | tvec1) * idet[3] };
 
-		test[0] = (test[0] && tu[0] >= zero) && (tv[0] >= zero && tu[0] + tv[0] <= det[0]);
-		test[1] = (test[1] && tu[1] >= zero) && (tv[1] >= zero && tu[1] + tv[1] <= det[1]);
-		test[2] = (test[2] && tu[2] >= zero) && (tv[2] >= zero && tu[2] + tv[2] <= det[2]);
-		test[3] = (test[3] && tu[3] >= zero) && (tv[3] >= zero && tu[3] + tv[3] <= det[3]);
+		test[0] = (test[0] && tu[0] >= zero) && (tv[0] >= zero && tu[0] + tv[0] <= one);
+		test[1] = (test[1] && tu[1] >= zero) && (tv[1] >= zero && tu[1] + tv[1] <= one);
+		test[2] = (test[2] && tu[2] >= zero) && (tv[2] >= zero && tu[2] + tv[2] <= one);
+		test[3] = (test[3] && tu[3] >= zero) && (tv[3] >= zero && tu[3] + tv[3] <= one);
 
 		ctx.distance[q + 0] = Condition(test[0], dist[0], distance[0]);
 		ctx.distance[q + 1] = Condition(test[1], dist[1], distance[1]);
@@ -445,7 +453,7 @@ void Triangle::Collide(SecondaryContext &ctx, int idx, int first, int last) cons
 		floatq u = (dir | tvec1) * idet;
 
 		f32x4b test = Min(u, v) >= zero && u + v <= one;
-		test = test && idet > zero && dist >= zero && dist < ctx.distance[tq];
+		test = test && /*idet > zero &&*/ dist >= zero && dist < ctx.distance[tq];
 
 		ctx.distance[tq] = Condition(test, dist, ctx.distance[tq]);
 		ctx.normals[tq] = Condition(test, tnrm, ctx.normals[tq]);
@@ -455,13 +463,14 @@ void Triangle::Collide(SecondaryContext &ctx, int idx, int first, int last) cons
 }
 
 bool Triangle::TestInterval(const RayInterval &i) const {
+	//TODO: wrong, backface culling still on
 	//TODO: min/max origin
 	float det =
 		(plane.x < 0.0f? i.minDir.x : i.maxDir.x) * plane.x +
 		(plane.y < 0.0f? i.minDir.y : i.maxDir.y) * plane.y +
 		(plane.z < 0.0f? i.minDir.z : i.maxDir.z) * plane.z;
 	if(det < 0.0f)
-		return 0;
+		return 1;
 
 	enum { sharedOrigin = 1 };
 	Vec3f c1a, c1b, c2a, c2b;

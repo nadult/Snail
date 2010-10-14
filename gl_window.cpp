@@ -230,9 +230,12 @@ namespace
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[pindex++ % 2]);
 
 		char *memBuf = (char*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY);
+		if(!memBuf)
+			ThrowException("Error while mapping PBO");
+
 		memcpy(memBuf, image.DataPointer(), image.Width() * image.Height() * 3);
 		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER_ARB);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texW, texH, GL_BGR, GL_UNSIGNED_BYTE, 0);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texW, texH, GL_RGB, GL_UNSIGNED_BYTE, 0);
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glShadeModel(GL_FLAT);
 		glEnable(GL_TEXTURE_2D);

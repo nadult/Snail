@@ -8,7 +8,8 @@ namespace {
 			:tris(tris), axis(axis) { }
 
 		bool operator()(int i1, int i2) const {
-			//Usuniecie tego ifa powoduje wywalanie sie programu 
+			// TODO: Jakis problem na GCC 4.3
+			//na innych gcc usuniecie tego ifa powoduje wywalanie sie programu 
 			if(i1 >= tris.size() || i2 >= tris.size()) {
 				printf("!!! %d %d > %d\n", i1, i2, tris.size());
 			}
@@ -53,7 +54,7 @@ namespace {
 
 void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
 	BBox bbox = nodes[nNode].bbox;
-	enum { useSah = 1 };
+	enum { useSah = 0 };
 
 	if(count <= 1) {
 	LEAF_NODE:
@@ -67,8 +68,6 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
 	else {
 		int minIdx = count / 2, minAxis = MaxAxis(bbox.Size()); {
 			vector<int> indices(count);
-			for(int n = 0; n < count; n++)
-				indices[n] = first + n;
 		
 			if(useSah) {
 				const float traverseCost = 0.0;
@@ -78,6 +77,8 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
 				float noSplitCost = intersectCost * count * BoxSA(bbox);
 
 				for(int axis = 0; axis <= 2; axis++) {
+					for(int n = 0; n < count; n++)
+						indices[n] = first + n;
 					std::sort(&indices[0], &indices[count], OrderTris(tris, axis));
 
 					vector<float> leftSA(count), rightSA(count); {
@@ -112,9 +113,13 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
 					goto LEAF_NODE;
 			}
 
-			if(!useSah || minAxis != 2)
-				std::nth_element(&indices[0], &indices[minIdx], &indices[count],
+			if(!useSah || minAxis != 2) {
+				for(int n = 0; n < count; n++)
+					indices[n] = first + n;
+				std::nth_element(indices.begin(), indices.begin() + minIdx, indices.end(),
 									OrderTris(tris, minAxis));
+			}
+
 			vector<Triangle> ttemp(count);
 			vector<ShTriangle> stemp(count);
 			for(int n = 0; n < count; n++) {
@@ -162,7 +167,7 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
 void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 	BBox bbox = nodes[nNode].bbox;
 
-	if(count <= 4) {
+	if(count <= 16) {
 	LEAF_NODE:
 		depth = Max(depth, sdepth);
 		nodes[nNode].first = first | 0x80000000;

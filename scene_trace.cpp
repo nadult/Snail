@@ -122,7 +122,7 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 		selector[n] = rays.Mask(n);
 	reflSel.Clear(); transSel.Clear();
 
-	if(gVals[4]) {     //no shading
+	if(0) {     //very simple shading
 		for(int q = 0; q < size; q++) {
 			floatq dist  = (Condition(tDistance[q] > maxDist, 0.0f, Inv(tDistance[q])));
 			floatq dist2 = dist * 250.0f;
@@ -139,212 +139,308 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 	shading::Sample samples[size];
 //	int matCount = materials.size();
 
-	for(uint b = 0, nBlocks = size / blockSize; b < nBlocks; b++) {
-		uint b4 = b << 2;
+	if(gVals[6]) { // full shading
+		for(uint b = 0, nBlocks = size / blockSize; b < nBlocks; b++) {
+			uint b4 = b << 2;
 
-		f32x4b mask[blockSize];
-		i32x4  matId[blockSize], object[blockSize], element[blockSize];
+			f32x4b mask[blockSize];
+			i32x4  matId[blockSize], object[blockSize], element[blockSize];
 
-		for(int q = 0; q < blockSize; q++) {
-			int tq = b4 + q;
-
-			shading::Sample &s = samples[tq];
-
-			mask[q] = tDistance[tq] < maxDist && selector.SSEMask(tq);
-			selector[tq] = ForWhich(mask[q]);
-			i32x4b imask(mask[q]);
-
-			object[q]  = Condition(imask, tObject[tq], i32x4(0));
-			element[q] = AccStruct::isctFlags & isct::fElement ? Condition(imask, tElement[tq], i32x4(0)) : i32x4(0);
-			s.position = rays.Dir(tq) * tDistance[tq] + rays.Origin(tq);
-			minPos     = Condition(mask[q], VMin(minPos, s.position), minPos);
-			maxPos     = Condition(mask[q], VMax(maxPos, s.position), maxPos);
-
-			s.diffuse = s.specular = Vec3q(0.0f, 0.0f, 0.0f);
-			matId[q]  = ~0;
-		}
-
-		int mask4 = selector.Mask4(b);
-		if(!mask4) continue;
-
-		shading::Sample *s = samples + b4;
-		int obj0 = object[0][0], elem0 = element[0][0];
-
-		// 4x4 full, single triangle
-		if(mask4 == 0xf0f0f0f &&
-		   ForAll(((object[0] == object[1] && element[0] == element[1]) &&
-				   (object[2] == object[3] && element[2] == element[3])) &&
-				  ((object[0] == object[2] && element[0] == element[2]) &&
-				   (object[0] == obj0 && element[0] == elem0)))) {
-			const ShTriangle shTri = geometry.GetSElement(obj0, elem0);
-			int tMatId = geometry.GetMaterialId(shTri.MatId(), obj0);
-
-			const bool flatNormals = shTri.FlatNormals();
-			const shading::Material *mat = tMatId == ~0? &defaultMat : &*materials[tMatId];
-			const bool computeTexCoords = mat->flags & shading::Material::fTexCoords;
-			reflSel.Mask4(b) = mat->flags & shading::Material::fReflection ? 0x0f0f0f0f : 0;
-			transSel.Mask4(b) = mat->flags & shading::Material::fTransparency ? 0x0f0f0f0f : 0;
-
-			if(!computeTexCoords) {
-				if(flatNormals) {
-					Vec3q nrm0(shTri.nrm[0]);
-					s[0].normal = s[1].normal = s[2].normal = s[3].normal = nrm0;
-				}
-				else {
-					Vec3f nrm0 = shTri.nrm[0];
-					Vec3q nrm1(shTri.nrm[1]);
-					Vec3q nrm2(shTri.nrm[2]);
-
-					for(int q = 0; q < 4; q++) {
-						const Vec2q bar = barycentric[b4 + q];
-						s[q].normal = Vec3q(nrm0) + (Vec3q(nrm1) * bar.x + Vec3q(nrm2) * bar.y);
-					}
-				}
-			}
-			else {
-				Vec2q uv0  = Vec2q(shTri.uv[0].x, shTri.uv[0].y);
-				Vec2q uv1  = Vec2q(shTri.uv[1].x, shTri.uv[1].y);
-				Vec2q uv2  = Vec2q(shTri.uv[2].x, shTri.uv[2].y);
-				Vec3f nrm0 = shTri.nrm[0];
-				Vec3f nrm1 = shTri.nrm[1];
-				Vec3f nrm2 = shTri.nrm[2];
-
-				for(int q = 0; q < 4; q++) {
-					const Vec2q bar = barycentric[b4 + q];
-					s[q].texCoord = uv0 + uv1 * bar.x + uv2 * bar.y;
-					Broadcast(Maximize(s[q].texCoord) - Minimize(s[q].texCoord), s[q].texDiff);
-					s[q].normal = Vec3q(nrm0) + Vec3q(nrm1) * bar.x + Vec3q(nrm2) * bar.y;
-				}
-			}
-
-			mat->Shade(s, RayGroup<sharedOrigin, hasMask>(rays, b4, 4), cache.samplingCache);
-		}
-		else {
-			for(uint q = 0; q < blockSize; q++) {
-				uint tq = b4 + q;
-				if(!selector[tq]) continue;
+			for(int q = 0; q < blockSize; q++) {
+				int tq = b4 + q;
 
 				shading::Sample &s = samples[tq];
 
+				mask[q] = tDistance[tq] < maxDist && selector.SSEMask(tq);
+				selector[tq] = ForWhich(mask[q]);
 				i32x4b imask(mask[q]);
-				int    invBitMask = ~ForWhich(imask);
 
-				int obj0 = object[q][0], elem0 = element[q][0];
-				if(EXPECT_TAKEN( i32x4(imask)[0] )) {
-					const ShTriangle shTri = geometry.GetSElement(obj0, elem0);
-
-					int tMatId = geometry.GetMaterialId(shTri.MatId(), obj0);
-					matId[q] = Condition(imask, i32x4(tMatId), matId[q]);
-
-					const Vec2q bar = barycentric[tq];
-
-					s.texCoord = Vec2q(shTri.uv[0].x, shTri.uv[0].y) +
-								 Vec2q(shTri.uv[1].x, shTri.uv[1].y) * bar.x +
-								 Vec2q(shTri.uv[2].x, shTri.uv[2].y) * bar.y;
-
-					s.normal = Vec3q(shTri.nrm[0]) + Vec3q(shTri.nrm[1]) * bar.x + Vec3q(shTri.nrm[2]) * bar.y;
-				}
-
-				if(AccStruct::isctFlags & isct::fElement ?
-						ForAny(object[q] != obj0 || element[q] != elem0) : ForAny(object[q] != obj0)) {
-
-					float texCoordX[4], texCoordY[4];
-					Vec3f normal[4];
-					Convert(s.texCoord.x, texCoordX);
-					Convert(s.texCoord.y, texCoordY);
-					Convert(s.normal, normal);
-
-					for(int k = 1; k < 4; k++) {
-						int obj = object[q][k], elem = element[q][k];
-						if((invBitMask & (1 << k)) || (obj == obj0 && elem == elem0)) continue;
-
-						const ShTriangle shTri = geometry.GetSElement(obj, elem);
-
-						int tMatId = geometry.GetMaterialId(shTri.MatId(), obj);
-						matId[q][k] = tMatId;
-
-						const Vec2q bar = barycentric[tq];
-
-						Vec2q tex = Vec2q(shTri.uv[0].x, shTri.uv[0].y) +
-									Vec2q(shTri.uv[1].x, shTri.uv[1].y) * bar.x +
-									Vec2q(shTri.uv[2].x, shTri.uv[2].y) * bar.y;
-
-						Vec2f diff = Maximize(tex) - Minimize(tex);
-						texCoordX[k] = tex.x[k];
-						texCoordY[k] = tex.y[k];
-						Vec3f nrm = shTri.nrm[0] + shTri.nrm[1] * bar.x[k] + shTri.nrm[2] * bar.y[k];
-
-						normal[k].x = nrm.x;
-						normal[k].y = nrm.y;
-						normal[k].z = nrm.z;
-					}
-
-					Convert(texCoordX, s.texCoord.x);
-					Convert(texCoordY, s.texCoord.y);
-					Convert(normal, s.normal);
-				}
-			}
-			
-			//todo: moga byc problemy na krawedziach ktrojkatow o roznych materialach
-			for(int q = 0; q < blockSize; q++) {
-				shading::Sample &s = samples[q + b4];
-				Vec2f diff = Maximize(s.texCoord) - Minimize(s.texCoord);
-				s.texDiff = Vec2q(diff);
+				object[q]  = Condition(imask, tObject[tq], i32x4(0));
+				element[q] = AccStruct::isctFlags & isct::fElement ? Condition(imask, tElement[tq], i32x4(0)) : i32x4(0);
+				s.position = rays.Dir(tq) * tDistance[tq] + rays.Origin(tq);
+				minPos     = Condition(mask[q], VMin(minPos, s.position), minPos);
+				maxPos     = Condition(mask[q], VMax(maxPos, s.position), maxPos);
+ 
+				s.diffuse = s.specular = Vec3q(0.0f, 0.0f, 0.0f);
+				matId[q]  = ~0;
 			}
 
-			int matId0 = matId[0][0];
+			int mask4 = selector.Mask4(b);
+			if(!mask4) continue;
 
-			if(mask4 == 0x0f0f0f0f && 
-				ForAll( ( matId[0] == matId[1] && matId[2] == matId[3] ) &&
-					    ( matId[0] == matId[2] && matId[0] == matId0   ) )) {
-				const shading::Material *mat = matId0 == ~0? &defaultMat : &*materials[matId0];
+			shading::Sample *s = samples + b4;
+			int obj0 = object[0][0], elem0 = element[0][0];
+
+			// 4x4 full, single triangle
+			if(mask4 == 0xf0f0f0f &&
+			   ForAll(((object[0] == object[1] && element[0] == element[1]) &&
+					   (object[2] == object[3] && element[2] == element[3])) &&
+					  ((object[0] == object[2] && element[0] == element[2]) &&
+					   (object[0] == obj0 && element[0] == elem0)))) {
+				const ShTriangle shTri = geometry.GetSElement(obj0, elem0);
+				int tMatId = geometry.GetMaterialId(shTri.MatId(), obj0);
+
+				const bool flatNormals = shTri.FlatNormals();
+				const shading::Material *mat = tMatId == ~0? &defaultMat : &*materials[tMatId];
+				const bool computeTexCoords = mat->flags & shading::Material::fTexCoords;
 				reflSel.Mask4(b) = mat->flags & shading::Material::fReflection ? 0x0f0f0f0f : 0;
 				transSel.Mask4(b) = mat->flags & shading::Material::fTransparency ? 0x0f0f0f0f : 0;
 
-				mat->Shade(s, RayGroup<sharedOrigin, 0>(rays, b4, 4), cache.samplingCache);
-			}
-			else {
-				static_assert(blockSize == 4, "4 is nice");
-				i32x4 matIds[blockSize] = { i32x4(~0), i32x4(~0), i32x4(~0), i32x4(~0) };
-				bool defaultUsed = 0;
+				if(!computeTexCoords) {
+					if(flatNormals) {
+						Vec3q nrm0(shTri.nrm[0]);
+						s[0].normal = s[1].normal = s[2].normal = s[3].normal = nrm0;
+					}
+					else {
+						Vec3f nrm0 = shTri.nrm[0];
+						Vec3q nrm1(shTri.nrm[1]);
+						Vec3q nrm2(shTri.nrm[2]);
 
-				uint matIdCount = 0;
-				for(int q = 0; q < blockSize; q++) {
-					const i32x4 tMatId = matId[q];
-
-					for(int k = 0; k < 4; k++) {
-						int id = tMatId[k];
-						defaultUsed |= id == ~0;
-
-						i32x4 kMatId(id);
-						if( (selector[b4 + q] & (1 << k)) && 
-							ForAll(	matIds[0] != kMatId && matIds[1] != kMatId &&
-									matIds[2] != kMatId && matIds[3] != kMatId ) ) {
-							matIds[matIdCount >> 2][matIdCount & 3] = id;
-							matIdCount++;
+						for(int q = 0; q < 4; q++) {
+							const Vec2q bar = barycentric[b4 + q];
+							s[q].normal = Vec3q(nrm0) + (Vec3q(nrm1) * bar.x + Vec3q(nrm2) * bar.y);
 						}
 					}
 				}
-				if(defaultUsed) matIdCount++;
+				else {
+					Vec2q uv0  = Vec2q(shTri.uv[0].x, shTri.uv[0].y);
+					Vec2q uv1  = Vec2q(shTri.uv[1].x, shTri.uv[1].y);
+					Vec2q uv2  = Vec2q(shTri.uv[2].x, shTri.uv[2].y);
+					Vec3f nrm0 = shTri.nrm[0];
+					Vec3f nrm1 = shTri.nrm[1];
+					Vec3f nrm2 = shTri.nrm[2];
 
-				for(uint n = 0; n < matIdCount; n++) {
-					uint id = matIds[n >> 2][n & 3];
+					for(int q = 0; q < 4; q++) {
+						const Vec2q bar = barycentric[b4 + q];
+						s[q].texCoord = uv0 + uv1 * bar.x + uv2 * bar.y;
+						Broadcast(Maximize(s[q].texCoord) - Minimize(s[q].texCoord), s[q].texDiff);
+						s[q].normal = Vec3q(nrm0) + Vec3q(nrm1) * bar.x + Vec3q(nrm2) * bar.y;
+					}
+				}
 
+				mat->Shade(s, RayGroup<sharedOrigin, hasMask>(rays, b4, 4), cache.samplingCache);
+			}
+			else {
+				for(uint q = 0; q < blockSize; q++) {
+					uint tq = b4 + q;
+					if(!selector[tq]) continue;
+
+					shading::Sample &s = samples[tq];
+
+					i32x4b imask(mask[q]);
+					int    invBitMask = ~ForWhich(imask);
+
+					int obj0 = object[q][0], elem0 = element[q][0];
+					if(EXPECT_TAKEN( i32x4(imask)[0] )) {
+						const ShTriangle shTri = geometry.GetSElement(obj0, elem0);
+
+						int tMatId = geometry.GetMaterialId(shTri.MatId(), obj0);
+						matId[q] = Condition(imask, i32x4(tMatId), matId[q]);
+
+						const Vec2q bar = barycentric[tq];
+
+						s.texCoord = Vec2q(shTri.uv[0].x, shTri.uv[0].y) +
+									 Vec2q(shTri.uv[1].x, shTri.uv[1].y) * bar.x +
+									 Vec2q(shTri.uv[2].x, shTri.uv[2].y) * bar.y;
+
+						s.normal = Vec3q(shTri.nrm[0]) + Vec3q(shTri.nrm[1]) * bar.x + Vec3q(shTri.nrm[2]) * bar.y;
+					}
+
+					if(AccStruct::isctFlags & isct::fElement ?
+							ForAny(object[q] != obj0 || element[q] != elem0) : ForAny(object[q] != obj0)) {
+
+						float texCoordX[4], texCoordY[4];
+						Vec3f normal[4];
+						Convert(s.texCoord.x, texCoordX);
+						Convert(s.texCoord.y, texCoordY);
+						Convert(s.normal, normal);
+
+						for(int k = 1; k < 4; k++) {
+							int obj = object[q][k], elem = element[q][k];
+							if((invBitMask & (1 << k)) || (obj == obj0 && elem == elem0)) continue;
+
+							const ShTriangle shTri = geometry.GetSElement(obj, elem);
+
+							int tMatId = geometry.GetMaterialId(shTri.MatId(), obj);
+							matId[q][k] = tMatId;
+
+							const Vec2q bar = barycentric[tq];
+
+							Vec2q tex = Vec2q(shTri.uv[0].x, shTri.uv[0].y) +
+										Vec2q(shTri.uv[1].x, shTri.uv[1].y) * bar.x +
+										Vec2q(shTri.uv[2].x, shTri.uv[2].y) * bar.y;
+
+							Vec2f diff = Maximize(tex) - Minimize(tex);
+							texCoordX[k] = tex.x[k];
+							texCoordY[k] = tex.y[k];
+							Vec3f nrm = shTri.nrm[0] + shTri.nrm[1] * bar.x[k] + shTri.nrm[2] * bar.y[k];
+
+							normal[k].x = nrm.x;
+							normal[k].y = nrm.y;
+							normal[k].z = nrm.z;
+						}
+
+						Convert(texCoordX, s.texCoord.x);
+						Convert(texCoordY, s.texCoord.y);
+						Convert(normal, s.normal);
+					}
+				}
+				
+				//todo: moga byc problemy na krawedziach ktrojkatow o roznych materialach
+				for(int q = 0; q < blockSize; q++) {
+					shading::Sample &s = samples[q + b4];
+					Vec2f diff = Maximize(s.texCoord) - Minimize(s.texCoord);
+					s.texDiff = Vec2q(diff);
+				}
+
+				int matId0 = matId[0][0];
+
+				if(mask4 == 0x0f0f0f0f && 
+					ForAll( ( matId[0] == matId[1] && matId[2] == matId[3] ) &&
+							( matId[0] == matId[2] && matId[0] == matId0   ) )) {
+					const shading::Material *mat = matId0 == ~0? &defaultMat : &*materials[matId0];
+					reflSel.Mask4(b) = mat->flags & shading::Material::fReflection ? 0x0f0f0f0f : 0;
+					transSel.Mask4(b) = mat->flags & shading::Material::fTransparency ? 0x0f0f0f0f : 0;
+
+					mat->Shade(s, RayGroup<sharedOrigin, 0>(rays, b4, 4), cache.samplingCache);
+				}
+				else {
+					static_assert(blockSize == 4, "4 is nice");
+					i32x4 matIds[blockSize] = { i32x4(~0), i32x4(~0), i32x4(~0), i32x4(~0) };
+					bool defaultUsed = 0;
+
+					uint matIdCount = 0;
+					for(int q = 0; q < blockSize; q++) {
+						const i32x4 tMatId = matId[q];
+
+						for(int k = 0; k < 4; k++) {
+							int id = tMatId[k];
+							defaultUsed |= id == ~0;
+
+							i32x4 kMatId(id);
+							if( (selector[b4 + q] & (1 << k)) && 
+								ForAll(	matIds[0] != kMatId && matIds[1] != kMatId &&
+										matIds[2] != kMatId && matIds[3] != kMatId ) ) {
+								matIds[matIdCount >> 2][matIdCount & 3] = id;
+								matIdCount++;
+							}
+						}
+					}
+					if(defaultUsed) matIdCount++;
+
+					for(uint n = 0; n < matIdCount; n++) {
+						uint id = matIds[n >> 2][n & 3];
+
+						char mask[4];
+						i32x4 id4(id);
+						mask[0] = ForWhich(matId[0] == id4) & selector[b4 + 0];
+						mask[1] = ForWhich(matId[1] == id4) & selector[b4 + 1];
+						mask[2] = ForWhich(matId[2] == id4) & selector[b4 + 2];
+						mask[3] = ForWhich(matId[3] == id4) & selector[b4 + 3];
+						const shading::Material *mat = id == ~0? &defaultMat : &*materials[id];
+						if(mat->flags & shading::Material::fReflection)
+							for(int q = 0; q < 4; q++)
+								reflSel[b4 + q] = mask[q];
+						if(mat->flags & shading::Material::fTransparency)
+							for(int q = 0; q < 4; q++)
+								transSel[b4 + q] = mask[q];
+
+						mat->Shade(samples + b4, RayGroup<sharedOrigin, 1>( rays.OriginPtr() +
+								(sharedOrigin? b4 : 0), rays.DirPtr() + b4, rays.IDirPtr() + b4, 4, mask),
+								cache.samplingCache);
+					}
+				}
+			}
+		}
+	}
+	else { //simple shading
+		for(uint b = 0, nBlocks = size / blockSize; b < nBlocks; b++) {
+			uint b4 = b << 2;
+
+			f32x4b mask[blockSize];
+			i32x4  matId[blockSize], object[blockSize], element[blockSize];
+
+			for(int q = 0; q < blockSize; q++) {
+				int tq = b4 + q;
+
+				shading::Sample &s = samples[tq];
+
+				mask[q] = tDistance[tq] < maxDist && selector.SSEMask(tq);
+				selector[tq] = ForWhich(mask[q]);
+				i32x4b imask(mask[q]);
+
+				object[q]  = Condition(imask, tObject[tq], i32x4(0));
+				element[q] = AccStruct::isctFlags & isct::fElement ? Condition(imask, tElement[tq], i32x4(0)) : i32x4(0);
+				s.position = rays.Dir(tq) * tDistance[tq] + rays.Origin(tq);
+				minPos     = Condition(mask[q], VMin(minPos, s.position), minPos);
+				maxPos     = Condition(mask[q], VMax(maxPos, s.position), maxPos);
+
+				s.diffuse = s.specular = Vec3q(0.0f, 0.0f, 0.0f);
+				matId[q]  = ~0;
+			}
+
+			int mask4 = selector.Mask4(b);
+			if(!mask4) continue;
+
+			shading::Sample *s = samples + b4;
+			int obj0 = object[0][0], elem0 = element[0][0];
+
+			// 4x4 full, single triangle
+			if(mask4 == 0xf0f0f0f &&
+			   ForAll(((object[0] == object[1] && element[0] == element[1]) &&
+					   (object[2] == object[3] && element[2] == element[3])) &&
+					  ((object[0] == object[2] && element[0] == element[2]) &&
+					   (object[0] == obj0 && element[0] == elem0)))) {
+				Vec3q nrm0(geometry.GetNormal(obj0, elem0));
+				s[0].normal = s[1].normal = s[2].normal = s[3].normal = nrm0;
+				defaultMat.Shade(s, RayGroup<sharedOrigin, hasMask>(rays, b4, 4), cache.samplingCache);
+			}
+			else {
+				for(uint q = 0; q < blockSize; q++) {
+					uint tq = b4 + q;
+					if(!selector[tq]) continue;
+
+					shading::Sample &s = samples[tq];
+
+					i32x4b imask(mask[q]);
+					int    invBitMask = ~ForWhich(imask);
+
+					int obj0 = object[q][0], elem0 = element[q][0];
+					if(EXPECT_TAKEN( i32x4(imask)[0] ))
+						s.normal = Vec3q(geometry.GetNormal(obj0, elem0));
+
+					if(AccStruct::isctFlags & isct::fElement ?
+							ForAny(object[q] != obj0 || element[q] != elem0) : ForAny(object[q] != obj0)) {
+
+						Vec3f normal[4];
+						Convert(s.normal, normal);
+
+						for(int k = 1; k < 4; k++) {
+							int obj = object[q][k], elem = element[q][k];
+							if((invBitMask & (1 << k)) || (obj == obj0 && elem == elem0)) continue;
+
+							Vec3f nrm = geometry.GetNormal(obj, elem);
+							normal[k].x = nrm.x;
+							normal[k].y = nrm.y;
+							normal[k].z = nrm.z;
+						}
+
+						Convert(normal, s.normal);
+					}
+				}
+				
+				if(mask4 == 0x0f0f0f0f)
+					defaultMat.Shade(s, RayGroup<sharedOrigin, 0>(rays, b4, 4), cache.samplingCache);
+				else {
+					static_assert(blockSize == 4, "4 is nice");
+				
 					char mask[4];
-					i32x4 id4(id);
-					mask[0] = ForWhich(matId[0] == id4) & selector[b4 + 0];
-					mask[1] = ForWhich(matId[1] == id4) & selector[b4 + 1];
-					mask[2] = ForWhich(matId[2] == id4) & selector[b4 + 2];
-					mask[3] = ForWhich(matId[3] == id4) & selector[b4 + 3];
-					const shading::Material *mat = id == ~0? &defaultMat : &*materials[id];
-					if(mat->flags & shading::Material::fReflection)
-						for(int q = 0; q < 4; q++)
-							reflSel[b4 + q] = mask[q];
-					if(mat->flags & shading::Material::fTransparency)
-						for(int q = 0; q < 4; q++)
-							transSel[b4 + q] = mask[q];
+					mask[0] = selector[b4 + 0];
+					mask[1] = selector[b4 + 1];
+					mask[2] = selector[b4 + 2];
+					mask[3] = selector[b4 + 3];
 
-					mat->Shade(samples + b4, RayGroup<sharedOrigin, 1>( rays.OriginPtr() +
+					defaultMat.Shade(samples + b4, RayGroup<sharedOrigin, 1>( rays.OriginPtr() +
 							(sharedOrigin? b4 : 0), rays.DirPtr() + b4, rays.IDirPtr() + b4, 4, mask),
 							cache.samplingCache);
 				}
@@ -352,7 +448,9 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 		}
 	}
 
-	if(reflSel.Any() && gVals[5] && cache.reflections < 1) {
+	if(/*reflSel.Any() &&*/ gVals[7] && cache.reflections < 1) {
+		//TODO: przywrocic obsluge wlaczania odbic dla wybranych materialow
+		reflSel = selector;
 		cache.reflections++;
 		Vec3q reflColor[size];
 		stats += TraceReflection(reflSel, rays.DirPtr(), samples, cache, reflColor);
@@ -407,7 +505,7 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 	else for(int q = 0; q < size; q++)
 		outColor[q] = samples[q].diffuse;
 
-	if(gVals[2] && flags & isct::fPrimary) {
+	if(gVals[5] && (flags & isct::fPrimary)) {
 		Vec3q col = StatsShader(stats, size)[0];
 		for(int q = 0; q < size; q++)
 			outColor[q] = col;

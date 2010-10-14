@@ -16,6 +16,11 @@ typedef vec4f32x4	Vec4q;
 typedef f32x4		floatq;
 typedef i32x4		intq;
 
+enum {
+	blockWidth = 16,
+	blockHeight = 64,
+};
+
 
 //TODO: WTF???
 #if !defined(__PPC) && !defined(__PPC__)

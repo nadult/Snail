@@ -21,40 +21,49 @@ using std::cout;
 using std::endl;
 
 static void PrintHelp() {
-	printf("Synopsis:    rtracer model_file [options]\nOptions:\n\t-res x y   - set rendering resolution [512 512]\n\t");
-	printf("TODO: update me\n");
-	printf("-fullscreen\n\t-toFile   - renders to file out/output.tga\n\t-threads n   - set threads number to n\n\t");
-	printf("\nExamples:\n\t./rtracer -res 1280 800 abrams.obj\n\t./rtracer pompei.obj -res 800 600 -fullscreen\n\n");
-	printf("Interactive control:\n\tA,W,S,D R,F - move the camera\n\tN,M - rotate camera\n\t");
-	printf("k - save image to out/output.tga\n\to - toggle reflections\n\tl - toggle lights\n\t");
-	printf("j - toggle lights movement\n\tp - print camera position; save camera configuration\n\t");
-	printf("c - center camera position in the scene\n\t");
-	printf("F1 - toggle shadow caching\n\t");
-	printf("esc - exit\n\n");
-}
-
-static vector<Light> GenLights(float scale = 1.0f, float power = 1000.0f) {
-	vector<Light> out;
-
-	float pos = float(gVals[5]) * 0.01f;
-
-	out.push_back(
-		/*Toasters*/ //Light(RotateY(pos)*Vec3f(0,400.5f,0),Vec3f(8,8,5),10000.f)
-		/*sponza*/  // Light(Vec3f(0,2,0),Vec3f(8,8,5),20.0f)
-		/*admin*/   Light(Vec3f(-78.0f,110.0f,-531.0f) * scale, Vec3f(1,1,0.7), power)
-	);
-//	out.push_back(Light(Vec3f(-600.0f,144.0f,-341.0f),Vec3f(0.3,0.6,1.0),800.0f));
-//	out.push_back(Light(Vec3f(407.0f,209.64f,1634.0f),Vec3f(1,1,1),1000.0f));
-
-	return out;
+	printf("Synopsis:    rtracer model_file [options]\nOptions:\n"
+			"\t-res x y     - set rendering resolution [1024 1024]\n"
+			"\t-fullscreen\n"
+			"\t-rebuild     - rebuild BVH tree (using faster algorithm)\n"
+			"\t-slowBuild   - rebuild BVH tree (using slower algorithm)\n"
+			"\t-flipNormals - flip normals of triangles when rebuilding\n"
+			"\t-swapYZ      - swap Y, Z axes when rebuilding\n"
+			"\t-threads n   - set threads number to n\n"
+			"\t-nodes n     - set nodes number to n\n"
+			"\t-host hname  - connect to host hname [blader]\n"
+			"\n\n"
+			"Interactive control:\n"
+			"\tA,W,S,D R,F         - move the camera\n"
+			"\tmouse + left button - rotate camera\n"
+			"\tmouse wheel         - zoom in/out camera (works only in orbit mode)\n"
+			"\tright mouse button  - flip mouse axes (works only in orbit mode)\n"
+			"\tshift               - faster movement / zooming\n"
+			"\tk   - save image to out/output.tga\n"
+			"\to   - toggle reflections\n"
+			"\tl   - toggle lights\n"
+			"\tj   - add new light in the camera position\n"
+			"\tp   - print camera position and save camera configuration\n"
+			"\tc   - center camera position in the scene\n"
+			"\tF6  - toggle scene complexity visualization\n"
+			"\tF7  - toggle advanced shading\n"
+			"\tF8  - toggle reflections\n"
+			"\tF9  - toggle node tasks visaulization\n"
+			"\tF10 - toggle antialiasing\n"
+			"\t1-8 - set number of threads to 1 - 8\n"
+			"\t9   - set number of threads to 16\n"
+			"\t0   - set number of threads to 32\n"
+			"\tesc - exit\n\n"
+		);
 }
 
 static void MoveCamera(OrbitingCamera &cam, GLWindow &window, float speed) {
 	if(window.Key(Key_lshift)) speed *= 5.f;
-	if(window.MouseKey(0)) {
+	if(window.MouseKey(0) || window.MouseKey(1)) {
+		float flip = window.MouseKey(1)? -1 : 1;
+
 		window.GrabMouse(1);
-		float dx = window.MouseMove().x;
-		float dy = window.MouseMove().y;
+		float dx = window.MouseMove().x * flip;
+		float dy = window.MouseMove().y * flip;
 
 		if(dx) cam.Rotate(-dx * 0.005);
 		if(dy) cam.RotateY(dy * 0.005);
@@ -70,7 +79,7 @@ static void MoveCamera(OrbitingCamera &cam, GLWindow &window, float speed) {
 	if(window.Key('F')) zoom = -1;
 
 	if(zoom)
-		cam.Zoom(-zoom * Clamp(sqrtf(cam.dist), 0.5f, 10.0f) * 0.1 * speed);
+		cam.Zoom(zoom * speed);
 
 	Vec3f move(0, 0, 0);
 	Camera tcam = (Camera)cam;
@@ -80,7 +89,8 @@ static void MoveCamera(OrbitingCamera &cam, GLWindow &window, float speed) {
 	if(window.Key('A')) move -= tcam.right;
 	if(window.Key('D')) move += tcam.right;
 
-	cam.SetPos(cam.pos + move * speed);
+	cam.target += move * speed;
+	cam.pos += move * speed;
 }
 static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 	if(window.Key(Key_lshift)) speed *= 5.f;
@@ -116,7 +126,7 @@ void SendFrameRequest(PSocket sock, Camera cam, vector<Light> &lights, int threa
 }
 
 static int client_main(int argc, char **argv) {
-	printf("Snail v0.20 by nadult\n");
+	printf("Snail v0.21 by nadult\n");
 	if(argc >= 2 && string("--help") == argv[1]) {
 		PrintHelp();
 		return 0;
@@ -124,18 +134,17 @@ static int client_main(int argc, char **argv) {
 	else printf("type './rtracer --help' to get some help\n");
 
 	CameraConfigs camConfigs;
-	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
+	try { Loader("cameras.dat") & camConfigs; } catch(...) { }
 
 	int resx = 1024, resy = 1024;
 	bool fullscreen = 0;
-	int threads = 2;
+	int threads = 2, nNodes = -1;
 	const char *modelFile = "foot.obj";
 	const char *host = "blader";
 
 //	Options options;
 	bool flipNormals = 1, swapYZ = 0;
 	int rebuild = 0;
-	string texPath = "scenes/";
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
@@ -143,10 +152,9 @@ static int client_main(int argc, char **argv) {
 		else if(string("-slowBuild") == argv[n]) rebuild = 2;
 		else if(string("-threads") == argv[n] && n < argc - 1) { threads=atoi(argv[n+1]); n+=1; }
 		else if(string("-fullscreen") == argv[n]) fullscreen = 1;
-		else if(string("+flipNormals") == argv[n]) flipNormals = 1;
 		else if(string("-flipNormals") == argv[n]) flipNormals = 0;
 		else if(string("-swapYZ") == argv[n]) swapYZ = 1;
-		else if(string("-texPath") == argv[n]) { texPath=argv[n+1]; n++; }
+		else if(string("-nodes") == argv[n]&&n<argc-1) { nNodes=atoi(argv[n+1]); n++; }
 		else if(string("-host") == argv[n]) { host=argv[n+1]; n++; }
 		else {
 			if(argv[n][0] == '-') {
@@ -158,6 +166,10 @@ static int client_main(int argc, char **argv) {
 	}
 
 	GLWindow window(resx, resy, fullscreen);
+	window.SetTitle("Snail client v0.21");
+
+	resx = ((resx + blockWidth  - 1) / blockWidth ) * blockWidth;
+	resy = ((resy + blockHeight - 1) / blockHeight) * blockHeight;
 	Font font;
 
 	gfxlib::Texture image(resx, resy, gfxlib::TI_R8G8B8);
@@ -177,7 +189,7 @@ static int client_main(int argc, char **argv) {
 		comm::LoadNewModel lm;
 		lm.name = modelFile; lm.resx = resx; lm.resy = resy;
 		lm.rebuild = rebuild; lm.flipNormals = flipNormals;
-		lm.swapYZ = swapYZ;
+		lm.swapYZ = swapYZ; lm.nNodes = nNodes;
 		sock << lm;
 		printf("Waiting for server..\n");
 		sock >> sceneCenter >> sceneSize;
@@ -205,19 +217,19 @@ static int client_main(int argc, char **argv) {
 		frmCounter.NextFrame();
 		
 		if(window.KeyDown('K'))
-			Saver("out/output.dds") & image;
-//		if(window.KeyDown('I'))
-//			options.rdtscShader ^= 1;
-		if(window.KeyDown('C'))
-			cam.SetPos(sceneCenter);
+			Saver("output.dds") & image;
+		if(window.KeyDown('C')) {
+			if(orbiting) ocam.Reset(sceneCenter, sceneScale);
+			else cam.SetPos(sceneCenter);
+		}
 		if(window.KeyDown('P')) {
 			camConfigs.AddConfig(string(modelFile),cam);
-			Saver("scenes/cameras.dat") & camConfigs;
+			Saver("cameras.dat") & camConfigs;
 			cam.Print();
 		}
 		if(window.KeyDown('O')) {
 			if(orbiting) cam.SetPos(ocam.pos);
-			else ocam.SetPos(cam.pos);
+			else ocam.Reset(cam.pos, -sceneScale);
 			orbiting ^= 1;
 		}
 		if(window.KeyDown('X')) {
@@ -242,7 +254,7 @@ static int client_main(int argc, char **argv) {
 		}
 		if(window.KeyDown('J')) {
 			Vec3f colors[4] = {
-				Vec3f(1,1,1), Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0) };
+				Vec3f(1, 1, 1), Vec3f(0.2, 0.5, 1), Vec3f(0.5, 1, 0.2), Vec3f(0.7, 1.0, 0.0) };
 
 			Vec3f pos = (orbiting?(Camera)ocam : (Camera)cam).pos;
 			srand(time(0));
@@ -264,16 +276,16 @@ static int client_main(int argc, char **argv) {
 			}
 		}
 
-		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Traversing from 8x8: %s\n", gVals[0]?"on" : "off"); }
-		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 2 %s\n",gVals[1]?"on":"off"); }
-		if(window.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 3 %s\n",gVals[2]?"on":"off"); }
-		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 4 %s\n",gVals[3]?"on":"off"); }
-		if(window.KeyDown(Key_f5)) { gVals[4]^=1; printf("Toggled shading\n"); }
-		if(window.KeyDown(Key_f6)) { gVals[5]^=1; printf("Val 5 %s\n",gVals[5]?"on":"off"); }
-		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Val 6 %s\n",gVals[6]?"on":"off"); }
-		if(window.KeyDown(Key_f8)) { gVals[7]^=1; printf("Val 7 %s\n",gVals[7]?"on":"off"); }
-		if(window.KeyDown(Key_f9)) { gVals[8]^=1; printf("Val 8 %s\n",gVals[8]?"on":"off"); }
-		if(window.KeyDown(Key_f10)) { gVals[9]^=1; printf("Val 9 %s\n",gVals[9]?"on":"off"); }
+		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 0 %s\n", gVals[0]?"on" : "off"); }
+		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 1 %s\n", gVals[1]?"on" : "off"); }
+		if(window.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 2 %s\n", gVals[2]?"on" : "off"); }
+		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 3 %s\n", gVals[3]?"on" : "off"); }
+		if(window.KeyDown(Key_f5)) { gVals[4]^=1; printf("Val 4 %s\n", gVals[4]?"on" : "off"); }
+		if(window.KeyDown(Key_f6)) { gVals[5]^=1; printf("Scene complexity visualization %s\n",gVals[5]?"on":"off"); }
+		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Advanced shading %s\n",gVals[6]?"on":"off"); }
+		if(window.KeyDown(Key_f8)) { gVals[7]^=1; printf("Reflections 7 %s\n",gVals[7]?"on":"off"); }
+		if(window.KeyDown(Key_f9)) { gVals[8]^=1; printf("Node tasks visualization 8 %s\n",gVals[8]?"on":"off"); }
+		if(window.KeyDown(Key_f10)) { gVals[9]^=1; printf("Antialiasing 4x %s\n",gVals[9]?"on":"off"); }
 
 		static float animPos = 0;
 		if(window.Key(Key_space)) animPos += 0.025f;
@@ -330,7 +342,7 @@ static int client_main(int argc, char **argv) {
 		fpsMax = Max(fpsMax, frmCounter.FPS());
 		fpsSum += frmCounter.FPS();
 
-		font.BeginDrawing(resx,resy);
+		font.BeginDrawing(resx, resy);
 		font.SetSize(Vec2f(30, 20));
 			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, (GetTime() - frameTime) * 1000.0, buildTime * 1000.0f));
 			frameTime = GetTime();

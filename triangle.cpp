@@ -90,7 +90,7 @@ bool Triangle::Collide(ShadowContext &c, int firstActive, int lastActive) const 
 		int tq = q + firstActive;
 
 		const Vec3q dir = c.Dir(tq);
-		floatq det = dir.x * nrm.x + dir.y * nrm.y + dir.z * nrm.z;
+		floatq det = Abs(dir.x * nrm.x + dir.y * nrm.y + dir.z * nrm.z);
 
 		floatq dist = tmul * Inv(det);
 		floatq v = dir.x * tvec0.x + dir.y * tvec0.y + dir.z * tvec0.z;
@@ -120,8 +120,9 @@ bool Triangle::TestInterval(const RayInterval &i) const {
 		(nrm.x < 0.0f? i.minDir.x : i.maxDir.x) * nrm.x +
 		(nrm.y < 0.0f? i.minDir.y : i.maxDir.y) * nrm.y +
 		(nrm.z < 0.0f? i.minDir.z : i.maxDir.z) * nrm.z;
+
 	if(det < 0.0f)
-		return 0;
+		return 1; // dirty hack :) TODO: repair and make it faster
 
 	enum { sharedOrigin = 1 };
 	Vec3f c1a, c1b, c2a, c2b;
@@ -185,8 +186,8 @@ bool Triangle::TestFrustum(const Frustum &frustum) const {
 bool Triangle::TestCornerRays(const CornerRays &rays) const {
 	Vec3f nrm = Nrm();
 	floatq det = rays.dir | nrm;
-	if(ForAll(det < 0.0f))
-		return 0;
+//	if(ForAll(det < 0.0f))
+//		return 0;
 
 	Vec3q tvec(rays.origin - a);
 	floatq u = rays.dir | (Vec3q(ba) ^ tvec);
