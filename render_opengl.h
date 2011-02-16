@@ -13,7 +13,7 @@ public:
 	OGLRenderer(const Scene<BVH> &bvh);
 	~OGLRenderer();
 
-	void Draw(const Camera &cam) const;
+	void Draw(const Camera &cam, float fov, float aspect) const;
 	void operator=(const OGLRenderer&) = delete;
 	OGLRenderer(const OGLRenderer&) = delete;
 

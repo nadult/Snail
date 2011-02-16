@@ -394,7 +394,7 @@ static int tmain(int argc, char **argv) {
 			Camera camera = orbiting?(Camera)ocam : (Camera)cam;
 
 			if(oglRendering) {
-				oglRenderer->Draw(camera);
+				oglRenderer->Draw(camera, 60.0f, float(resx) / float(resy));
 			}
 			else {
 				stats = Render(scene, camera, image, options, threads);

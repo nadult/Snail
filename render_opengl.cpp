@@ -49,19 +49,25 @@ OGLRenderer::OGLRenderer(const Scene<BVH> &scene) {
 	}
 	else useUvs = false;
 
-	if(shTris.size() == tris.size()) {
+	{
 		useNormals = true;
 		glBindBuffer(GL_ARRAY_BUFFER, nrmBuffer);
 		vector<Vec3f> normals(shTris.size() * 3);
-		for(size_t n = 0; n < tris.size(); n++) {
-			normals[n * 3 + 0] = shTris[n].nrm[0];
-			normals[n * 3 + 1] = shTris[n].nrm[1];
-			normals[n * 3 + 2] = shTris[n].nrm[2];
+
+		if(shTris.size() == tris.size()) {
+			for(size_t n = 0; n < tris.size(); n++) {
+				normals[n * 3 + 0] = shTris[n].nrm[0];
+				normals[n * 3 + 1] = shTris[n].nrm[1] + shTris[n].nrm[0];
+				normals[n * 3 + 2] = shTris[n].nrm[2] + shTris[n].nrm[0];
+			}
+		}
+		else {
+			for(size_t n = 0; n < tris.size(); n++)
+				normals[n * 3 + 0] = normals[n * 3 + 1] = normals[n * 3 + 2] =  Vec3f(tris[n].plane);
 		}
 		glBufferData(GL_ARRAY_BUFFER, shTris.size() * 3 * 3 * 4, &normals[0], GL_STATIC_DRAW);
 		InputAssert(glGetError() == GL_NO_ERROR);
 	}
-	else useNormals = false;
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	triCount = tris.size();
@@ -84,7 +90,8 @@ void OGLRenderer::InitShaders() {
 	unsigned f = glCreateShader(GL_FRAGMENT_SHADER);
 
 	const char *fs = "varying vec4 position, normal; void main() {\n"
-					"	gl_FragColor = vec4(normal.x, normal.y, normal.z, 1); }";
+//					"float col = max(normal.z, 0.0);gl_FragColor = vec4(col, col, col, 1); }";
+					"gl_FragColor = vec4(normal.xyz, 1); }";
 	const char *vs = "varying vec4 position, normal; void main() {\n"
 	   				"normal = (gl_ModelViewProjectionMatrix * vec4(gl_Normal, 0.0));\n"
 				   	"gl_Position = (gl_ModelViewProjectionMatrix * gl_Vertex); }";
@@ -117,7 +124,7 @@ OGLRenderer::~OGLRenderer() {
 	glDeleteProgram(program);
 }
 
-void OGLRenderer::Draw(const Camera &cam) const {
+void OGLRenderer::Draw(const Camera &cam, float fov, float aspect) const {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glDisable(GL_TEXTURE_2D);
@@ -127,7 +134,7 @@ void OGLRenderer::Draw(const Camera &cam) const {
 
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
-	gluPerspective(60, 1.0f, tsize * 0.01f, tsize * 10.0f);
+	gluPerspective(fov, aspect, tsize * 0.01f, tsize * 10.0f);
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
