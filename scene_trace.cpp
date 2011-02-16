@@ -122,7 +122,7 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 		selector[n] = rays.Mask(n);
 	reflSel.Clear(); transSel.Clear();
 
-	if(0) {     //very simple shading
+	if(gVals[1]) {     //very simple shading
 		for(int q = 0; q < size; q++) {
 			floatq dist  = (Condition(tDistance[q] > maxDist, 0.0f, Inv(tDistance[q])));
 			floatq dist2 = dist * 250.0f;
@@ -286,11 +286,11 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 					}
 				}
 				
-				//todo: moga byc problemy na krawedziach ktrojkatow o roznych materialach
+				//todo: sa problemy na krawedziach trojkatow o roznych materialach (a nawet tych samych materialow)
 				for(int q = 0; q < blockSize; q++) {
 					shading::Sample &s = samples[q + b4];
 					Vec2f diff = Maximize(s.texCoord) - Minimize(s.texCoord);
-					s.texDiff = Vec2q(diff);
+					s.texDiff = /*ForAll(object[q] == object[q][0]) && gVals[1]? Vec2q(diff) :*/ Vec2q(0.0f, 0.0f);
 				}
 
 				int matId0 = matId[0][0];
@@ -465,6 +465,7 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 		Vec3q transColor[size];
 		for(int q = 0; q < size; q++)
 			transSel[q] &= ForWhich(samples[q].opacity < 1.0f);
+
 		if(transSel.Any()) {
 			cache.transp++;
 			stats += TraceTransparency(transSel, rays, tDistance, transColor, cache);
@@ -620,8 +621,8 @@ const TreeStats Scene<AccStruct>::TraceTransparency(RaySelector selector,
 
 	const int size = rays.Size();
 	Vec3q origin[size];
-	for(int q = 0; q < size; q++)
-		origin[q] = rays.Dir(q) * (distance[q] + 0.1f) + rays.Origin(q);
+	for(int q = 0; q < size; q++) //TODO: robust epsilons
+		origin[q] = rays.Dir(q) * (distance[q] + 0.0001) + rays.Origin(q);
 
 	return selector.All()?
 		RayTrace(RayGroup<0, 0>(origin, rays.DirPtr(), rays.IDirPtr(), size), cache, out) :

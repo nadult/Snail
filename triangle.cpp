@@ -186,8 +186,8 @@ bool Triangle::TestFrustum(const Frustum &frustum) const {
 bool Triangle::TestCornerRays(const CornerRays &rays) const {
 	Vec3f nrm = Nrm();
 	floatq det = rays.dir | nrm;
-//	if(ForAll(det < 0.0f))
-//		return 0;
+	if(ForAll(det < 0.0f))
+		return 0;
 
 	Vec3q tvec(rays.origin - a);
 	floatq u = rays.dir | (Vec3q(ba) ^ tvec);

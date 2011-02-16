@@ -21,17 +21,19 @@ namespace shading {
 				if(hasMask) {
 					s.diffuse = Condition(rays.SSEMask(q), diffuse, s.diffuse);
 					s.specular = Condition(rays.SSEMask(q), spec, s.specular);
+					s.opacity = Condition(rays.SSEMask(q), floatq(dissFactor), s.opacity);
 				}
 				else {
 					s.diffuse = diffuse;
 					s.specular = diffuse;
+					s.opacity = floatq(dissFactor);
 				}
 			}
 		}
 
 	private:
 		Vec3f ambient, diffuse, specular;
-		float refrIndex;
+		float refrIndex, dissFactor;
 	};
 
 

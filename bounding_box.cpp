@@ -215,6 +215,27 @@ bool BBox::TestInterval(const RayInterval &i) const {
 
 	return lmax >= 0.0f && lmin <= lmax;
 }
+
+bool BBox::TestCornerRays(const CornerRays &crays) const {
+	floatq l1 = crays.idir.x * (min.x - crays.origin.x);
+	floatq l2 = crays.idir.x * (max.x - crays.origin.x);
+	float lmin = Minimize(Min(l1, l2));
+	float lmax = Maximize(Max(l1, l2));
+
+	l1 = crays.idir.y * (min.y - crays.origin.y);
+	l2 = crays.idir.y * (max.y - crays.origin.y);
+	lmin = Max(Minimize(Min(l1, l2)), lmin);
+	lmax = Min(Maximize(Max(l1, l2)), lmax);
+
+	l1 = crays.idir.z * (min.z - crays.origin.z);
+	l2 = crays.idir.z * (max.z - crays.origin.z);
+	lmin = Max(Minimize(Min(l1, l2)), lmin);
+	lmax = Min(Maximize(Max(l1, l2)), lmax);
+
+	return lmax >= 0.0f && lmin <= lmax;
+}
+
+
 /*
 void GaussPointsFit(int iQuantity, const Vec3f* akPoint,Vec3f& rkCenter, Vec3f akAxis[3], float afExtent[3]);
 

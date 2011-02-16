@@ -254,6 +254,7 @@ public:
 	bool Test(ShadowContext &context, int &firstActive, int &lastActive) const;
 
 	bool TestInterval(const RayInterval&) const;
+	bool TestCornerRays(const CornerRays&) const;
 
 	Vec3f min, max;
 };

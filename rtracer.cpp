@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include "camera.h"
 
 #include "gl_window.h"
@@ -17,8 +18,11 @@
 #include "font.h"
 #include "frame_counter.h"
 
+#include "render_opengl.h"
+
 using std::cout;
 using std::endl;
+
 
 static void PrintHelp() {
 	printf("Synopsis:    rtracer model_file [options]\nOptions:\n"
@@ -96,7 +100,7 @@ static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 		float dx = window.MouseMove().x;
 		float dy = window.MouseMove().y;
 
-		if(dx) cam.Rotate(-dx * 0.005);
+		if(dx) cam.Rotate(dx * 0.005);
 		if(dy) cam.RotateY(dy * 0.005);
 	}
 	else window.GrabMouse(0);
@@ -106,8 +110,8 @@ static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 
 	if(window.Key('W')) move += tcam.front;
 	if(window.Key('S')) move -= tcam.front;
-	if(window.Key('A')) move -= tcam.right;
-	if(window.Key('D')) move += tcam.right;
+	if(window.Key('A')) move += tcam.right;
+	if(window.Key('D')) move -= tcam.right;
 	if(window.Key('R')) move += tcam.up;
 	if(window.Key('F')) move -= tcam.up;
 
@@ -207,6 +211,28 @@ static int tmain(int argc, char **argv) {
 				baseScene.LoadDoom3Proc(fileName);
 			else if(fileName.find(".obj") != string::npos)
 				baseScene.LoadWavefrontObj(fileName);
+			else if(fileName.find(".list") != string::npos) {
+				std::ifstream file(fileName.c_str());
+
+				string elementFileName;
+				size_t ntris = 0;
+
+				while(std::getline(file, elementFileName)) {
+					elementFileName = "scenes/" + elementFileName;
+					BaseScene tmp;
+					std::cout << "Loading " << elementFileName << '\n';
+					tmp.LoadWavefrontObj(elementFileName);
+
+					for(size_t n = 0; n < tmp.objects.size(); n++) {
+						if(tmp.objects[n].tris.size() < 800000) {
+							baseScene.objects.push_back(tmp.objects[n]);
+							ntris += baseScene.objects.back().tris.size();
+						}
+					}
+					if(ntris > 4000000)
+						break;
+				}
+			}
 			else ThrowException("Unrecognized format: ", fileName);
 
 			int tris = 0;
@@ -268,7 +294,12 @@ static int tmain(int argc, char **argv) {
 		speed = (size.x + size.y + size.z) * 0.0025f;
 	}
 
+	OGLRenderer *oglRenderer = 0;
+	bool oglRendering = 0;
+
 	FrameCounter frmCounter;
+	float lastFrameTime = 0.0f;
+	double lastTime = GetTime();
 
 	while(window.PollEvents()) {
 		frmCounter.NextFrame();
@@ -306,10 +337,27 @@ static int tmain(int argc, char **argv) {
 			lights.push_back(Light(pos, colors[rand()&3], 2000.0f * 0.001f * sceneScale));
 		}
 
+		if(window.KeyDown('H')) {
+			oglRendering ^= 1;
+			if(oglRendering && !oglRenderer) {
+				try {
+					oglRenderer = new OGLRenderer(scene);
+				}
+				catch(const Exception &ex) {
+					std::cout << ex.what();
+					oglRendering = false;
+				}
+			}
+		}
+
+		float tspeed = speed * lastFrameTime * 20.0f;
+		lastFrameTime = GetTime() - lastTime;
+		lastTime = GetTime();
+
 		if(orbiting)
-			MoveCamera(ocam, window, speed);
+			MoveCamera(ocam, window, tspeed);
 		else
-			MoveCamera(cam, window, speed);
+			MoveCamera(cam, window, tspeed);
 
 		for(int n = 1; n <= 8; n++) if(window.Key('0' + n))
 				{ threads = n; printf("Threads: %d\n", threads); }
@@ -330,35 +378,51 @@ static int tmain(int argc, char **argv) {
 		if(window.Key(Key_space)) animPos+=0.025f;
 
 		double buildTime = GetTime();
-	//		Scene<DBVH> dscene;
-	//		dscene.geometry = MakeDBVH(&scene.geometry);
-	//		dscene.materials = scene.materials;
+			Scene<DBVH> dscene;
+		//	dscene.geometry = MakeDBVH(&scene.geometry);
+		//	dscene.materials = scene.materials;
 		buildTime = GetTime() - buildTime;
 
 		vector<Light> tLights = lightsEnabled?lights:vector<Light>();
 			for(int n=0;n<tLights.size();n++)
 				tLights[n].pos += Vec3f(sin(animPos+n*n),cos(animPos+n*n),
-					sin(animPos-n*n)*cos(animPos+n*n))*speed;
-		scene.lights = /*dscene.lights =*/ tLights;
+					sin(animPos-n*n)*cos(animPos+n*n)) * tspeed;
+		scene.lights = dscene.lights = tLights;
 		
-		double time = GetTime();
-		TreeStats stats;
-		stats = Render(scene, orbiting?(Camera)ocam : (Camera)cam, image, options, threads);
+		double time = GetTime(); 
+		TreeStats stats; {
+			Camera camera = orbiting?(Camera)ocam : (Camera)cam;
+
+			if(oglRendering) {
+				oglRenderer->Draw(camera);
+			}
+			else {
+				stats = Render(scene, camera, image, options, threads);
+			}
+		}
+		
+		if(!oglRendering)		
+			window.RenderImage(image);
 
 		time = GetTime() - time;
-		window.RenderImage(image);
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 		double mrays = double(unsigned(frmCounter.FPS() * stats.GetRays() * 0.0001)) * 0.01;
 
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));
+		if(oglRendering) {
+			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " (opengl rendering)");
+		}
+		else {
 			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, time * 1000.0, buildTime * 1000.0));
 			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays);
 			if(lightsEnabled && lights.size())
 				font.PrintAt(Vec2f(5, 45), "Lights: ",lightsEnabled?lights.size() : 0);
 			font.PrintAt(Vec2f(5, 85), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
 					" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7]);
+		}
+
 		font.FinishDrawing();
 		window.SwapBuffers();
 	}

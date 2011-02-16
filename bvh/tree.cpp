@@ -8,17 +8,11 @@ namespace {
 			:tris(tris), axis(axis) { }
 
 		bool operator()(int i1, int i2) const {
-			// TODO: Jakis problem na GCC 4.3
-			//na innych gcc usuniecie tego ifa powoduje wywalanie sie programu 
-			if(i1 >= tris.size() || i2 >= tris.size()) {
-				printf("!!! %d %d > %d\n", i1, i2, tris.size());
-			}
-
 			const Triangle &tri1 = tris[i1], &tri2 = tris[i2];
 
-			Vec3f p1 = tri1.P1() + tri1.P2() + tri1.P3();
-			Vec3f p2 = tri2.P1() + tri2.P2() + tri2.P3();
-			return (&p1.x)[axis] < (&p2.x)[axis];
+			float a1 = (&tri1.a.x)[axis], ba1 = (&tri1.ba.x)[axis], ca1 = (&tri1.ca.x)[axis];
+			float a2 = (&tri2.a.x)[axis], ba2 = (&tri2.ba.x)[axis], ca2 = (&tri2.ca.x)[axis];
+			return a1 * 3.0f + ba1 + ca1  < a2 * 3.0f + ba2 + ca2;
 		}
 
 		const ATriVector &tris;
@@ -54,9 +48,9 @@ namespace {
 
 void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
 	BBox bbox = nodes[nNode].bbox;
-	enum { useSah = 0 };
+	enum { useSah = 1 };
 
-	if(count <= 1) {
+	if(count <= 8 || sdepth == maxDepth - 1) {
 	LEAF_NODE:
 		nodes[nNode].bbox = tris[first].GetBBox();
 		for(int n = 1; n < count; n++)

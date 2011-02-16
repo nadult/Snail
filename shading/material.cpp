@@ -40,6 +40,11 @@ namespace shading {
 		return out;	
 	}
 
+	MaterialDesc::MaterialDesc()
+		:ambient(0, 0, 0), diffuse(1, 1, 1), specular(0, 0, 0), emissive(0, 0, 0),
+		 transmission(0, 0, 0), illuminationModel(0), dissolveFactor(0),
+		 specularExponent(0), refractionIndex(0) { } 
+
 	const vector<MaterialDesc> LoadMaterialDescs(const string &fileName) {
 		std::filebuf fb;
 		if(!fb.open (fileName.c_str(),std::ios::in)) {
@@ -84,7 +89,7 @@ namespace shading {
 				ss >> token;
 				if(token == "-halo")
 					ThrowException("-halo parameter not supported");
-				newMat.dissolveFactor = atoi(token.c_str());
+				newMat.dissolveFactor = atof(token.c_str());
 			}
 			else if(token == "Ns") ss >> newMat.specularExponent;
 			else if(token == "Ni") ss >> newMat.refractionIndex;

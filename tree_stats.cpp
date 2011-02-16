@@ -36,7 +36,7 @@
 		char *p = buf + sprintf(buf, "in:%5.2f it:%5.2f  ms:%6.2f  (%d rays)",
 				double(data[0]) / nPixels, double(data[1]) / nPixels, msRenderTime, data[2]);
 
-		if(msBuildTime > 0.0)
+		if(msBuildTime > 0.01)
 			p += sprintf(p, " build:%.2f", msBuildTime);
 		
 		InputAssert(sizeof(timers) / sizeof(int) >= 8);

@@ -19,8 +19,9 @@ struct ObjectInstance {
 		return 1;
 	}
 
-	const Vec3q TransformVec(const Vec3q &v) const {
-		return Vec3q(	v.x * rotation[0].x + v.y * rotation[0].y + v.z * rotation[0].z,
+	template <class Vec>
+	const Vec TransformVec(const Vec &v) const {
+		return Vec(	v.x * rotation[0].x + v.y * rotation[0].y + v.z * rotation[0].z,
 						v.x * rotation[1].x + v.y * rotation[1].y + v.z * rotation[1].z,
 						v.x * rotation[2].x + v.y * rotation[2].y + v.z * rotation[2].z);
 	}
@@ -176,8 +177,8 @@ struct ObjectInstance {
 	void ComputeBBox();
 
 	const Vec3f GetNormal(int elem) const {
-		ThrowException("Write me!");
-		return Vec3f(0, 1, 0);
+		Vec3f nrm = tree->GetNormal(elem, 0);
+		return TransformVec(nrm);
 	}
 
 	Vec3f rotation[3];

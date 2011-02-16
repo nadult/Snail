@@ -15,13 +15,13 @@ FILES=funcs render tree_stats bounding_box gl_window rtbase base_scene bvh/trave
 	  tex_handle bvh/tree sampling/point_sampler_dxt sampling/sampler sampling/sat_sampler \
 	shading/material sampling/bilinear_sampler sampling/point_sampler16bit shading/uber_material rtracer \
 	sampling/point_sampler formats/loader formats/wavefront_obj formats/doom3_proc compression \
-	comm_data comm_mpi comm_tcp dbvh/tree dbvh/traverse scene scene_trace
+	comm_data comm_mpi comm_tcp dbvh/tree dbvh/traverse scene scene_trace render_opengl
 
-RFILES=render bvh/traverse dbvh/traverse ray_generator scene_trace
+RFILES=render_opengl render bvh/traverse dbvh/traverse ray_generator scene_trace
 TFILES=client server node gl_window tex_handle font rtracer comm_mpi comm_tcp comm_data
 SHARED_FILES=$(filter-out $(RFILES), $(filter-out $(TFILES), $(FILES)))
 
-LIBS=-lgfxlib -lbaselib -lpng -lz 
+LIBS=-lgfxlib -lbaselib -lpng -lz -lgomp
 
 MPILIBS=`$(HOME)/bin/mpicxx -showme:link`
 
@@ -32,7 +32,7 @@ NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
 FLAGS=-march=native --param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdynamic \
 	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread
 
-CXX=g++
+CXX=/usr/local/gcc-4.5/bin/g++
 
 DEPS:=$(FILES:%=$(BUILD_DIR)/%.dep)
 SOURCES:=$(FILES:%=%.cpp)
@@ -59,7 +59,7 @@ client: $(SHARED_OBJECTS) $(BUILD_DIR)/client.o $(BUILD_DIR)/gl_window.o \
 		$(LINUX_LIBS) -lboost_system -lboost_regexs -g
 
 rtracer: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)/gl_window.o \
-	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o
+	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/render_opengl.o
 	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lXrandr -lGL -lGLU \
 		$(LINUX_LIBS) -g
 

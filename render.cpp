@@ -70,7 +70,7 @@ struct RenderTask: public thread_pool::Task {
 
 				if(gVals[9]) {
 					int offx[4] = { 0, PWidth, 0, PWidth }, offy[4] = { 0, 0, PHeight, PHeight };
-					int coff[4] = { 0, NQuads / 4, NQuads / 4 * 2, NQuads / 4 * 3 };
+					int coff[4] = { 0, 2, NQuads / 2, NQuads / 2 + 2 };
 
 					for(int k = 0; k < 4; k++) {
 						rayGen.Generate(PWidth, PHeight, (startX + x) * 2 + offx[k],
@@ -79,22 +79,34 @@ struct RenderTask: public thread_pool::Task {
 					
 						Vec3q tcolors[NQuads];
 						*outStats += scene->RayTrace(RayGroup<1, 0>(&origin, dir, idir, NQuads), cache, tcolors);
+						enum { line = 4 };
+							
 						float *dstx = (float*)&colors[coff[k]].x[0];
 						float *dsty = (float*)&colors[coff[k]].y[0];
 						float *dstz = (float*)&colors[coff[k]].z[0];
 
-						for(int q = 0; q < NQuads; q += 4) {
-							for(int i = 0; i < 4; i++) {
-								const Vec3q col = tcolors[q + i];
-								dstx[i] = col.x[0] + col.x[1] + col.x[2] + col.x[3];
-								dsty[i] = col.y[0] + col.y[1] + col.y[2] + col.y[3];
-								dstz[i] = col.z[0] + col.z[1] + col.z[2] + col.z[3];
+						for(int tq = 0; tq < NQuads; tq += line * 2) {
+
+							for(int t = 0; t < line; t += 2) {
+								int q = tq + t;
+
+								for(int i = 0; i < 2; i++) {
+									const Vec3q col = (tcolors[q + i] + tcolors[q + i + line]) * floatq(0.25f);
+
+									dstx[i * 2 + 0] = col.x[0] + col.x[1];
+									dsty[i * 2 + 0] = col.y[0] + col.y[1];
+									dstz[i * 2 + 0] = col.z[0] + col.z[1];
+									dstx[i * 2 + 1] = col.x[2] + col.x[3];
+									dsty[i * 2 + 1] = col.y[2] + col.y[3];
+									dstz[i * 2 + 1] = col.z[2] + col.z[3];
+								}
+								dstx += 12; dsty += 12; dstz += 12;
 							}
-							dstx += 12; dsty += 12; dstz += 12;
+							dstx += 12 * (line / 2);
+							dsty += 12 * (line / 2);
+							dstz += 12 * (line / 2);
 						}
 					}
-					for(int q = 0; q < NQuads; q++)
-						colors[q] *= floatq(0.25f);
 				}
 				else {
 					rayGen.Generate(PWidth, PHeight, startX + x, startY + y, dir);
@@ -122,7 +134,7 @@ struct RenderTask: public thread_pool::Task {
 				if(NQuads == 1)
 					throw 0; //TODO
 				else {
-					rayGen.Decompose(colors, colors);
+			//		rayGen.Decompose(colors, colors);
 					const Vec3q *src = colors;
 
 					if(compress) {
@@ -273,12 +285,11 @@ template TreeStats Render<BVH>(const Scene<BVH>&, const Camera&, uint, uint, uns
 
 template TreeStats Render<BVH>(const Scene<BVH>&, const Camera&, gfxlib::Texture&,
 									const Options, uint);
-	
 
-//template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, gfxlib::Texture&,
-//									uint, uint, uint, const Options, uint);
+template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, uint, uint, unsigned char*,
+								const vector<int>&, const vector<int>&, const Options, uint, uint);
 
-//template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, gfxlib::Texture&,
-//									const Options, uint);
+template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, gfxlib::Texture&,
+									const Options, uint);
 	
 

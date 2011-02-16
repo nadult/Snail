@@ -1,3 +1,4 @@
+#include "rtbase.h"
 #include "ray_generator.h"
 
 RayGenerator::RayGenerator(int level, int tw, int th, float pd, Vec3f right, Vec3f up, Vec3f front)
@@ -20,20 +21,30 @@ static const int tx[16] = { 0, 2, 0, 2, 4, 6, 4, 6, 0, 2, 0, 2, 4, 6, 4, 6 };
 static const int ty[16] = { 0, 0, 2, 2, 0, 0, 2, 2, 4, 4, 6, 6, 4, 4, 6, 6 };
 
 void RayGenerator::Generate(int level,int pw,int ph,int x,int y, Vec3q *out) const {
-	/*{
+	{
+		Assert(level == 3);
+
 		GridSampler sampler;
 		Vec3q right(tright), up(tup), tadd = txyz;
 		floatq xoff(x + 0, x + 0, x + 2, x + 2);
 		floatq yoff(y + 0, y + 0, y - 1, y - 1);
 
-		for(int ty = 0; ty < 16; ty++) 
-			for(int tx = 0; tx < 16; tx += 4) {
-				Vec2q tpos(floatq(tx) + xoff, floatq(ty) + yoff);
-				Vec3q points = right * tpos.x + up * tpos.y + tadd;
-				out[(tx >> 2) + ty * 4] = points * RSqrt(points | points);
-			}
+		for(int ty = 0; ty < 16; ty++) {
+			floatq tposx[4] = { floatq(0.0f) + xoff, floatq(4.0f) + xoff,
+								floatq(8.0f) + xoff, floatq(12.0f) + xoff };
+			floatq tposy = floatq(ty) + yoff;
+
+			Vec3q tpoint = up * tposy + tadd;
+			Vec3q points[4] = { right * tposx[0] + tpoint, right * tposx[1] + tpoint,
+								right * tposx[2] + tpoint, right * tposx[3] + tpoint };
+
+			out[ty * 4 + 0] = points[0] * RSqrt(points[0] | points[0]);
+			out[ty * 4 + 1] = points[1] * RSqrt(points[1] | points[1]);
+			out[ty * 4 + 2] = points[2] * RSqrt(points[2] | points[2]);
+			out[ty * 4 + 3] = points[3] * RSqrt(points[3] | points[3]);
+		}
 		return;
-	}*/
+	}
 
 	if(level > 2) {
 		int npw = pw >> 1, nph = ph >> 1, nl = level - 1;

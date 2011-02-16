@@ -52,6 +52,8 @@ namespace shading {
 	};
 
 	struct MaterialDesc {
+		MaterialDesc();
+
 		Vec3f ambient, diffuse, specular, emissive;
 		Vec3f transmission;
 		int illuminationModel;

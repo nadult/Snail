@@ -15,3 +15,6 @@ Wywala sie serwer gdy uruchomimy najpierw w 1024^2 a potem w 1600x1200, albo
 gdy uruchomimy w rozdzialce > 1024^2 na 1 wezle
 
 Bugi w swiatlach / odbiciach na scenie z obracajacymi sie pudelkami
+
+Bug w intrpolowanych normalnych na kawalkach obrazka czesciowo pustych z wlaczonymi swiatlami
+widoczne na fruit/fruit_v2.obj
