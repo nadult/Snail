@@ -207,26 +207,13 @@ void BVH::WideTrace(const Vec3f *origin, const Vec3f *dir, const Vec3f *idir,
 		int child = node.subNode;
 		const BBox &left  = nodes[child + 0].bbox;
 		const BBox &right = nodes[child + 1].bbox;
-		int newCount;
+		unsigned newCount;
 
 		u16 newIndices[count];
-
-		newCount = 0;
-		for(unsigned n = 0; n < count; n++) {
-			u16 idx = indices[n];
-			if(left.Test(origin[idx], dir[idx], dist[idx]))
-				newIndices[newCount++] = idx;
-		}
-		if(newCount)
+		if(newCount = left.WideTest(origin, idir, indices, dist, count, newIndices))
 			WideTrace(origin, dir, idir, newIndices, dist, newCount, child + 0);
-
-		newCount = 0;
-		for(unsigned n = 0; n < count; n++) {
-			u16 idx = indices[n];
-			if(right.Test(origin[idx], dir[idx], dist[idx]))
-				newIndices[newCount++] = idx;
-		}
-		if(newCount)
+		
+		if(newCount = right.WideTest(origin, idir, indices, dist, count, newIndices))
 			WideTrace(origin, dir, idir, newIndices, dist, newCount, child + 1);
 	}
 }

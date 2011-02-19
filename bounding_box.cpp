@@ -234,6 +234,76 @@ bool BBox::TestCornerRays(const CornerRays &crays) const {
 
 	return lmax >= 0.0f && lmin <= lmax;
 }
+	
+unsigned BBox::WideTest(const Vec3f *origins, const Vec3f *idirs, const u16 *__restrict indices,
+					float *maxDist, unsigned count, u16 *__restrict newIndices) const
+{
+	unsigned newCount = 0;
+
+	floatq minx(min.x), miny(min.y), minz(min.z);
+	floatq maxx(max.x), maxy(max.y), maxz(max.z);
+
+	for(unsigned n = 0; n < (count & ~3); n += 4) {
+		u16 idx[4] = {indices[n + 0], indices[n + 1], indices[n + 2], indices[n + 3] };
+
+		Vec3q orig; Convert(origins[idx[0]], origins[idx[1]], origins[idx[2]], origins[idx[3]], orig);
+		Vec3q idir; Convert(idirs[idx[0]], idirs[idx[1]], idirs[idx[2]], idirs[idx[3]], idir);
+		floatq dist(maxDist[idx[0]], maxDist[idx[1]], maxDist[idx[2]], maxDist[idx[3]]); 
+		
+		floatq l1, l2;
+		
+		l1 = idir.x * (minx - orig.x);
+		l2 = idir.x * (maxx - orig.x);
+		floatq lmin = Min(l1, l2);
+		floatq lmax = Max(l1, l2);
+
+		l1 = idir.y * (miny - orig.y);
+		l2 = idir.y * (maxy - orig.y);
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		l1 = idir.z * (minz - orig.z);
+		l2 = idir.z * (maxz - orig.z);
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		int result = ForWhich(lmax >= 0.0f && lmin <= Min(lmax, dist));
+
+		if(result & 1) newIndices[newCount++] = idx[0];
+		if(result & 2) newIndices[newCount++] = idx[1];
+		if(result & 4) newIndices[newCount++] = idx[2];
+		if(result & 8) newIndices[newCount++] = idx[3];
+	}
+
+	for(unsigned n = count & ~3; n < count; n++) {
+		u16 idx = indices[n];
+
+		Vec3f orig = origins[idx];
+		Vec3f idir = idirs[idx];
+		
+		float l1, l2;
+		
+		l1 = idir.x * (float(min.x) - orig.x);
+		l2 = idir.x * (float(max.x) - orig.x);
+		float lmin = Min(l1, l2);
+		float lmax = Max(l1, l2);
+
+		l1 = idir.y * (float(min.y) - orig.y);
+		l2 = idir.y * (float(max.y) - orig.y);
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		l1 = idir.z * (float(min.z) - orig.z);
+		l2 = idir.z * (float(max.z) - orig.z);
+		lmin = Max(Min(l1, l2), lmin);
+		lmax = Min(Max(l1, l2), lmax);
+
+		if(lmax >= 0.0f && lmin <= Min(lmax, maxDist[idx]))
+			newIndices[newCount++] = idx;
+	}
+
+	return newCount;
+}
 
 
 /*

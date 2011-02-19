@@ -303,6 +303,8 @@ static int tmain(int argc, char **argv) {
 	double lastTime = GetTime();
 
 	vector<Photon> photons;
+	if(!oglRenderer) oglRenderer = new OGLRenderer(scene);
+	double photonGenTime = 0.0;
 
 	while(window.PollEvents()) {
 		frmCounter.NextFrame();
@@ -374,7 +376,7 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 1 %s\n", gVals[1]?"on" : "off"); }
 		if(window.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 2 %s\n", gVals[2]?"on" : "off"); }
 		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 3 %s\n", gVals[3]?"on" : "off"); }
-		if(window.KeyDown(Key_f5)) { gVals[4]^=1; printf("Val 4 %s\n", gVals[4]?"on" : "off"); }
+		if(window.KeyDown(Key_f5)) { gVals[4]^=1; printf("Photon tracing %s\n", gVals[4]?"on" : "off"); }
 		if(window.KeyDown(Key_f6)) { gVals[5]^=1; printf("Scene complexity visualization %s\n",gVals[5]?"on":"off"); }
 		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Advanced shading %s\n",gVals[6]?"on":"off"); }
 		if(window.KeyDown(Key_f8)) { gVals[7]^=1; printf("Reflections 7 %s\n",gVals[7]?"on":"off"); }
@@ -402,14 +404,27 @@ static int tmain(int argc, char **argv) {
 			Camera camera = orbiting?(Camera)ocam : (Camera)cam;
 
 			if(oglRendering) {
-				oglRenderer->Draw(camera, 60.0f, float(resx) / float(resy));
+				oglRenderer->BeginDrawing(camera, 60.0f, float(resx) / float(resy), 1);
+				oglRenderer->Draw();
+				oglRenderer->DrawPhotons(photons, 0);
+				oglRenderer->FinishDrawing();
 			}
 			else {
 				stats = Render(scene, camera, image, options, threads);
-				TracePhotons(photons, scene, 32 * 1024);
+				bool updated = 0;
+
+				if(gVals[4]) {
+					photonGenTime = GetTime();
+					TracePhotons(photons, scene, 4 * 1024 * 1024);
+					photonGenTime = GetTime() - photonGenTime;
+					gVals[4] = 0;
+					updated = 1;
+				}
 				window.RenderImage(image);
-				if(oglRenderer)
-					oglRenderer->DrawPhotons(photons, camera, 60.0f, float(resx) / float(resy));
+
+				oglRenderer->BeginDrawing(camera, 60.0f, float(resx) / float(resy), 0);
+				oglRenderer->DrawPhotons(photons, updated);
+				oglRenderer->FinishDrawing();
 			}
 		}	
 
@@ -417,6 +432,7 @@ static int tmain(int argc, char **argv) {
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 		double mrays = double(unsigned(frmCounter.FPS() * stats.GetRays() * 0.0001)) * 0.01;
+		double ptime = double(unsigned(photonGenTime * 100.0)) * 0.01;
 
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));
@@ -426,8 +442,9 @@ static int tmain(int argc, char **argv) {
 		else {
 			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, time * 1000.0, buildTime * 1000.0));
 			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays);
+			font.PrintAt(Vec2f(5, 45), photons.size() / 1024, "k photons generated in ", ptime);
 			if(lightsEnabled && lights.size())
-				font.PrintAt(Vec2f(5, 45), "Lights: ",lightsEnabled?lights.size() : 0);
+				font.PrintAt(Vec2f(5, 65), "Lights: ",lightsEnabled?lights.size() : 0);
 			font.PrintAt(Vec2f(5, 85), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
 					" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7]);
 		}

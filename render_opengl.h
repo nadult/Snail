@@ -14,8 +14,11 @@ public:
 	OGLRenderer(const Scene<BVH> &bvh);
 	~OGLRenderer();
 
-	void Draw(const Camera &cam, float fov, float aspect) const;
-	void DrawPhotons(const vector<Photon> &photons, const Camera &cam, float fov, float aspect) const;
+	void BeginDrawing(const Camera &cam, float fov, float aspect, bool clearColor) const;
+	void FinishDrawing() const;
+
+	void Draw() const;
+	void DrawPhotons(const vector<Photon> &photons, bool update);
 	void operator=(const OGLRenderer&) = delete;
 	OGLRenderer(const OGLRenderer&) = delete;
 
@@ -25,6 +28,7 @@ private:
 	unsigned triCount;
 	unsigned posBuffer, uvBuffer, nrmBuffer;
 	unsigned program;
+	unsigned photonBuffer, photonColorsBuffer, photonBufferSize;
 	bool useNormals, useUvs;
 	BBox bbox;
 };

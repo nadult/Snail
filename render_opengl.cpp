@@ -15,6 +15,11 @@ OGLRenderer::OGLRenderer(const Scene<BVH> &scene) {
 	posBuffer = temp[0];
 	uvBuffer = temp[1];
 	nrmBuffer = temp[2];
+	photonBuffer = 0;
+	photonColorsBuffer = 0;
+	photonBufferSize = 0;
+
+	std::cout << "Loading mesh to GPU...\n";
 
 	const ATriVector &tris = scene.geometry.tris;
 	{
@@ -90,10 +95,10 @@ void OGLRenderer::InitShaders() {
 	unsigned f = glCreateShader(GL_FRAGMENT_SHADER);
 
 	const char *fs = "varying vec4 position, normal; void main() {\n"
-//					"float col = max(normal.z, 0.0);gl_FragColor = vec4(col, col, col, 1); }";
-					"gl_FragColor = vec4(normal.xyz, 1); }";
+//					"float col = max(normal.z, 0.0) * 0.2; gl_FragColor = vec4(col, col, col, 1); }";
+					"gl_FragColor = vec4(abs(normal.xyz), 1) * 0.1; }";
 	const char *vs = "varying vec4 position, normal; void main() {\n"
-	   				"normal = (gl_ModelViewProjectionMatrix * vec4(gl_Normal, 0.0));\n"
+	   				"normal = vec4(gl_Normal, 0.0);//(gl_ModelViewProjectionMatrix * vec4(gl_Normal, 0.0));\n"
 				   	"gl_Position = (gl_ModelViewProjectionMatrix * gl_Vertex); }";
 
 	glShaderSource(v, 1, &vs, 0);
@@ -121,11 +126,15 @@ OGLRenderer::~OGLRenderer() {
 	glDeleteBuffers(1, &posBuffer);
 	glDeleteBuffers(1, &uvBuffer);
 	glDeleteBuffers(1, &nrmBuffer);
+	if(photonBuffer)
+		glDeleteBuffers(1, &photonBuffer);
+	if(photonColorsBuffer)
+		glDeleteBuffers(1, &photonColorsBuffer);
 	glDeleteProgram(program);
 }
 
-void OGLRenderer::Draw(const Camera &cam, float fov, float aspect) const {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+void OGLRenderer::BeginDrawing(const Camera &cam, float fov, float aspect, bool clearColor) const {
+	glClear((clearColor? GL_COLOR_BUFFER_BIT : 0) | GL_DEPTH_BUFFER_BIT);
 
 	glDisable(GL_TEXTURE_2D);
 
@@ -141,7 +150,16 @@ void OGLRenderer::Draw(const Camera &cam, float fov, float aspect) const {
 	glLoadIdentity();
 	Vec3f eye = cam.pos, center = cam.pos + cam.front * 10.0f, up = cam.up;
 	gluLookAt(eye.x, eye.y, eye.z, center.x, center.y, center.z, up.x, up.y, up.z);
+}
 
+void OGLRenderer::FinishDrawing() const {
+	glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+}
+
+void OGLRenderer::Draw() const {
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_FRONT);
@@ -170,50 +188,70 @@ void OGLRenderer::Draw(const Camera &cam, float fov, float aspect) const {
 
 	glUseProgram(0);
 
-	glPopMatrix();
-	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 }
 	
 
-void OGLRenderer::DrawPhotons(const vector<Photon> &photons, const Camera &cam, float fov, float aspect) const {
-	glClear(GL_DEPTH_BUFFER_BIT);
-	glDisable(GL_TEXTURE_2D);
+void OGLRenderer::DrawPhotons(const vector<Photon> &photons, bool update) {
+	if(update) {
+		if(!photonBuffer || photonBufferSize < photons.size()) {
+			if(photonBuffer) {
+				glDeleteBuffers(1, &photonBuffer);
+				glDeleteBuffers(1, &photonColorsBuffer);
+			}
+			glGenBuffers(1, &photonBuffer);
+			glGenBuffers(1, &photonColorsBuffer);
+
+			glBindBuffer(GL_ARRAY_BUFFER, photonBuffer);
+			glBufferData(GL_ARRAY_BUFFER, photons.size() * 4 * 3, 0, GL_DYNAMIC_DRAW);
+
+			glBindBuffer(GL_ARRAY_BUFFER, photonColorsBuffer);
+			glBufferData(GL_ARRAY_BUFFER, photons.size() * 4, 0, GL_DYNAMIC_DRAW);
+			photonBufferSize = photons.size();
+		}	
+		const unsigned step = 4096;
+
+		glBindBuffer(GL_ARRAY_BUFFER, photonBuffer);
+		for(unsigned n = 0; n < photons.size(); n += step) {
+			Vec3f pbuf[step];
+			unsigned count = Min(step, photons.size() - n);
+			for(unsigned i = 0; i < count; i++)
+				pbuf[i] = photons[n + i].position;
+			glBufferSubData(GL_ARRAY_BUFFER, n * 4 * 3, count * 4 * 3, pbuf);
+		}
+
+		glBindBuffer(GL_ARRAY_BUFFER, photonColorsBuffer);
+		for(unsigned n = 0; n < photons.size(); n += step) {
+			unsigned cbuf[step];
+			unsigned count = Min(step, photons.size() - n);
+			for(unsigned i = 0; i < count; i++) {
+				const Photon &photon = photons[n + i];
+				cbuf[i] = *((u32*)photon.color);
+			}
+			glBufferSubData(GL_ARRAY_BUFFER, n * 4, count * 4, cbuf);
+		}
+	}
+
+	if(!photonBufferSize)
+		return;
+
 	glEnable(GL_DEPTH_TEST);
 
-	Vec3f size = bbox.Size();
-	float tsize = size.x + size.y + size.z;
+	glPointSize(3.0f);
 
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
-	gluPerspective(fov, aspect, tsize * 0.01f, tsize * 10.0f);
+	glBindBuffer(GL_ARRAY_BUFFER, photonBuffer);
+	glVertexPointer(3, GL_FLOAT, 0, 0);
+	glEnableClientState(GL_VERTEX_ARRAY);
+		
+	glBindBuffer(GL_ARRAY_BUFFER, photonColorsBuffer);
+	glColorPointer(4, GL_UNSIGNED_BYTE, 0, 0);
+	glEnableClientState(GL_COLOR_ARRAY);
 
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
-	glLoadIdentity();
-	Vec3f eye = cam.pos, center = cam.pos + cam.front * 10.0f, up = cam.up;
-	gluLookAt(eye.x, eye.y, eye.z, center.x, center.y, center.z, up.x, up.y, up.z);
-
-	glPointSize(10.0f);
-
-	glBegin(GL_POINTS);
-	for(size_t n = 0; n < photons.size(); n++) {
-		const Photon &photon = photons[n];
-		glColor3f(float(photon.color[0]) / 255.0f, float(photon.color[1]) / 255.0f, float(photon.color[2]) / 255.0f);
-//		glColor3f(1, 0, 0);
-		glVertex3f(photon.position.x, photon.position.y, photon.position.z);
-	}
-	glColor3f(1, 1, 1);
-	glEnd();
+	glDrawArrays(GL_POINTS, 0, photonBufferSize);
+		
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glPointSize(1.0f);
-
-	glPopMatrix();
-	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
 	glDisable(GL_DEPTH_TEST);
 }

@@ -98,6 +98,9 @@ public:
 		}
 	}
 
+	unsigned WideTest(const Vec3f *origin, const Vec3f *idir, const u16 *__restrict indices,
+						float *dist, unsigned count, u16 *__restrict newIndices) const;
+
 	template <class Real,class Vec>
 	bool Test(const Vec &orig,const Vec &dir,const Real &maxDist=Real(1.0f/0.0f)) const {
 		Real l1,l2,idir[3]={Inv(dir.x),Inv(dir.y),Inv(dir.z)};
