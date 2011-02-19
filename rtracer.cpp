@@ -19,6 +19,7 @@
 #include "frame_counter.h"
 
 #include "render_opengl.h"
+#include "photons.h"
 
 using std::cout;
 using std::endl;
@@ -301,6 +302,8 @@ static int tmain(int argc, char **argv) {
 	float lastFrameTime = 0.0f;
 	double lastTime = GetTime();
 
+	vector<Photon> photons;
+
 	while(window.PollEvents()) {
 		frmCounter.NextFrame();
 
@@ -331,10 +334,15 @@ static int tmain(int argc, char **argv) {
 			lightsEnabled^=1;
 		}
 		if(window.KeyDown('J')) {
-			Vec3f colors[4]={Vec3f(1,1,1),Vec3f(0.2,0.5,1),Vec3f(0.5,1,0.2),Vec3f(0.7,1.0,0.0)};
+			Vec3f colors[] = {
+			//	Vec3f(1.0, 1.0, 1.0),
+				Vec3f(0.2, 0.5, 1.0),
+				Vec3f(1.0, 0.5, 0.2),
+			//	Vec3f(0.7, 1.0, 0.0),
+			};
 
 			Vec3f pos = (orbiting?(Camera)ocam : (Camera)cam).pos;
-			lights.push_back(Light(pos, colors[rand()&3], 2000.0f * 0.001f * sceneScale));
+			lights.push_back(Light(pos, colors[rand() % countof(colors)], 2000.0f * 0.001f * sceneScale));
 		}
 
 		if(window.KeyDown('H')) {
@@ -384,9 +392,9 @@ static int tmain(int argc, char **argv) {
 		buildTime = GetTime() - buildTime;
 
 		vector<Light> tLights = lightsEnabled?lights:vector<Light>();
-			for(int n=0;n<tLights.size();n++)
-				tLights[n].pos += Vec3f(sin(animPos+n*n),cos(animPos+n*n),
-					sin(animPos-n*n)*cos(animPos+n*n)) * tspeed;
+		//	for(int n=0;n<tLights.size();n++)
+		//		tLights[n].pos += Vec3f(sin(animPos+n*n),cos(animPos+n*n),
+		//			sin(animPos-n*n)*cos(animPos+n*n)) * tspeed;
 		scene.lights = dscene.lights = tLights;
 		
 		double time = GetTime(); 
@@ -398,11 +406,12 @@ static int tmain(int argc, char **argv) {
 			}
 			else {
 				stats = Render(scene, camera, image, options, threads);
+				TracePhotons(photons, scene, 32 * 1024);
+				window.RenderImage(image);
+				if(oglRenderer)
+					oglRenderer->DrawPhotons(photons, camera, 60.0f, float(resx) / float(resy));
 			}
-		}
-		
-		if(!oglRendering)		
-			window.RenderImage(image);
+		}	
 
 		time = GetTime() - time;
 

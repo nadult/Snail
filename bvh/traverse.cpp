@@ -187,3 +187,48 @@ template void BVH::TraversePrimary<0, 1>(Context<0, 1>&) const;
 template void BVH::TraversePrimary<1, 0>(Context<1, 0>&) const;
 template void BVH::TraversePrimary<1, 1>(Context<1, 1>&) const;
 
+
+void BVH::WideTrace(const Vec3f *origin, const Vec3f *dir, const Vec3f *idir,
+						u16 *indices, float *dist, unsigned count, unsigned nodeIdx) const {
+	const Node &node = nodes[nodeIdx];
+
+	if(node.IsLeaf()) {
+		int triCount = node.count, firstTri = node.first & 0x7fffffff;
+		for(int t = 0; t < triCount; t++) {
+			const Triangle &tri = tris[firstTri + t];
+			for(unsigned n = 0; n < count; n++) {
+				unsigned idx = indices[n];
+				auto isct = tri.Collide<0>(origin[idx], dir[idx]);
+				dist[idx] = Min(dist[idx], isct.Distance(0));
+			}
+		}
+	}
+	else {
+		int child = node.subNode;
+		const BBox &left  = nodes[child + 0].bbox;
+		const BBox &right = nodes[child + 1].bbox;
+		int newCount;
+
+		u16 newIndices[count];
+
+		newCount = 0;
+		for(unsigned n = 0; n < count; n++) {
+			u16 idx = indices[n];
+			if(left.Test(origin[idx], dir[idx], dist[idx]))
+				newIndices[newCount++] = idx;
+		}
+		if(newCount)
+			WideTrace(origin, dir, idir, newIndices, dist, newCount, child + 0);
+
+		newCount = 0;
+		for(unsigned n = 0; n < count; n++) {
+			u16 idx = indices[n];
+			if(right.Test(origin[idx], dir[idx], dist[idx]))
+				newIndices[newCount++] = idx;
+		}
+		if(newCount)
+			WideTrace(origin, dir, idir, newIndices, dist, newCount, child + 1);
+	}
+}
+
+

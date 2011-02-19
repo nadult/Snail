@@ -15,7 +15,7 @@ FILES=funcs render tree_stats bounding_box gl_window rtbase base_scene bvh/trave
 	  tex_handle bvh/tree sampling/point_sampler_dxt sampling/sampler sampling/sat_sampler \
 	shading/material sampling/bilinear_sampler sampling/point_sampler16bit shading/uber_material rtracer \
 	sampling/point_sampler formats/loader formats/wavefront_obj formats/doom3_proc compression \
-	comm_data comm_mpi comm_tcp dbvh/tree dbvh/traverse scene scene_trace render_opengl
+	comm_data comm_mpi comm_tcp dbvh/tree dbvh/traverse scene scene_trace render_opengl photons
 
 RFILES=render_opengl render bvh/traverse dbvh/traverse ray_generator scene_trace
 TFILES=client server node gl_window tex_handle font rtracer comm_mpi comm_tcp comm_data
@@ -30,7 +30,7 @@ INCLUDES=-I$(HOME)/include/ -I./
 
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
 FLAGS=-march=native --param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdynamic \
-	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread
+	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread -fopenmp
 
 CXX=/usr/local/gcc-4.5/bin/g++
 

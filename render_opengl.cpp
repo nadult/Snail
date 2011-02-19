@@ -177,3 +177,43 @@ void OGLRenderer::Draw(const Camera &cam, float fov, float aspect) const {
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 }
+	
+
+void OGLRenderer::DrawPhotons(const vector<Photon> &photons, const Camera &cam, float fov, float aspect) const {
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glDisable(GL_TEXTURE_2D);
+	glEnable(GL_DEPTH_TEST);
+
+	Vec3f size = bbox.Size();
+	float tsize = size.x + size.y + size.z;
+
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	gluPerspective(fov, aspect, tsize * 0.01f, tsize * 10.0f);
+
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glLoadIdentity();
+	Vec3f eye = cam.pos, center = cam.pos + cam.front * 10.0f, up = cam.up;
+	gluLookAt(eye.x, eye.y, eye.z, center.x, center.y, center.z, up.x, up.y, up.z);
+
+	glPointSize(10.0f);
+
+	glBegin(GL_POINTS);
+	for(size_t n = 0; n < photons.size(); n++) {
+		const Photon &photon = photons[n];
+		glColor3f(float(photon.color[0]) / 255.0f, float(photon.color[1]) / 255.0f, float(photon.color[2]) / 255.0f);
+//		glColor3f(1, 0, 0);
+		glVertex3f(photon.position.x, photon.position.y, photon.position.z);
+	}
+	glColor3f(1, 1, 1);
+	glEnd();
+
+	glPointSize(1.0f);
+
+	glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glDisable(GL_DEPTH_TEST);
+}

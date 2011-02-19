@@ -3,6 +3,7 @@
 
 #include "rtbase.h"
 #include "scene.h"
+#include "photons.h"
 
 class BVH;
 class Camera;
@@ -14,6 +15,7 @@ public:
 	~OGLRenderer();
 
 	void Draw(const Camera &cam, float fov, float aspect) const;
+	void DrawPhotons(const vector<Photon> &photons, const Camera &cam, float fov, float aspect) const;
 	void operator=(const OGLRenderer&) = delete;
 	OGLRenderer(const OGLRenderer&) = delete;
 

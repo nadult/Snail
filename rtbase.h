@@ -13,6 +13,9 @@ extern int gVals[16];
 
 void FileModTime(const string &path, time_t*);
 
+template <typename T, size_t N>
+size_t countof(T (&array)[N]) { return N; }
+
 inline unsigned short ByteSwap(unsigned short v) {
 	return ((v & 0xff) << 8) | ((v & 0xff00) >> 8);
 }

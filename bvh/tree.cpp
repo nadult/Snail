@@ -50,7 +50,7 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
 	BBox bbox = nodes[nNode].bbox;
 	enum { useSah = 1 };
 
-	if(count <= 8 || sdepth == maxDepth - 1) {
+	if(count <= 4 || sdepth == maxDepth - 1) {
 	LEAF_NODE:
 		nodes[nNode].bbox = tris[first].GetBBox();
 		for(int n = 1; n < count; n++)

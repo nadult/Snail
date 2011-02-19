@@ -40,6 +40,8 @@ public:
 	
 	void TraverseShadow(ShadowContext &c) const;
 	
+	void WideTrace(const Vec3f *origin, const Vec3f *dir, const Vec3f *idir,
+					u16 *indices, float *dist, unsigned count, unsigned nodeIdx = 0) const;
 
 protected:
 	void FindSplit(int nNode, int first, int count, int depth);

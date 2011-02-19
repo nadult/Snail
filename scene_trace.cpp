@@ -485,7 +485,7 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 			lSpecular[q] = spec;
 		}
 	}
-	{
+	if(0) {
 		int   nLights = lights.size();
 		Vec3f tMinPos(Minimize(minPos)), tMaxPos(Maximize(maxPos));
 		for(int n = 0; n < nLights; n++) {
