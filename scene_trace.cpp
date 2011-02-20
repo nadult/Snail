@@ -1,4 +1,5 @@
 #include "scene.h"
+#include "photons.h"
 
 namespace {
 
@@ -62,6 +63,8 @@ namespace {
 	{
 		StatsShader(const TreeStats &tStats, int size) : stats(tStats), size(size) { }
 		Vec3q operator[](int) const {
+			return Vec3q(log(stats.timers[0]) * 0.05f, 0.0f, 0.0f);
+
 			return Vec3q(
 				   float(stats.GetIntersects()) * (0.002f / size),
 				   float(stats.GetLoopIters()) * (0.02f / size),
@@ -485,6 +488,14 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 			lSpecular[q] = spec;
 		}
 	}
+
+	if(photons) {
+		stats.timers[0] = GatherPhotons(*photonNodes, *photons, samples, size, 3.0, geometry.GetBBox());
+		for(unsigned q = 0; q < size; q++)
+			samples[q].diffuse += samples[q].temp1;
+		
+	}
+
 	if(0) {
 		int   nLights = lights.size();
 		Vec3f tMinPos(Minimize(minPos)), tMaxPos(Maximize(maxPos));

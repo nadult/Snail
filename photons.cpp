@@ -1,6 +1,145 @@
 #include "photons.h"
 #include <tr1/random>
 #include <algorithm>
+#include "shading.h"
+
+
+struct OrderPhotons {
+	OrderPhotons(int ax) :axis(ax) { }
+	bool operator()(const Photon &a, const Photon &b) const
+		{ return (&a.position.x)[axis] < (&b.position.x)[axis]; }
+
+	int axis;
+};
+
+void MakePhotonTree(vector<PhotonNode> &nodes, Photon *photons, unsigned nodeIdx,
+					unsigned first, unsigned count, const BBox &box, unsigned minNode, int level) {
+/*	if(box.Width() < 0.25f && box.Height() < 0.25f && box.Width() < 0.25f) {
+		Vec3f sumPos(0, 0, 0), sumCol(0, 0, 0);
+		for(unsigned int n = 0; n < count; n++) {
+			sumPos += photons[n].position;
+			sumCol += photons[n].Color();
+		}
+
+		sumPos /= float(count);
+		photons[0] = Photon(sumPos, Vec3f(0, 1, 0), sumCol);
+		count = 1;
+	} */
+
+	int axis = MaxAxis(box.max - box.min);
+	size_t mid = count / 2;
+
+	std::nth_element(photons + first, photons + first + mid, photons + first + count, OrderPhotons(axis));
+	float split = (&photons[first + mid].position.x)[axis];
+
+	nodes[nodeIdx] = PhotonNode(axis, split, nodeIdx * 2 + 1);
+	nodes[nodeIdx].count = count;
+	nodes[nodeIdx].first = first;
+	
+	unsigned leftIdx = nodeIdx * 2 + 1;
+	unsigned rightIdx = nodeIdx * 2 + 2;
+
+
+	if(mid <= minNode) {
+		nodes[leftIdx] = PhotonNode(mid, first);
+		nodes[rightIdx] = PhotonNode(count - mid, first + mid);
+		return;
+	}
+
+	Vec3f newMin = box.min, newMax = box.max;
+	newMin[axis] = split; newMax[axis] = split;
+
+	MakePhotonTree(nodes, photons, leftIdx, first, mid, {box.min, newMax}, minNode, level + 1);
+	MakePhotonTree(nodes, photons, rightIdx, first + mid, count - mid, {newMin, box.max}, minNode, level + 1);
+}
+
+void MakePhotonTree(vector<PhotonNode> &nodes, vector<Photon> &photons) {
+	nodes.resize(photons.size() * 4 + 16);
+	BBox box(photons[0].position, photons[0].position);
+	for(size_t n = 0; n < photons.size(); n++) {
+		Vec3f point = photons[n].position;
+		box.min = VMin(box.min, point);
+		box.max = VMax(box.max, point);
+	}
+
+	MakePhotonTree(nodes, &photons[0], 0, 0, photons.size(), box, 1, 0);
+}
+
+int GatherPhotons(const vector<PhotonNode> &nodes, const vector<Photon> &photons,
+					shading::Sample *samples, unsigned count, float range, const BBox &sceneBox)
+{
+	int stack[128];
+	BBox boxStack[128];
+	int stackPos = 0;
+	int visitedNodes = 0;
+
+	floatq rangeSq = range * range;
+	floatq mul = 0.1 * (1.0f / 255.0f) * (1.0f / rangeSq);
+	
+	boxStack[stackPos] = BBox(sceneBox.min - Vec3f(range, range, range), sceneBox.max + Vec3f(range, range, range));
+	stack[stackPos++] = 0;
+
+	for(int q = 0; q < count; q++)
+		samples[q].temp1 = Vec3q(0.0f, 0.0f, 0.0f);
+
+	while(stackPos) {
+		int nodeIdx = stack[--stackPos];
+		BBox bbox = boxStack[stackPos];
+		const PhotonNode &node = nodes[nodeIdx];
+		visitedNodes++;
+
+		if(node.IsLeaf()) {
+			int first = node.first;
+
+			for(int n = 0; n < node.Count(); n++) {
+				const Photon &photon = photons[first + n];
+				Vec3q posq(photon.position.x, photon.position.y, photon.position.z);
+				Vec3q color = Vec3q(photon.color[0], photon.color[1], photon.color[2]) * mul;
+
+				for(int q = 0; q < count; q++) {
+					floatq weight = Clamp(rangeSq - LengthSq(posq - samples[q].position), (floatq)0.0f, rangeSq);
+					samples[q].temp1 += color * weight;
+				}
+			}
+		}
+		else {
+			int axis = node.Axis();
+
+			BBox leftBox = bbox, rightBox = bbox;
+			(&leftBox.max.x)[axis] = node.Split() + range;
+			(&rightBox.min.x)[axis] = node.Split() - range;
+
+			Vec3q bmin(leftBox.min), bmax(leftBox.max);
+
+			for(unsigned q = 0; q < count; q++) {
+				const Vec3q pos = samples[q].position;
+
+				if(ForAny(	pos.x >= bmin.x && pos.y >= bmin.y && pos.z >= bmin.z &&
+							pos.x <= bmax.x && pos.y <= bmax.y && pos.z <= bmax.z)) {
+					boxStack[stackPos] = leftBox;
+					stack[stackPos++] = node.Left();
+					break;
+				}
+			}
+
+			bmin = Vec3q(rightBox.min), bmax = Vec3q(rightBox.max);
+	
+			for(unsigned q = 0; q < count; q++) {
+				const Vec3q pos = samples[q].position;
+				
+				if(ForAny(	pos.x >= bmin.x && pos.y >= bmin.y && pos.z >= bmin.z &&
+							pos.x <= bmax.x && pos.y <= bmax.y && pos.z <= bmax.z)) {
+					boxStack[stackPos] = rightBox;
+					stack[stackPos++] = node.Right();
+					break;
+				}
+			}
+		}
+	}
+
+	return visitedNodes;
+}
+
 
 //source:: PBRT
 static Vec3f UniformSampleHemisphere(float u1, float u2) {
@@ -64,7 +203,7 @@ void TracePhotons(vector<Photon> &out, const Scene<BVH> &scene, unsigned count) 
 				Vec3f dir = UniformSampleSphere(u1, u2);
 
 				dirs[n] = dir;
-				origins[n] = light.pos + (Vec3f(rand(), rand(), rand()) - Vec3f(0.5f, 0.5f, 0.5f)) * 2.0f;
+				origins[n] = light.pos + (Vec3f(rand(), rand(), rand()) - Vec3f(0.5f, 0.5f, 0.5f)) * .04f;
 				dists[n] = constant::inf;
 				indices[n] = n;
 				idirs[n] = VInv(dirs[n]);
@@ -77,7 +216,7 @@ void TracePhotons(vector<Photon> &out, const Scene<BVH> &scene, unsigned count) 
 				out[offset + n] = Photon(
 						origins[n] + dirs[n] * dists[n],
 						-dirs[n],
-						light.color * Clamp((50.0f - dists[n]) * 0.02f, 0.0f, 1.0f));
+						light.color);
 				out[offset + n].temp = dists[n] == constant::inf?0 : 1;
 			}
 		}

@@ -29,6 +29,7 @@ LINUX_LIBS=$(LIBS)
 INCLUDES=-I$(HOME)/include/ -I./
 
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
+#FLAGS=-ggdb -std=gnu++0x
 FLAGS=-march=native --param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdynamic \
 	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread -fopenmp
 

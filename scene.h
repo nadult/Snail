@@ -23,6 +23,9 @@ public:
 #include "shading/material.h"
 #include "shading/simple_material.h"
 
+class Photon;
+class PhotonNode;
+
 template <class AccStruct>
 class Scene {
 public:
@@ -35,6 +38,9 @@ public:
 	shading::MatDict matDict;
 	shading::TexDict texDict;
 	shading::MaterialWrapper<shading::SimpleMaterial<true> > defaultMat;
+
+	vector<Photon> *photons;
+	vector<PhotonNode> *photonNodes;
 
 	void UpdateMaterials();
 	const std::map<string, int> GetMatIdMap() const;

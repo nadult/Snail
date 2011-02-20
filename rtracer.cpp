@@ -303,6 +303,8 @@ static int tmain(int argc, char **argv) {
 	double lastTime = GetTime();
 
 	vector<Photon> photons;
+	vector<PhotonNode> photonTree;
+
 	if(!oglRenderer) oglRenderer = new OGLRenderer(scene);
 	double photonGenTime = 0.0;
 
@@ -375,7 +377,7 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 0 %s\n", gVals[0]?"on" : "off"); }
 		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 1 %s\n", gVals[1]?"on" : "off"); }
 		if(window.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 2 %s\n", gVals[2]?"on" : "off"); }
-		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Val 3 %s\n", gVals[3]?"on" : "off"); }
+		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Photons visible %s\n", gVals[3]?"on" : "off"); }
 		if(window.KeyDown(Key_f5)) { gVals[4]^=1; printf("Photon tracing %s\n", gVals[4]?"on" : "off"); }
 		if(window.KeyDown(Key_f6)) { gVals[5]^=1; printf("Scene complexity visualization %s\n",gVals[5]?"on":"off"); }
 		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Advanced shading %s\n",gVals[6]?"on":"off"); }
@@ -398,6 +400,11 @@ static int tmain(int argc, char **argv) {
 		//		tLights[n].pos += Vec3f(sin(animPos+n*n),cos(animPos+n*n),
 		//			sin(animPos-n*n)*cos(animPos+n*n)) * tspeed;
 		scene.lights = dscene.lights = tLights;
+
+		if(photons.size()) {
+			scene.photons = &photons;
+			scene.photonNodes = &photonTree;
+		}
 		
 		double time = GetTime(); 
 		TreeStats stats; {
@@ -406,7 +413,7 @@ static int tmain(int argc, char **argv) {
 			if(oglRendering) {
 				oglRenderer->BeginDrawing(camera, 60.0f, float(resx) / float(resy), 1);
 				oglRenderer->Draw();
-				oglRenderer->DrawPhotons(photons, 0);
+				if(gVals[3]) oglRenderer->DrawPhotons(photons, 0);
 				oglRenderer->FinishDrawing();
 			}
 			else {
@@ -415,16 +422,19 @@ static int tmain(int argc, char **argv) {
 
 				if(gVals[4]) {
 					photonGenTime = GetTime();
-					TracePhotons(photons, scene, 4 * 1024 * 1024);
+					TracePhotons(photons, scene, 32 * 1024);
+					MakePhotonTree(photonTree, photons);
 					photonGenTime = GetTime() - photonGenTime;
-					gVals[4] = 0;
+					gVals[4] = 0; gVals[3] = 1;
 					updated = 1;
 				}
 				window.RenderImage(image);
 
-				oglRenderer->BeginDrawing(camera, 60.0f, float(resx) / float(resy), 0);
-				oglRenderer->DrawPhotons(photons, updated);
-				oglRenderer->FinishDrawing();
+				if(gVals[3]) {
+					oglRenderer->BeginDrawing(camera, 60.0f, float(resx) / float(resy), 0);
+					oglRenderer->DrawPhotons(photons, updated);
+					oglRenderer->FinishDrawing();
+				}
 			}
 		}	
 

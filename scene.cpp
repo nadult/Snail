@@ -3,6 +3,8 @@
 template <class AccStruct>
 Scene<AccStruct>::Scene() :defaultMat(Vec3f(1, 1, 1)) {
 	ambientLight = Vec3f(0.1f,0.1f,0.1f);
+	photons = 0;
+	photonNodes = 0;
 }
 
 template <class AccStruct>
