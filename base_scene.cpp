@@ -36,27 +36,43 @@ CompactTris BaseScene::ToCompactTris() const {
 	return out;
 }
 
-ATriVector BaseScene::ToTriVector() const {
+const ATriVector BaseScene::ToTriVector() const {
 	ATriVector out;
 	
-	for(int o=0;o<objects.size();o++) {
+	size_t count = 0;
+	for(size_t o = 0; o < objects.size(); o++)
+		count += objects[o].tris.size();
+
+	out.resize(count);
+
+	size_t index = 0;
+	for(size_t o = 0; o < objects.size(); o++) {
 		const Object &obj = objects[o];
 		
-		for(int t=0;t<obj.tris.size();t++)
-			out.push_back(obj.GetTriangle(t));
+		for(size_t n = 0; n < obj.tris.size(); n++)
+			out[index++] = obj.GetTriangle(n);
 	}
 	
 	return out;
 }
 
-AShTriVector BaseScene::ToShTriVector() const {
+const AShTriVector BaseScene::ToShTriVector() const {
 	AShTriVector out;
+	
+	size_t count = 0;
+	for(size_t o = 0; o < objects.size(); o++)
+		count += objects[o].tris.size();
 
-	for(int o=0;o<objects.size();o++) {
-		AShTriVector t = objects[o].ToShTriVector();
-		for(int n=0;n<t.size();n++) out.push_back(t[n]);
+	out.resize(count);
+
+	size_t index = 0;
+	for(size_t o = 0; o < objects.size(); o++) {
+		const Object &obj = objects[o];
+		
+		for(size_t n = 0; n < obj.tris.size(); n++)
+			out[index++] = obj.GetTriangle(n);
 	}
-
+	
 	return out;
 }
 
@@ -71,7 +87,7 @@ void BaseScene::SwapYZ() {
 }
 
 BBox BaseScene::GetBBox() const {
-	if(objects.size()==0)
+	if(objects.size() == 0)
 		ThrowException("Trying to compute bounding box of empty scene");
 	
 	BBox out=objects[0].GetBBox()*objects[0].trans;	
@@ -289,7 +305,7 @@ void BaseScene::Object::Optimize() {
 	bbox=BBox(&verts[0],verts.size(),trans);
 }
 
-BaseScene::Triangle BaseScene::Object::GetTriangle(uint n) const {
+const BaseScene::Triangle BaseScene::Object::GetTriangle(uint n) const {
 	Triangle out;
 	const IndexedTri &src=tris[n];
 

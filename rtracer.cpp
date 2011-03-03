@@ -33,6 +33,7 @@ static void PrintHelp() {
 			"\t-slowBuild   - rebuild BVH tree (using slower algorithm)\n"
 			"\t-flipNormals - flip normals of triangles when rebuilding\n"
 			"\t-swapYZ      - swap Y, Z axes when rebuilding\n"
+			"\t-instances n	- draw N istances of given model\n"
 			"\n\n"
 			"Interactive control:\n"
 			"\tA,W,S,D R,F         - move the camera\n"
@@ -119,14 +120,14 @@ static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 	cam.Move(move * speed);
 }
 
-static const DBVH MakeDBVH(BVH *bvh) {
+static const DBVH MakeDBVH(BVH *bvh, int nInstances) {
 	srand(0);
 	static float anim = 0; anim += 0.02f;
 
 	float scale = Length(bvh->GetBBox().Size()) * 0.025;
 
 	vector<ObjectInstance> instances;
-	for(int n = 0; n < 1000; n++) {
+	for(int n = 0; n < nInstances; n++) {
 		ObjectInstance inst;
 		inst.tree = bvh;
 		inst.translation = (Vec3f(rand() % 1000, rand() % 1000, rand() % 1000) - Vec3f(500, 500, 500))
@@ -174,14 +175,17 @@ static int tmain(int argc, char **argv) {
 	bool rebuild = 0, slowBuild = 0;
 	string texPath = "";
 
+	int nInstances = 1;
+
 	for(int n = 1; n < argc; n++) {
 			 if(string("-res") == argv[n] && n < argc-2) { resx = atoi(argv[n+1]); resy = atoi(argv[n+2]); n += 2; }
 		else if(string("-rebuild") == argv[n]) rebuild = 1;
 		else if(string("-slowBuild") == argv[n]) { rebuild = 1; slowBuild = 1; }
-		else if(string("-threads") == argv[n] && n < argc - 1) { threads=atoi(argv[n+1]); n+=1; }
+		else if(string("-threads") == argv[n] && n < argc - 1) { threads = atoi(argv[n + 1]); n += 1; }
 		else if(string("-fullscreen") == argv[n]) fullscreen = 1;
 		else if(string("-flipNormals") == argv[n]) flipNormals = 0;
 		else if(string("-swapYZ") == argv[n]) swapYZ = 1;
+		else if(string("-instances") == argv[n]) { nInstances = atoi(argv[n + 1]); n += 1; }
 		else {
 			if(argv[n][0] == '-') {
 				printf("Unknown option: %s\n",argv[n]);
@@ -290,7 +294,7 @@ static int tmain(int argc, char **argv) {
 	bool lightsEnabled = 1;
 	bool staticEnabled = 0, orbiting = 0;
 	float speed; {
-	//	scene.geometry.Construct(builder.ExtractElements());
+		//scene.geometry.Construct(builder.ExtractElements());
 		Vec3f size = scene.geometry.GetBBox().Size();
 		speed = (size.x + size.y + size.z) * 0.0025f;
 	}
@@ -305,7 +309,7 @@ static int tmain(int argc, char **argv) {
 	vector<Photon> photons;
 	vector<PhotonNode> photonTree;
 
-	if(!oglRenderer) oglRenderer = new OGLRenderer(scene);
+//	if(!oglRenderer) oglRenderer = new OGLRenderer(scene);
 	double photonGenTime = 0.0;
 
 	while(window.PollEvents()) {
@@ -371,7 +375,7 @@ static int tmain(int argc, char **argv) {
 		else
 			MoveCamera(cam, window, tspeed);
 
-		for(int n = 1; n <= 8; n++) if(window.Key('0' + n))
+		for(int n = 1; n <= 8; n++) if(window.KeyDown('0' + n))
 				{ threads = n; printf("Threads: %d\n", threads); }
 
 		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 0 %s\n", gVals[0]?"on" : "off"); }
@@ -390,9 +394,11 @@ static int tmain(int argc, char **argv) {
 		if(window.Key(Key_space)) animPos+=0.025f;
 
 		double buildTime = GetTime();
-			Scene<DBVH> dscene;
-		//	dscene.geometry = MakeDBVH(&scene.geometry);
-		//	dscene.materials = scene.materials;
+		Scene<DBVH> dscene;
+		if(nInstances > 1) {
+			dscene.geometry = MakeDBVH(&scene.geometry, nInstances);
+			dscene.materials = scene.materials;
+		}
 		buildTime = GetTime() - buildTime;
 
 		vector<Light> tLights = lightsEnabled?lights:vector<Light>();
@@ -417,12 +423,13 @@ static int tmain(int argc, char **argv) {
 				oglRenderer->FinishDrawing();
 			}
 			else {
-				stats = Render(scene, camera, image, options, threads);
+				stats = nInstances > 1? Render(dscene, camera, image, options, threads) :
+										Render( scene, camera, image, options, threads);
 				bool updated = 0;
 
 				if(gVals[4]) {
 					photonGenTime = GetTime();
-					TracePhotons(photons, scene, 32 * 1024);
+					TracePhotons(photons, scene, 4 * 1024 * 1024);
 					MakePhotonTree(photonTree, photons);
 					photonGenTime = GetTime() - photonGenTime;
 					gVals[4] = 0; gVals[3] = 1;

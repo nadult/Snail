@@ -14,8 +14,8 @@ public:
 	void SaveWavefrontObj(const string &fileName) const;
 	
 	CompactTris ToCompactTris() const;
-	ATriVector ToTriVector() const;
-	AShTriVector ToShTriVector() const;
+	const ATriVector ToTriVector() const;
+	const AShTriVector ToShTriVector() const;
 
 	BBox GetBBox() const;
 	
@@ -57,7 +57,7 @@ public:
 		// erases bad triangles
 		void Repair();
 
-		Triangle GetTriangle(uint n) const;
+		const Triangle GetTriangle(uint n) const;
 
 		CompactTris ToCompactTris() const;
 		ATriVector ToTriVector() const;

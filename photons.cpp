@@ -62,7 +62,7 @@ void MakePhotonTree(vector<PhotonNode> &nodes, vector<Photon> &photons) {
 		box.max = VMax(box.max, point);
 	}
 
-	MakePhotonTree(nodes, &photons[0], 0, 0, photons.size(), box, 1, 0);
+	MakePhotonTree(nodes, &photons[0], 0, 0, photons.size(), box, 4, 0);
 }
 
 int GatherPhotons(const vector<PhotonNode> &nodes, const vector<Photon> &photons,
@@ -74,13 +74,16 @@ int GatherPhotons(const vector<PhotonNode> &nodes, const vector<Photon> &photons
 	int visitedNodes = 0;
 
 	floatq rangeSq = range * range;
-	floatq mul = 0.1 * (1.0f / 255.0f) * (1.0f / rangeSq);
+	floatq hrange = range * 0.5f;
+	floatq mul = 0.2 * (1.0f / 255.0f) * (1.0f / range);
 	
 	boxStack[stackPos] = BBox(sceneBox.min - Vec3f(range, range, range), sceneBox.max + Vec3f(range, range, range));
 	stack[stackPos++] = 0;
 
 	for(int q = 0; q < count; q++)
 		samples[q].temp1 = Vec3q(0.0f, 0.0f, 0.0f);
+
+	int nPhotons = 0;
 
 	while(stackPos) {
 		int nodeIdx = stack[--stackPos];
@@ -90,14 +93,18 @@ int GatherPhotons(const vector<PhotonNode> &nodes, const vector<Photon> &photons
 
 		if(node.IsLeaf()) {
 			int first = node.first;
+			nPhotons += node.Count();
 
 			for(int n = 0; n < node.Count(); n++) {
 				const Photon &photon = photons[first + n];
 				Vec3q posq(photon.position.x, photon.position.y, photon.position.z);
 				Vec3q color = Vec3q(photon.color[0], photon.color[1], photon.color[2]) * mul;
+				Vec3f normal = photon.direction;
 
 				for(int q = 0; q < count; q++) {
-					floatq weight = Clamp(rangeSq - LengthSq(posq - samples[q].position), (floatq)0.0f, rangeSq);
+					floatq dist = Length(posq - samples[q].position);
+					floatq weight = Max(floatq(range) - dist, floatq(0.0f));
+					weight *= Max(samples[q].normal | normal, floatq(0.0f));
 					samples[q].temp1 += color * weight;
 				}
 			}
@@ -137,7 +144,7 @@ int GatherPhotons(const vector<PhotonNode> &nodes, const vector<Photon> &photons
 		}
 	}
 
-	return visitedNodes;
+	return nPhotons;
 }
 
 
@@ -196,14 +203,23 @@ void TracePhotons(vector<Photon> &out, const Scene<BVH> &scene, unsigned count) 
 			float dists[step];
 			u16 indices[step];
 
+			int tcount = sqrt(count);
+			float itcount = 1.0f / float(tcount);
+
 			int scount = Min(count - k * step, step);
 			for(unsigned n = 0; n < scount; n++) {
 				Vec3f pos = light.pos;
-				float u1 = rand(), u2 = rand();
+				float u1 = (float((n + k * step) % tcount) + 0.75f * (rand() - 0.5f)) * itcount;
+				float u2 = (float((n + k * step) / tcount) + 0.75f * (rand() - 0.5f)) * itcount;
+
+				//float u1 = rand(), u2 = rand();
 				Vec3f dir = UniformSampleSphere(u1, u2);
 
-				dirs[n] = dir;
-				origins[n] = light.pos + (Vec3f(rand(), rand(), rand()) - Vec3f(0.5f, 0.5f, 0.5f)) * .04f;
+				dirs[n] = dir; float lightSize = 4.0f;
+				Vec3f offset(1.0f / 0.0f, 0, 0);
+				while(LengthSq(offset) > lightSize)
+					offset = Vec3f(rand() - 0.5f, rand() - 0.5f, rand() -0.5f) * lightSize;
+				origins[n] = light.pos + offset;
 				dists[n] = constant::inf;
 				indices[n] = n;
 				idirs[n] = VInv(dirs[n]);
@@ -213,10 +229,7 @@ void TracePhotons(vector<Photon> &out, const Scene<BVH> &scene, unsigned count) 
 	
 			int offset = l * count + k * step;
 			for(unsigned n = 0; n < scount; n++) {
-				out[offset + n] = Photon(
-						origins[n] + dirs[n] * dists[n],
-						-dirs[n],
-						light.color);
+				out[offset + n] = Photon(origins[n] + dirs[n] * dists[n], dirs[n], light.color);
 				out[offset + n].temp = dists[n] == constant::inf?0 : 1;
 			}
 		}

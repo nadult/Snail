@@ -1,103 +1,94 @@
 #include "triangle.h"
 
-namespace {
-
-	struct Interval {
-		Interval(float min, float max) :min(min), max(max) { }
-		Interval(float v) :min(v), max(v) { }
-		Interval() { }
-
-		const Interval operator+(const Interval rhs) const {
-			return Interval(min + rhs.min, max + rhs.max);
-		}
-		const Interval operator-(const Interval rhs) const {
-			return Interval(min - rhs.max, max - rhs.min);
-		}
-		const Interval operator*(const Interval rhs) const {
-			float a = min * rhs.min;
-			float b = min * rhs.max;
-			float c = max * rhs.min;
-			float d = max * rhs.max;
-
-			return Interval(Min(Min(a, b), Min(c, d)), Max(Max(a, b), Max(c, d)));
-		}
-		const Interval operator-() const {
-			return Interval(-max, -min);
-		}
-
-		float min, max;
-	};
-
-}
-
 template <bool sharedOrigin, bool hasMask>
 void Triangle::Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActive, int lastActive) const {
-	Vec3f nrm = Nrm(), tvec0, tvec1;
-	float tmul;
+	int count = lastActive - firstActive + 1;
 
-	if(sharedOrigin) {
-		Vec3f tvec = ExtractN(c.Origin(0), 0) - a;
-		tvec0 = (ba ^ tvec) * it0;
-		tvec1 = (tvec ^ ca) * it0;
-		tmul = -(tvec | nrm);
+	floatq dets[count], tmuls[count];
+	Vec2q uvs[count];
+	float tmul; {
+		Vec3f tvec0, tvec1;
+		const Vec3f nrm = Nrm();
+	
+		if(sharedOrigin) {
+			Vec3f tvec = ExtractN(c.Origin(0), 0) - a;
+			tvec0 = (ba ^ tvec) * it0;
+			tvec1 = (tvec ^ ca) * it0;
+			tmul = -(tvec | nrm);
+		}
+		
+		for(int q = 0; q < count; q++)
+		{
+			int tq = q + firstActive;
+			const Vec3q dir = c.Dir(tq);
+
+			dets[q] = dir | nrm;
+			if(sharedOrigin) {
+				uvs[q].y = (dir | tvec0);
+				uvs[q].x = (dir | tvec1);
+			}
+			else {
+				Vec3q tvec = c.Origin(tq) - Vec3q(a);
+				Vec3q tvec0 = Vec3q(ba) ^ tvec;
+				Vec3q tvec1 = tvec ^ Vec3q(ca);
+				tmuls[q] = -(tvec | nrm);
+
+				uvs[q].y = (dir | tvec0) * it0;
+				uvs[q].x = (dir | tvec1) * it0;
+			}
+		}
 	}
 
-	int count = lastActive - firstActive + 1;
 	for(int q = 0; q < count; q++) {
 		int tq = q + firstActive;
 
-		const Vec3q dir = c.Dir(tq);
-		floatq idet = Inv(dir.x * nrm.x + dir.y * nrm.y + dir.z * nrm.z);
+		floatq u = uvs[q].x, v = uvs[q].y, det = dets[q];
 
-		floatq u, v, dist;
-		if(sharedOrigin) {
-			dist = idet * tmul;
-			v = (dir.x * tvec0.x + dir.y * tvec0.y + dir.z * tvec0.z) * idet;
-			u = (dir.x * tvec1.x + dir.y * tvec1.y + dir.z * tvec1.z) * idet;
+		f32x4b test = Min(u, v) >= 0.0f && u + v <= det;
+		if(hasMask) test = test && c.SSEMask(tq);
+
+		if(ForAny(test)) {
+			floatq idet = Inv(det);
+			floatq dist = idet * (sharedOrigin?tmul : tmuls[q]);
+			test = test && dist < c.Distance(tq) && dist > 0.0f;
+			c.Distance(tq) = Condition(test, dist, c.Distance(tq));
+			c.Object(tq) = Condition(i32x4b(test), i32x4(idx), c.Object(tq));
+			c.barycentric[tq] = Condition(test, Vec2q(u, v) * idet, c.barycentric[tq]);
 		}
-		else {
-			Vec3q tvec = c.Origin(tq) - Vec3q(a);
-			dist = -(tvec | nrm) * idet;
-			Vec3q tvec0 = Vec3q(ba) ^ tvec;
-			Vec3q tvec1 = tvec ^ Vec3q(ca);
-
-			idet *= it0;
-			v = (dir | tvec0) * idet;
-			u = (dir | tvec1) * idet;
-		}
-
-		f32x4b test = Min(u, v) >= 0.0f && u + v <= floatq(1.0f);
-		test = test && dist >= floatq(0.0f) && dist < c.Distance(tq);
-//		if(hasMask) test = test && c.SSEMask(tq);
-
-		c.Distance(tq) = Condition(test, dist, c.Distance(tq));
-		c.Object(tq) = Condition(i32x4b(test), i32x4(idx), c.Object(tq));
-		c.barycentric[tq] = Condition(test, Vec2q(u, v), c.barycentric[tq]);
 	}
 }
 
 bool Triangle::Collide(ShadowContext &c, int firstActive, int lastActive) const {
-	const Vec3f nrm = Nrm();
-	const Vec3f tvec = ExtractN(c.Origin(0), 0) - a;
-	const Vec3f tvec0 = (ba ^ tvec) * it0;
-	const Vec3f tvec1 = (tvec ^ ca) * it0;
-	const float tmul = -(tvec | nrm);
-
 	int count = lastActive - firstActive + 1;
 	bool full = count == c.Size();
+
+	floatq dets[count];
+	Vec2q uvs[count];
+	floatq tmul;
+
+	{
+		Vec3f nrm = Nrm();
+		Vec3f tvec = ExtractN(c.Origin(0), 0) - a;
+		Vec3f tvec0 = (ba ^ tvec) * it0;
+		Vec3f tvec1 = (tvec ^ ca) * it0;
+		tmul = -(tvec | nrm);
+
+		for(int q = 0; q < count; q++) {
+			int tq = q + firstActive;
+			Vec3q dir = c.Dir(tq);
+			dets[q] = dir | nrm;
+			uvs[q].y = dir | tvec0;
+			uvs[q].x = dir | tvec1;
+		}
+	}
 
 	for(int q = 0; q < count; q++) {
 		int tq = q + firstActive;
 
-		const Vec3q dir = c.Dir(tq);
-		floatq det = Abs(dir.x * nrm.x + dir.y * nrm.y + dir.z * nrm.z);
-
-		floatq dist = tmul * Inv(det);
-		floatq v = dir.x * tvec0.x + dir.y * tvec0.y + dir.z * tvec0.z;
-		floatq u = dir.x * tvec1.x + dir.y * tvec1.y + dir.z * tvec1.z;
+		floatq det = dets[q], u = uvs[q].x, v = uvs[q].y;
 		
 		f32x4b test = Min(u, v) >= 0.0f && u + v <= det;
-		test = test && dist >= 0.0f && dist < c.Distance(tq);
+		test = test && tmul > 0.0f && tmul < c.Distance(tq) * det;
 		full &= ForAll(test);
 
 		c.Distance(tq) = Condition(test, -constant::inf, c.Distance(tq));
@@ -186,14 +177,17 @@ bool Triangle::TestFrustum(const Frustum &frustum) const {
 bool Triangle::TestCornerRays(const CornerRays &rays) const {
 	Vec3f nrm = Nrm();
 	floatq det = rays.dir | nrm;
-	if(ForAll(det < 0.0f))
-		return 0;
+
+//	if(ForAll(det < 0.0f))
+//		return 0;
 
 	Vec3q tvec(rays.origin - a);
 	floatq u = rays.dir | (Vec3q(ba) ^ tvec);
 	floatq v = rays.dir | (tvec ^ Vec3q(ca));
 
-	if(ForAll(u < 0.0f) || ForAll(v < 0.0f) || ForAll(u + v > det * floatq(t0)))
+	floatq cmp = det * t0;
+
+	if(ForAll(u < 0.0f) || ForAll(v < 0.0f) || ForAll(u + v > cmp))
 		return 0;
 
 	return 1;

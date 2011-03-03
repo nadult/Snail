@@ -55,6 +55,8 @@ private:
 
 	const TreeStats TraceReflection(RaySelector, const Vec3q*, const shading::Sample*, Cache&, Vec3q *__restrict__)
 		const NOINLINE;
+
+	const TreeStats TraceAmbientOcclusion(RaySelector, const shading::Sample*) const;
 	
 	template <bool sharedOrigin, bool hasMask>
 	const TreeStats TraceTransparency(RaySelector, const RayGroup<sharedOrigin, hasMask>&, const floatq*,

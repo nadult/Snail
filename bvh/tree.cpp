@@ -161,7 +161,7 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
 void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 	BBox bbox = nodes[nNode].bbox;
 
-	if(count <= 16) {
+	if(count <= 4) {
 	LEAF_NODE:
 		depth = Max(depth, sdepth);
 		nodes[nNode].first = first | 0x80000000;

@@ -63,7 +63,7 @@ namespace {
 	{
 		StatsShader(const TreeStats &tStats, int size) : stats(tStats), size(size) { }
 		Vec3q operator[](int) const {
-			return Vec3q(log(stats.timers[0]) * 0.05f, 0.0f, 0.0f);
+		//	return Vec3q(log(stats.timers[0]) * 0.1f, 0.0f, 0.0f);
 
 			return Vec3q(
 				   float(stats.GetIntersects()) * (0.002f / size),
@@ -490,13 +490,17 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 	}
 
 	if(photons) {
-		stats.timers[0] = GatherPhotons(*photonNodes, *photons, samples, size, 3.0, geometry.GetBBox());
+		for(int k = 0; k < 4; k++)
+			GatherPhotons(*photonNodes, *photons, samples + k * (size / 4),
+										size / 4, 0.75, geometry.GetBBox());
+//		if(count < 50)
+//			GatherPhotons(*photonNodes, *photons, samples, size, 2.5, geometry.GetBBox());
+
 		for(unsigned q = 0; q < size; q++)
 			samples[q].diffuse += samples[q].temp1;
 		
 	}
-
-	if(0) {
+	else {
 		int   nLights = lights.size();
 		Vec3f tMinPos(Minimize(minPos)), tMaxPos(Maximize(maxPos));
 		for(int n = 0; n < nLights; n++) {
@@ -525,6 +529,7 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 
 	return stats;
 }
+
 
 template <class AccStruct>
 const TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shading::Sample *samples,
@@ -602,6 +607,14 @@ const TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shadin
 		diffuse [q] += Condition(msk, lColor * diffMul);
 		specular[q] += Condition(msk, lColor * specMul);
 	}
+
+	return stats;
+}
+
+template <class AccStruct>
+const TreeStats Scene <AccStruct>::TraceAmbientOcclusion(RaySelector inputSel, const shading::Sample *samples) const {
+	int size = inputSel.Size();
+	TreeStats stats;
 
 	return stats;
 }

@@ -46,7 +46,7 @@ void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 			if(box.Test(c, firstActive, lastActive))
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = tris[first + n];
-					if(/*sharedOrigin?tri.TestInterval(interval):*/tri.TestCornerRays(crays)) {
+					if(sharedOrigin? tri.TestInterval(interval) /*tri.TestCornerRays(crays)*/ : 1) {
 						tri.Collide(c, first + n, firstActive, lastActive);
 						stats.Intersection(lastActive - firstActive + 1);
 					}
@@ -112,7 +112,7 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 			if(box.Test(c, firstActive, lastActive))
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = tris[first + n];
-					if(1 || tri.TestInterval(interval)) {
+					if(tri.TestInterval(interval)) {
 						if(tri.Collide(c, firstActive, lastActive)) {
 							stats.Skip();
 							if(c.stats) (*c.stats) += stats;
@@ -150,6 +150,11 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 template <bool sharedOrigin, bool hasMask>
 void BVH::TraversePrimary(Context<sharedOrigin, hasMask> &c) const {
 	const int size = c.Size();
+
+	// Wyglada na to ze splitowanie jedynie spowalnia...
+	TraversePrimaryN(c);
+	return;
+
 
 	if(sharedOrigin || size <= 4) {
 		TraversePrimaryN(c);
