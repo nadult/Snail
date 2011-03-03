@@ -38,13 +38,17 @@ void Triangle::Collide(Context<sharedOrigin, hasMask> &c, int idx, int firstActi
 			}
 		}
 	}
-
+		
 	for(int q = 0; q < count; q++) {
 		int tq = q + firstActive;
 
 		floatq u = uvs[q].x, v = uvs[q].y, det = dets[q];
 
-		f32x4b test = Min(u, v) >= 0.0f && u + v <= det;
+		floatq duv = det - u - v;
+		floatq uvmin = Min(u, Min(v, duv));
+		floatq uvmax = Max(u, Max(v, duv));
+
+		f32x4b test = uvmax <= 0.0f || uvmin >= 0.0f;
 		if(hasMask) test = test && c.SSEMask(tq);
 
 		if(ForAny(test)) {
@@ -178,20 +182,14 @@ bool Triangle::TestCornerRays(const CornerRays &rays) const {
 	Vec3f nrm = Nrm();
 	floatq det = rays.dir | nrm;
 
-//	if(ForAll(det < 0.0f))
-//		return 0;
-
 	Vec3q tvec(rays.origin - a);
 	floatq u = rays.dir | (Vec3q(ba) ^ tvec);
 	floatq v = rays.dir | (tvec ^ Vec3q(ca));
 
-	floatq cmp = det * t0;
+	floatq duv = det * t0 - u - v;
+	floatq sign = Condition(det < 0.0f, -1.0f, 1.0f);
 
-	if(ForAll(u < 0.0f) || ForAll(v < 0.0f) || ForAll(u + v > cmp))
-		return 0;
-
-	return 1;
-	// TODO poprawic...
+	return ForAny(u * sign > 0.0f) && ForAny(v * sign > 0.0f) && ForAny(duv * sign > 0.0f);
 
 /*	u = _mm_shuffle_ps(u.m, u.m, (0 << 0) | (1 << 2) | (3 << 4) | (2 << 6));
 	v = _mm_shuffle_ps(v.m, v.m, (0 << 0) | (1 << 2) | (3 << 4) | (2 << 6));

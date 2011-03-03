@@ -46,7 +46,7 @@ void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 			if(box.Test(c, firstActive, lastActive))
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = tris[first + n];
-					if(sharedOrigin? tri.TestInterval(interval) /*tri.TestCornerRays(crays)*/ : 1) {
+					if(sharedOrigin? tri.TestInterval(interval) : 1) {
 						tri.Collide(c, first + n, firstActive, lastActive);
 						stats.Intersection(lastActive - firstActive + 1);
 					}
