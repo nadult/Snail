@@ -134,9 +134,9 @@ namespace {
 
 					for(int x = 0; x < w; x++) {
 						unsigned char red = tsrcr[x];
-						tdst[0] = red;
+						tdst[2] = red;
 						tdst[1] = tsrcg[x] + red;
-						tdst[2] = tsrcb[x] + red;
+						tdst[0] = tsrcb[x] + red;
 						tdst += 3;
 					}
 				}

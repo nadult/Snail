@@ -46,9 +46,8 @@ namespace {
 
 }
 
-void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
+void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth, bool useSah) {
 	BBox bbox = nodes[nNode].bbox;
-	enum { useSah = 1 };
 
 	if(count <= 4 || sdepth == maxDepth - 1) {
 	LEAF_NODE:
@@ -153,8 +152,8 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth) {
 		nodes.push_back(Node(leftBox));
 		nodes.push_back(Node(rightBox));
 
-		FindSplitSweep(subNode + 0, first, minIdx, sdepth + 1);
-		FindSplitSweep(subNode + 1, first + minIdx, count - minIdx, sdepth + 1);
+		FindSplitSweep(subNode + 0, first, minIdx, sdepth + 1, useSah);
+		FindSplitSweep(subNode + 1, first + minIdx, count - minIdx, sdepth + 1, useSah);
 	}
 }
 
@@ -287,11 +286,11 @@ void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 	FindSplit(subNode + 1, first + leftCount, rightCount, sdepth + 1);
 }
 
-BVH::BVH(const BaseScene &elems, bool fast) {
-	Construct(elems, fast);
+BVH::BVH(const BaseScene &elems, bool fast, bool useSah) {
+	Construct(elems, fast, useSah);
 }
 
-void BVH::Construct(const BaseScene &scene, bool fast) {
+void BVH::Construct(const BaseScene &scene, bool fast, bool useSah) {
 	tris = scene.ToTriVector();
 	shTris = scene.ToShTriVector();
 	InputAssert(shTris.size() == tris.size());
@@ -309,7 +308,7 @@ void BVH::Construct(const BaseScene &scene, bool fast) {
 	if(fast)
 		FindSplit(0, 0, tris.size(), 0);
 	else
-		FindSplitSweep(0, 0, tris.size(), 0);
+		FindSplitSweep(0, 0, tris.size(), 0, useSah);
 	InputAssert(depth <= maxDepth);
 
 	std::map<int, string> matNames;

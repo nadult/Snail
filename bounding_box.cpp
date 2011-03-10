@@ -74,20 +74,26 @@ bool BBox::Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &
 
 		floatq l1 = idir.x * (sharedOrigin? tmin.x : min.x - origin.x);
 		floatq l2 = idir.x * (sharedOrigin? tmax.x : max.x - origin.x);
+
 		floatq lmin = Min(l1, l2);
 		floatq lmax = Max(l1, l2);
 
 		l1 = idir.y * (sharedOrigin? tmin.y : min.y - origin.y);
 		l2 = idir.y * (sharedOrigin? tmax.y : max.y - origin.y);
-		lmin = Max(Min(l1, l2), lmin);
-		lmax = Min(Max(l1, l2), lmax);
+
+		lmin = Max(lmin, Min(l1, l2));
+		lmax = Min(lmax, Max(l1, l2));
 
 		l1 = idir.z * (sharedOrigin? tmin.z : min.z - origin.z);
 		l2 = idir.z * (sharedOrigin? tmax.z : max.z - origin.z);
-		lmin = Max(Min(l1, l2), lmin);
-		lmax = Min(Max(l1, l2), lmax);
 
-		if(ForAny( lmax >= floatq(0.0f) && lmin <= Min(lmax, context.Distance(q)) )) {
+		lmin = Max(lmin, Min(l1, l2));
+		lmax = Min(lmax, Max(l1, l2));
+
+		f32x4b mask = lmax < floatq(0.0f) || lmin > Min(lmax, context.Distance(q));
+//		if(hasMask) mask = mask && context.SSEMask(q);
+
+		if(!ForAll(mask)) {
 			firstActive = q;
 			ret = 1;
 			break;
@@ -104,15 +110,18 @@ bool BBox::Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &
 
 		l1 = idir.y * (sharedOrigin? tmin.y : min.y - origin.y);
 		l2 = idir.y * (sharedOrigin? tmax.y : max.y - origin.y);
-		lmin = Max(Min(l1, l2), lmin);
-		lmax = Min(Max(l1, l2), lmax);
+		lmin = Max(lmin, Min(l1, l2));
+		lmax = Min(lmax, Max(l1, l2));
 
 		l1 = idir.z * (sharedOrigin? tmin.z : min.z - origin.z);
 		l2 = idir.z * (sharedOrigin? tmax.z : max.z - origin.z);
-		lmin = Max(Min(l1, l2), lmin);
-		lmax = Min(Max(l1, l2), lmax);
+		lmin = Max(lmin, Min(l1, l2));
+		lmax = Min(lmax, Max(l1, l2));
 
-		if(ForAny( lmax >= floatq(0.0f) && lmin <= Min(lmax, context.Distance(q)) )) {
+		f32x4b mask = lmax < floatq(0.0f) || lmin > Min(lmax, context.Distance(q));
+//		if(hasMask) mask = mask && context.SSEMask(q);
+		
+		if(!ForAll(mask)) {
 			lastActive = q;
 			ret = 1;
 			break;
@@ -125,8 +134,8 @@ bool BBox::Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &
 bool BBox::Test(ShadowContext &context, int &firstActive, int &lastActive) const {
 	bool ret = 0;
 
-	Vec3f tmin = min - ExtractN(context.Origin(0), 0);
-	Vec3f tmax = max - ExtractN(context.Origin(0), 0);
+	Vec3f tmin(min - ExtractN(context.Origin(0), 0));
+	Vec3f tmax(max - ExtractN(context.Origin(0), 0));
 
 	for(int q = firstActive; q <= lastActive; q++) {
 		Vec3q idir = context.IDir(q);
@@ -219,20 +228,21 @@ bool BBox::TestInterval(const RayInterval &i) const {
 bool BBox::TestCornerRays(const CornerRays &crays) const {
 	floatq l1 = crays.idir.x * (min.x - crays.origin.x);
 	floatq l2 = crays.idir.x * (max.x - crays.origin.x);
-	float lmin = Minimize(Min(l1, l2));
-	float lmax = Maximize(Max(l1, l2));
+	floatq lmin = Min(l1, l2);
+	floatq lmax = Max(l1, l2);
 
 	l1 = crays.idir.y * (min.y - crays.origin.y);
 	l2 = crays.idir.y * (max.y - crays.origin.y);
-	lmin = Max(Minimize(Min(l1, l2)), lmin);
-	lmax = Min(Maximize(Max(l1, l2)), lmax);
+	lmin = Max(Min(l1, l2), lmin);
+	lmax = Min(Max(l1, l2), lmax);
 
 	l1 = crays.idir.z * (min.z - crays.origin.z);
 	l2 = crays.idir.z * (max.z - crays.origin.z);
-	lmin = Max(Minimize(Min(l1, l2)), lmin);
-	lmax = Min(Maximize(Max(l1, l2)), lmax);
+	lmin = Max(Min(l1, l2), lmin);
+	lmax = Min(Max(l1, l2), lmax);
 
-	return lmax >= 0.0f && lmin <= lmax;
+	//TODO: WRONG!
+	return ForAny(lmax >= 0.0f && lmin <= lmax);
 }
 	
 unsigned BBox::WideTest(const Vec3f *origins, const Vec3f *idirs, const u16 *__restrict indices,

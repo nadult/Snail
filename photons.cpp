@@ -95,6 +95,8 @@ int GatherPhotons(const vector<PhotonNode> &nodes, const vector<Photon> &photons
 			int first = node.first;
 			nPhotons += node.Count();
 
+			Vec3q min(1.0f, 1.0f, 1.0f);
+
 			for(int n = 0; n < node.Count(); n++) {
 				const Photon &photon = photons[first + n];
 				Vec3q posq(photon.position.x, photon.position.y, photon.position.z);
@@ -106,8 +108,13 @@ int GatherPhotons(const vector<PhotonNode> &nodes, const vector<Photon> &photons
 					floatq weight = Max(floatq(range) - dist, floatq(0.0f));
 					weight *= Max(samples[q].normal | normal, floatq(0.0f));
 					samples[q].temp1 += color * weight;
+					min = VMin(min, samples[q].temp1);
 				}
 			}
+
+		//	Vec3f tmin = Minimize(min);
+		//	if(tmin.x >= 1.0f || tmin.y >= 1.0f || tmin.z >= 1.0f)
+		//		goto END;
 		}
 		else {
 			int axis = node.Axis();
@@ -144,6 +151,10 @@ int GatherPhotons(const vector<PhotonNode> &nodes, const vector<Photon> &photons
 		}
 	}
 
+	
+END:	
+//	for(int q = 0; q < count; q++)
+//		samples[q].temp1 = VMin(samples[q].temp1, Vec3q(1.0f, 1.0f, 1.0f));
 	return nPhotons;
 }
 

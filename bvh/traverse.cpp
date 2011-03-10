@@ -46,7 +46,7 @@ void BVH::TraversePrimaryN(Context<sharedOrigin, hasMask> &c) const {
 			if(box.Test(c, firstActive, lastActive))
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = tris[first + n];
-					if(sharedOrigin? tri.TestInterval(interval) : 1) {
+					if(sharedOrigin? /*tri.TestCornerRays(crays)*/ tri.TestInterval(interval) : 1) {
 						tri.Collide(c, first + n, firstActive, lastActive);
 						stats.Intersection(lastActive - firstActive + 1);
 					}
@@ -88,6 +88,7 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 
 	int sign[3] = { c.Dir(0).x[0] < 0.0f, c.Dir(0).y[0] < 0.0f, c.Dir(0).z[0] < 0.0f };
 	RayInterval interval(c.rays, c.distance);
+	CornerRays crays(c.rays);
 	
 	while(stackPos) {
 		int nNode = stack[--stackPos].node;
@@ -112,7 +113,7 @@ void BVH::TraverseShadow(ShadowContext &c) const {
 			if(box.Test(c, firstActive, lastActive))
 				for(int n = 0; n < count; n++) {
 					const Triangle &tri = tris[first + n];
-					if(tri.TestInterval(interval)) {
+					if(tri.TestInterval(interval)/*tri.TestCornerRays(crays)*/) {
 						if(tri.Collide(c, firstActive, lastActive)) {
 							stats.Skip();
 							if(c.stats) (*c.stats) += stats;

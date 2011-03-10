@@ -191,37 +191,5 @@ bool Triangle::TestCornerRays(const CornerRays &rays) const {
 
 	return ForAny(u * sign > 0.0f) && ForAny(v * sign > 0.0f) && ForAny(duv * sign > 0.0f);
 
-/*	u = _mm_shuffle_ps(u.m, u.m, (0 << 0) | (1 << 2) | (3 << 4) | (2 << 6));
-	v = _mm_shuffle_ps(v.m, v.m, (0 << 0) | (1 << 2) | (3 << 4) | (2 << 6));
-
-	floatq su = _mm_shuffle_ps(u.m, u.m, (1 << 0) | (2 << 2) | (3 << 4) | (0 << 6));
-	floatq sv = _mm_shuffle_ps(v.m, v.m, (1 << 0) | (2 << 2) | (3 << 4) | (0 << 6));
-
-	floatq ssu = _mm_shuffle_ps(su.m, su.m, (1 << 0) | (2 << 2) | (3 << 4) | (0 << 6));
-	floatq ssv = _mm_shuffle_ps(sv.m, sv.m, (1 << 0) | (2 << 2) | (3 << 4) | (0 << 6));
-
-	Vec2q cnrm((sv - v), -(su - u));
-	cnrm *= RSqrt(cnrm | cnrm);
-
-	floatq dist = u * cnrm.x + v * cnrm.y;
-	if(ForAny(ssu * cnrm.x + ssv * cnrm.y - dist < 0.0f))
-		return 1;
-
-	floatq side0 = cnrm.x * 0.0f + cnrm.y * 0.0f - dist;
-	floatq side1 = cnrm.x * 1.0f + cnrm.y * 0.0f - dist;
-	floatq side2 = cnrm.x * 0.0f + cnrm.y * 1.0f - dist;
-
-	floatq du = su - u, dv = sv - v;
-	floatq ddu = _mm_shuffle_ps(du.m, du.m, (1 << 0) | (2 << 2) | (3 << 4) | (0 << 6));
-	floatq ddv = _mm_shuffle_ps(dv.m, dv.m, (1 << 0) | (2 << 2) | (3 << 4) | (0 << 6));
-	
-	bool isConvex =
-		CountMaskBits( ForWhich(_mm_xor_ps((du < 0.0f).m, (ddu < 0.0f).m)) ) <= 2 &&
-		CountMaskBits( ForWhich(_mm_xor_ps((dv < 0.0f).m, (ddv < 0.0f).m)) ) <= 2;
-//	du/=Abs(du); dv/=Abs(dv); ddu/=Abs(ddu); ddv/=Abs(ddv);
-//	std::cout << isConvex << '\n' << du << ' ' << dv << '\n' << ddu << ' ' << ddv << "\n\n";
-
-	bool ret = !( isConvex && ForAny(side0 < 0.0f && side1 < 0.0f && side2 < 0.0f) );
-	std::cout << ret;
-	return ret; */
+	//TODO: SAT?
 }

@@ -99,7 +99,7 @@ static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 		float dx = window.MouseMove().x;
 		float dy = window.MouseMove().y;
 
-		if(dx) cam.Rotate(-dx * 0.005);
+		if(dx) cam.Rotate(dx * 0.005);
 		if(dy) cam.RotateY(dy * 0.005);
 	}
 	else window.GrabMouse(0);
@@ -109,8 +109,8 @@ static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 
 	if(window.Key('W')) move += tcam.front;
 	if(window.Key('S')) move -= tcam.front;
-	if(window.Key('A')) move -= tcam.right;
-	if(window.Key('D')) move += tcam.right;
+	if(window.Key('A')) move += tcam.right;
+	if(window.Key('D')) move -= tcam.right;
 	if(window.Key('R')) move += tcam.up;
 	if(window.Key('F')) move -= tcam.up;
 

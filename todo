@@ -19,8 +19,6 @@ Bugi w swiatlach / odbiciach na scenie z obracajacymi sie pudelkami
 Bug w intrpolowanych normalnych na kawalkach obrazka czesciowo pustych z wlaczonymi swiatlami
 widoczne na fruit/fruit_v2.obj
 
-
-
 Photon mapping:
 liczymy mape fotonow tylko dla malego kawalka sceny (im mniej tym lepiej, ale na tyle duzo
 zeby nie trzeba bylo powtarzac za duzo obliczen). Jesli chcemy wyliczyc ile swiatla przychodzi

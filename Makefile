@@ -17,13 +17,13 @@ FILES=funcs render tree_stats bounding_box gl_window rtbase base_scene bvh/trave
 	sampling/point_sampler formats/loader formats/wavefront_obj formats/doom3_proc compression \
 	comm_data comm_mpi comm_tcp dbvh/tree dbvh/traverse scene scene_trace render_opengl photons
 
-RFILES=render_opengl render bvh/traverse dbvh/traverse ray_generator scene_trace
+RFILES=render_opengl render bvh/traverse dbvh/traverse ray_generator scene_trace photons
 TFILES=client server node gl_window tex_handle font rtracer comm_mpi comm_tcp comm_data
 SHARED_FILES=$(filter-out $(RFILES), $(filter-out $(TFILES), $(FILES)))
 
 LIBS=-lgfxlib -lbaselib -lpng -lz -lgomp
 
-MPILIBS=`$(HOME)/bin/mpicxx -showme:link`
+MPILIBS=`mpicxx -showme:link`
 
 LINUX_LIBS=$(LIBS)
 INCLUDES=-I$(HOME)/include/ -I./
@@ -31,7 +31,9 @@ INCLUDES=-I$(HOME)/include/ -I./
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
 #FLAGS=-ggdb -std=gnu++0x
 FLAGS=-march=native --param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdynamic \
-	  -ffast-math -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread -fopenmp
+	  -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread -fopenmp \
+	  -fno-math-errno -funsafe-math-optimizations -fno-rounding-math -fno-trapping-math
+
 
 CXX=/usr/local/gcc-4.5/bin/g++
 
@@ -52,12 +54,12 @@ $(OBJECTS): $(BUILD_DIR)/%.o: pch.h.gch %.cpp
 
 node: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/server.o $(BUILD_DIR)/node.o \
 		$(BUILD_DIR)/comm_mpi.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(MPILIBS) $(LINUX_LIBS) -lboost_system -lboost_regex
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(MPILIBS) $(LINUX_LIBS) -lboost_system -lboost_regex -lGL -lGLU
 
 client: $(SHARED_OBJECTS) $(BUILD_DIR)/client.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o
 	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lXrandr -lGL -lGLU \
-		$(LINUX_LIBS) -lboost_system -lboost_regexs -g
+		$(LINUX_LIBS) -lboost_system -lboost_regex -g
 
 rtracer: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/render_opengl.o

@@ -27,23 +27,22 @@ std::ostream &operator<<(std::ostream &str, const Plane &p) {
 }
 
 bool isnan(float t) {
-	union { float f; int i; }; f = t;
-	return (i & 0x7f800000) == 0x7f8 && (i & 0x7fffff) != 0;
+	floatq t4(t);
+	return ForAny(t4 != t4);
 }
 
 bool IsNan(const Vec3f f) {
-	return isnan(f.x)||isnan(f.y)||isnan(f.z);
+	floatq t(f.x, f.y, f.z, f.z);
+	return ForAny(t != t);
 }
+
 bool IsNan(const Vec4f f) {
-	return isnan(f.x)||isnan(f.y)||isnan(f.z)||isnan(f.w);
+	floatq t(f.x, f.y, f.z, f.w);
+	return ForAny(t != t);
 }
 
 bool IsNan(const Vec3q f) {
-	return 
-		isnan(f.x[0])||isnan(f.y[0])||isnan(f.z[0])||
-		isnan(f.x[1])||isnan(f.y[1])||isnan(f.z[1])||
-		isnan(f.x[2])||isnan(f.y[2])||isnan(f.z[2])||
-		isnan(f.x[3])||isnan(f.y[3])||isnan(f.z[3]);
+	return ForAny( f.x != f.x || f.y != f.y || f.z != f.z);
 }
 
 void Intersect(const Plane &a, const Plane &b, Vec3f &dir, Vec3f &point) {

@@ -10,9 +10,9 @@ class BaseScene;
 
 class BVH {
 public:
-	BVH(const BaseScene&, bool fast = 1);
+	BVH(const BaseScene&, bool fast = 1, bool useSah = 1);
 	BVH() { }
-	void Construct(const BaseScene&, bool fast = 1);
+	void Construct(const BaseScene&, bool fast = 1, bool useSah = 1);
 	void Serialize(Serializer&);
 	const BBox GetBBox() const { return nodes[0].bbox; }
 	void PrintInfo() const;
@@ -45,7 +45,7 @@ public:
 
 protected:
 	void FindSplit(int nNode, int first, int count, int depth);
-	void FindSplitSweep(int nNode, int first, int count, int depth);
+	void FindSplitSweep(int nNode, int first, int count, int depth, bool useSah);
 	
 public:
 	struct Node {

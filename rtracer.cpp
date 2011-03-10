@@ -24,7 +24,6 @@
 using std::cout;
 using std::endl;
 
-
 static void PrintHelp() {
 	printf("Synopsis:    rtracer model_file [options]\nOptions:\n"
 			"\t-res x y     - set rendering resolution [1024 1024]\n"
@@ -33,6 +32,7 @@ static void PrintHelp() {
 			"\t-slowBuild   - rebuild BVH tree (using slower algorithm)\n"
 			"\t-flipNormals - flip normals of triangles when rebuilding\n"
 			"\t-swapYZ      - swap Y, Z axes when rebuilding\n"
+			"\t-noSah       - don't use SAH when rebuilding\n"
 			"\t-instances n	- draw N istances of given model\n"
 			"\n\n"
 			"Interactive control:\n"
@@ -124,7 +124,7 @@ static const DBVH MakeDBVH(BVH *bvh, int nInstances) {
 	srand(0);
 	static float anim = 0; anim += 0.02f;
 
-	float scale = Length(bvh->GetBBox().Size()) * 0.025;
+	float scale = Length(bvh->GetBBox().Size()) * 0.015;
 
 	vector<ObjectInstance> instances;
 	for(int n = 0; n < nInstances; n++) {
@@ -155,6 +155,16 @@ static const DBVH MakeDBVH(BVH *bvh, int nInstances) {
 }
 
 static int tmain(int argc, char **argv) {
+	float nan = 0.0f / 0.0f;
+	float not_nan = 3.0f;
+
+	InputAssert(IsNan(Vec3f(nan, nan, nan)));
+	InputAssert(isnan(nan));
+	InputAssert(!isnan(not_nan));
+	Vec3q nan3;
+	Convert(Vec3f(nan, nan, nan), Vec3f(nan, nan, nan), Vec3f(nan, nan, nan), Vec3f(nan, nan, nan), nan3);
+	InputAssert(IsNan(nan3));
+
 	printf("Snail v0.20 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
 		PrintHelp();
@@ -172,7 +182,7 @@ static int tmain(int argc, char **argv) {
 
 	Options options;
 	bool flipNormals = 1, swapYZ = 0;
-	bool rebuild = 0, slowBuild = 0;
+	bool rebuild = 0, slowBuild = 0, useSah = 1;
 	string texPath = "";
 
 	int nInstances = 1;
@@ -185,6 +195,7 @@ static int tmain(int argc, char **argv) {
 		else if(string("-fullscreen") == argv[n]) fullscreen = 1;
 		else if(string("-flipNormals") == argv[n]) flipNormals = 0;
 		else if(string("-swapYZ") == argv[n]) swapYZ = 1;
+		else if(string("-noSah") == argv[n]) useSah = 0;
 		else if(string("-instances") == argv[n]) { nInstances = atoi(argv[n + 1]); n += 1; }
 		else {
 			if(argv[n][0] == '-') {
@@ -255,7 +266,7 @@ static int tmain(int argc, char **argv) {
 		loadingTime = GetTime() - loadingTime;
 		
 		double buildTime = GetTime();
-		scene.geometry.Construct(baseScene, !slowBuild);
+		scene.geometry.Construct(baseScene, !slowBuild, useSah);
 		Saver(string("dump/") + sceneName) & scene.geometry;
 		buildTime = GetTime() - buildTime;
 		std::cout << "Loading time: " << loadingTime << "  Build time: " << buildTime << '\n';
@@ -321,6 +332,8 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown('C')) {
 			if(orbiting) ocam.Reset(sceneCenter, sceneScale);
 			else cam.SetPos(sceneCenter);
+			cam.ang = 0;
+			cam.pitch = 0;
 		}
 		if(window.KeyDown('P')) {
 			camConfigs.AddConfig(string(sceneName),cam);
