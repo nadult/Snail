@@ -68,7 +68,7 @@
 		GLWindow(uint w,uint h,bool fullscreen);
 		~GLWindow();
 
-		void RenderImage(const gfxlib::Texture&);
+		void RenderImage(const gfxlib::Texture&, bool autoScale);
 		
 		bool PollEvents();
 		void SwapBuffers();

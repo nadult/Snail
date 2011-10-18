@@ -74,21 +74,31 @@ bool BBox::Test(Context<sharedOrigin, hasMask> &context, int &firstActive, int &
 
 		floatq l1 = idir.x * (sharedOrigin? tmin.x : min.x - origin.x);
 		floatq l2 = idir.x * (sharedOrigin? tmax.x : max.x - origin.x);
+//		if(IsNan(l1) || IsNan(l2))
+//			printf("FUCKUP X!\n");
 
 		floatq lmin = Min(l1, l2);
 		floatq lmax = Max(l1, l2);
 
 		l1 = idir.y * (sharedOrigin? tmin.y : min.y - origin.y);
 		l2 = idir.y * (sharedOrigin? tmax.y : max.y - origin.y);
+//		if(IsNan(l1) || IsNan(l2))
+//			printf("FUCKUP Y!\n");
 
 		lmin = Max(lmin, Min(l1, l2));
 		lmax = Min(lmax, Max(l1, l2));
 
 		l1 = idir.z * (sharedOrigin? tmin.z : min.z - origin.z);
 		l2 = idir.z * (sharedOrigin? tmax.z : max.z - origin.z);
+//		if(IsNan(l1) || IsNan(l2))
+//			printf("FUCKUP Z!\n");
 
 		lmin = Max(lmin, Min(l1, l2));
 		lmax = Min(lmax, Max(l1, l2));
+		
+//		if(IsNan(lmin) || IsNan(lmax))
+//			printf("FUCKUP!\n");
+
 
 		f32x4b mask = lmax < floatq(0.0f) || lmin > Min(lmax, context.Distance(q));
 //		if(hasMask) mask = mask && context.SSEMask(q);

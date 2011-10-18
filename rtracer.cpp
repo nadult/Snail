@@ -158,6 +158,7 @@ static int tmain(int argc, char **argv) {
 	float nan = 0.0f / 0.0f;
 	float not_nan = 3.0f;
 
+//	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 	InputAssert(IsNan(Vec3f(nan, nan, nan)));
 	InputAssert(isnan(nan));
 	InputAssert(!isnan(not_nan));
@@ -182,20 +183,22 @@ static int tmain(int argc, char **argv) {
 
 	Options options;
 	bool flipNormals = 1, swapYZ = 0;
-	bool rebuild = 0, slowBuild = 0, useSah = 1;
+	bool rebuild = 0;
 	string texPath = "";
+	int buildFlags = BVH::useSah | BVH::fastBuild;
 
 	int nInstances = 1;
 
 	for(int n = 1; n < argc; n++) {
 			 if(string("-res") == argv[n] && n < argc-2) { resx = atoi(argv[n+1]); resy = atoi(argv[n+2]); n += 2; }
 		else if(string("-rebuild") == argv[n]) rebuild = 1;
-		else if(string("-slowBuild") == argv[n]) { rebuild = 1; slowBuild = 1; }
+		else if(string("-slowBuild") == argv[n]) { rebuild = 1; buildFlags &= ~BVH::fastBuild; }
 		else if(string("-threads") == argv[n] && n < argc - 1) { threads = atoi(argv[n + 1]); n += 1; }
 		else if(string("-fullscreen") == argv[n]) fullscreen = 1;
 		else if(string("-flipNormals") == argv[n]) flipNormals = 0;
 		else if(string("-swapYZ") == argv[n]) swapYZ = 1;
-		else if(string("-noSah") == argv[n]) useSah = 0;
+		else if(string("-noSah") == argv[n]) buildFlags &= ~BVH::useSah;
+		else if(string("-noShadingData") == argv[n]) buildFlags |= BVH::noShadingData;
 		else if(string("-instances") == argv[n]) { nInstances = atoi(argv[n + 1]); n += 1; }
 		else {
 			if(argv[n][0] == '-') {
@@ -266,7 +269,7 @@ static int tmain(int argc, char **argv) {
 		loadingTime = GetTime() - loadingTime;
 		
 		double buildTime = GetTime();
-		scene.geometry.Construct(baseScene, !slowBuild, useSah);
+		scene.geometry.Construct(baseScene, buildFlags);
 		Saver(string("dump/") + sceneName) & scene.geometry;
 		buildTime = GetTime() - buildTime;
 		std::cout << "Loading time: " << loadingTime << "  Build time: " << buildTime << '\n';
@@ -450,7 +453,7 @@ static int tmain(int argc, char **argv) {
 				}
 				window.RenderImage(image);
 
-				if(gVals[3]) {
+				if(gVals[3] && oglRenderer) {
 					oglRenderer->BeginDrawing(camera, 60.0f, float(resx) / float(resy), 0);
 					oglRenderer->DrawPhotons(photons, updated);
 					oglRenderer->FinishDrawing();

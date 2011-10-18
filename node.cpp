@@ -11,6 +11,7 @@
 #include "scene.h"
 
 #include <mpi.h>
+#include <unistd.h>
 #include "comm.h"
 #include "quicklz/quicklz.h"
 
@@ -29,22 +30,21 @@ typedef BVH StaticTree;
 
 static char sendbuf[2048 * 2048 * 4];
 
-static const DBVH MakeDBVH(BVH *bvh) {
+static const DBVH MakeDBVH(BVH *bvh, int nInstances, float animPos) {
 	srand(0);
-	static float anim = 0; anim += 0.02f;
 
 	float scale = Length(bvh->GetBBox().Size()) * 0.02f;
 
 	vector<ObjectInstance> instances;
-	for(int n = 0; n < 1000; n++) {
+	for(int n = 0; n < nInstances; n++) {
 		ObjectInstance inst;
 		inst.tree = bvh;
 		inst.translation = (Vec3f(rand() % 1000, rand() % 1000, rand() % 1000) - Vec3f(500, 500, 500))
 			* scale;
 		Matrix<Vec4f> rot = Rotate(
-				(rand() % 1000) * 0.002f * constant::pi + anim,
-				(rand() % 1000) * 0.002f * constant::pi + anim * 0.2f,
-				(rand() % 1000) * 0.002f * constant::pi + anim * 0.1f);
+				(rand() % 1000) * 0.002f * constant::pi + animPos,
+				(rand() % 1000) * 0.002f * constant::pi + animPos * 0.2f,
+				(rand() % 1000) * 0.002f * constant::pi + animPos * 0.1f);
 
 		inst.rotation[0] = Vec3f(rot.x);
 		inst.rotation[1] = Vec3f(rot.y);
@@ -173,8 +173,8 @@ static void CReceiveData(void *data, size_t size) {
 }
 
 static void ReceiveBVH(BVH *tree) {
-	int nNodes, nTris, nMaterials;
-	MPIBcast() >> nNodes >> nTris >> tree->depth >> nMaterials;
+	int nNodes, nTris, nShTris, nMaterials;
+	MPIBcast() >> nNodes >> nTris >> nShTris >> tree->depth >> nMaterials;
 	if(bigEndian) {
 		ByteSwap(&nNodes); ByteSwap(&nTris);
 		ByteSwap(&tree->depth); ByteSwap(&nMaterials);
@@ -183,11 +183,11 @@ static void ReceiveBVH(BVH *tree) {
 	
 	tree->nodes.resize(nNodes);
 	tree->tris.resize(nTris);
-	tree->shTris.resize(nTris);
+	tree->shTris.resize(nShTris);
 
 	ReceiveData(&tree->nodes[0], nNodes * sizeof(BVH::Node));
 	ReceiveData(&tree->tris[0], nTris * sizeof(Triangle));
-	ReceiveData(&tree->shTris[0], nTris * sizeof(ShTriangle));
+	ReceiveData(&tree->shTris[0], nShTris * sizeof(ShTriangle));
 	
 	if(bigEndian) {
 		printf("b"); fflush(stdout);
@@ -217,9 +217,15 @@ int node_main(int argc, char **argv) {
 #if defined(__PPC) || defined(__PPC__)
 		"ppc64";
 #else
+	#ifdef __x86_64__
 		"x86_64";
+	#else
+		"x86";
+	#endif
 #endif
-	printf("Snail v 0.20 node %d / %d arch: %s\n", rank, numNodes, arch);
+	char hostName[256];
+	gethostname(hostName, sizeof(hostName));
+	printf("Snail v 0.20 node %d / %d arch: %s at: %s\n", rank, numNodes, arch, hostName);
 
 	MPI_Buffer_attach(sendbuf, sizeof(sendbuf));
 
@@ -297,7 +303,8 @@ int node_main(int argc, char **argv) {
 				break;
 			}
 
-			int nLights;
+			int nLights, nInstances;
+			float dAnimPos;
 
 			MPIBcast() >> Pod(cam) >> nLights;
 #ifdef __BIG_ENDIAN
@@ -307,7 +314,7 @@ int node_main(int argc, char **argv) {
 
 			scene.lights.resize(nLights);
 			MPIBcast()	>> comm::Data(&scene.lights[0], sizeof(Light) * nLights)
-						>> Pod(gVals) >> Pod(threads);
+						>> Pod(gVals) >> Pod(threads) >> Pod(nInstances) >> Pod(dAnimPos);
 			if(nParts == 0)
 				continue;
 
@@ -319,7 +326,7 @@ int node_main(int argc, char **argv) {
 	
 			Scene<DBVH> dscene;
 			dscene.lights = scene.lights;
-		//	dscene.geometry = MakeDBVH(&scene.geometry);
+			dscene.geometry = MakeDBVH(&scene.geometry, nInstances, dAnimPos);
 
 			TreeStats stats;
 			double renderTime = GetTime();
@@ -327,8 +334,9 @@ int node_main(int argc, char **argv) {
 			stats = RenderAndSend(scene, cam, resx, resy, &data[0], &comprData[0],
 						partCoords, partOffsets, options, rank, threads);
 #else
-			stats = Render(scene, cam, resx, resy, &data[0], partCoords, partOffsets,
-						options, rank, threads);
+			stats = nInstances > 1?
+				Render(dscene, cam, resx, resy, &data[0], partCoords, partOffsets, options, rank, threads) :
+				Render( scene, cam, resx, resy, &data[0], partCoords, partOffsets, options, rank, threads);
 			for(int n = 0; n < sizeof(stats.timers) / sizeof(int); n++)
 				stats.timers[n] = 0;
 
@@ -357,7 +365,7 @@ int node_main(int argc, char **argv) {
 }
 
 int main(int argc,char **argv) {
-	if(MPI_Init(0, 0) != MPI_SUCCESS) {
+	if(MPI_Init(&argc, &argv) != MPI_SUCCESS) {
 		std::cout << "Error initializing mpi\n";
 		return 1;
 	}

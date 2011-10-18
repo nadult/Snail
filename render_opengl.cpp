@@ -57,7 +57,7 @@ OGLRenderer::OGLRenderer(const Scene<BVH> &scene) {
 	{
 		useNormals = true;
 		glBindBuffer(GL_ARRAY_BUFFER, nrmBuffer);
-		vector<Vec3f> normals(shTris.size() * 3);
+		vector<Vec3f> normals(tris.size() * 3);
 
 		if(shTris.size() == tris.size()) {
 			for(size_t n = 0; n < tris.size(); n++) {
@@ -70,7 +70,7 @@ OGLRenderer::OGLRenderer(const Scene<BVH> &scene) {
 			for(size_t n = 0; n < tris.size(); n++)
 				normals[n * 3 + 0] = normals[n * 3 + 1] = normals[n * 3 + 2] =  Vec3f(tris[n].plane);
 		}
-		glBufferData(GL_ARRAY_BUFFER, shTris.size() * 3 * 3 * 4, &normals[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * 3 * 4, &normals[0], GL_STATIC_DRAW);
 		InputAssert(glGetError() == GL_NO_ERROR);
 	}
 
@@ -96,7 +96,7 @@ void OGLRenderer::InitShaders() {
 
 	const char *fs = "varying vec4 position, normal; void main() {\n"
 //					"float col = max(normal.z, 0.0) * 0.2; gl_FragColor = vec4(col, col, col, 1); }";
-					"gl_FragColor = vec4(abs(normal.xyz), 1) * 0.1; }";
+					"gl_FragColor = vec4(abs(normal.xyz), 1) * 0.5; }";
 	const char *vs = "varying vec4 position, normal; void main() {\n"
 	   				"normal = vec4(gl_Normal, 0.0);//(gl_ModelViewProjectionMatrix * vec4(gl_Normal, 0.0));\n"
 				   	"gl_Position = (gl_ModelViewProjectionMatrix * gl_Vertex); }";

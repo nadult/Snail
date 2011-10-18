@@ -24,6 +24,7 @@ int server_main(int, char**) {
 #include "comm.h"
 #include "tree_stats.h"
 #include <algorithm>
+#include <unistd.h>
 
 #include "quicklz/quicklz.h"
 
@@ -41,22 +42,21 @@ typedef BVH StaticTree;
 
 static char sendbuf[2048 * 2048 * 4];
 
-static const DBVH MakeDBVH(BVH *bvh) {
+static const DBVH MakeDBVH(BVH *bvh, int nInstances, float animPos) {
 	srand(0);
-	static float anim = 0; anim += 0.02f;
 
 	float scale = Length(bvh->GetBBox().Size()) * 0.02f;
 
 	vector<ObjectInstance> instances;
-	for(int n = 0; n < 1000; n++) {
+	for(int n = 0; n < nInstances; n++) {
 		ObjectInstance inst;
 		inst.tree = bvh;
 		inst.translation = (Vec3f(rand() % 1000, rand() % 1000, rand() % 1000) - Vec3f(500, 500, 500))
 			* scale;
 		Matrix<Vec4f> rot = Rotate(
-				(rand() % 1000) * 0.002f * constant::pi + anim,
-				(rand() % 1000) * 0.002f * constant::pi + anim * 0.2f,
-				(rand() % 1000) * 0.002f * constant::pi + anim * 0.1f);
+				(rand() % 1000) * 0.002f * constant::pi + animPos,
+				(rand() % 1000) * 0.002f * constant::pi + animPos * 0.2f,
+				(rand() % 1000) * 0.002f * constant::pi + animPos * 0.1f);
 
 		inst.rotation[0] = Vec3f(rot.x);
 		inst.rotation[1] = Vec3f(rot.y);
@@ -145,12 +145,13 @@ static void SendData(void *data, size_t size) {
 }
 
 static void SendBVH(BVH &tree) {
-	int nNodes, nTris, nMaterials;
+	int nNodes, nTris, nShTris, nMaterials;
 	nNodes = tree.nodes.size();
 	nTris = tree.tris.size();
+	nShTris = tree.shTris.size();
 	nMaterials = tree.materials.size();
 
-	MPIBcast() << nNodes << nTris << tree.depth << nMaterials;
+	MPIBcast() << nNodes << nTris << nShTris << tree.depth << nMaterials;
 
 	SendData(&tree.nodes[0], nNodes * sizeof(BVH::Node));
 	printf(">"); fflush(stdout);
@@ -158,11 +159,23 @@ static void SendBVH(BVH &tree) {
 	SendData(&tree.tris[0], nTris * sizeof(Triangle));
 	printf(">"); fflush(stdout);
 
-	SendData(&tree.shTris[0], nTris * sizeof(ShTriangle));
+	SendData(&tree.shTris[0], nShTris * sizeof(ShTriangle));
 	printf(">"); fflush(stdout);
 
 	for(int n = 0; n < nMaterials; n++)
 		SendString(tree.materials[n].name);
+}
+
+static void SendDBVH(DBVH &tree) {
+	//TODO: 64 vs 32 bity
+	int nNodes, nElements;
+	nNodes = tree.nodes.size();
+	nElements = tree.elements.size();
+
+	MPIBcast() << nNodes << nElements;
+
+	SendData(&tree.nodes[0], nNodes * sizeof(DBVH::Node));
+	SendData(&tree.elements[0], nElements * sizeof(ObjectInstance));
 }
 
 static vector<int> DivideImage(int w, int h, int blockWidth, int blockHeight) {
@@ -185,7 +198,9 @@ int server_main(int argc, char **argv) {
 	MPI_Comm_size(MPI_COMM_WORLD, &numNodes);
 	InputAssert(rank == 0);
 
-	printf("Snail v 0.20 server %d / %d\n", rank, numNodes);
+	char hostName[256];
+	gethostname(hostName, sizeof(hostName));
+	printf("Snail v 0.20 server %d / %d at %s\n", rank, numNodes, hostName);
 	if(numNodes == 1) {
 		printf("No rendering nodes avaliable!\n");
 		return 1;
@@ -351,25 +366,27 @@ int server_main(int argc, char **argv) {
 				break;
 			}
 
-			int nLights;
+			int nLights, nInstances;
+			float dAnimPos;
 
 			sock >> Pod(cam) >> nLights;
 			scene.lights.resize(nLights);
 			sock >> comm::Data(&scene.lights[0], nLights * sizeof(Light));
-			sock >> Pod(gVals) >> threads;
+			sock >> Pod(gVals) >> threads >> nInstances >> dAnimPos;
 
 			double time = GetTime();
 			MPIBcast() << Pod(cam) << nLights << comm::Data(&scene.lights[0], sizeof(Light) * nLights)
-						<< comm::Data(gVals, sizeof(gVals)) << threads;
+						<< comm::Data(gVals, sizeof(gVals)) << threads << nInstances << dAnimPos;
 
-			/*
-			double buildTime = GetTime();
-			Scene<DBVH> dscene;
-			dscene.geometry = MakeDBVH(&scene.geometry);
-			dscene.lights = scene.lights;
-			buildTime = GetTime() - buildTime;
-			*/
 			double buildTime = 0.0;
+		//	double buildTime = GetTime();
+		//	Scene<DBVH> dscene;
+		//	if(nInstances) {
+		//		dscene.geometry = MakeDBVH(&scene.geometry, nInstances);
+		//		dscene.lights = scene.lights;
+		//	}
+		//	buildTime = GetTime() - buildTime;
+
 			int nFinished = 0;
 
 			while(nFinished < nActiveNodes) {

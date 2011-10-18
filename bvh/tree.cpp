@@ -114,14 +114,13 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth, bool useSa
 			}
 
 			vector<Triangle> ttemp(count);
-			vector<ShTriangle> stemp(count);
-			for(int n = 0; n < count; n++) {
-				ttemp[n] = tris[indices[n]];
-				stemp[n] = shTris[indices[n]];
-			}
-			for(int n = 0; n < count; n++) {
-				tris[first + n] = ttemp[n];
-				shTris[first + n] = stemp[n];
+			for(int n = 0; n < count; n++) ttemp[n] = tris[indices[n]];
+			for(int n = 0; n < count; n++) tris[first + n] = ttemp[n];
+
+			if(shTris.size()) {
+				vector<ShTriangle> stemp(count);
+				for(int n = 0; n < count; n++) stemp[n] = shTris[indices[n]];
+				for(int n = 0; n < count; n++) shTris[first + n] = stemp[n];
 			}
 		}
 
@@ -242,14 +241,13 @@ void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 		std::partition(&indices[0], &indices[count], TestTris(tris, minAxis, minIdx, sub, mul));
 
 		vector<Triangle> ttemp(count);
-		vector<ShTriangle> stemp(count);
-		for(int n = 0; n < count; n++) {
-			ttemp[n] = tris[indices[n]];
-			stemp[n] = shTris[indices[n]];
-		}
-		for(int n = 0; n < count; n++) {
-			tris[first + n] = ttemp[n];
-			shTris[first + n] = stemp[n];
+		for(int n = 0; n < count; n++) ttemp[n] = tris[indices[n]];
+		for(int n = 0; n < count; n++) tris[first + n] = ttemp[n];
+		
+		if(shTris.size()) {
+			vector<ShTriangle> stemp(count);
+			for(int n = 0; n < count; n++) stemp[n] = shTris[indices[n]];
+			for(int n = 0; n < count; n++) shTris[first + n] = stemp[n];
 		}
 
 		BBox leftBox = leftBoxes[minIdx - 1];
@@ -286,14 +284,17 @@ void BVH::FindSplit(int nNode, int first, int count, int sdepth) {
 	FindSplit(subNode + 1, first + leftCount, rightCount, sdepth + 1);
 }
 
-BVH::BVH(const BaseScene &elems, bool fast, bool useSah) {
-	Construct(elems, fast, useSah);
+BVH::BVH(const BaseScene &elems, int flags) {
+	Construct(elems, flags);
 }
 
-void BVH::Construct(const BaseScene &scene, bool fast, bool useSah) {
+void BVH::Construct(const BaseScene &scene, int flags) {
 	tris = scene.ToTriVector();
-	shTris = scene.ToShTriVector();
-	InputAssert(shTris.size() == tris.size());
+	if(!(flags & noShadingData)) {
+		shTris = scene.ToShTriVector();
+		InputAssert(shTris.size() == tris.size());
+	}
+	else shTris.clear();
 
 	nodes.reserve(tris.size() * 2);
 	nodes.clear();
@@ -305,10 +306,10 @@ void BVH::Construct(const BaseScene &scene, bool fast, bool useSah) {
 		bbox +=	tris[n].GetBBox();
 
 	nodes.push_back(Node(bbox));
-	if(fast)
+	if(flags & fastBuild)
 		FindSplit(0, 0, tris.size(), 0);
 	else
-		FindSplitSweep(0, 0, tris.size(), 0, useSah);
+		FindSplitSweep(0, 0, tris.size(), 0, flags & useSah);
 	InputAssert(depth <= maxDepth);
 
 	std::map<int, string> matNames;

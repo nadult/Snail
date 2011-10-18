@@ -6,16 +6,22 @@
 #include "triangle.h"
 
 class BaseScene;
-	
+
 
 class BVH {
 public:
-	BVH(const BaseScene&, bool fast = 1, bool useSah = 1);
+	BVH(const BaseScene&, int flags = fastBuild | useSah);
 	BVH() { }
-	void Construct(const BaseScene&, bool fast = 1, bool useSah = 1);
+	void Construct(const BaseScene&, int flags = fastBuild | useSah);
 	void Serialize(Serializer&);
 	const BBox GetBBox() const { return nodes[0].bbox; }
 	void PrintInfo() const;
+
+	enum {
+		noShadingData = 1,
+		fastBuild = 2,
+		useSah = 4
+	};
 
 public:
 	typedef Triangle   CElement;
@@ -24,6 +30,8 @@ public:
 	enum { isComplex = 0 };
 	enum { isctFlags = CElement::isctFlags | isct::fObject | isct::fStats };
 	enum { maxDepth = 64 };
+
+	bool HasShadingData() const { return shTris.size(); }
 
 	const ShTriangle &GetSElement(int elem, int subElem) const {
 		return shTris[elem];

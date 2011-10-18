@@ -160,7 +160,7 @@ END:
 
 
 //source:: PBRT
-static Vec3f UniformSampleHemisphere(float u1, float u2) {
+Vec3f UniformSampleHemisphere(float u1, float u2) {
 	float z = u1;
 	float r = Sqrt(Max(0.0f, 1.0f - z * z));
 	float phi = 2 * constant::pi * u2;
@@ -170,7 +170,7 @@ static Vec3f UniformSampleHemisphere(float u1, float u2) {
 }
 
 //source: PBRT
-static Vec3f UniformSampleSphere(float u1, float u2) {
+Vec3f UniformSampleSphere(float u1, float u2) {
 	float z = 1.0f - 2.0f * u1;
 	float r = Sqrt(Max(0.0f, 1.0f - z * z));
 	float phi = 2 * constant::pi * u2;

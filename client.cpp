@@ -30,7 +30,8 @@ static void PrintHelp() {
 			"\t-swapYZ      - swap Y, Z axes when rebuilding\n"
 			"\t-threads n   - set threads number to n\n"
 			"\t-nodes n     - set nodes number to n\n"
-			"\t-host hname  - connect to host hname [blader]\n"
+			"\t-instances n	- draw N istances of given model\n"
+			"\t-host hname  - connect to host hname [localhost]\n"
 			"\n\n"
 			"Interactive control:\n"
 			"\tA,W,S,D R,F         - move the camera\n"
@@ -92,6 +93,7 @@ static void MoveCamera(OrbitingCamera &cam, GLWindow &window, float speed) {
 	cam.target += move * speed;
 	cam.pos += move * speed;
 }
+
 static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 	if(window.Key(Key_lshift)) speed *= 5.f;
 	if(window.MouseKey(0)) {
@@ -117,12 +119,13 @@ static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 	cam.Move(move * speed);
 }
 
-void SendFrameRequest(PSocket sock, Camera cam, vector<Light> &lights, int threads, bool finish) {
+void SendFrameRequest(PSocket sock, Camera cam, vector<Light> &lights, int threads,
+						int nInstances, float dynAnimPos, bool finish) {
 	int size = lights.size();
 
 	sock << finish << Pod(cam) << size;
 	sock << comm::Data(&lights[0], size * sizeof(Light));
-	sock << Pod(gVals) << threads;
+	sock << Pod(gVals) << threads << nInstances << dynAnimPos;
 }
 
 static int client_main(int argc, char **argv) {
@@ -140,11 +143,12 @@ static int client_main(int argc, char **argv) {
 	bool fullscreen = 0;
 	int threads = 2, nNodes = -1;
 	const char *modelFile = "foot.obj";
-	const char *host = "blader";
+	const char *host = "localhost";
 
 //	Options options;
 	bool flipNormals = 1, swapYZ = 0;
 	int rebuild = 0;
+	int nInstances = 1;
 
 	for(int n=1;n<argc;n++) {
 			 if(string("-res")==argv[n]&&n<argc-2) { resx=atoi(argv[n+1]); resy=atoi(argv[n+2]); n+=2; }
@@ -156,6 +160,7 @@ static int client_main(int argc, char **argv) {
 		else if(string("-swapYZ") == argv[n]) swapYZ = 1;
 		else if(string("-nodes") == argv[n]&&n<argc-1) { nNodes=atoi(argv[n+1]); n++; }
 		else if(string("-host") == argv[n]) { host=argv[n+1]; n++; }
+		else if(string("-instances") == argv[n]) { nInstances = atoi(argv[n + 1]); n += 1; }
 		else {
 			if(argv[n][0] == '-') {
 				printf("Unknown option: %s\n",argv[n]);
@@ -203,7 +208,7 @@ static int client_main(int argc, char **argv) {
 	OrbitingCamera ocam;
 
 	bool finish = 0, orbiting = 0;
-	SendFrameRequest(sock, (Camera)cam, lights, threads, finish);
+	SendFrameRequest(sock, (Camera)cam, lights, threads, nInstances, 0.0f, finish);
 	double frameTime = GetTime();
 
 	vector<DecompressBuffer> buffers(2);
@@ -298,7 +303,7 @@ static int client_main(int argc, char **argv) {
 		int nBytes = 0, nBuffers = 0, numNodes;
 		double buildTime, decompressTime = 0, renderTimes[32];
 		TreeStats stats;
-		SendFrameRequest(sock, orbiting?(Camera)ocam : (Camera)cam, tLights, threads, finish);
+		SendFrameRequest(sock, orbiting?(Camera)ocam : (Camera)cam, tLights, threads, nInstances, animPos, finish);
 
 		while(true) {
 			DecompressBuffer &buffer = buffers[nBuffers++];

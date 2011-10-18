@@ -157,6 +157,8 @@ std::ostream &operator<<(std::ostream&, const Plane&);
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f>&);
 
+const vector<string> FindFiles(const char *tDirName, const char *ext, bool recursive);
+
 #include "tree_stats.h"
 
 

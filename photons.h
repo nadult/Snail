@@ -51,4 +51,7 @@ int GatherPhotons(const vector<PhotonNode> &nodes, const vector<Photon> &photons
 void MakePhotonTree(vector<PhotonNode> &nodes, vector<Photon> &photons);
 void TracePhotons(vector<Photon> &out, const Scene<BVH> &scene, unsigned count);
 
+Vec3f UniformSampleHemisphere(float u1, float u2);
+Vec3f UniformSampleSphere(float u1, float u2);
+
 #endif

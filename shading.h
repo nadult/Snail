@@ -7,7 +7,7 @@ namespace sampling { struct Cache; }
 
 namespace shading {
 
-	enum { blockSize=4 };
+	enum { blockSize = 4 };
 
 	struct Sample {
 		floatq distance;

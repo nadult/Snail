@@ -125,7 +125,7 @@ namespace
 		key2Glfw[Key_kp_enter]=GLFW_KEY_KP_ENTER;
 		created=1;
 		
-		glfwSwapInterval(0);
+		glfwSwapInterval(1);
 	}
 
 	GLWindow::~GLWindow()
@@ -199,7 +199,7 @@ namespace
 	}
 		
 
-	void GLWindow::RenderImage(const gfxlib::Texture &image) {
+	void GLWindow::RenderImage(const gfxlib::Texture &image, bool autoScale) {
 		static GLuint texture = 0, texW = 0, texH = 0;
 		static GLuint pbo[2] = {0, 0};
 		static int pindex = 0;
@@ -216,8 +216,8 @@ namespace
 			glBindTexture(GL_TEXTURE_2D, texture);
 			
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texW, texH, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 			glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[0]);
 			glBufferData(GL_PIXEL_UNPACK_BUFFER_ARB, texW * texH * 3, 0, GL_STREAM_DRAW);
@@ -240,8 +240,8 @@ namespace
 		glShadeModel(GL_FLAT);
 		glEnable(GL_TEXTURE_2D);
 		
-		float u = float(GetWidth()) / float(texW);
-		float v = float(GetHeight()) / float(texH);
+		float u = autoScale? 1.0f : float(GetWidth()) / float(texW);
+		float v = autoScale? 1.0f : float(GetHeight()) / float(texH);
 		
 		glBegin(GL_QUADS);
 			glTexCoord2f(u  , 0.0); glVertex3f(-1.0, -1.0, 0.0);

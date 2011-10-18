@@ -204,6 +204,10 @@ public:
 	enum { isComplex = 1 };
 	enum { isctFlags = isct::fObject | isct::fElement | isct::fStats };
 	enum { maxDepth = 64 };
+	
+	bool HasShadingData() const {
+		return 0; //TODO!
+	}
 
 	const ShTriangle GetSElement(int elem, int subElem) const {
 		ShTriangle out = elements[elem].tree->GetSElement(subElem, 0);
