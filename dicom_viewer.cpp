@@ -28,6 +28,7 @@ struct Node {
 		union { i32 child[2]; };
 	};
 	i32 axis;
+	float split;
 	BBox box;
 };
 
@@ -42,8 +43,8 @@ struct VTree {
 
 	void BuildTree(int w, int h, int d, int firstNode, int count);
 
-	u16 Trace(const Vec3f &origin, const Vec3f &dir, int node, u16 min, u16 max) const;
-	u16 Trace(const Vec3f &origin, const Vec3f &dir, u16 min, u16 max) const;
+	u16 Trace(const Vec3f &origin, const Vec3f &dir, int node, float rmin, float rmax, u16 min) const;
+	u16 Trace(const Vec3f &origin, const Vec3f &dir, u16 min) const;
 
 	BBox GetBBox() const { return nodes[startNode].box; }
 
@@ -116,6 +117,11 @@ struct DICOM {
 		vector<u16> data;
 	};
 
+	void LoadSlice(int y, const u16 *src) {
+		for(int z = 0; z < depth; z++)
+			memcpy(&data[(z * height + y) * width], &src[z * width], width * sizeof(data[0]));
+	}
+
 	void Load(const char *folder) {
 		vector<string> files = FindFiles(folder, ".dcm", false);
 
@@ -123,18 +129,18 @@ struct DICOM {
 
 		Slice slice; Loader(files[0]) & slice;
 		width = slice.width;
-		height = slice.height;
-		depth = files.size();
+		height = files.size();
+		depth = slice.height;
 
 		data.resize(width * height * depth);
-		memcpy(&data[0], &slice.data[0], width * height * sizeof(data[0]));
+		LoadSlice(0, &slice.data[0]);
 
 		printf("Loading %d slices: ", files.size()); fflush(stdout);
 		for(int n = 1; n < files.size(); n++) {
 			Loader(files[n]) & slice;
 			InputAssert(width == slice.width);
-			InputAssert(height == slice.height);
-			memcpy(&data[width * height * n], &slice.data[0], width * height * sizeof(data[0]));
+			InputAssert(depth == slice.height);
+			LoadSlice(n, &slice.data[0]);
 			printf("."); fflush(stdout);
 		}
 		printf("\n");
@@ -243,6 +249,7 @@ void VTree::BuildTree(int w, int h, int d, int first, int count) {
 				newNode.max = Max(leftNode->max, rightNode->max);
 				newNode.box = leftNode->box;
 				newNode.box += rightNode->box;
+				newNode.split = (&leftNode->box.max.x)[axis];
 				nodes.push_back(newNode);
 			}
 
@@ -262,31 +269,58 @@ void VTree::BuildTree(int w, int h, int d, int first, int count) {
 	BuildTree(w, h, d, first + count, newCount);
 }
 
-u16 VTree::Trace(const Vec3f &origin, const Vec3f &idir, int nodeId, u16 min, u16 max) const {
-	if(nodeId < 0)
+u16 VTree::Trace(const Vec3f &origin, const Vec3f &idir, int nodeId, float rmin, float rmax, u16 cmin) const {
+	if(nodeId < 0 || rmin >= rmax)
 		return 0;
 
 	const Node &node = nodes[nodeId];
-
-	int firstNode = (&idir.x)[node.axis] < 0.0f? 1 : 0;
-	if(!node.box.TestI(origin, idir, 1.0f / 0.0f))
-		return 0;
-	if(node.max < min)
+	
+	if(node.max < cmin)
 		return 0;
 	if(node.min == node.max)
 		return node.min;
 
+	int firstNode = (&idir.x)[node.axis] < 0.0f? 1 : 0;
+
 	if(node.IsLeaf())
 		return node.max;
 
-	u16 ret = Trace(origin, idir, node.child[firstNode], min, max);
+	float t = (node.split - (&origin.x)[node.axis]) * (&idir.x)[node.axis];
+
+	if(rmax <= t)
+		return Trace(origin, idir, node.child[firstNode], rmin, rmax, cmin);
+	if(rmin >= t)
+		return Trace(origin, idir, node.child[firstNode ^ 1], rmin, rmax, cmin);
+
+	u16 ret = Trace(origin, idir, node.child[firstNode], rmin, t, cmin);
 	if(!ret)
-		return Trace(origin, idir, node.child[firstNode ^ 1], min, max);
+		return Trace(origin, idir, node.child[firstNode ^ 1], t, rmax, cmin);
 }
 
-u16 VTree::Trace(const Vec3f &origin, const Vec3f &dir, u16 min, u16 max) const {
+u16 VTree::Trace(const Vec3f &origin, const Vec3f &dir, u16 cmin) const {
 	Vec3f idir = VInv(dir);
-	return Trace(origin, idir, startNode, min, max);
+
+	BBox box = GetBBox();
+	if(dir.x < 0.0f)
+		Swap(box.min.x, box.max.x);
+	if(dir.y < 0.0f)
+		Swap(box.min.y, box.max.y);
+	if(dir.z < 0.0f)
+		Swap(box.min.z, box.max.z);
+
+	float rmin = Max( Max(
+				(box.min.x - origin.x) * idir.x,
+				(box.min.y - origin.y) * idir.y),
+				(box.min.z - origin.z) * idir.z );
+	float rmax = Min( Min(
+				(box.max.x - origin.x) * idir.x,
+				(box.max.y - origin.y) * idir.y),
+				(box.max.z - origin.z) * idir.z );
+
+	rmin = Max(0.0f, rmin);
+	rmax = Max(0.0f, rmax);
+
+	return Trace(origin, idir, startNode, rmin, rmax, cmin);
 }
 
 static void PrintHelp() {
@@ -387,12 +421,13 @@ static void MoveCamera(FPSCamera &cam, GLWindow &window, float speed) {
 }
 
 static int tmain(int argc, char **argv) {
-	printf("Snail v0.20 by nadult\n");
 	if(argc>=2 && string("--help") == argv[1]) {
 		PrintHelp();
 		return 0;
 	}
-	else printf("type './rtracer --help' to get some help\n");
+
+	printf("sizeof(Node) = %d\n", sizeof(Node));
+	printf("sizeof(Block) = %d\n", sizeof(Block));
 
 	CameraConfigs camConfigs;
 	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
@@ -525,7 +560,7 @@ static int tmain(int argc, char **argv) {
 
 		{
 //			dicom.Blit(image, slice);
-#pragma omp parallel for
+//#pragma omp parallel for
 			for(int y = 0; y < image.Height(); y += 2) {
 				for(int x = 0; x < image.Width(); x += 2) {
 					float tx = float(x) / image.Width() - 0.5f;
@@ -536,7 +571,7 @@ static int tmain(int argc, char **argv) {
 						+ Vec3f(0.0001f, 0.0001f, 0.00001f);
 					Vec3f dir = Normalize(target - eye);
 				
-					u16 value = tree.Trace(eye, dir, 2000, 0xffff);
+					u16 value = tree.Trace(eye, dir, 2000);
 					int color = (value >> 7) * 4;
 					color = Min(color, 255);
 
