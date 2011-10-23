@@ -14,6 +14,43 @@ using std::cout;
 using std::endl;
 
 
+struct Block {
+	enum { size = 4, size3 = size * size * size };
+	u16 data[size3];
+};
+
+struct Node {
+	bool IsLeaf() const { return axis == 3; }
+
+	u16 min, max;
+	union {
+		struct { i32 leftChild, rightChild; };
+		union { i32 child[2]; };
+	};
+	i32 axis;
+	BBox box;
+};
+
+class DICOM;
+
+struct VTree {
+	vector<Block> blocks;
+	vector<Node> nodes;
+
+	int width, height, depth;
+	int startNode;
+
+	void BuildTree(int w, int h, int d, int firstNode, int count);
+
+	u16 Trace(const Vec3f &origin, const Vec3f &dir, int node, u16 min, u16 max) const;
+	u16 Trace(const Vec3f &origin, const Vec3f &dir, u16 min, u16 max) const;
+
+	BBox GetBBox() const { return nodes[startNode].box; }
+
+	VTree(const DICOM &dicom);
+	VTree() = default;
+};
+
 struct DICOM {
 	struct Slice {
 		void Serialize(Serializer &sr) {
@@ -40,6 +77,7 @@ struct DICOM {
 					size = size16;
 
 				u32 end = sr.Pos() + size;
+			//	printf("Chunk %x %x\n", type, subType);
 
 				if(type == 0x28) {
 					u16 tmp; sr & tmp;
@@ -51,17 +89,26 @@ struct DICOM {
 						samples = tmp;
 					else if(subType == 0x100)
 						bits = tmp;
-
 				}
 				else if(type == 0x7fe0 && subType == 0x10) {
-					data.resize(size / 2);
+					data.resize(width * height);
 					sr.Data(&data[0], size);
 				}
 
 				sr.Seek(end);
 			}
 
-			InputAssert(bits == 16 && samples == 1);
+			InputAssert((bits == 16 || bits == 8) && samples == 1);
+
+			if(bits == 8) {
+				u8 *src = (u8*)&data[0];
+				u16 *dst = &data[0];
+
+		//		for(int n = width * height - 1; n >= 0; n--)
+		//			dst[n] = ((int)src[n]) * 256;
+				bits = 16;
+			}
+
 			InputAssert(data.size() * sizeof(data[0]) == width * height * (bits / 8));
 		}
 	
@@ -82,6 +129,7 @@ struct DICOM {
 		data.resize(width * height * depth);
 		memcpy(&data[0], &slice.data[0], width * height * sizeof(data[0]));
 
+		printf("Loading %d slices: ", files.size()); fflush(stdout);
 		for(int n = 1; n < files.size(); n++) {
 			Loader(files[n]) & slice;
 			InputAssert(width == slice.width);
@@ -89,6 +137,7 @@ struct DICOM {
 			memcpy(&data[width * height * n], &slice.data[0], width * height * sizeof(data[0]));
 			printf("."); fflush(stdout);
 		}
+		printf("\n");
 	}
 
 	void Blit(gfxlib::Texture &img, int slice) const {
@@ -103,6 +152,7 @@ struct DICOM {
 			for(int x = 0; x < w; x++) {
 				int value = (src[x] >> 7) * 2;
 				value = Min(value, 255);
+
 				dst[x * 3 + 0] = value;
 				dst[x * 3 + 1] = value;
 				dst[x * 3 + 2] = value;
@@ -114,6 +164,130 @@ struct DICOM {
 	int width, height, depth;
 };
 
+VTree::VTree(const DICOM &dic) {
+	width  = (dic.width  + Block::size - 1) / Block::size;
+	height = (dic.height + Block::size - 1) / Block::size;
+	depth  = (dic.depth  + Block::size - 1) / Block::size;
+
+	blocks.resize(width * height * depth);
+
+	int dw = dic.width  % Block::size == 0? Block::size : dic.width  % Block::size;
+	int dh = dic.height % Block::size == 0? Block::size : dic.height % Block::size;
+	int dd = dic.depth  % Block::size == 0? Block::size : dic.depth  % Block::size;
+
+	for(int z = 0; z < depth; z++)
+		for(int y = 0; y < height; y++)
+			for(int x = 0; x < width; x++) {
+				Block &block = blocks[x + (z * height + y) * width];
+				memset(block.data, 0, sizeof(block.data));
+
+				const u16 *src = &dic.data[(x + (z * dic.height + y) * dic.width) * Block::size];
+				int tw = x == width  - 1? dw : Block::size;
+				int th = y == height - 1? dh : Block::size;
+				int td = z == depth  - 1? dd : Block::size;
+
+				for(int tz = 0; tz < td; tz++)
+					for(int ty = 0; ty < th; ty++) {
+						u16 *dptr = &block.data[(tz * Block::size + ty) * Block::size];
+						const u16 *sptr = src + (tz * dic.height + ty) * dic.width;
+						for(int tx = 0; tx < tw; tx++)
+							dptr[tx] = sptr[tx];
+					}
+			}
+
+	nodes.resize(blocks.size());
+	for(int z = 0; z < depth; z++)
+		for(int y = 0; y < height; y++)
+			for(int x = 0; x < width; x++) {
+		int n = x + (z * height + y) * width;
+
+		Node &node = nodes[n];
+		const Block &block = blocks[n];
+		node.min = node.max = block.data[0];
+		for(uint i = 1; i < Block::size3; i++) {
+			node.min = Min(node.min, block.data[i]);
+			node.max = Max(node.max, block.data[i]);
+		}
+
+		node.leftChild = n;
+		node.rightChild = -1;
+		node.axis = 3;
+		node.box.min = Vec3f(x, y, z);
+		node.box.max = Vec3f(x + Block::size, y + Block::size, z + Block::size);
+	}
+
+	BuildTree(width, height, depth, 0, nodes.size());
+}
+
+void VTree::BuildTree(int w, int h, int d, int first, int count) {
+	printf("%d %d %d\n", w, h, d);
+	int axis = h > w? (d > h? 2 : 1) : (d > w? 2 : 0);
+				
+	//TODO: special case if left node has only one child, and there is no right node
+
+	for(int z = 0; z < d; z += (axis == 2? 2 : 1))
+		for(int y = 0; y < h; y += (axis == 1? 2 : 1))
+			for(int x = 0; x < w; x += (axis == 0? 2 : 1)) {
+				int idx = first + x + (z * h + y) * w;
+				int nidx = idx + (axis == 0? 1 : axis == 1? w : w * h);
+				bool singleChild = axis == 0? x == w - 1 : axis == 1? y == h - 1 : z == d - 1;
+
+				const Node *leftNode = &nodes[idx];
+				const Node *rightNode = &nodes[singleChild? idx : nidx];
+
+				Node newNode;
+				newNode.leftChild = idx;
+				newNode.rightChild = singleChild? -1 : nidx;
+				newNode.axis = axis;
+				newNode.min = Min(leftNode->min, rightNode->min);
+				newNode.max = Max(leftNode->max, rightNode->max);
+				newNode.box = leftNode->box;
+				newNode.box += rightNode->box;
+				nodes.push_back(newNode);
+			}
+
+	w = axis == 0? (w + 1) / 2 : w;
+	h = axis == 1? (h + 1) / 2 : h;
+	d = axis == 2? (d + 1) / 2 : d;
+	
+	int newCount = nodes.size() - first - count;
+	InputAssert(w * h * d == newCount);
+
+	if(newCount == 1) {
+		startNode = nodes.size() - 1;
+		return;
+	}
+
+
+	BuildTree(w, h, d, first + count, newCount);
+}
+
+u16 VTree::Trace(const Vec3f &origin, const Vec3f &idir, int nodeId, u16 min, u16 max) const {
+	if(nodeId < 0)
+		return 0;
+
+	const Node &node = nodes[nodeId];
+
+	int firstNode = (&idir.x)[node.axis] < 0.0f? 1 : 0;
+	if(!node.box.TestI(origin, idir, 1.0f / 0.0f))
+		return 0;
+	if(node.max < min)
+		return 0;
+	if(node.min == node.max)
+		return node.min;
+
+	if(node.IsLeaf())
+		return node.max;
+
+	u16 ret = Trace(origin, idir, node.child[firstNode], min, max);
+	if(!ret)
+		return Trace(origin, idir, node.child[firstNode ^ 1], min, max);
+}
+
+u16 VTree::Trace(const Vec3f &origin, const Vec3f &dir, u16 min, u16 max) const {
+	Vec3f idir = VInv(dir);
+	return Trace(origin, idir, startNode, min, max);
+}
 
 static void PrintHelp() {
 	printf("Synopsis:    rtracer model_file [options]\nOptions:\n"
@@ -234,7 +408,10 @@ static int tmain(int argc, char **argv) {
 
 	int nInstances = 1;
 	DICOM dicom;
-	dicom.Load("/mnt/data/zatoki/dicom/");
+	dicom.Load("/mnt/data/volumes/zatoki/dicom/");
+//	dicom.Load("/mnt/data/volumes/PNEUMATIX/PNEUMATIX/Cardiovascular Heart-Cardiac Function/cine_retro_hla");
+
+	VTree tree(dicom);
 
 	for(int n = 1; n < argc; n++) {
 			 if(string("-res") == argv[n] && n < argc-2) { resx = atoi(argv[n+1]); resy = atoi(argv[n+2]); n += 2; }
@@ -262,7 +439,7 @@ static int tmain(int argc, char **argv) {
 	}
 
 	float sceneScale = 1.0f;
-	Vec3f sceneCenter(0.0f, 0.0f, 0.0f);
+	Vec3f sceneCenter = tree.GetBBox().Center();
 
 	GLWindow window(resx, resy, fullscreen);
 	window.SetTitle("DICOM viewer");
@@ -305,6 +482,7 @@ static int tmain(int argc, char **argv) {
 			if(orbiting) cam.SetPos(ocam.pos);
 			else ocam.Reset(cam.pos, -sceneScale);
 			orbiting ^= 1;
+			printf("Orbiting: %s\n", orbiting? "true" : "false");
 		}
 		if(window.KeyDown('P')) {
 			camConfigs.AddConfig(string(sceneName),cam);
@@ -345,7 +523,36 @@ static int tmain(int argc, char **argv) {
 		double time = GetTime(); 
 		Camera camera = orbiting?(Camera)ocam : (Camera)cam;
 
-		dicom.Blit(image, slice);
+		{
+//			dicom.Blit(image, slice);
+#pragma omp parallel for
+			for(int y = 0; y < image.Height(); y += 2) {
+				for(int x = 0; x < image.Width(); x += 2) {
+					float tx = float(x) / image.Width() - 0.5f;
+					float ty = float(y) / image.Height() - 0.5f;
+
+					Vec3f eye = camera.pos;
+					Vec3f target = eye + camera.front + camera.right * tx + camera.up * ty
+						+ Vec3f(0.0001f, 0.0001f, 0.00001f);
+					Vec3f dir = Normalize(target - eye);
+				
+					u16 value = tree.Trace(eye, dir, 2000, 0xffff);
+					int color = (value >> 7) * 4;
+					color = Min(color, 255);
+
+#define PIXEL(x, y, col) { \
+						u8 *img = ((u8*)image.DataPointer()) + ((x) + (y) * image.Width()) * 3; \
+						img[0] = img[1] = img[2] = (col); }
+
+					PIXEL(x, y, color);
+				   	PIXEL(x + 1, y, color);
+				   	PIXEL(x, y + 1, color);
+				   	PIXEL(x + 1, y + 1, color);
+
+#undef PIXEL
+				}
+			}
+		}
 
 		window.RenderImage(image, true);
 
