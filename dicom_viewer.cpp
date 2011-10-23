@@ -29,7 +29,6 @@ struct Node {
 	};
 	i32 axis;
 	float split;
-	BBox box;
 };
 
 class DICOM;
@@ -37,16 +36,17 @@ class DICOM;
 struct VTree {
 	vector<Block> blocks;
 	vector<Node> nodes;
+	vector<BBox> boxes;
 
 	int width, height, depth;
 	int startNode;
+	BBox treeBBox;
 
 	void BuildTree(int w, int h, int d, int firstNode, int count);
 
 	u16 Trace(const Vec3f &origin, const Vec3f &dir, int node, float rmin, float rmax, u16 min) const;
 	u16 Trace(const Vec3f &origin, const Vec3f &dir, u16 min) const;
-
-	BBox GetBBox() const { return nodes[startNode].box; }
+	BBox GetBBox() const { return treeBBox; }
 
 	VTree(const DICOM &dicom);
 	VTree() = default;
@@ -202,6 +202,8 @@ VTree::VTree(const DICOM &dic) {
 			}
 
 	nodes.resize(blocks.size());
+	boxes.resize(blocks.size());
+
 	for(int z = 0; z < depth; z++)
 		for(int y = 0; y < height; y++)
 			for(int x = 0; x < width; x++) {
@@ -218,8 +220,8 @@ VTree::VTree(const DICOM &dic) {
 		node.leftChild = n;
 		node.rightChild = -1;
 		node.axis = 3;
-		node.box.min = Vec3f(x, y, z);
-		node.box.max = Vec3f(x + Block::size, y + Block::size, z + Block::size);
+		boxes[n].min = Vec3f(x, y, z);
+		boxes[n].max = Vec3f(x + Block::size, y + Block::size, z + Block::size);
 	}
 
 	BuildTree(width, height, depth, 0, nodes.size());
@@ -235,22 +237,29 @@ void VTree::BuildTree(int w, int h, int d, int first, int count) {
 		for(int y = 0; y < h; y += (axis == 1? 2 : 1))
 			for(int x = 0; x < w; x += (axis == 0? 2 : 1)) {
 				int idx = first + x + (z * h + y) * w;
-				int nidx = idx + (axis == 0? 1 : axis == 1? w : w * h);
-				bool singleChild = axis == 0? x == w - 1 : axis == 1? y == h - 1 : z == d - 1;
-
-				const Node *leftNode = &nodes[idx];
-				const Node *rightNode = &nodes[singleChild? idx : nidx];
 
 				Node newNode;
-				newNode.leftChild = idx;
-				newNode.rightChild = singleChild? -1 : nidx;
-				newNode.axis = axis;
-				newNode.min = Min(leftNode->min, rightNode->min);
-				newNode.max = Max(leftNode->max, rightNode->max);
-				newNode.box = leftNode->box;
-				newNode.box += rightNode->box;
-				newNode.split = (&leftNode->box.max.x)[axis];
+				BBox box;
+
+				if(axis == 0? x == w - 1 : axis == 1? y == h - 1 : z == d - 1) { // single child
+					newNode = nodes[idx];
+					box = boxes[idx];
+				}
+				else {
+					int nidx = idx + (axis == 0? 1 : axis == 1? w : w * h);
+
+					newNode.leftChild = idx;
+					newNode.rightChild = nidx;
+					newNode.axis = axis;
+					newNode.min = Min(nodes[idx].min, nodes[nidx].min);
+					newNode.max = Max(nodes[idx].max, nodes[nidx].max);
+					box = boxes[idx];
+					newNode.split = (&box.max.x)[axis];
+					box += boxes[nidx];
+				}
+
 				nodes.push_back(newNode);
+				boxes.push_back(box);
 			}
 
 	w = axis == 0? (w + 1) / 2 : w;
@@ -262,39 +271,12 @@ void VTree::BuildTree(int w, int h, int d, int first, int count) {
 
 	if(newCount == 1) {
 		startNode = nodes.size() - 1;
+		treeBBox = boxes[startNode];
 		return;
 	}
 
 
 	BuildTree(w, h, d, first + count, newCount);
-}
-
-u16 VTree::Trace(const Vec3f &origin, const Vec3f &idir, int nodeId, float rmin, float rmax, u16 cmin) const {
-	if(nodeId < 0 || rmin >= rmax)
-		return 0;
-
-	const Node &node = nodes[nodeId];
-	
-	if(node.max < cmin)
-		return 0;
-	if(node.min == node.max)
-		return node.min;
-
-	int firstNode = (&idir.x)[node.axis] < 0.0f? 1 : 0;
-
-	if(node.IsLeaf())
-		return node.max;
-
-	float t = (node.split - (&origin.x)[node.axis]) * (&idir.x)[node.axis];
-
-	if(rmax <= t)
-		return Trace(origin, idir, node.child[firstNode], rmin, rmax, cmin);
-	if(rmin >= t)
-		return Trace(origin, idir, node.child[firstNode ^ 1], rmin, rmax, cmin);
-
-	u16 ret = Trace(origin, idir, node.child[firstNode], rmin, t, cmin);
-	if(!ret)
-		return Trace(origin, idir, node.child[firstNode ^ 1], t, rmax, cmin);
 }
 
 u16 VTree::Trace(const Vec3f &origin, const Vec3f &dir, u16 cmin) const {
@@ -320,7 +302,49 @@ u16 VTree::Trace(const Vec3f &origin, const Vec3f &dir, u16 cmin) const {
 	rmin = Max(0.0f, rmin);
 	rmax = Max(0.0f, rmax);
 
-	return Trace(origin, idir, startNode, rmin, rmax, cmin);
+	struct StackElem {
+		int node;
+		float min, max;
+	} stack[64], *top = stack;
+
+	int signs[3] = { idir.x < 0.0f, idir.y < 0.0f, idir.z < 0.0f };
+	const Node *node = &nodes[startNode];
+
+	while(true) {
+		if(node->max < cmin || rmin >= rmax) {
+			if(top == stack)
+				return 0;
+
+			top--;
+			rmin = top->min;
+			rmax = top->max;
+			node = &nodes[top->node];
+			continue;
+		}
+		if(node->IsLeaf() || node->min == node->max)
+			return node->max;
+
+		int axis = node->axis;
+		int sign = signs[axis];
+		float t = (node->split - (&origin.x)[axis]) * (&idir.x)[axis];
+
+		if(rmax <= t) {
+			node = &nodes[node->child[sign]];
+			continue;
+		}
+		if(rmin >= t) {
+			node = &nodes[node->child[sign ^ 1]];
+			continue;
+		}
+
+		top->min = t;
+		top->max = rmax;
+		top->node = node->child[sign ^ 1];
+		top++;
+
+		rmax = t;
+		node = &nodes[node->child[sign]];
+	}
 }
 
 static void PrintHelp() {
@@ -560,9 +584,9 @@ static int tmain(int argc, char **argv) {
 
 		{
 //			dicom.Blit(image, slice);
-//#pragma omp parallel for
-			for(int y = 0; y < image.Height(); y += 2) {
-				for(int x = 0; x < image.Width(); x += 2) {
+#pragma omp parallel for
+			for(int y = 0; y < image.Height(); y += 1) {
+				for(int x = 0; x < image.Width(); x += 1) {
 					float tx = float(x) / image.Width() - 0.5f;
 					float ty = float(y) / image.Height() - 0.5f;
 
@@ -580,9 +604,9 @@ static int tmain(int argc, char **argv) {
 						img[0] = img[1] = img[2] = (col); }
 
 					PIXEL(x, y, color);
-				   	PIXEL(x + 1, y, color);
-				   	PIXEL(x, y + 1, color);
-				   	PIXEL(x + 1, y + 1, color);
+//				   	PIXEL(x + 1, y, color);
+//				   	PIXEL(x, y + 1, color);
+//				   	PIXEL(x + 1, y + 1, color);
 
 #undef PIXEL
 				}
