@@ -41,4 +41,8 @@ struct VTree {
 	VTree() = default;
 };
 
+class Camera;
+
+void RenderTree(gfxlib::Texture &image, const VTree &tree, const Camera &camera);
+
 #endif

@@ -9,7 +9,7 @@
 
 #include "font.h"
 #include "frame_counter.h"
-#include "vtree.h"
+#include "vrender_opengl.h"
 
 using std::cout;
 using std::endl;
@@ -118,9 +118,6 @@ static int tmain(int argc, char **argv) {
 		return 0;
 	}
 
-	printf("sizeof(Node) = %d\n", sizeof(Node));
-	printf("sizeof(Block) = %d\n", sizeof(Block));
-
 	CameraConfigs camConfigs;
 	try { Loader("scenes/cameras.dat") & camConfigs; } catch(...) { }
 
@@ -136,9 +133,12 @@ static int tmain(int argc, char **argv) {
 	int nInstances = 1;
 	DICOM dicom;
 	dicom.Load("/mnt/data/volumes/zatoki/dicom/");
-//	dicom.Load("/mnt/data/volumes/PNEUMATIX/PNEUMATIX/Cardiovascular Heart-Cardiac Function/cine_retro_hla");
 
-	VTree tree(dicom);
+	printf("\nUploading data (%d, %d, %d) to GPU: ", dicom.width, dicom.height, dicom.depth);
+	fflush(stdout);
+	double uploadTime = GetTime();
+	uploadTime = GetTime() - uploadTime;
+	printf("%.2f msec\n", uploadTime * 1000.0);
 
 	for(int n = 1; n < argc; n++) {
 			 if(string("-res") == argv[n] && n < argc-2) { resx = atoi(argv[n+1]); resy = atoi(argv[n+2]); n += 2; }
@@ -166,7 +166,7 @@ static int tmain(int argc, char **argv) {
 	}
 
 	float sceneScale = 1.0f;
-	Vec3f sceneCenter = tree.GetBBox().Center();
+	Vec3f sceneCenter = Vec3f(dicom.width, dicom.height, dicom.depth) * 0.5f;
 
 	GLWindow window(resx, resy, fullscreen);
 	window.SetTitle("DICOM viewer");
@@ -181,12 +181,13 @@ static int tmain(int argc, char **argv) {
 
 	bool lightsEnabled = 1;
 	bool staticEnabled = 0, orbiting = 0;
-	float speed = 1.0f;
+	float speed = 10.0f;
 	int slice = 0;
 
 	FrameCounter frmCounter;
 	float lastFrameTime = 0.0f;
 	double lastTime = GetTime();
+	Load3dTexture(dicom);
 
 	while(window.PollEvents()) {
 		frmCounter.NextFrame();
@@ -250,40 +251,9 @@ static int tmain(int argc, char **argv) {
 		double time = GetTime(); 
 		Camera camera = orbiting?(Camera)ocam : (Camera)cam;
 
-		{
-//			dicom.Blit(image, slice);
-#pragma omp parallel for
-			for(int y = 0; y < image.Height(); y += 1) {
-				for(int x = 0; x < image.Width(); x += 1) {
-					float tx = float(x) / image.Width() - 0.5f;
-					float ty = float(y) / image.Height() - 0.5f;
-
-					Vec3f eye = camera.pos;
-					Vec3f target = eye + camera.front + camera.right * tx + camera.up * ty
-						+ Vec3f(0.0001f, 0.0001f, 0.00001f);
-					Vec3f dir = Normalize(target - eye);
-				
-					u16 value = tree.Trace(eye, dir, 2000);
-					int color = (value >> 7) * 4;
-					color = Min(color, 255);
-
-#define PIXEL(x, y, col) { \
-						u8 *img = ((u8*)image.DataPointer()) + ((x) + (y) * image.Width()) * 3; \
-						img[0] = img[1] = img[2] = (col); }
-
-					PIXEL(x, y, color);
-//				   	PIXEL(x + 1, y, color);
-//				   	PIXEL(x, y + 1, color);
-//				   	PIXEL(x + 1, y + 1, color);
-
-#undef PIXEL
-				}
-			}
-		}
-
-		window.RenderImage(image, true);
-
 		time = GetTime() - time;
+
+		RenderVolume(camera, float(resx) / resy, 64);
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 

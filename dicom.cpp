@@ -69,6 +69,7 @@ void DICOM::LoadSlice(int y, const u16 *src) {
 
 void DICOM::Load(const char *folder) {
 	vector<string> files = FindFiles(folder, ".dcm", false);
+	InputAssert(files.size());
 
 	std::sort(files.begin(), files.end());
 
@@ -80,9 +81,13 @@ void DICOM::Load(const char *folder) {
 	data.resize(width * height * depth);
 	LoadSlice(0, &slice.data[0]);
 
-	printf("Loading %d slices: ", files.size()); fflush(stdout);
+	printf("Loading %d slices (%dx%dx%d): ", files.size(), width, height, depth);
+	fflush(stdout);
+
 	for(int n = 1; n < files.size(); n++) {
-		Loader(files[n]) & slice;
+		try { Loader(files[n]) & slice; }
+		catch(...) { slice.data.resize(width * height * depth, 0); }
+
 		InputAssert(width == slice.width);
 		InputAssert(depth == slice.height);
 		LoadSlice(n, &slice.data[0]);

@@ -61,7 +61,7 @@ namespace
 		}
 
 		glfwDisable(GLFW_AUTO_POLL_EVENTS);
-		glfwSetWindowPos(980, 20);
+		glfwSetWindowPos(980, 64);
 
 		wantClose=0;
 		glfwSetWindowCloseCallback(CloseWindowHandle);
