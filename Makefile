@@ -36,7 +36,7 @@ FLAGS=-march=native --param inline-unit-growth=1000 -std=gnu++0x -O3 -ggdb -rdyn
 	  -fno-math-errno -funsafe-math-optimizations -fno-rounding-math -fno-trapping-math
 
 
-CXX=/usr/local/gcc-4.5/bin/g++
+CXX=g++
 
 DEPS:=$(FILES:%=$(BUILD_DIR)/%.dep)
 SOURCES:=$(FILES:%=%.cpp)
@@ -59,17 +59,17 @@ node: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/server.o $(BUILD_DIR)/nod
 
 client: $(SHARED_OBJECTS) $(BUILD_DIR)/client.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lXrandr -lGL -lGLU \
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lGL -lGLU \
 		$(LINUX_LIBS) -lboost_system -lboost_regex -g
 
 dicom_viewer: $(SHARED_OBJECTS) $(BUILD_DIR)/dicom_viewer.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/camera.o
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lXrandr -lGL -lGLU \
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lGL -lGLU \
 		$(LINUX_LIBS) -g
 
 rtracer: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)/gl_window.o \
 	$(BUILD_DIR)/tex_handle.o $(BUILD_DIR)/font.o $(BUILD_DIR)/render_opengl.o
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lXrandr -lGL -lGLU \
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lGL -lGLU \
 		$(LINUX_LIBS) -g
 
 ssh_all:

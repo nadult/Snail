@@ -336,7 +336,7 @@ static int client_main(int argc, char **argv) {
 
 //		glClear(GL_COLOR_BUFFER_BIT);
 //		TODO: jest duzy spadek wydajnosci miedzy 1376x1024 a 1344x1024
-		window.RenderImage(image);
+		window.RenderImage(image, false);
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 		double mrays = double(unsigned(frmCounter.FPS() * stats.GetRays() * 0.0001)) * 0.01;

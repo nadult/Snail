@@ -9,7 +9,7 @@
 	{
 	public:
 		typedef size_t size_type;
-		typedef ptrdiff_t difference_type;
+		typedef long long difference_type;
 		typedef T* pointer;
 		typedef const T* const_pointer;
 		typedef T& reference;
@@ -45,6 +45,11 @@
 		}
 		void construct(pointer p,const_reference c)	{ new( reinterpret_cast<void*>(p) ) T(c); }
 		void destroy(pointer p)						{ (p)->~T(); }
+      
+		template<typename... _Args>
+        void
+     	   construct(pointer __p, _Args&&... __args)
+			{ ::new((void *)__p) T(std::forward<_Args>(__args)...); }
 	};
 
 
