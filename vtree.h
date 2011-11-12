@@ -3,7 +3,7 @@
 
 #include "rtbase.h"
 #include "bounding_box.h"
-#include "dicom.h"
+#include "volume_data.h"
 
 struct Block {
 	enum { size = 4, size3 = size * size * size };
@@ -37,7 +37,7 @@ struct VTree {
 	u16 Trace(const Vec3f &origin, const Vec3f &dir, u16 min) const;
 	BBox GetBBox() const { return treeBBox; }
 
-	VTree(const DICOM &dicom);
+	VTree(const VolumeData &dicom);
 	VTree() = default;
 };
 

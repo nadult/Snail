@@ -136,8 +136,8 @@ static void FindFiles(vector<string> &out, const char *dirName, const char *ext,
 			if(lstat(fullName, &fileInfo) < 0)
 				continue; //TODO: handle error
 
-			if(S_ISDIR(fileInfo.st_mode) && recursive) {
-				if(strcmp(dirp->d_name, ".") && strcmp(dirp->d_name, ".."))
+			if(S_ISDIR(fileInfo.st_mode)) {
+				if(strcmp(dirp->d_name, ".") && strcmp(dirp->d_name, "..") && recursive)
 					FindFiles(out, fullName, ext, recursive);
 			}
 			else {

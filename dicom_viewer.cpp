@@ -68,7 +68,7 @@ static void MoveCamera(OrbitingCamera &cam, GLWindow &window, float speed) {
 	if(window.Key(Key_right)) cam.Rotate(-0.01);
 	
 	float zoom = 0;
-	zoom = window.MouseMove().z * 4;
+	zoom = window.MouseMove().z;
 	if(window.Key('R')) zoom = 1;
 	if(window.Key('F')) zoom = -1;
 
@@ -131,14 +131,6 @@ static int tmain(int argc, char **argv) {
 	int rebuild = 0, buildFlags = 8;
 
 	int nInstances = 1;
-	DICOM dicom;
-	dicom.Load("/mnt/data/volumes/zatoki/dicom/");
-
-	printf("\nUploading data (%d, %d, %d) to GPU: ", dicom.width, dicom.height, dicom.depth);
-	fflush(stdout);
-	double uploadTime = GetTime();
-	uploadTime = GetTime() - uploadTime;
-	printf("%.2f msec\n", uploadTime * 1000.0);
 
 	for(int n = 1; n < argc; n++) {
 			 if(string("-res") == argv[n] && n < argc-2) { resx = atoi(argv[n+1]); resy = atoi(argv[n+2]); n += 2; }
@@ -166,34 +158,47 @@ static int tmain(int argc, char **argv) {
 	}
 
 	float sceneScale = 1.0f;
-	Vec3f sceneCenter = Vec3f(dicom.width, dicom.height, dicom.depth) * 0.5f;
+	Vec3f sceneCenter(0, 0, 0);
 
 	GLWindow window(resx, resy, fullscreen);
-	window.SetTitle("DICOM viewer");
+	window.SetTitle("Volume viewer v 0.002");
 	Font font;
-
-	gfxlib::Texture image(550, 550, gfxlib::TI_R8G8B8);
 			
+		bool lightsEnabled = 1;
+	bool staticEnabled = 0, orbiting = true;
+	float speed = 10.0f;
+
+	{
+		VolumeData volume;
+		//volume.LoadDicom("/mnt/data/volumes/zatoki/dicom/");
+		volume.LoadRaw("/mnt/data/volumes/bunny/", 512, 512, 16);
+
+		sceneCenter = Vec3f(volume.width, volume.height, volume.depth) * 0.5f;
+		sceneScale = Length(sceneCenter) * 2.0f;
+
+		printf("\nUploading data (%d, %d, %d) to GPU: ", volume.width, volume.height, volume.depth);
+		fflush(stdout);
+		double uploadTime = GetTime();
+		uploadTime = GetTime() - uploadTime;
+		Load3dTexture(volume);
+		printf("%.2f msec\n", uploadTime * 1000.0);
+	}
+	
 	FPSCamera cam;
 	if(!camConfigs.GetConfig(string(sceneName),cam))
 		cam.SetPos(sceneCenter);
 	OrbitingCamera ocam;
+	ocam.Reset(sceneCenter, sceneScale);
 
-	bool lightsEnabled = 1;
-	bool staticEnabled = 0, orbiting = 0;
-	float speed = 10.0f;
-	int slice = 0;
 
 	FrameCounter frmCounter;
 	float lastFrameTime = 0.0f;
 	double lastTime = GetTime();
-	Load3dTexture(dicom);
 
 	while(window.PollEvents()) {
 		frmCounter.NextFrame();
 
 		if(window.KeyUp(Key_esc)) break;
-		if(window.KeyDown('K')) Saver("out/output.dds") & image;
 
 		if(window.KeyDown('C')) {
 			if(orbiting) ocam.Reset(sceneCenter, sceneScale);
@@ -217,9 +222,6 @@ static int tmain(int argc, char **argv) {
 			Saver("scenes/cameras.dat") & camConfigs;
 			cam.Print();
 		}
-
-		slice += window.MouseMove().z;
-		slice = Clamp(slice, 0, dicom.depth - 1);
 
 		float tspeed = speed * lastFrameTime * 20.0f;
 		lastFrameTime = GetTime() - lastTime;
@@ -253,13 +255,13 @@ static int tmain(int argc, char **argv) {
 
 		time = GetTime() - time;
 
-		RenderVolume(camera, float(resx) / resy, 64);
+		RenderVolume(camera, float(resx) / resy, 256);
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));
-		font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " Slice: ", slice);
+		font.PrintAt(Vec2f(5, 25), "FPS: ", fps);
 
 		font.FinishDrawing();
 		window.SwapBuffers();

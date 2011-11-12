@@ -2,7 +2,7 @@
 #include <cstring>
 
 
-VTree::VTree(const DICOM &dic) {
+VTree::VTree(const VolumeData &dic) {
 	width  = (dic.width  + Block::size - 1) / Block::size;
 	height = (dic.height + Block::size - 1) / Block::size;
 	depth  = (dic.depth  + Block::size - 1) / Block::size;

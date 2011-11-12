@@ -6,6 +6,9 @@
 #include <GL/glu.h>
 #include <cstring>
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "camera.h"
 
 typedef Matrix<Vec4f> Matrix4;
@@ -101,6 +104,12 @@ namespace
 	int volumeSize[3] = {0, 0, 0};
 
 	void InitShaders() {
+		if(shaderProgram) {
+			GLuint handle = shaderProgram;
+			glDeleteProgram(handle);
+			shaderProgram = 0;
+		}
+
 		unsigned v = glCreateShader(GL_VERTEX_SHADER);
 		unsigned f = glCreateShader(GL_FRAGMENT_SHADER);
 
@@ -163,10 +172,30 @@ namespace
 		glTexCoord3f(pos.x / vScale.x, pos.y / vScale.y, pos.z / vScale.z);
 		glVertex3f(pos.x, pos.y, pos.z);
 	}
+	
+	bool ShadersModified() {
+		static time_t lastTime;
+		static bool set0 = 0;
+		if(!set0) {
+			struct stat attrib;
+			stat("dicom_viewer", &attrib);
+			lastTime = attrib.st_mtime;
+			set0 = 1;
+		}
+
+		struct stat attrib;
+		stat("shader.fsh", &attrib);
+		if(difftime(attrib.st_mtime, lastTime) > 0) {
+			lastTime = attrib.st_mtime;
+			return true;
+		}
+
+		return false;
+	}
 
 }
 
-void Load3dTexture(const DICOM &dicom) {
+void Load3dTexture(const VolumeData &data) {
 	if(volumeHandle) {
 		GLuint handle = volumeHandle;
 		glDeleteTextures(1, &handle);
@@ -185,12 +214,12 @@ void Load3dTexture(const DICOM &dicom) {
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP);
 
 	int tw = 512, th = 512, td = 512;
-	int w = dicom.width, h = dicom.height, d = dicom.depth;
+	int w = data.width, h = data.height, d = data.depth;
 	while(tw > w * 2) tw /= 2;
 	while(th > h * 2) th /= 2;
 	while(td > d * 2) td /= 2;
 	
-	vector<u16> data(tw * th * td, 0);
+	vector<u16> tdata(tw * th * td, 0);
 	volumeSize[0] = tw;
 	volumeSize[1] = th;
 	volumeSize[2] = td;
@@ -198,15 +227,15 @@ void Load3dTexture(const DICOM &dicom) {
 	for(int z = 0; z < Min(td, d); z++)
 		for(int y = 0; y < Min(th, h); y++)
 			for(int x = 0; x < Min(tw, w); x++)
-				data[x + (z * th + y) * tw] = dicom.data[x + (z * h + y) * w] / 16;
+				tdata[x + (z * th + y) * tw] = data.data[x + (z * h + y) * w];
 
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_LUMINANCE_ALPHA, tw, th, td, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, &data[0]);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_LUMINANCE_ALPHA, tw, th, td, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, &tdata[0]);
 
 	InputAssert(glGetError() == GL_NO_ERROR);
 	volumeHandle = handle;
 }
 void RenderVolume(const Camera &cam, float aspectRatio, int res) {
-	if(!shaderProgram)
+	if(!shaderProgram || ShadersModified())
 		InitShaders();
 	
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -262,9 +291,13 @@ void RenderVolume(const Camera &cam, float aspectRatio, int res) {
 		else
 			rayMax = Max(rayMax, t);
 	}
+	rayMin = -Length(size) * 0.5f;
+	rayMax = Length(size) * 0.5f;
 
 	for(int n = res - 1; n >= 0; n--) {
-		Vec3f center = rayOrigin + rayDir * (rayMin + n * (rayMax - rayMin) / float(res - 1));
+		float t = n / float(res - 1);
+
+		Vec3f center = rayOrigin + rayDir * (rayMin +  (rayMax - rayMin) * t);
 		glBegin(GL_QUADS);
 		glColor4f(n / float(res), 1, 1, 0.01f);
 		QuadVertex(center - cam.right * scale - cam.up * scale, size);

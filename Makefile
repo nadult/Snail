@@ -16,7 +16,7 @@ FILES=funcs render tree_stats bounding_box gl_window rtbase base_scene bvh/trave
 	shading/material sampling/bilinear_sampler sampling/point_sampler16bit shading/uber_material rtracer \
 	sampling/point_sampler formats/loader formats/wavefront_obj formats/doom3_proc compression \
 	comm_data comm_mpi comm_tcp dbvh/tree dbvh/traverse scene scene_trace render_opengl photons dicom_viewer \
-	dicom vtree vrender_opengl
+	volume_data vtree vrender_opengl
 
 RFILES=render_opengl render bvh/traverse dbvh/traverse ray_generator scene scene_trace photons
 TFILES=client server node gl_window tex_handle font rtracer comm_mpi comm_tcp comm_data dicom_viewer
