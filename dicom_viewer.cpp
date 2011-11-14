@@ -170,8 +170,8 @@ static int tmain(int argc, char **argv) {
 
 	{
 		VolumeData volume;
-		//volume.LoadDicom("/mnt/data/volumes/zatoki/dicom/");
-		volume.LoadRaw("/mnt/data/volumes/bunny/", 512, 512, 16);
+		volume.LoadDicom("/mnt/data/volumes/zatoki/dicom/");
+		//volume.LoadRaw("/mnt/data/volumes/bunny/", 512, 512, 16);
 
 		sceneCenter = Vec3f(volume.width, volume.height, volume.depth) * 0.5f;
 		sceneScale = Length(sceneCenter) * 2.0f;
@@ -255,7 +255,7 @@ static int tmain(int argc, char **argv) {
 
 		time = GetTime() - time;
 
-		RenderVolume(camera, float(resx) / resy, 256);
+		RenderVolume(camera, float(resx) / resy, 512);
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 

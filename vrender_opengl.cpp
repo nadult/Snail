@@ -227,9 +227,10 @@ void Load3dTexture(const VolumeData &data) {
 	for(int z = 0; z < Min(td, d); z++)
 		for(int y = 0; y < Min(th, h); y++)
 			for(int x = 0; x < Min(tw, w); x++)
-				tdata[x + (z * th + y) * tw] = data.data[x + (z * h + y) * w];
+				tdata[x + (z * th + y) * tw] = data.data[x + (z * h + y) * w] / 16;
 
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_LUMINANCE_ALPHA, tw, th, td, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, &tdata[0]);
+	//gluBuild3DMipmaps(GL_TEXTURE_3D, GL_LUMINANCE_ALPHA, tw, th, td, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, &tdata[0]);
 
 	InputAssert(glGetError() == GL_NO_ERROR);
 	volumeHandle = handle;
