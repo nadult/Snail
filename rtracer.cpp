@@ -159,12 +159,12 @@ static int tmain(int argc, char **argv) {
 	float not_nan = 3.0f;
 
 //	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
-	InputAssert(IsNan(Vec3f(nan, nan, nan)));
-	InputAssert(isnan(nan));
-	InputAssert(!isnan(not_nan));
+	ASSERT(IsNan(Vec3f(nan, nan, nan)));
+	ASSERT(isnan(nan));
+	ASSERT(!isnan(not_nan));
 	Vec3q nan3;
 	Convert(Vec3f(nan, nan, nan), Vec3f(nan, nan, nan), Vec3f(nan, nan, nan), Vec3f(nan, nan, nan), nan3);
-	InputAssert(IsNan(nan3));
+	ASSERT(IsNan(nan3));
 
 	printf("Snail v0.20 by nadult\n");
 	if(argc>=2&&string("--help")==argv[1]) {
@@ -223,7 +223,7 @@ static int tmain(int argc, char **argv) {
 	}
 	if(rebuild) {
 		printf("Loading...\n");
-		double loadingTime = GetTime();
+		double loadingTime = getTime();
 		BaseScene baseScene; {
 			string fileName = string("scenes/") + sceneName;
 			if(fileName.find(".proc") != string::npos)
@@ -252,7 +252,7 @@ static int tmain(int argc, char **argv) {
 						break;
 				}
 			}
-			else ThrowException("Unrecognized format: ", fileName);
+			else THROW("Unrecognized format: %s", fileName.c_str());
 
 			int tris = 0;
 			for(int n = 0; n < baseScene.objects.size(); n++)
@@ -266,12 +266,12 @@ static int tmain(int argc, char **argv) {
 			baseScene.GenNormals();
 		//	baseScene.Optimize();
 		}
-		loadingTime = GetTime() - loadingTime;
+		loadingTime = getTime() - loadingTime;
 		
-		double buildTime = GetTime();
+		double buildTime = getTime();
 		scene.geometry.Construct(baseScene, buildFlags);
 		Saver(string("dump/") + sceneName) & scene.geometry;
-		buildTime = GetTime() - buildTime;
+		buildTime = getTime() - buildTime;
 		std::cout << "Loading time: " << loadingTime << "  Build time: " << buildTime << '\n';
 	}
 	scene.geometry.PrintInfo();
@@ -318,7 +318,7 @@ static int tmain(int argc, char **argv) {
 
 	FrameCounter frmCounter;
 	float lastFrameTime = 0.0f;
-	double lastTime = GetTime();
+	double lastTime = getTime();
 
 	vector<Photon> photons;
 	vector<PhotonNode> photonTree;
@@ -383,8 +383,8 @@ static int tmain(int argc, char **argv) {
 		}
 
 		float tspeed = speed * lastFrameTime * 20.0f;
-		lastFrameTime = GetTime() - lastTime;
-		lastTime = GetTime();
+		lastFrameTime = getTime() - lastTime;
+		lastTime = getTime();
 
 		if(orbiting)
 			MoveCamera(ocam, window, tspeed);
@@ -409,13 +409,13 @@ static int tmain(int argc, char **argv) {
 		static float animPos = 0;
 		if(window.Key(Key_space)) animPos+=0.025f;
 
-		double buildTime = GetTime();
+		double buildTime = getTime();
 		Scene<DBVH> dscene;
 		if(nInstances > 1) {
 			dscene.geometry = MakeDBVH(&scene.geometry, nInstances);
 			dscene.materials = scene.materials;
 		}
-		buildTime = GetTime() - buildTime;
+		buildTime = getTime() - buildTime;
 
 		vector<Light> tLights = lightsEnabled?lights:vector<Light>();
 		//	for(int n=0;n<tLights.size();n++)
@@ -428,7 +428,7 @@ static int tmain(int argc, char **argv) {
 			scene.photonNodes = &photonTree;
 		}
 		
-		double time = GetTime(); 
+		double time = getTime(); 
 		TreeStats stats; {
 			Camera camera = orbiting?(Camera)ocam : (Camera)cam;
 
@@ -443,25 +443,25 @@ static int tmain(int argc, char **argv) {
 										Render( scene, camera, image, options, threads);
 				bool updated = 0;
 
-				if(gVals[4]) {
-					photonGenTime = GetTime();
+			/*	if(gVals[4]) {
+					photonGenTime = getTime();
 					TracePhotons(photons, scene, 4 * 1024 * 1024);
 					MakePhotonTree(photonTree, photons);
-					photonGenTime = GetTime() - photonGenTime;
+					photonGenTime = getTime() - photonGenTime;
 					gVals[4] = 0; gVals[3] = 1;
 					updated = 1;
-				}
-				window.RenderImage(image);
+				} */
+				window.RenderImage(image, true);
 
-				if(gVals[3] && oglRenderer) {
+			/*	if(gVals[3] && oglRenderer) {
 					oglRenderer->BeginDrawing(camera, 60.0f, float(resx) / float(resy), 0);
 					oglRenderer->DrawPhotons(photons, updated);
 					oglRenderer->FinishDrawing();
-				}
+				} */
 			}
 		}	
 
-		time = GetTime() - time;
+		time = getTime() - time;
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 		double mrays = double(unsigned(frmCounter.FPS() * stats.GetRays() * 0.0001)) * 0.01;
@@ -469,17 +469,26 @@ static int tmain(int argc, char **argv) {
 
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));
+		char text[256];
+
 		if(oglRendering) {
-			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " (opengl rendering)");
+			snprintf(text, sizeof(text), "FPS: ", fps, " (opengl rendering)");
+			font.PrintAt(Vec2f(5, 25), text);
 		}
 		else {
 			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, time * 1000.0, buildTime * 1000.0));
-			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays);
-			font.PrintAt(Vec2f(5, 45), photons.size() / 1024, "k photons generated in ", ptime);
-			if(lightsEnabled && lights.size())
-				font.PrintAt(Vec2f(5, 65), "Lights: ",lightsEnabled?lights.size() : 0);
-			font.PrintAt(Vec2f(5, 85), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
-					" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7]);
+			snprintf(text, sizeof(text), "FPS: %.2f %s%.2f", fps, " MRays/sec:", mrays);
+			font.PrintAt(Vec2f(5, 25), text);
+			snprintf(text, sizeof(text), "%d%s%.2f", (int)photons.size() / 1024, "k photons generated in ", ptime);
+			font.PrintAt(Vec2f(5, 45), text);
+			if(lightsEnabled && lights.size()) {
+				snprintf(text, sizeof(text), "Lights: %d", lightsEnabled?(int)lights.size() : 0);
+				font.PrintAt(Vec2f(5, 65), text);
+			}
+			
+//			snprintf(text, sizeof(text), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
+//				" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7]);
+//			font.PrintAt(Vec2f(5, 85), text);
 		}
 
 		font.FinishDrawing();

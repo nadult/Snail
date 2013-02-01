@@ -3,7 +3,7 @@
 #include "pch.h"
 
 int server_main(int, char**) {
-	ThrowException("Server (node with rank 0) can only be run on x86");
+	THROW("Server (node with rank 0) can only be run on x86");
 }
 
 #else
@@ -196,7 +196,7 @@ int server_main(int argc, char **argv) {
 	int rank, numNodes;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &numNodes);
-	InputAssert(rank == 0);
+	ASSERT(rank == 0);
 
 	char hostName[256];
 	gethostname(hostName, sizeof(hostName));
@@ -285,7 +285,7 @@ int server_main(int argc, char **argv) {
 						baseScene.LoadDoom3Proc(fileName);
 					else if(fileName.find(".obj") != string::npos)
 						baseScene.LoadWavefrontObj(fileName);
-					else ThrowException("Unrecognized format: ", fileName);
+					else THROW("Unrecognized format: ", fileName);
 				}
 				catch(const Exception &ex) {
 					printf("Exception: %s\n", ex.what());

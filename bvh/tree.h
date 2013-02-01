@@ -13,7 +13,7 @@ public:
 	BVH(const BaseScene&, int flags = fastBuild | useSah);
 	BVH() { }
 	void Construct(const BaseScene&, int flags = fastBuild | useSah);
-	void Serialize(Serializer&);
+	void serialize(Serializer&);
 	const BBox GetBBox() const { return nodes[0].bbox; }
 	void PrintInfo() const;
 
@@ -72,7 +72,7 @@ public:
 
 	struct MatId {
 		MatId() :id(~0) { }
-		void Serialize(Serializer &sr) { sr & name; }
+		void serialize(Serializer &sr) { sr & name; }
 
 		string name;
 		int id;

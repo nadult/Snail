@@ -22,7 +22,7 @@ static const int ty[16] = { 0, 0, 2, 2, 0, 0, 2, 2, 4, 4, 6, 6, 4, 4, 6, 6 };
 
 void RayGenerator::Generate(int level,int pw,int ph,int x,int y, Vec3q *out) const {
 	{
-		Assert(level == 3);
+		DASSERT(level == 3);
 
 		GridSampler sampler;
 		Vec3q right(tright), up(tup), tadd = txyz;

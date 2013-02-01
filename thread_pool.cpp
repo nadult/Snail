@@ -90,7 +90,7 @@ namespace {
 	void FreeThreads();
 
 	void ChangeThreads(int nThreads_) {
-		Assert(nThreads_ > 0 && nThreads_ <= maxThreads);
+		DASSERT(nThreads_ > 0 && nThreads_ <= maxThreads);
 
 		static bool sinit = 0;
 		if(!sinit) {

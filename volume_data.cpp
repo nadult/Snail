@@ -7,25 +7,25 @@ namespace
 {
 
 	struct Slice {
-		void Serialize(Serializer &sr);
+		void serialize(Serializer &sr);
 	
 		int width, height;
 		vector<u16> data;
 	};
 
-	void Slice::Serialize(Serializer &sr) {
+	void Slice::serialize(Serializer &sr) {
 		char zeros[128] = {0,};
-		sr.Data(zeros, sizeof(zeros));
+		sr.data(zeros, sizeof(zeros));
 
-		sr.Signature("DICM", 4);
-		InputAssert(sr.IsLoading());
+		sr.signature("DICM", 4);
+		ASSERT(sr.isLoading());
 
 		int samples = 1;
 		int bits = 8;
 		width = height = 0;
 		data.clear();
 
-		while(sr.Pos() < sr.Size()) {
+		while(sr.pos() < sr.size()) {
 			u16 type, subType;
 			u16 format, size16;
 			u32 size;
@@ -36,7 +36,7 @@ namespace
 			else
 				size = size16;
 
-			u32 end = sr.Pos() + size;
+			u32 end = sr.pos() + size;
 		//	printf("Chunk %x %x\n", type, subType);
 
 			if(type == 0x28) {
@@ -52,13 +52,13 @@ namespace
 			}
 			else if(type == 0x7fe0 && subType == 0x10) {
 				data.resize(width * height);
-				sr.Data(&data[0], size);
+				sr.data(&data[0], size);
 			}
 
-			sr.Seek(end);
+			sr.seek(end);
 		}
 
-		InputAssert((bits == 16 || bits == 8) && samples == 1);
+		ASSERT((bits == 16 || bits == 8) && samples == 1);
 
 		if(bits == 8) {
 			u8 *src = (u8*)&data[0];
@@ -69,14 +69,14 @@ namespace
 			bits = 16;
 		}
 
-		InputAssert(data.size() * sizeof(data[0]) == width * height * (bits / 8));
+		ASSERT(data.size() * sizeof(data[0]) == width * height * (bits / 8));
 	}
 
 }
 
 void VolumeData::LoadDicom(const char *folder) {
 	vector<string> files = FindFiles(folder, ".dcm", false);
-	InputAssert(files.size());
+	ASSERT(files.size());
 
 	std::sort(files.begin(), files.end());
 
@@ -96,8 +96,8 @@ void VolumeData::LoadDicom(const char *folder) {
 		try { Loader(files[n]) & slice; }
 		catch(...) { slice.data.resize(width * height * depth, 0); }
 
-		InputAssert(width == slice.width);
-		InputAssert(depth == slice.height);
+		ASSERT(width == slice.width);
+		ASSERT(depth == slice.height);
 		for(int z = 0; z < depth; z++)
 			memcpy(&data[(z * height + n) * width], &slice.data[z * width], width * sizeof(data[0]));
 		printf("."); fflush(stdout);
@@ -116,7 +116,7 @@ void VolumeData::LoadRaw(const char *folder, int w, int h, int bits) {
 	std::sort(files.begin(), files.end(),
 			[](const string &a, const string &b) { return a.size() == b.size()? a < b : a.size() < b.size(); } );
 
-	InputAssert(bits == 8 || bits == 16);
+	ASSERT(bits == 8 || bits == 16);
 	
 	width = w;
 	height = h;
@@ -129,11 +129,11 @@ void VolumeData::LoadRaw(const char *folder, int w, int h, int bits) {
 		u16 *dst = &data[n * width * height];
 
 		if(bits == 16) {
-			Loader(files[n]).Data(dst, width * height * 2);
+			Loader(files[n]).data(dst, width * height * 2);
 		}
 		else {
 			vector<u8> temp(width, height);
-			Loader(files[n]).Data(&temp[0], width * height);
+			Loader(files[n]).data(&temp[0], width * height);
 			for(int i = 0, count = width * height; i < count; i++)
 				dst[i] = ((int)temp[i]) * 256;
 		}
@@ -149,7 +149,7 @@ void VolumeData::LoadRaw(const char *folder, int w, int h, int bits) {
 
 void VolumeData::Blit(gfxlib::Texture &img, int slice) const {
 	int w = Min(width, img.Width()), h = Min(height, img.Height());
-	InputAssert(img.GetFormat() == gfxlib::TI_R8G8B8);
+	ASSERT(img.GetFormat() == gfxlib::TI_R8G8B8);
 
 	for(int y = 0; y < h; y++) {
 		u8 *dst = (u8*)img.DataPointer(0);

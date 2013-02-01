@@ -37,7 +37,7 @@ public:
 	operator const Camera() const;
 
 	void Print();
-	void Serialize(Serializer&);
+	void serialize(Serializer&);
 
 	void Rotate(float a);
 	void RotateY(float p);
@@ -56,7 +56,7 @@ class CameraConfigs {
 public:
 	void AddConfig(const string &fileName, const FPSCamera&);
 	bool GetConfig(const string &fileName, FPSCamera&) const;
-	void Serialize(Serializer&);
+	void serialize(Serializer&);
 
 	std::map<string, FPSCamera> data;
 };

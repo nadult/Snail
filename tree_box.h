@@ -103,8 +103,8 @@
 			
 			return 0;
 		}
-		void Serialize(const Serializer &sr) {
-			ThrowException("TODO: TreeBox Serializer not avaliable");
+		void serialize(const Serializer &sr) {
+			THROW("TODO: TreeBox serializer not avaliable");
 		}
 
 //	private:
@@ -127,7 +127,7 @@
 		TreeBoxVector() { }
 		TreeBoxVector(const vector<CElement,AlignedAllocator<CElement> > &e) :elems(e) { }
 
-		void Serialize(Serializer &sr) { sr&elems; }
+		void serialize(Serializer &sr) { sr&elems; }
 
 		INLINE const CElement &operator[](int elem) const { return elems[elem]; }
 		INLINE const CElement &GetCElement(int elem) const { return elems[elem]; }

@@ -215,7 +215,7 @@ template <int QuadLevels, class AccStruct>
 static TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
 		gfxlib::Texture &image, const Options options, uint nThreads) {
 	enum { taskSize = 64 };
-	InputAssert(image.GetFormat().BytesPerPixel() == 3);
+	ASSERT(image.GetFormat().BytesPerPixel() == 3);
 
 	uint nTasks = ((image.Width() + taskSize - 1) / taskSize)
 					* ((image.Height() + taskSize - 1) / taskSize);

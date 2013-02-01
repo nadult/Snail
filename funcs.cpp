@@ -121,7 +121,7 @@ Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 static void FindFiles(vector<string> &out, const char *dirName, const char *ext, bool recursive) {
 	DIR *dp = opendir(dirName);
 	if(!dp)
-		ThrowException("Error while opening directory ", dirName, ": ", strerror(errno));
+		THROW("Error while opening directory ", dirName, ": ", strerror(errno));
 
 
 	try {

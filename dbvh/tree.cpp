@@ -168,7 +168,7 @@ void DBVH::Construct(const vector<ObjectInstance> &tElements) {
 	nodes.push_back(Node(bbox));
 	FindSplit(0, 0, elements.size(), 0);
 
-	InputAssert(depth <= maxDepth);
+	ASSERT(depth <= maxDepth);
 }
 
 void DBVH::PrintInfo() const {

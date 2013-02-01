@@ -5,6 +5,7 @@
 #include "shading/transparent_material.h"
 #include <sstream>
 #include <fstream>
+#include <iostream>
 
 namespace shading {
 	using namespace sampling;
@@ -25,9 +26,9 @@ namespace shading {
 		string x, y, z;
 		ss >> x;
 		if(x == "spectral")
-			ThrowException("spectral files not supported");
+			THROW("spectral files not supported");
 		if(x == "xyz")
-			ThrowException("xyz values not supported");
+			THROW("xyz values not supported");
 		Vec3f out;
 		out.x = atof(x.c_str());
 		ss >> y >> z;
@@ -88,7 +89,7 @@ namespace shading {
 				string token;
 				ss >> token;
 				if(token == "-halo")
-					ThrowException("-halo parameter not supported");
+					THROW("-halo parameter not supported");
 				newMat.dissolveFactor = atof(token.c_str());
 			}
 			else if(token == "Ns") ss >> newMat.specularExponent;
@@ -103,7 +104,7 @@ namespace shading {
 			}
 			else if(token == "") continue;
 			else {
-			//	ThrowException("Unknown token: ", token);
+			//	THROW("Unknown token: ", token);
 			}
 		}
 

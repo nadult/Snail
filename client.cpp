@@ -209,13 +209,13 @@ static int client_main(int argc, char **argv) {
 
 	bool finish = 0, orbiting = 0;
 	SendFrameRequest(sock, (Camera)cam, lights, threads, nInstances, 0.0f, finish);
-	double frameTime = GetTime();
+	double frameTime = getTime();
 
 	vector<DecompressBuffer> buffers(2);
 
 	double fpsMin = constant::inf, fpsMax = 0, fpsSum = 0;
 	long long nFrames = 0, nRays = 0;
-	double startTime = GetTime();
+	double startTime = getTime();
 
 	while(!finish) {
 		if(!window.PollEvents() || window.KeyUp(Key_esc)) finish = 1;
@@ -242,11 +242,11 @@ static int client_main(int argc, char **argv) {
 			fpsMin = constant::inf;
 			fpsMax = fpsSum = 0;
 			nFrames = nRays = 0;
-			startTime = GetTime();
+			startTime = getTime();
 		}
 		if(window.KeyDown('Z')) {
 			printf("Stats:\n");
-			double workTime = GetTime() - startTime;
+			double workTime = getTime() - startTime;
 			double fpsAvg = fpsSum / double(nFrames);
 			double mraysPerSec = (double(nRays) / workTime) / 1000000;
 			printf("Min FPS: %f\nMax FPS: %f\nAvg FPS: %f\nMRays/sec: %f\n",
@@ -320,17 +320,17 @@ static int client_main(int argc, char **argv) {
 			sock >> comm::Data(&buffer.comprData[0], Abs(buffer.comprSize));
 
 			if(nBuffers == buffers.size()) {
-				double tTime = GetTime();
+				double tTime = getTime();
 				DecompressParts(image, buffers, nBuffers, 2);
-				decompressTime += GetTime() - tTime;
+				decompressTime += getTime() - tTime;
 				nBuffers = 0;
 			}
 		}
 
 		{
-			double tTime = GetTime();
+			double tTime = getTime();
 			DecompressParts(image, buffers, nBuffers, 2);
-			decompressTime += GetTime() - tTime;
+			decompressTime += getTime() - tTime;
 		}
 		sock >> Pod(stats) >> buildTime >> numNodes >> Pod(renderTimes);
 
@@ -349,21 +349,30 @@ static int client_main(int argc, char **argv) {
 
 		font.BeginDrawing(resx, resy);
 		font.SetSize(Vec2f(30, 20));
-			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, (GetTime() - frameTime) * 1000.0, buildTime * 1000.0f));
-			frameTime = GetTime();
-			font.PrintAt(Vec2f(5, 25), "FPS: ", fps, " MRays/sec:", mrays, " KBytes/frame:", nBytes / 1024,
-							" Dec.time:", double((int)(decompressTime * 100000.0)) * 0.01);
+			font.SetPos(Vec2f(5, 5));
+			font.Print(stats.GenInfo(resx, resy, (getTime() - frameTime) * 1000.0, buildTime * 1000.0f));
+			frameTime = getTime();
+			font.SetPos(Vec2f(5, 25));
+			char text[256];
+			snprintf(text, sizeof(text), "FPS: ", fps, " MRays/sec:", mrays, " KBytes/frame:", nBytes / 1024,
+					" Dec.time:", double((int)(decompressTime * 100000.0)) * 0.01);
+			font.Print(text);
+			
 			for(int n = 0; n < Min(32, numNodes); n++) {
-				char text[32]; snprintf(text, sizeof(text), "%.0f", renderTimes[n] * 1000);
-				font.PrintAt(Vec2f(5 + n * 32, 45), text);
+				snprintf(text, sizeof(text), "%.0f", renderTimes[n] * 1000);
+				font.SetPos(Vec2f(5 + n * 32, 45));
+				font.Print(text);
 			}
-			if(lightsEnabled && lights.size())
-				font.PrintAt(Vec2f(5, 65), "Lights: ",lightsEnabled?lights.size() : 0);
+			if(lightsEnabled && lights.size()) {
+				font.SetPos(Vec2f(5, 65));
+				snprintf(text, sizeof(text), "Lights: ",lightsEnabled?lights.size() : 0);
+				font.Print(text);
+			}
 		font.FinishDrawing();
 		window.SwapBuffers();
 	}
 
-	double workTime = GetTime() - startTime;
+	double workTime = getTime() - startTime;
 	double fpsAvg = fpsSum / double(nFrames);
 	double mraysPerSec = (double(nRays) / workTime) / 1000000;
 

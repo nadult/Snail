@@ -6,11 +6,12 @@
 #include <GL/glext.h>
 #include <GL/glu.h>
 #include "shading/material.h"
+#include <iostream>
 
 OGLRenderer::OGLRenderer(const Scene<BVH> &scene) {
 	unsigned int temp[3];
 	glGenBuffers(3, temp);
-	InputAssert(glGetError() == GL_NO_ERROR);
+	ASSERT(glGetError() == GL_NO_ERROR);
 
 	posBuffer = temp[0];
 	uvBuffer = temp[1];
@@ -31,7 +32,7 @@ OGLRenderer::OGLRenderer(const Scene<BVH> &scene) {
 			positions[n * 3 + 2] = tris[n].P3();
 		}
 		glBufferData(GL_ARRAY_BUFFER, tris.size() * 3 * 3 * 4, &positions[0], GL_STATIC_DRAW);
-		InputAssert(glGetError() == GL_NO_ERROR);
+		ASSERT(glGetError() == GL_NO_ERROR);
 	}
 
 	const AShTriVector &shTris = scene.geometry.shTris;
@@ -50,7 +51,7 @@ OGLRenderer::OGLRenderer(const Scene<BVH> &scene) {
 			uvs[n * 3 + 2] = shTris[n].uv[2];
 		}
 		glBufferData(GL_ARRAY_BUFFER, shTris.size() * 3 * 2 * 4, &uvs[0], GL_STATIC_DRAW);
-		InputAssert(glGetError() == GL_NO_ERROR);
+		ASSERT(glGetError() == GL_NO_ERROR);
 	}
 	else useUvs = false;
 
@@ -71,7 +72,7 @@ OGLRenderer::OGLRenderer(const Scene<BVH> &scene) {
 				normals[n * 3 + 0] = normals[n * 3 + 1] = normals[n * 3 + 2] =  Vec3f(tris[n].plane);
 		}
 		glBufferData(GL_ARRAY_BUFFER, normals.size() * 3 * 4, &normals[0], GL_STATIC_DRAW);
-		InputAssert(glGetError() == GL_NO_ERROR);
+		ASSERT(glGetError() == GL_NO_ERROR);
 	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -119,7 +120,7 @@ void OGLRenderer::InitShaders() {
 		glGetProgramInfoLog(program, sizeof(buf), 0, buf);
 		std::cout << buf << '\n';
 	}
-	InputAssert(glGetError() == GL_NO_ERROR);
+	ASSERT(glGetError() == GL_NO_ERROR);
 }
 
 OGLRenderer::~OGLRenderer() {

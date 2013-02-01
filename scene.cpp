@@ -1,6 +1,7 @@
 #include "scene.h"
 #include "photons.h"
 #include <algorithm>
+#include <iostream>
 
 template <class AccStruct>
 Scene<AccStruct>::Scene() :defaultMat(Vec3f(1, 1, 1)),
@@ -15,7 +16,7 @@ Scene<AccStruct>::Scene() :defaultMat(Vec3f(1, 1, 1)),
 			float u1 = rand(), u2 = rand();
 			giRays[x + y * giDim] = UniformSampleSphere(u1, u2);
 			//giRays[x + y * giDim] = UniformSampleSphere(x / float(giDim), y / float(giDim));
-			std::cout << giRays[x + y * giDim] << '\n';
+			//std::cout << giRays[x + y * giDim] << '\n';
 		}
 }
 

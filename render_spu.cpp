@@ -88,7 +88,7 @@ namespace {
 	}
 
 	void ChangeThreads(int nth) {
-		InputAssert(nth <= maxThreads && nth >= 0);
+		ASSERT(nth <= maxThreads && nth >= 0);
 
 		while(nThreads < nth) {
 			speContext[nThreads].Create();
@@ -154,13 +154,13 @@ static TreeStats RenderAndSend(const Scene<AccStruct> &scene,const Camera &camer
 		const gfxlib::Texture *tex = id == ~0? 0 :
 			scene.materials[id]?scene.materials[id]->GetTexture() : 0;
 		if(tex) {
-			Assert(tex->GetFormat().GetBytesPerPixel() == 3);
+			DASSERT(tex->GetFormat().GetBytesPerPixel() == 3);
 
 			info.dataPtr = (unsigned long long)tex->DataPointer();
 			info.width = tex->Width();
 			info.height = tex->Height();
-			Assert(!(info.width & (info.width - 1)));
-			Assert(!(info.height & (info.height - 1)));
+			DASSERT(!(info.width & (info.width - 1)));
+			DASSERT(!(info.height & (info.height - 1)));
 			info.wMask = info.width - 1;
 			info.hMask = info.height - 1;
 		}
@@ -197,7 +197,7 @@ static TreeStats RenderAndSend(const Scene<AccStruct> &scene,const Camera &camer
 		float ratio = float(resx) / float(resy);
 		u8 *outPtr = &data[offsets[n]];
 	
-		Assert(width == blockWidth && height == blockHeight);
+		DASSERT(width == blockWidth && height == blockHeight);
 
 		TaskInfo newTask;
 		newTask.bvhNodes = (unsigned long long)&scene.geometry.nodes[0];

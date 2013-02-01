@@ -2,11 +2,11 @@
 #include "baselib.h"
 
 FrameCounter::FrameCounter()
-	:time(baselib::GetTime()), frames(0), fps(0) {
+	:time(baselib::getTime()), frames(0), fps(0) {
 }
 
 void FrameCounter::NextFrame() {
-	double tTime = baselib::GetTime();
+	double tTime = baselib::getTime();
 	double interval = 0.5f;
 
 	frames++;

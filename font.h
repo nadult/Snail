@@ -12,12 +12,11 @@ public:
 	void FinishDrawing();
 
 	void Print(const string &text);
-
-	template <typename... Args>
-	void Print(const Args & ...args) { Print((string)Stringize(args...)); }
-
-	template <typename... Args>
-	void PrintAt(const Vec2f &pos,const Args & ...args) { SetPos(pos); Print((string)Stringize(args...)); }
+	
+	inline void PrintAt(const Vec2f &pos, const string &text) {
+		SetPos(pos);
+		Print(text);
+	}
 
 	gfxlib::Font font;
 	TexHandle tex;

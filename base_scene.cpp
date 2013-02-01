@@ -88,7 +88,7 @@ void BaseScene::SwapYZ() {
 
 BBox BaseScene::GetBBox() const {
 	if(objects.size() == 0)
-		ThrowException("Trying to compute bounding box of empty scene");
+		THROW("Trying to compute bounding box of empty scene");
 	
 	BBox out=objects[0].GetBBox()*objects[0].trans;	
 	for(int n=1;n<objects.size();n++)

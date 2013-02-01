@@ -214,27 +214,27 @@ public:
 	Isct() { }
 
 	Real &Distance(int q=0) {
-		if(!(flags&isct::fDistance)) ThrowException("Structure doesnt contain 'distance' member.");
+		if(!(flags&isct::fDistance)) THROW("Structure doesnt contain 'distance' member.");
 		return distance[q];
 	}
 	const Real &Distance(int q=0) const {
-		if(!(flags&isct::fDistance)) ThrowException("Structure doesnt contain 'distance' member.");
+		if(!(flags&isct::fDistance)) THROW("Structure doesnt contain 'distance' member.");
 		return distance[q];
 	}
 	Int &Object(int q=0) {
-		if(!(flags&isct::fObject)) ThrowException("Structure doesnt contain 'object' member.");
+		if(!(flags&isct::fObject)) THROW("Structure doesnt contain 'object' member.");
 		return object[q];
 	}
 	const Int &Object(int q=0) const {
-		if(!(flags&isct::fObject)) ThrowException("Structure doesnt contain 'object' member.");
+		if(!(flags&isct::fObject)) THROW("Structure doesnt contain 'object' member.");
 		return object[q];
 	}
 	Int &Element(int q=0) {
-		if(!(flags&isct::fElement)) ThrowException("Structure doesnt contain 'element' member.");
+		if(!(flags&isct::fElement)) THROW("Structure doesnt contain 'element' member.");
 		return element[q];
 	}
 	const Int &Element(int q=0) const {
-		if(!(flags&isct::fElement)) ThrowException("Structure doesnt contain 'element' member.");
+		if(!(flags&isct::fElement)) THROW("Structure doesnt contain 'element' member.");
 		return element[q];
 	}
 

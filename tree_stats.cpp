@@ -39,7 +39,7 @@
 		if(msBuildTime > 0.01)
 			p += sprintf(p, " build:%.2f", msBuildTime);
 		
-		InputAssert(sizeof(timers) / sizeof(int) >= 8);
+		ASSERT(sizeof(timers) / sizeof(int) >= 8);
 		sprintf(p, " all:%d tr:%d (in:%d) sh:%d sm:%d  %d %d %d",
 				timers[0], timers[1], timers[2], timers[3], timers[4], timers[5], timers[6], timers[7]);
 

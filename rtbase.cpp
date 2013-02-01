@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <ostream>
 
 void FileModTime(const string &path, time_t *out) {
 	struct stat attrib;

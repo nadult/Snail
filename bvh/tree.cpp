@@ -1,6 +1,6 @@
 #include "bvh/tree.h"
-#include <algorithm>
 #include "base_scene.h"
+#include <algorithm>
 
 namespace {
 	struct OrderTris {
@@ -292,7 +292,7 @@ void BVH::Construct(const BaseScene &scene, int flags) {
 	tris = scene.ToTriVector();
 	if(!(flags & noShadingData)) {
 		shTris = scene.ToShTriVector();
-		InputAssert(shTris.size() == tris.size());
+		ASSERT(shTris.size() == tris.size());
 	}
 	else shTris.clear();
 
@@ -310,7 +310,7 @@ void BVH::Construct(const BaseScene &scene, int flags) {
 		FindSplit(0, 0, tris.size(), 0);
 	else
 		FindSplitSweep(0, 0, tris.size(), 0, flags & useSah);
-	InputAssert(depth <= maxDepth);
+	ASSERT(depth <= maxDepth);
 
 	std::map<int, string> matNames;
 	const std::map<string, int> &tnames = scene.matNames;
@@ -320,13 +320,13 @@ void BVH::Construct(const BaseScene &scene, int flags) {
 
 	int idx = 0;
 	for(std::map<int, string>::const_iterator it = matNames.begin(); it != matNames.end(); ++it) {
-		InputAssert(it->first == idx);
+		ASSERT(it->first == idx);
 		materials[idx++].name = it->second;
 	}
 }
 
 
-void BVH::Serialize(Serializer &sr) {
+void BVH::serialize(Serializer &sr) {
 	sr & depth & tris & shTris & nodes & materials;
 }
 

@@ -145,7 +145,7 @@ namespace bih {
 		
 		Tree() { }
 
-		void Serialize(Serializer&);
+		void serialize(Serializer&);
 
 		BBox GetBBox() const { return bBox; }
 

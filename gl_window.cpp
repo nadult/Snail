@@ -176,7 +176,7 @@ namespace
 		for(;;) {
 			glfwPollEvents();
 			// Aplikacja jest zminimalizowana -> uspij na 50msec
-			if(glfwGetWindowParam(GLFW_ICONIFIED)) { Sleep(0.05); continue; }
+			if(glfwGetWindowParam(GLFW_ICONIFIED)) { sleep(0.05); continue; }
 			break;
 		}
 		int width,height; glfwGetWindowSize(&width,&height);
@@ -204,7 +204,7 @@ namespace
 		static GLuint pbo[2] = {0, 0};
 		static int pindex = 0;
 
-		InputAssert(image.GetFormat() == gfxlib::TI_R8G8B8);
+		ASSERT(image.GetFormat() == gfxlib::TI_R8G8B8);
 		
 		if(image.Width() != texW || image.Height() != texH) {
 			if(!pbo[0]) {
@@ -231,7 +231,7 @@ namespace
 
 		char *memBuf = (char*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY);
 		if(!memBuf)
-			ThrowException("Error while mapping PBO");
+			THROW("Error while mapping PBO");
 
 		memcpy(memBuf, image.DataPointer(), image.Width() * image.Height() * 3);
 		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER_ARB);

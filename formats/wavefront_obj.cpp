@@ -68,7 +68,7 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 	
 	std::filebuf fb;
 	if(!fb.open (fileName.c_str(),std::ios::in))
-		ThrowException("Error while opening: ", fileName);
+		THROW("Error while opening: %s", fileName.c_str());
 
 	std::istream is(&fb);
 	
@@ -147,13 +147,13 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 
 				if(tri.v[k] >= int(verts.size()) || tri.v[k] < 0) {
 					std::cout << line << '\n';
-					ThrowException("Wrong vertex index: ",tri.v[k],"/",int(verts.size()));
+					THROW("Wrong vertex index: ",tri.v[k],"/",int(verts.size()));
 				}
 				if(tri.vt[k] >= int(uvs.size()))
-					ThrowException("Wrong tex-coord index: ",tri.vt[k],"/",int(uvs.size()));
+					THROW("Wrong tex-coord index: ",tri.vt[k],"/",int(uvs.size()));
 				if(tri.vn[k] >= int(normals.size())) {
 					tri.vn[k] = -1; //TODO
-				//	ThrowException("Wrong normal index",tri.vn[k],"/",int(normals.size()));
+				//	THROW("Wrong normal index",tri.vn[k],"/",int(normals.size()));
 				}
 			}
 			
@@ -207,7 +207,12 @@ void BaseScene::SaveWavefrontObj(const string &fileName) const {
 	
 	for(int n=0;n<objects.size();n++) {
 		const Object &obj=objects[n];
-		os << "o " << (obj.name==""?Stringize("object_",n):obj.name) << '\n';
+		os << "o ";
+	   	if(obj.name == "")
+			os << "object_" << n;
+		else
+			os << obj.name;
+		os << '\n';
 		
 		for(int f=0;f<obj.tris.size();f++) {
 			const IndexedTri &tri=obj.tris[f];

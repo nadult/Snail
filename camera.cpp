@@ -19,12 +19,12 @@ static void Rotate(const Vec3f axis, float radians, Vec3f &v1, Vec3f &v2, Vec3f 
 	v3 = Vec3f(xzm + ySin, yzm - xSin, zz * oneMinusCos + cos);
 }
 
-void CameraConfigs::Serialize(Serializer &sr) {
+void CameraConfigs::serialize(Serializer &sr) {
 	std::map<string, FPSCamera>::iterator it=data.begin();
 	int count=data.size();
 	sr&count;
 
-	if(sr.IsLoading()) {
+	if(sr.isLoading()) {
 		for(int n=0;n<count;n++) {
 			string str; FPSCamera cam;
 			sr & str & cam;
@@ -67,7 +67,7 @@ FPSCamera::operator const Camera() const {
 	return Camera(pos, right, up, front, plane_dist);
 }
 
-void FPSCamera::Serialize(Serializer &sr) {
+void FPSCamera::serialize(Serializer &sr) {
 	sr & pos & ang & pitch & plane_dist;
 }
 

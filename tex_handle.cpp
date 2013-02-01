@@ -11,14 +11,14 @@
 			if(err==GL_NO_ERROR) return;
 
 			switch(err) {
-		#define CASE(e) case e: ThrowException(#e,' ',args...);
+		#define CASE(e) case e: THROW(#e,' ',args...);
 				CASE(GL_INVALID_ENUM)
 				CASE(GL_INVALID_VALUE)
 				CASE(GL_INVALID_OPERATION)
 				CASE(GL_STACK_OVERFLOW)
 				CASE(GL_STACK_UNDERFLOW)
 				CASE(GL_OUT_OF_MEMORY)
-				default: ThrowException(args...);
+				default: THROW(args...);
 		#undef CASE
 			}
 		}
@@ -27,9 +27,9 @@
 
 		void SetTextureData(u32 level,const Format &fmt,u32 width,u32 height,void *pixels) {
 			if((width&(width-1))||(height&(height-1)))
-				ThrowException("Texture width or height is not a power of 2");
+				THROW("Texture width or height is not a power of 2");
 
-			if(fmt.IsCompressed()) ThrowException("Texture compression is not supported");
+			if(fmt.IsCompressed()) THROW("Texture compression is not supported");
 				
 			glTexImage2D(GL_TEXTURE_2D,level,fmt.GlInternal(),width,height,0,fmt.GlFormat(),fmt.GlType(),pixels);
 			TestGlError("Error while loading texture surface to the device (internal: ",fmt.GlInternal()," glFormat: ",fmt.GlFormat(),')');
@@ -73,7 +73,7 @@
 		
 		glGenTextures(1,(GLuint*)&id);
 		if(glGetError()!=GL_NO_ERROR)
-			ThrowException("Error while creating texture");
+			THROW("Error while creating texture");
 		
 		::glBindTexture(GL_TEXTURE_2D, id);
 
@@ -97,11 +97,11 @@
 			GetTextureData(mip,fmt,out.DataPointer(mip));
 	}
 
-	void TexHandle::Serialize(Serializer &sr) {
+	void TexHandle::serialize(Serializer &sr) {
 		Surface surface;
-		if(sr.IsSaving()) GetSurface(surface);
+		if(sr.isSaving()) GetSurface(surface);
 		sr & surface;
-		if(sr.IsLoading()) SetSurface(surface);
+		if(sr.isLoading()) SetSurface(surface);
 	}
 	
 	void TexHandle::CreateMip(uint level,uint w,uint h,Format fmt) {

@@ -8,6 +8,7 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "gfxlib_texture.h"
 
 #include "camera.h"
 
@@ -101,7 +102,32 @@ namespace
 {
 	int shaderProgram = 0;
 	int volumeHandle = 0;
+	int transferHandle = 0;
 	int volumeSize[3] = {0, 0, 0};
+
+	void InitTransferFunc() {
+		if(transferHandle)
+			return;
+
+		gfxlib::Texture tex;
+		Loader("hue_bar.png") & tex;
+
+		const char *data = (const char*)tex.DataPointer();
+
+		GLuint handle;
+		glGenTextures(1, &handle);
+		glBindTexture(GL_TEXTURE_2D, handle);
+		ASSERT(glGetError() == GL_NO_ERROR);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP);
+
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, tex.Width(), tex.Height(), 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		transferHandle = handle;
+	}
 
 	void InitShaders() {
 		if(shaderProgram) {
@@ -115,8 +141,8 @@ namespace
 
 		vector<char> fs;
 		Loader ldr("shader.fsh");
-		fs.resize(ldr.Size() + 1);
-		ldr.Data(&fs[0], ldr.Size());
+		fs.resize(ldr.size() + 1);
+		ldr.data(&fs[0], ldr.size());
 		fs.back() = 0;
 		
 		const char *fsp = &fs[0];
@@ -151,7 +177,7 @@ namespace
 			glGetProgramInfoLog(shaderProgram, sizeof(buf), 0, buf);
 			printf("%s\n", buf);
 		}
-		Assert(glGetError() == GL_NO_ERROR);
+		DASSERT(glGetError() == GL_NO_ERROR);
 	}
 
 	void InitMatrices(const Camera &cam, float fov, float aspect) {
@@ -205,7 +231,7 @@ void Load3dTexture(const VolumeData &data) {
 	GLuint handle;
 	glGenTextures(1, &handle);
 	glBindTexture(GL_TEXTURE_3D, handle);
-	InputAssert(glGetError() == GL_NO_ERROR);
+	ASSERT(glGetError() == GL_NO_ERROR);
 
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -232,12 +258,14 @@ void Load3dTexture(const VolumeData &data) {
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_LUMINANCE_ALPHA, tw, th, td, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, &tdata[0]);
 	//gluBuild3DMipmaps(GL_TEXTURE_3D, GL_LUMINANCE_ALPHA, tw, th, td, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, &tdata[0]);
 
-	InputAssert(glGetError() == GL_NO_ERROR);
+	ASSERT(glGetError() == GL_NO_ERROR);
 	volumeHandle = handle;
 }
 void RenderVolume(const Camera &cam, float aspectRatio, int res) {
 	if(!shaderProgram || ShadersModified())
 		InitShaders();
+	if(!transferHandle)
+		InitTransferFunc();
 	
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -262,6 +290,10 @@ void RenderVolume(const Camera &cam, float aspectRatio, int res) {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 
+	glActiveTexture(GL_TEXTURE1);
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, transferHandle);
+
 	glActiveTexture(GL_TEXTURE0);
 	glEnable(GL_TEXTURE_3D);
 	glBindTexture(GL_TEXTURE_3D, volumeHandle);
@@ -270,6 +302,7 @@ void RenderVolume(const Camera &cam, float aspectRatio, int res) {
 
 	glUniform3f(glGetUniformLocation(shaderProgram, "volumeSize"), size.x, size.y, size.z);
 	glUniform1i(glGetUniformLocation(shaderProgram, "volume"), 0);
+	glUniform1i(glGetUniformLocation(shaderProgram, "transfer"), 1);
 
 	glPushMatrix();
 	glLoadIdentity();
@@ -295,6 +328,8 @@ void RenderVolume(const Camera &cam, float aspectRatio, int res) {
 	rayMin = -Length(size) * 0.5f;
 	rayMax = Length(size) * 0.5f;
 
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
 	for(int n = res - 1; n >= 0; n--) {
 		float t = n / float(res - 1);
 
@@ -318,4 +353,8 @@ void RenderVolume(const Camera &cam, float aspectRatio, int res) {
 
 	glDisable(GL_TEXTURE_3D);
 	glUseProgram(0);
+	
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
 }

@@ -124,13 +124,14 @@ static int tmain(int argc, char **argv) {
 	int resx = 1024, resy = 1024;
 	bool fullscreen = 0;
 	int threads = 2;
-	string sceneName = "sponza.obj";
+	string sceneName = "/mnt/data/volumes/zatoki/dicom/";
 
 	bool flipNormals = 1, swapYZ = 0;
 	string texPath = "";
 	int rebuild = 0, buildFlags = 8;
 
 	int nInstances = 1;
+	int nPlanes = 256;
 
 	for(int n = 1; n < argc; n++) {
 			 if(string("-res") == argv[n] && n < argc-2) { resx = atoi(argv[n+1]); resy = atoi(argv[n+2]); n += 2; }
@@ -170,8 +171,7 @@ static int tmain(int argc, char **argv) {
 
 	{
 		VolumeData volume;
-		volume.LoadDicom("/mnt/data/volumes/zatoki/dicom/");
-		//volume.LoadRaw("/mnt/data/volumes/bunny/", 512, 512, 16);
+		volume.LoadDicom(sceneName.c_str());
 
 		sceneCenter = Vec3f(volume.width, volume.height, volume.depth) * 0.5f;
 		sceneScale = Length(sceneCenter) * 2.0f;
@@ -235,7 +235,8 @@ static int tmain(int argc, char **argv) {
 		for(int n = 1; n <= 8; n++) if(window.KeyDown('0' + n))
 				{ threads = n; printf("Threads: %d\n", threads); }
 
-		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 0 %s\n", gVals[0]?"on" : "off"); }
+		if(window.KeyDown(Key_f1)) nPlanes *= 2;
+		if(window.KeyDown(Key_f2)) nPlanes /= 2;
 		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 1 %s\n", gVals[1]?"on" : "off"); }
 		if(window.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 2 %s\n", gVals[2]?"on" : "off"); }
 		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Photons visible %s\n", gVals[3]?"on" : "off"); }
@@ -247,6 +248,8 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown(Key_f10)) { gVals[9]^=1; printf("Antialiasing 4x %s\n",gVals[9]?"on":"off"); }
 		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Traversing from 8x8: %s\n", gVals[0]?"on" : "off"); }
 
+		nPlanes = Clamp(nPlanes, 16, 2048);
+
 		static float animPos = 0;
 		if(window.Key(Key_space)) animPos+=0.025f;
 
@@ -255,13 +258,13 @@ static int tmain(int argc, char **argv) {
 
 		time = GetTime() - time;
 
-		RenderVolume(camera, float(resx) / resy, 512);
+		RenderVolume(camera, float(resx) / resy, nPlanes);
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));
-		font.PrintAt(Vec2f(5, 25), "FPS: ", fps);
+		font.PrintAt(Vec2f(5, 25), "FPS: ", fps, "  Planes: ", nPlanes);
 
 		font.FinishDrawing();
 		window.SwapBuffers();

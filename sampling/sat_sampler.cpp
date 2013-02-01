@@ -4,9 +4,9 @@ namespace sampling {
 
 	SATSampler::SATSampler(const gfxlib::Texture &tex) {
 		if(tex.Width()&(tex.Width()-1)||tex.Height()&(tex.Height()-1))
-			ThrowException("Texture width & height must be a power of 2");
+			THROW("Texture width & height must be a power of 2");
 		if(tex.GetFormat().GetIdent()!=gfxlib::TI_R8G8B8)
-			ThrowException("For now only R8G8B8 textures are supported");
+			THROW("For now only R8G8B8 textures are supported");
 
 		w=tex.Width(); h=tex.Height();
 		wMask=w-1; hMask=h-1;

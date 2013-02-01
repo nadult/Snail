@@ -241,7 +241,7 @@ int node_main(int argc, char **argv) {
 #ifdef __BIG_ENDIAN
 		ByteSwap(&resx); ByteSwap(&resy);
 #endif
-		Assert(resx % blockSize == 0 && resy % blockSize == 0);
+		DASSERT(resx % blockSize == 0 && resy % blockSize == 0);
 
 		vector<int> partCoords; {
 			int nCoords;

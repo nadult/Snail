@@ -4,13 +4,13 @@ namespace sampling {
 
 	PointSampler::PointSampler(const PTexture tex) : tex(tex) {
 		if(tex->Width() & (tex->Width() - 1) || tex->Height() & (tex->Height() - 1))
-			ThrowException("Texture width & height must be a power of 2");
+			THROW("Texture width & height must be a power of 2");
 		if(tex->GetFormat().GetIdent() != gfxlib::TI_R8G8B8)
-			ThrowException("For now only R8G8B8 textures are supported");
+			THROW("For now only R8G8B8 textures are supported");
 		if(tex->Width() > 65536 || tex->Height() > 65536)
-			ThrowException("Maximum width / height of a texture is: 65536");
+			THROW("Maximum width / height of a texture is: 65536");
 //		if(tex->Mips()>1&&tex->Width()!=tex->Height())
-//			ThrowException("Mipmapped textures must have width same as height");
+//			THROW("Mipmapped textures must have width same as height");
 		Update();
 	}
 

@@ -153,8 +153,8 @@ namespace {
 
 void DecompressParts(gfxlib::Texture &image, vector<DecompressBuffer> &parts, uint nParts,
 		uint nThreads) {
-	InputAssert(parts.size() >= nParts);
-	InputAssert(image.GetFormat().BytesPerPixel() == 3);
+	ASSERT(parts.size() >= nParts);
+	ASSERT(image.GetFormat().BytesPerPixel() == 3);
 
 	vector<DecompressTask> tasks(nParts);
 	for(size_t n = 0; n < nParts; n++)

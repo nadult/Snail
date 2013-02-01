@@ -67,7 +67,7 @@ namespace sampling {
 				return new PointSamplerDXT(*tex);
 		}
 
-		ThrowException("Cannot create a sampler from texture ", "TODO: name",
+		THROW("Cannot create a sampler from texture ", "TODO: name",
 						": format is not supported");
 	}
 

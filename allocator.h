@@ -18,8 +18,8 @@
 
 		template <class U> struct rebind { typedef AlignedAllocator<T,alignment> other; };
 
-		template <class U> bool operator==(const AlignedAllocator &other) { return true; }
-		template <class U> bool operator!=(const AlignedAllocator &other) { return false; }
+		bool operator==(const AlignedAllocator &other) { return true; }
+		bool operator!=(const AlignedAllocator &other) { return false; }
 
 		pointer address(reference r) const				{ return &r; }
 		const_pointer address(const_reference c)			{ return &c; }

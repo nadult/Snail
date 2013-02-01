@@ -15,7 +15,7 @@ void Mesh::Load(const string &fileName) {
 		if(token == "joints") {
 			in >> token; assert(token=="{");
 			while(true) {
-				if(in.eof()) ThrowException("Error while loading mesh from ",fileName);
+				if(in.eof()) THROW("Error while loading mesh from ",fileName);
 				in >> token;
 				if(token=="}") break;
 
@@ -36,25 +36,25 @@ void Mesh::Load(const string &fileName) {
 
 			in >> token; assert(token=="{");
 			while(true) {
-				if(in.eof()) ThrowException("Error while loading mesh from ",fileName);
+				if(in.eof()) THROW("Error while loading mesh from ",fileName);
 				in >> token;
 				if(token=="}") break;
 
 				if(token=="vert") {
-					if(numVerts==~0) ThrowException("Error while loading mesh from ",fileName);
+					if(numVerts==~0) THROW("Error while loading mesh from ",fileName);
 					int id; string p1,p2; in >> id;
 					Vert &vert=verts[id];
 					in >> p1 >> vert.uv.x >> vert.uv.y >> p2 >> vert.weightIdx >> vert.weightCount;
 					assert(p1=="("&&p2==")");
 				}
 				else if(token=="tri") {
-					if(numTris==~0) ThrowException("Error while loading mesh from ",fileName);
+					if(numTris==~0) THROW("Error while loading mesh from ",fileName);
 					int id; in >> id;
 					Tri &tri=tris[id];
 					in >> tri.idx[0] >> tri.idx[2] >> tri.idx[1];
 				}
 				else if(token=="weight") {
-					if(numWeights==~0) ThrowException("Error while loading mesh from ",fileName);
+					if(numWeights==~0) THROW("Error while loading mesh from ",fileName);
 					int id; string p1,p2; in >> id;
 					Weight &weight=weights[id];
 					in >> weight.jointIdx >> weight.value;
@@ -204,7 +204,7 @@ void MeshAnim::Load(const string &fileName) {
 			in >> token; assert(token=="{");
 
 			while(true) {
-				if(in.eof()) ThrowException("Error while loading mesh anim from ",fileName);
+				if(in.eof()) THROW("Error while loading mesh anim from ",fileName);
 				in >> token;
 				if(token=="}") break;
 
@@ -216,7 +216,7 @@ void MeshAnim::Load(const string &fileName) {
 		else if(token=="bounds") {
 			in >> token; assert(token=="{");
 			while(true) {
-				if(in.eof()) ThrowException("Error while loading mesh anim from ",fileName);
+				if(in.eof()) THROW("Error while loading mesh anim from ",fileName);
 				in >> token;
 				if(token=="}") break;
 
@@ -233,7 +233,7 @@ void MeshAnim::Load(const string &fileName) {
 			Vec3f *pos=&framePos[numFrames*numJoints];
 			Vec4f *rot=&frameRot[numFrames*numJoints];
 			while(true) {
-				if(in.eof()) ThrowException("Error while loading mesh anim from ",fileName);
+				if(in.eof()) THROW("Error while loading mesh anim from ",fileName);
 				in >> token;
 				if(token=="}") break;
 
@@ -254,7 +254,7 @@ void MeshAnim::Load(const string &fileName) {
 
 			int n=0;
 			while(true) {
-				if(in.eof()) ThrowException("Error while loading mesh anim from ",fileName);
+				if(in.eof()) THROW("Error while loading mesh anim from ",fileName);
 
 				if(h[n].numComp&1) in >> pos[n].x; else pos[n].x=basePos[n].x;
 				if(h[n].numComp&2) in >> pos[n].z; else pos[n].z=basePos[n].z;

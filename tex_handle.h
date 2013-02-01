@@ -14,7 +14,7 @@
 		TexHandle();
 		~TexHandle();
 
-		void Serialize(Serializer &sr);
+		void serialize(Serializer &sr);
 
 		void Create(uint mips);
 		

@@ -99,7 +99,7 @@ void VTree::BuildTree(int w, int h, int d, int first, int count) {
 	d = axis == 2? (d + 1) / 2 : d;
 	
 	int newCount = nodes.size() - first - count;
-	InputAssert(w * h * d == newCount);
+	ASSERT(w * h * d == newCount);
 
 	if(newCount == 1) {
 		startNode = nodes.size() - 1;

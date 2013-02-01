@@ -249,7 +249,7 @@ public:
 
 	vector<ShData> shData;
 
-	void Serialize(Serializer &sr) {
+	void serialize(Serializer &sr) {
 		sr &verts & shData & tris;
 	}
 

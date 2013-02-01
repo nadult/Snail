@@ -4,9 +4,9 @@ namespace sampling {
 
 	BilinearSampler::BilinearSampler(const gfxlib::Texture &t) :tex(t) {
 		if(tex.Width()&(tex.Width()-1)||tex.Height()&(tex.Height()-1))
-			ThrowException("Texture width & height must be a power of 2");
+			THROW("Texture width & height must be a power of 2");
 		if(tex.GetFormat().GetIdent()!=gfxlib::TI_R8G8B8)
-			ThrowException("For now only R8G8B8 textures are supported");
+			THROW("For now only R8G8B8 textures are supported");
 
 		wMask=tex.Width()-1;
 		hMask=tex.Height()-1;

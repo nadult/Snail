@@ -4,11 +4,11 @@ namespace sampling {
 
 	PointSampler16bit::PointSampler16bit(const gfxlib::Texture &t) :tex(t) {
 		if(tex.Width()&(tex.Width()-1)||tex.Height()&(tex.Height()-1))
-			ThrowException("Texture width & height must be a power of 2");
+			THROW("Texture width & height must be a power of 2");
 		if(tex.GetFormat().GetIdent()!=gfxlib::TI_R5G6B5)
-			ThrowException("For now only R5G6B5 textures are supported");
+			THROW("For now only R5G6B5 textures are supported");
 //		if(tex.Mips()>1&&tex.Width()!=tex.Height())
-//			ThrowException("Mipmapped textures must have width same as height");
+//			THROW("Mipmapped textures must have width same as height");
 
 		wMask=tex.Width()-1;
 		hMask=tex.Height()-1;
@@ -18,7 +18,7 @@ namespace sampling {
 		wShift1=wShift+1;
 
 		if(tex.Pitch()!=(2<<wShift))
-			ThrowException("Texture pitch must be equal to width*2");
+			THROW("Texture pitch must be equal to width*2");
 	}
 
 	Vec3q PointSampler16bit::operator()(const Vec2q &coord) const {
