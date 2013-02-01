@@ -1,3 +1,5 @@
+TODO: translate
+
 Ogolny opis dzialania:
 
 Klient laczy sie z serwerem wysylajac informacje o rozdzielczosci, nazwie sceny.
