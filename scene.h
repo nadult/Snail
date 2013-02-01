@@ -24,9 +24,6 @@ public:
 #include "shading/simple_material.h"
 #include <tr1/random>
 
-class Photon;
-class PhotonNode;
-
 template <class AccStruct>
 class Scene {
 public:
@@ -40,9 +37,6 @@ public:
 	shading::TexDict texDict;
 	shading::MaterialWrapper<shading::SimpleMaterial<true> > defaultMat;
 
-	vector<Photon> *photons;
-	vector<PhotonNode> *photonNodes;
-	
 	mutable std::tr1::variate_generator<std::tr1::mt19937, std::tr1::uniform_real<> > rand;
 
 	void UpdateMaterials();
@@ -52,17 +46,12 @@ public:
 	const TreeStats RayTrace(const RayGroup<sharedOrigin, hasMask>&, Cache&, Vec3q *outColor)
 		const __attribute__((noinline));
 
-	enum { numGIRays = 64, giDim = 8 };
-	Vec3f giRays[numGIRays];
-
 private:
 	const TreeStats TraceLight(RaySelector, const shading::Sample*, Vec3q*__restrict__, Vec3q*__restrict__, int)
 							const NOINLINE;
 
 	const TreeStats TraceReflection(RaySelector, const Vec3q*, const shading::Sample*, Cache&, Vec3q *__restrict__)
 		const NOINLINE;
-
-	const TreeStats TraceAmbientOcclusion(RaySelector, shading::Sample*, const Vec3q*, Cache&) const;
 	
 	template <bool sharedOrigin, bool hasMask>
 	const TreeStats TraceTransparency(RaySelector, const RayGroup<sharedOrigin, hasMask>&, const floatq*,

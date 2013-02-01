@@ -451,13 +451,7 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 		}
 	}
 
-	if(gVals[7] && cache.reflections < 1) {
-		cache.reflections++;
-		TraceAmbientOcclusion(selector, samples, rays.DirPtr(), cache);
-		cache.reflections--;
-	}
-
-	if(0 && /*reflSel.Any() &&*/ gVals[7] && cache.reflections < 1) {
+	if(/*reflSel.Any() &&*/ gVals[7] && cache.reflections < 1) {
 		//TODO: przywrocic obsluge wlaczania odbic dla wybranych materialow
 		reflSel = selector;
 		cache.reflections++;
@@ -470,7 +464,8 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 					(reflColor[q] - samples[q].diffuse) * floatq(0.3f), samples[q].diffuse);
 		}
 	}
-	if(0 && transSel.Any()) {
+
+	if(transSel.Any()) {
 		Vec3q transColor[size];
 		for(int q = 0; q < size; q++)
 			transSel[q] &= ForWhich(samples[q].opacity < 1.0f);
@@ -495,30 +490,17 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 		}
 	}
 
-	if(photons) {
-		for(int k = 0; k < 4; k++)
-			GatherPhotons(*photonNodes, *photons, samples + k * (size / 4),
-										size / 4, 0.75, geometry.GetBBox());
-//		if(count < 50)
-//			GatherPhotons(*photonNodes, *photons, samples, size, 2.5, geometry.GetBBox());
+	int   nLights = lights.size();
+	Vec3f tMinPos(Minimize(minPos)), tMaxPos(Maximize(maxPos));
+	for(int n = 0; n < nLights; n++) {
+		const Light &light = lights[n];
+		if(BoxPointDistanceSq(BBox(tMinPos, tMaxPos), light.pos) > light.radSq)
+			continue;
 
-		for(unsigned q = 0; q < size; q++)
-			samples[q].diffuse += samples[q].temp1;
-		
-	}
-	else {
-		int   nLights = lights.size();
-		Vec3f tMinPos(Minimize(minPos)), tMaxPos(Maximize(maxPos));
-		for(int n = 0; n < nLights; n++) {
-			const Light &light = lights[n];
-			if(BoxPointDistanceSq(BBox(tMinPos, tMaxPos), light.pos) > light.radSq)
-				continue;
-
-			stats += TraceLight(selector, samples, lDiffuse, lSpecular, n);
-		}
+		stats += TraceLight(selector, samples, lDiffuse, lSpecular, n);
 	}
 
-	if(lights.size() && cache.reflections == 1) {
+	if(lights.size()) {
 		Vec3q zero(0.0f, 0.0f, 0.0f), one(1.0f, 1.0f, 1.0f);
 		for(int q = 0; q < size; q++) {
 			outColor[q] = samples[q].diffuse * lDiffuse[q] + samples[q].specular * lSpecular[q];
@@ -616,51 +598,6 @@ const TreeStats Scene <AccStruct>::TraceLight(RaySelector inputSel, const shadin
 
 	return stats;
 }
-
-template <class AccStruct>
-const TreeStats Scene <AccStruct>::TraceAmbientOcclusion(RaySelector inputSel, shading::Sample *samples,
-			const Vec3q *__restrict rayDir, Cache &cache) const {
-	int size = inputSel.Size();
-	TreeStats stats;
-
-	for(int i = 0; i < size; i++)
-		samples[i].diffuse = Vec3q(0.0f, 0.0f, 0.0f);
-
-	for(int n = 0; n < numGIRays; n++) {
-		Vec3q reflDir[size], reflOrig[size], idir[size];
-		floatq dot[size];
-		char selectorData[size + 4];
-		RaySelector newSel(selectorData, size);
-		
-		Vec3f ray = giRays[n];//UniformSampleSphere(rand(), rand());
-		reflDir[0] = Vec3q(ray);
-		idir[0] = SafeInv(reflDir[0]);
-
-		for(int i = 0; i < size; i++) {
-			reflDir[i] = reflDir[0];
-			idir[i] = idir[0];
-			dot[i] = reflDir[i] | -samples[i].normal;
-			f32x4b mask = inputSel.SSEMask(i) && dot[i] > floatq(0.0f);
-			newSel[i] = ForWhich(mask);
-			reflOrig[i] = samples[i].position + reflDir[i] * floatq(0.001f);
-		}
-
-		if(newSel.Any()) {
-			Vec3q color[size];
-			RayTrace(RayGroup<false, true>(reflOrig, reflDir, idir, size, &newSel[0]), cache, color);
-
-			Vec3q zero(0.0f, 0.0f, 0.0f), one(1.0f, 1.0f, 1.0f);
-			for(int i = 0; i < size; i++)
-				samples[i].diffuse += Condition(newSel.SSEMask(i), VMax(color[i], zero), zero);
-		}
-	}	
-		
-	for(int i = 0; i < size; i++)
-		samples[i].diffuse *= floatq(1.0f / numGIRays);
-
-	return stats;
-}
-
 
 template <class AccStruct>
 const TreeStats Scene<AccStruct>::TraceReflection(RaySelector selector, const Vec3q *dir, const shading::Sample *samples,

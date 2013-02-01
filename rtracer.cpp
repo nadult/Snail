@@ -179,7 +179,7 @@ static int tmain(int argc, char **argv) {
 	int resx = 1024, resy = 1024;
 	bool fullscreen = 0;
 	int threads = 2;
-	string sceneName = "pompei.obj";//"doom3/admin.proc";
+	string sceneName = "sponza.obj";
 
 	Options options;
 	bool flipNormals = 1, swapYZ = 0;
@@ -320,11 +320,7 @@ static int tmain(int argc, char **argv) {
 	float lastFrameTime = 0.0f;
 	double lastTime = getTime();
 
-	vector<Photon> photons;
-	vector<PhotonNode> photonTree;
-
 //	if(!oglRenderer) oglRenderer = new OGLRenderer(scene);
-	double photonGenTime = 0.0;
 
 	while(window.PollEvents()) {
 		frmCounter.NextFrame();
@@ -366,7 +362,7 @@ static int tmain(int argc, char **argv) {
 			};
 
 			Vec3f pos = (orbiting?(Camera)ocam : (Camera)cam).pos;
-			lights.push_back(Light(pos, colors[rand() % countof(colors)], 2000.0f * 0.001f * sceneScale));
+			lights.push_back(Light(pos, colors[rand() % countof(colors)], 1000.0f * 0.001f * sceneScale));
 		}
 
 		if(window.KeyDown('H')) {
@@ -397,8 +393,6 @@ static int tmain(int argc, char **argv) {
 		if(window.KeyDown(Key_f1)) { gVals[0]^=1; printf("Val 0 %s\n", gVals[0]?"on" : "off"); }
 		if(window.KeyDown(Key_f2)) { gVals[1]^=1; printf("Val 1 %s\n", gVals[1]?"on" : "off"); }
 		if(window.KeyDown(Key_f3)) { gVals[2]^=1; printf("Val 2 %s\n", gVals[2]?"on" : "off"); }
-		if(window.KeyDown(Key_f4)) { gVals[3]^=1; printf("Photons visible %s\n", gVals[3]?"on" : "off"); }
-		if(window.KeyDown(Key_f5)) { gVals[4]^=1; printf("Photon tracing %s\n", gVals[4]?"on" : "off"); }
 		if(window.KeyDown(Key_f6)) { gVals[5]^=1; printf("Scene complexity visualization %s\n",gVals[5]?"on":"off"); }
 		if(window.KeyDown(Key_f7)) { gVals[6]^=1; printf("Advanced shading %s\n",gVals[6]?"on":"off"); }
 		if(window.KeyDown(Key_f8)) { gVals[7]^=1; printf("Reflections 7 %s\n",gVals[7]?"on":"off"); }
@@ -423,11 +417,6 @@ static int tmain(int argc, char **argv) {
 		//			sin(animPos-n*n)*cos(animPos+n*n)) * tspeed;
 		scene.lights = dscene.lights = tLights;
 
-		if(photons.size()) {
-			scene.photons = &photons;
-			scene.photonNodes = &photonTree;
-		}
-		
 		double time = getTime(); 
 		TreeStats stats; {
 			Camera camera = orbiting?(Camera)ocam : (Camera)cam;
@@ -435,29 +424,13 @@ static int tmain(int argc, char **argv) {
 			if(oglRendering) {
 				oglRenderer->BeginDrawing(camera, 60.0f, float(resx) / float(resy), 1);
 				oglRenderer->Draw();
-				if(gVals[3]) oglRenderer->DrawPhotons(photons, 0);
 				oglRenderer->FinishDrawing();
 			}
 			else {
 				stats = nInstances > 1? Render(dscene, camera, image, options, threads) :
 										Render( scene, camera, image, options, threads);
 				bool updated = 0;
-
-			/*	if(gVals[4]) {
-					photonGenTime = getTime();
-					TracePhotons(photons, scene, 4 * 1024 * 1024);
-					MakePhotonTree(photonTree, photons);
-					photonGenTime = getTime() - photonGenTime;
-					gVals[4] = 0; gVals[3] = 1;
-					updated = 1;
-				} */
 				window.RenderImage(image, true);
-
-			/*	if(gVals[3] && oglRenderer) {
-					oglRenderer->BeginDrawing(camera, 60.0f, float(resx) / float(resy), 0);
-					oglRenderer->DrawPhotons(photons, updated);
-					oglRenderer->FinishDrawing();
-				} */
 			}
 		}	
 
@@ -465,7 +438,6 @@ static int tmain(int argc, char **argv) {
 
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 		double mrays = double(unsigned(frmCounter.FPS() * stats.GetRays() * 0.0001)) * 0.01;
-		double ptime = double(unsigned(photonGenTime * 100.0)) * 0.01;
 
 		font.BeginDrawing(resx,resy);
 		font.SetSize(Vec2f(30, 20));
@@ -479,8 +451,6 @@ static int tmain(int argc, char **argv) {
 			font.PrintAt(Vec2f(5,  5), stats.GenInfo(resx, resy, time * 1000.0, buildTime * 1000.0));
 			snprintf(text, sizeof(text), "FPS: %.2f %s%.2f", fps, " MRays/sec:", mrays);
 			font.PrintAt(Vec2f(5, 25), text);
-			snprintf(text, sizeof(text), "%d%s%.2f", (int)photons.size() / 1024, "k photons generated in ", ptime);
-			font.PrintAt(Vec2f(5, 45), text);
 			if(lightsEnabled && lights.size()) {
 				snprintf(text, sizeof(text), "Lights: %d", lightsEnabled?(int)lights.size() : 0);
 				font.PrintAt(Vec2f(5, 65), text);
