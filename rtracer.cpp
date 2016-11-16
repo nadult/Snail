@@ -174,7 +174,7 @@ public:
 		int resx = 1024, resy = 1024;
 		bool fullscreen = false;
 		int threads = 2;
-		string sceneName = "sponza.obj";
+		string sceneName = "abrams.obj";
 
 		Options options;
 		bool flipNormals = false, swapYZ = false;
