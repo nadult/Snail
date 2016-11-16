@@ -3,5 +3,4 @@ out/
 build/
 scenes/cameras.dat
 .ycm_extra_conf.pyc
-pch.h.gch
 rtracer

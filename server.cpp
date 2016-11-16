@@ -1,14 +1,11 @@
 #if defined(__PPC) || defined(__PPC__)
 
-#include "pch.h"
-
 int server_main(int, char**) {
 	THROW("Server (node with rank 0) can only be run on x86");
 }
 
 #else
 
-#include "pch.h"
 #include <iostream>
 #include "camera.h"
 

@@ -11,8 +11,7 @@
 #include "spu/trace.h"
 #include <string.h>
 
-#include "pch.h"
-#include <iostream>
+include <iostream>
 #include "camera.h"
 #include "scene.h"
 #include "bvh/tree.h"

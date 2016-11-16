@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "quat.h"
 
 Quat::Quat(const Matrix<Vec4f> &mat) {

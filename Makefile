@@ -40,20 +40,19 @@ FLAGS=-march=native -std=c++14 -O3 -ggdb -rdynamic \
 
 CXX=g++
 
-DEPS:=$(FILES:%=$(BUILD_DIR)/%.dep)
+DEPS:=$(FILES:%=$(BUILD_DIR)/%.d) $(BUILD_DIR)/pch.h.d
 SOURCES:=$(FILES:%=%.cpp)
 OBJECTS:=$(FILES:%=$(BUILD_DIR)/%.o)
 SHARED_OBJECTS:=$(SHARED_FILES:%=$(BUILD_DIR)/%.o)
 RENDER_OBJECTS:=$(RFILES:%=$(BUILD_DIR)/%.o)
 
-$(DEPS): $(BUILD_DIR)/%.dep: %.cpp
-	$(CXX) $(FLAGS) $(INCLUDES) -MM $< -MT $(BUILD_DIR)/$*.o > $@
+PCH_FILE=$(BUILD_DIR)/pch.h.gch
+$(PCH_FILE): pch.h
+	cp pch.h $(BUILD_DIR)/pch.h
+	$(CXX) -MMD $(FLAGS) $(INCLUDES) $(BUILD_DIR)/pch.h -o $@
 
-pch.h.gch: pch.h
-	$(CXX) $(FLAGS) $(INCLUDES) pch.h -o $@
-
-$(OBJECTS): $(BUILD_DIR)/%.o: pch.h.gch %.cpp
-	$(CXX) $(FLAGS) $(INCLUDES) -c $*.cpp -o $@
+$(OBJECTS): $(BUILD_DIR)/%.o: $(PCH_FILE) %.cpp
+	$(CXX) -MMD $(FLAGS) $(INCLUDES) -include $(BUILD_DIR)/pch.h -c $*.cpp -o $@
 
 node: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/server.o $(BUILD_DIR)/node.o \
 		$(BUILD_DIR)/comm_mpi.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o $(LINUX_FWK_LIB)
@@ -71,25 +70,14 @@ rtracer: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)
 	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lGL -lGLU \
 		$(LINUX_LIBS) -g
 
-clean:
-	-rm -f $(OBJECTS) $(DEPS) $(BUILD_DIR)/.depend pch.h.gch client node
-	-rmdir $(BUILD_DIR)/formats $(BUILD_DIR)/sampling $(BUILD_DIR)/shading $(BUILD_DIR)/bvh $(BUILD_DIR)/dbvh \
-		$(BUILD_DIR)/cell
+rtclean:
+	-rm -f $(OBJECTS) $(DEPS) $(PCH_FILE) $(BUILD_DIR)/pch.h client node rtracer dicom_viewer
+	find $(BUILD_DIR) -type d -empty -delete
 	-rmdir $(BUILD_DIR)
-	cd cell && make clean
+
+clean: rtclean
 	$(MAKE) -C $(FWK_DIR) clean
 
-$(BUILD_DIR)/.depend: $(DEPS)
-	cat $(DEPS) > $(BUILD_DIR)/.depend
+.PHONY: clean rtclean 
 
-depend: $(BUILD_DIR)/.depend
-
-.PHONY: clean depend
-
-
-DEPEND_FILE=$(BUILD_DIR)/.depend
-DEP=$(wildcard $(DEPEND_FILE))
-ifneq "$(DEP)" ""
-include $(DEP)
-endif
-
+-include $(DEPS)

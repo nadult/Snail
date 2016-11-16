@@ -136,7 +136,7 @@ public:
 	Vec4f plane;
 };
 
-SERIALIZE_AS_POD(Triangle)
+SERIALIZE_AS_POD(::Triangle)
 
 template <int flags, class VecO, class Vec>
 const Isct <typename Vec::TScalar, 1, isct::fDistance | flags> Triangle::Collide(VecO rOrig, Vec rDir) const {
