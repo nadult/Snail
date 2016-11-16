@@ -1,0 +1,6 @@
+[submodule "libfwk"]
+	path = libfwk
+	url = https://github.com/nadult/libfwk.git
+[submodule "veclib"]
+	path = veclib
+	url = https://github.com/nadult/veclib.git

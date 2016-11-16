@@ -3,6 +3,7 @@
 #include "rtbase.h"
 #include "quicklz/quicklz.h"
 #include "quicklz/quicklz.c"
+#include "mipmap_texture.h"
 
 static void Decompress(unsigned char *data) {
 	enum {
@@ -42,7 +43,7 @@ namespace {
 
 	struct DecompressTask: public thread_pool::Task {
 		DecompressTask() { }
-		DecompressTask(gfxlib::Texture &image, DecompressBuffer *buffer)
+		DecompressTask(MipmapTexture &image, DecompressBuffer *buffer)
 			:image(&image), buf(buffer) { }
 #if defined(__PPC) || defined(__PPC__)
 		void Work(SPEContext*) {
@@ -145,16 +146,16 @@ namespace {
 			}
 		}
 
-		gfxlib::Texture *image;
+		MipmapTexture *image;
 		DecompressBuffer *buf;
 	};
 
 }
 
-void DecompressParts(gfxlib::Texture &image, vector<DecompressBuffer> &parts, uint nParts,
+void DecompressParts(MipmapTexture &image, vector<DecompressBuffer> &parts, uint nParts,
 		uint nThreads) {
 	ASSERT(parts.size() >= nParts);
-	ASSERT(image.GetFormat().BytesPerPixel() == 3);
+	ASSERT(image.GetFormat() == fwk::TextureFormatId::rgb);
 
 	vector<DecompressTask> tasks(nParts);
 	for(size_t n = 0; n < nParts; n++)

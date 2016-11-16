@@ -2,16 +2,15 @@
 #define RTRACER_SAMPLING_SAT_SAMPLER_H
 
 #include "rtbase.h"
-#include <gfxlib_texture.h>
 #include "sampling.h"
 
 namespace sampling {
 
-	class Cache;
+	struct Cache;
 
 	class SATSampler: public Sampler {
 	public:
-		SATSampler(const gfxlib::Texture&);
+		SATSampler(const MipmapTexture&);
 		SATSampler() { }
 
 		Vec3f operator()(const Vec2f &uv,const Vec2f &diff) const;
@@ -51,7 +50,7 @@ namespace sampling {
 		TSample ComputeRect(uint ax,uint ay,uint bx,uint by) const;
 		void ComputeRect(i32x4 ax,i32x4 ay,i32x4 bx,i32x4 by,TSample out[4]) const;
 
-		vector<TSample,AlignedAllocator<TSample> > samples;
+		std::vector<TSample,AlignedAllocator<TSample>> samples;
 		uint w,h,wMask,hMask,wShift;
 		Vec3f avg;
 	};

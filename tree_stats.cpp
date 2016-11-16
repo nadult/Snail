@@ -1,5 +1,4 @@
 #include "rtbase.h"
-#include "gfxlib_texture.h"
 #include <stdio.h>
 
 /*
@@ -10,7 +9,7 @@
 			for(int n=0;n<res;n++) data[n]=0;
 		}
 	}
-	void MemPattern::Draw(gfxlib::Texture &img) const {
+	void MemPattern::Draw(MipmapTexture &img) const {
 		if(enabled) {
 			int width=Min(data.size(),img.width);
 			for(int n=0;n<width;n++) {

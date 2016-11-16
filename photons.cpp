@@ -246,5 +246,5 @@ void TracePhotons(vector<Photon> &out, const Scene<BVH> &scene, unsigned count) 
 		}
 	}
 
-	out.resize(remove_if(out.begin(), out.end(), [](const Photon &p) { return !p.temp; }) - out.begin());
+	out.resize(std::remove_if(out.begin(), out.end(), [](const Photon &p) { return !p.temp; }) - out.begin());
 }

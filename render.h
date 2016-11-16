@@ -1,7 +1,8 @@
 #include "camera.h"
 #include "rtbase.h"
 #include "tree_stats.h"
-#include "gfxlib_texture.h"
+
+namespace fwk { class Texture; }
 
 template <class AccStruct> class Scene;
 
@@ -19,7 +20,7 @@ TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera, uint resx,
 
 template <class AccStruct>
 TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
-					gfxlib::Texture &image, const Options options, uint threads);
+					MipmapTexture &image, const Options options, uint threads);
 
 template <class AccStruct>
 TreeStats RenderAndSend(const Scene<AccStruct> &scene, const Camera &camera, uint resx, uint resy,

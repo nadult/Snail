@@ -2,9 +2,7 @@
 #include <iostream>
 #include "camera.h"
 
-#include "gl_window.h"
 #include "scene.h"
-#include "font.h"
 #include "frame_counter.h"
 #include "compression.h"
 #include "comm.h"
@@ -19,6 +17,8 @@ using comm::Pod;
 
 using std::cout;
 using std::endl;
+
+// TODO: port it to libfwk just like rtracer
 
 static void PrintHelp() {
 	printf("Synopsis:    rtracer model_file [options]\nOptions:\n"
@@ -222,7 +222,7 @@ static int client_main(int argc, char **argv) {
 		frmCounter.NextFrame();
 		
 		if(window.KeyDown('K'))
-			Saver("output.dds") & image;
+			Saver("output.tga") & image;
 		if(window.KeyDown('C')) {
 			if(orbiting) ocam.Reset(sceneCenter, sceneScale);
 			else cam.SetPos(sceneCenter);

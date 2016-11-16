@@ -1,11 +1,12 @@
 #include "sampling/point_sampler.h"
+#include "mipmap_texture.h"
 
 namespace sampling {
 
-	PointSampler::PointSampler(const PTexture tex) : tex(tex) {
+	PointSampler::PointSampler(const PMipmapTexture tex) : tex(tex) {
 		if(tex->Width() & (tex->Width() - 1) || tex->Height() & (tex->Height() - 1))
 			THROW("Texture width & height must be a power of 2");
-		if(tex->GetFormat().GetIdent() != gfxlib::TI_R8G8B8)
+		if(tex->GetFormat().id() != fwk::TextureFormatId::rgb)
 			THROW("For now only R8G8B8 textures are supported");
 		if(tex->Width() > 65536 || tex->Height() > 65536)
 			THROW("Maximum width / height of a texture is: 65536");

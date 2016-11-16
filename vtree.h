@@ -43,6 +43,6 @@ struct VTree {
 
 class Camera;
 
-void RenderTree(gfxlib::Texture &image, const VTree &tree, const Camera &camera);
+void RenderTree(MipmapTexture &image, const VTree &tree, const Camera &camera);
 
 #endif

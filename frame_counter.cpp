@@ -1,12 +1,12 @@
 #include "frame_counter.h"
-#include "baselib.h"
+#include "fwk_base.h"
 
 FrameCounter::FrameCounter()
-	:time(baselib::getTime()), frames(0), fps(0) {
+	:time(fwk::getTime()), frames(0), fps(0) {
 }
 
 void FrameCounter::NextFrame() {
-	double tTime = baselib::getTime();
+	double tTime = fwk::getTime();
 	double interval = 0.5f;
 
 	frames++;

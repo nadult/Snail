@@ -2,10 +2,10 @@
 
 namespace sampling {
 
-	PointSamplerDXT::PointSamplerDXT(const gfxlib::Texture &t) :tex(t) {
+	PointSamplerDXT::PointSamplerDXT(const Texture &t) :tex(t) {
 		if(tex.Width()&(tex.Width()-1)||tex.Height()&(tex.Height()-1))
 			THROW("Texture width & height must be a power of 2");
-		if(tex.GetFormat().GetIdent()!=gfxlib::TI_DXT1)
+		if(tex.GetFormat().GetIdent()!=TextureFormatId::dxt1)
 			THROW("DXT sampler requires DXT1 texture");
 //		if(tex.Mips()>1&&tex.Width()!=tex.Height())
 //			THROW("Mipmapped textures must have width same as height");

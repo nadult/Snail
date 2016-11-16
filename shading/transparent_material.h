@@ -41,7 +41,7 @@ namespace shading {
 			}
 		}
 		
-		const gfxlib::Texture *GetTexture() const { return cSampler->GetTexture(); }
+		const MipmapTexture *GetTexture() const { return cSampler->GetTexture(); }
 
 	private:
 		sampling::PSampler cSampler, tSampler;

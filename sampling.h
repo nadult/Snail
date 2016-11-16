@@ -2,10 +2,10 @@
 #define RTRACER_SAMPLING_H
 
 #include "shading.h"
-#include <gfxlib_texture.h>
 
 namespace sampling {
 
+	/*
 	struct DXTBlock { u16 c1,c2; union { u8 bits8[4]; u32 bits32; }; };
 
 	class DXTCache {
@@ -25,27 +25,26 @@ namespace sampling {
 	
 		i32x4 colors[size][16];
 		Ident idents[size];
-	};
+	};*/
 
 	struct Cache {
-		DXTCache dxtCache;
+	//	DXTCache dxtCache;
 	};
 
-	class Sampler: public RefCounter {
+	class Sampler {
 	public:
 		enum { blockSize=shading::blockSize };
 
 		virtual ~Sampler() { }
 
 		virtual void Sample(shading::Sample *samples,Cache&,bool mipmapping = 1) const = 0;
-		virtual const gfxlib::Texture *GetTexture() const { return 0; }
+		virtual const MipmapTexture *GetTexture() const { return nullptr; }
 	};
 
-	typedef Ptr<gfxlib::Texture> PTexture;
-	typedef std::map<string, PTexture> TexDict;
-	typedef Ptr<Sampler> PSampler;
+	using TexDict = std::map<string, PMipmapTexture>;
+	using PSampler = shared_ptr<Sampler>;
 
-	Sampler *NewSampler(PTexture);
+	PSampler NewSampler(PMipmapTexture);
 
 }
 

@@ -17,7 +17,7 @@ struct Camera {
 class OrbitingCamera {
 public:
 	OrbitingCamera();
-	operator const Camera() const;
+	operator Camera() const;
 
 	void Rotate(float);
 	void RotateY(float);
@@ -34,10 +34,11 @@ public:
 	FPSCamera(const Vec3f pos, float angle, float pitch);
 	FPSCamera();
 
-	operator const Camera() const;
+	operator Camera() const;
 
 	void Print();
-	void serialize(Serializer&);
+	void save(Stream&) const;
+	void load(Stream&);
 
 	void Rotate(float a);
 	void RotateY(float p);
@@ -46,17 +47,19 @@ public:
 
 	const Vec3f Pos() const;
 
-	float plane_dist;
+	float plane_dist = 1.0f;
 //private:
-	float ang, pitch;
-	Vec3f pos;
+	float ang = 0.0f, pitch = 0.0f;
+	Vec3f pos = Vec3f(0.0f, 0.0f, 0.0f);
 };
 
 class CameraConfigs {
 public:
 	void AddConfig(const string &fileName, const FPSCamera&);
 	bool GetConfig(const string &fileName, FPSCamera&) const;
-	void serialize(Serializer&);
+
+	void save(Stream&) const;
+	void load(Stream&);
 
 	std::map<string, FPSCamera> data;
 };

@@ -14,6 +14,8 @@ namespace shading {
 
 		template <bool sharedOrigin, bool hasMask>
 		void Shade_(Sample *samples, const RayGroup<sharedOrigin, hasMask> &rays, SCache &sc) const {
+			//TODO: write me
+			/*
 			sampler->Sample(samples, sc);
 
 			for(int q = 0; q < blockSize; q++) {
@@ -31,10 +33,10 @@ namespace shading {
 					s.diffuse = diffuse;
 					s.specular = diffuse;
 				}
-			}
+			}*/
 		}
 		
-		const gfxlib::Texture *GetTexture() const { return sampler->GetTexture(); }
+		const MipmapTexture *GetTexture() const { return sampler->GetTexture(); }
 
 	private:
 		sampling::PSampler sampler;

@@ -1,44 +1,18 @@
 #include "sampling.h"
 #include "sampling/point_sampler.h"
-#include "sampling/point_sampler_dxt.h"
-#include "sampling/point_sampler16bit.h"
+//#include "sampling/point_sampler_dxt.h"
 #include "sampling/sat_sampler.h"
-#include <squish.h>
-#include <memory.h>
-#include <stdio.h>
+#include "mipmap_texture.h"
 
 namespace sampling {
 
-	gfxlib::Texture Compress(const gfxlib::Texture &src) {
-		gfxlib::Texture out;
+	PSampler NewSampler(PMipmapTexture tex) {
+		if(!tex)
+			return {};
 
-		std::vector<squish::u8> temp(src.Width()*src.Height()*4);
-		out.Set(src.Width(),src.Height(),gfxlib::TI_DXT1,5);
-
-		for(int m=0;m<out.Mips();m++) {
-			int w=src.Width(m),h=src.Height(m);
-			for(int y=0;y<h;y++) {
-				squish::u8 *srcPix=((squish::u8*)src.DataPointer(m))+y*w*3;
-				for(int x=0;x<w;x++) {
-					temp[(x+y*w)*4+0]=srcPix[x*3+2];
-					temp[(x+y*w)*4+1]=srcPix[x*3+1];
-					temp[(x+y*w)*4+2]=srcPix[x*3+0];
-					temp[(x+y*w)*4+3]=255;
-				}
-			}
-			squish::CompressImage(&temp[0],w,h,(squish::u8*)out.DataPointer(m),squish::kDxt1);
-			printf("%d ",m); fflush(stdout);
-		}
-
-		return out;
-	}
-
-	Sampler *NewSampler(PTexture tex) {
-		if(!tex) return 0;
-
-		switch(tex->GetFormat().GetIdent()) {
-			case gfxlib::TI_A8R8G8B8: {
-				PTexture tmp = new gfxlib::Texture(tex->Width(),tex->Height(),gfxlib::TI_R8G8B8,0);
+		switch(tex->GetFormat().id()) {
+			case fwk::TextureFormatId::rgba: {
+				auto tmp = make_shared<MipmapTexture>(tex->Width(),tex->Height(), fwk::TextureFormatId::rgb, 0);
 				int w=tex->Width(),h=tex->Height();
 				for(int y=0;y<h;y++) {
 					u8 *src=(u8*)tex->DataPointer()+y*tex->Pitch();
@@ -51,24 +25,21 @@ namespace sampling {
 					}
 				}
 			 	tmp->GenMips();
-				return new PointSampler(tmp);
-				return new PointSamplerDXT(Compress(*tmp));
+				return make_shared<PointSampler>(PointSampler(tmp));
 			}
-			case gfxlib::TI_R8G8B8:
+			case fwk::TextureFormatId::rgb:
 				if(tex->Mips() == 1) {
 					tex->ReallocMips(0);
 					tex->GenMips();
 				}
-				return new PointSampler(tex);
-				return new PointSamplerDXT(Compress(*tex));
-			case gfxlib::TI_R5G6B5:
-				return new PointSampler16bit(*tex);
-			case gfxlib::TI_DXT1:
-				return new PointSamplerDXT(*tex);
+				return make_shared<PointSampler>(tex);
+		//	case gfxlib::TI_DXT1:
+		//		return make_shared<PointSamplerDXT>(*tex);
 		}
 
 		THROW("Cannot create a sampler from texture ", "TODO: name",
 						": format is not supported");
+		return {};
 	}
 
 }

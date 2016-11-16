@@ -1,10 +1,8 @@
 #include "rtbase.h"
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <dirent.h>
 #include <libgen.h>
 #include <errno.h>
 #include <cstring>
+#include <fwk_gfx.h>
 
 float BoxPointDistanceSq(const BBox &box,const Vec3f &point) {
 	float xMin=box.min.x,yMin=box.min.y,zMin=box.min.z;
@@ -118,49 +116,14 @@ Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 	return mOut;   
 }
 
-static void FindFiles(vector<string> &out, const char *dirName, const char *ext, bool recursive) {
-	DIR *dp = opendir(dirName);
-	if(!dp)
-		THROW("Error while opening directory ", dirName, ": ", strerror(errno));
-
-
-	try {
-		size_t extLen = strlen(ext);
-		struct dirent *dirp;
-
-		while ((dirp = readdir(dp))) {
-			char fullName[FILENAME_MAX];
-			struct stat fileInfo;
-
-			snprintf(fullName, sizeof(fullName), "%s/%s", dirName, dirp->d_name);
-			if(lstat(fullName, &fileInfo) < 0)
-				continue; //TODO: handle error
-
-			if(S_ISDIR(fileInfo.st_mode)) {
-				if(strcmp(dirp->d_name, ".") && strcmp(dirp->d_name, "..") && recursive)
-					FindFiles(out, fullName, ext, recursive);
-			}
-			else {
-				size_t len = strlen(dirp->d_name);
-				if(len >= extLen && strcmp(dirp->d_name + len - extLen, ext) == 0)
-					out.push_back(string(dirName) + '/' + dirp->d_name);
-			}
-		}
-	}
-	catch(...) {
-		closedir(dp);
-		throw;
-	}
-	closedir(dp);
+namespace {
+	fwk::ResourceManager<fwk::FontCore> s_font_cores("data/fonts/", ".fnt");
+	fwk::ResourceManager<fwk::DTexture> s_font_textures("data/fonts/", "");
 }
 
-const vector<string> FindFiles(const char *tDirName, const char *ext, bool recursive) {
-	string dirName = tDirName;
-	if(!dirName.empty() && dirName[dirName.size() - 1] == '/')
-		dirName.resize(dirName.size() - 1);
-
-	vector<string> out;
-	FindFiles(out, dirName.c_str(), ext, recursive);
-	return out;
+fwk::Font getFont(const string &name) {
+	auto core = s_font_cores[name];
+	auto texture = s_font_textures[core->textureName()];
+	return {std::move(core), std::move(texture)};
 }
 

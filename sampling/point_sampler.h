@@ -8,7 +8,7 @@ namespace sampling {
 
 	class PointSampler: public Sampler {
 	public:
-		PointSampler(const PTexture);
+		PointSampler(const PMipmapTexture);
 		PointSampler(const PointSampler&);
 		PointSampler() { }
 		void operator=(const PointSampler&);
@@ -19,12 +19,12 @@ namespace sampling {
 		INLINE Vec3q operator()(const Vec2q &uv,const Vec2q &diff,Cache&) const { return operator()(uv,diff); }
 
 		void Sample(shading::Sample*, Cache&, bool mipmapping = 1) const;
-		const gfxlib::Texture *GetTexture() const { return &*tex; }
+		const MipmapTexture *GetTexture() const { return tex.get(); }
 
 	protected:
 		void Update();
 
-		PTexture tex;
+		PMipmapTexture tex;
 		uint mipPitch[16];
 		uint wMask, hMask, mips, w, h, wShift;
 		float hMul, wMul;

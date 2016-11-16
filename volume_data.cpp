@@ -1,21 +1,23 @@
 #include "volume_data.h"
-#include <gfxlib_texture.h>
 #include <algorithm>
 #include <cstring>
+#include "fwk_gfx.h"
+
+using fwk::Loader;
 
 namespace
 {
 
 	struct Slice {
-		void serialize(Serializer &sr);
+		void load(Stream&);
 	
 		int width, height;
 		vector<u16> data;
 	};
 
-	void Slice::serialize(Serializer &sr) {
+	void Slice::load(Stream &sr) {
 		char zeros[128] = {0,};
-		sr.data(zeros, sizeof(zeros));
+		sr.loadData(zeros, sizeof(zeros));
 
 		sr.signature("DICM", 4);
 		ASSERT(sr.isLoading());
@@ -30,9 +32,9 @@ namespace
 			u16 format, size16;
 			u32 size;
 
-			sr(type, subType, format, size16);
+			sr.unpack(type, subType, format, size16);
 			if(size16 == 0 && (type != 0x08 && type != 0x20))
-				sr & size;
+				sr >> size;
 			else
 				size = size16;
 
@@ -40,7 +42,7 @@ namespace
 		//	printf("Chunk %x %x\n", type, subType);
 
 			if(type == 0x28) {
-				u16 tmp; sr & tmp;
+				u16 tmp; sr >> tmp;
 				if(subType == 0x10)
 					width = tmp;
 				else if(subType == 0x11)
@@ -52,7 +54,7 @@ namespace
 			}
 			else if(type == 0x7fe0 && subType == 0x10) {
 				data.resize(width * height);
-				sr.data(&data[0], size);
+				sr.loadData(&data[0], size);
 			}
 
 			sr.seek(end);
@@ -75,12 +77,12 @@ namespace
 }
 
 void VolumeData::LoadDicom(const char *folder) {
-	vector<string> files = FindFiles(folder, ".dcm", false);
+	vector<string> files = fwk::findFiles(folder, ".dcm");
 	ASSERT(files.size());
 
 	std::sort(files.begin(), files.end());
 
-	Slice slice; Loader(files[0]) & slice;
+	Slice slice; Loader(files[0]) >> slice;
 	width = slice.width;
 	height = files.size();
 	depth = slice.height;
@@ -93,7 +95,7 @@ void VolumeData::LoadDicom(const char *folder) {
 	fflush(stdout);
 
 	for(int n = 1; n < files.size(); n++) {
-		try { Loader(files[n]) & slice; }
+		try { Loader(files[n]) >> slice; }
 		catch(...) { slice.data.resize(width * height * depth, 0); }
 
 		ASSERT(width == slice.width);
@@ -106,7 +108,7 @@ void VolumeData::LoadDicom(const char *folder) {
 }
 
 void VolumeData::LoadRaw(const char *folder, int w, int h, int bits) {
-	vector<string> files = FindFiles(folder, "", false);
+	vector<string> files = fwk::findFiles(folder, "");
 	data.clear();
 	width = depth = height = 0;
 
@@ -129,11 +131,11 @@ void VolumeData::LoadRaw(const char *folder, int w, int h, int bits) {
 		u16 *dst = &data[n * width * height];
 
 		if(bits == 16) {
-			Loader(files[n]).data(dst, width * height * 2);
+			Loader(files[n]).loadData(dst, width * height * 2);
 		}
 		else {
 			vector<u8> temp(width, height);
-			Loader(files[n]).data(&temp[0], width * height);
+			Loader(files[n]).loadData(&temp[0], width * height);
 			for(int i = 0, count = width * height; i < count; i++)
 				dst[i] = ((int)temp[i]) * 256;
 		}
@@ -147,24 +149,17 @@ void VolumeData::LoadRaw(const char *folder, int w, int h, int bits) {
 	printf("Min / Max: %d %d\n", (int)min, (int)max);
 }
 
-void VolumeData::Blit(gfxlib::Texture &img, int slice) const {
-	int w = Min(width, img.Width()), h = Min(height, img.Height());
-	ASSERT(img.GetFormat() == gfxlib::TI_R8G8B8);
+void VolumeData::Blit(fwk::Texture &img, int slice) const {
+	int w = Min(width, img.width()), h = Min(height, img.height());
+	//TODO: testme
 
 	for(int y = 0; y < h; y++) {
-		u8 *dst = (u8*)img.DataPointer(0);
 		const u16 *src = &data[slice * width * height + y * width];
-		dst += img.Pitch() * y;
 
 		for(int x = 0; x < w; x++) {
 			int value = (src[x] >> 7) * 2;
 			value = Min(value, 255);
-
-			dst[x * 3 + 0] = value;
-			dst[x * 3 + 1] = value;
-			dst[x * 3 + 2] = value;
+			img(x, y) = {value, value, value};
 		}
 	}
 }
-
-VolumeData::VolumeData() :width(0), height(0), depth(0) { }

@@ -7,6 +7,8 @@
 #include "render.h"
 #include "thread_pool.h"
 #include "ray_generator.h"
+#include "fwk_gfx.h"
+#include "mipmap_texture.h"
 
 static i32x4 ConvColor(Vec3q rgb) {
 	i32x4 tr = Trunc(Clamp(rgb.x * 255.0f, floatq(0.0f), floatq(255.0f)));
@@ -213,9 +215,9 @@ struct RenderTask: public thread_pool::Task {
 
 template <int QuadLevels, class AccStruct>
 static TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
-		gfxlib::Texture &image, const Options options, uint nThreads) {
+		MipmapTexture &image, const Options options, uint nThreads) {
 	enum { taskSize = 64 };
-	ASSERT(image.GetFormat().BytesPerPixel() == 3);
+	ASSERT(image.GetFormat() == fwk::TextureFormatId::rgb);
 
 	uint nTasks = ((image.Width() + taskSize - 1) / taskSize)
 					* ((image.Height() + taskSize - 1) / taskSize);
@@ -260,7 +262,7 @@ static TreeStats Render(const Scene<AccStruct> &scene,const Camera &camera, uint
 	thread_pool::Run(tasks, nThreads);
 
 	TreeStats stats;
-	for(uint n = 0; n < nTasks; n++)
+	for(int n = 0; n < nTasks; n++)
 		stats += taskStats[n];
 
 	return stats;
@@ -275,7 +277,7 @@ TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera, uint resx,
 
 template <class AccStruct>
 TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
-				gfxlib::Texture &image, const Options options, uint threads) {
+				MipmapTexture &image, const Options options, uint threads) {
 	return Render<3>(scene, camera, image, options, threads);
 }
 
@@ -283,13 +285,13 @@ TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
 template TreeStats Render<BVH>(const Scene<BVH>&, const Camera&, uint, uint, unsigned char*,
 								const vector<int>&, const vector<int>&, const Options, uint, uint);
 
-template TreeStats Render<BVH>(const Scene<BVH>&, const Camera&, gfxlib::Texture&,
+template TreeStats Render<BVH>(const Scene<BVH>&, const Camera&, MipmapTexture&,
 									const Options, uint);
 
 template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, uint, uint, unsigned char*,
 								const vector<int>&, const vector<int>&, const Options, uint, uint);
 
-template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, gfxlib::Texture&,
+template TreeStats Render<DBVH>(const Scene<DBVH>&, const Camera&, MipmapTexture&,
 									const Options, uint);
 	
 

@@ -183,7 +183,7 @@ struct ObjectInstance {
 
 	Vec3f rotation[3];
 	Vec3f translation;
-	BVH *tree;
+	const BVH *tree;
 	BBox bbox;
 };
 
@@ -249,7 +249,7 @@ public:
 	}
 
 	vector<ObjectInstance> elements;
-	vector<Node, AlignedAllocator<Node> > nodes;
+	std::vector<Node, AlignedAllocator<Node> > nodes;
 };
 
 SERIALIZE_AS_POD(DBVH::Node)

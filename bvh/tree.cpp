@@ -326,8 +326,12 @@ void BVH::Construct(const BaseScene &scene, int flags) {
 }
 
 
-void BVH::serialize(Serializer &sr) {
-	sr & depth & tris & shTris & nodes & materials;
+void BVH::save(Stream &sr) const {
+	sr << depth << tris << shTris << nodes << materials;
+}
+
+void BVH::load(Stream &sr) {
+	sr >> depth >> tris >> shTris >> nodes >> materials;
 }
 
 void BVH::PrintInfo() const {

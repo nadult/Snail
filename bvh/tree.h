@@ -13,7 +13,8 @@ public:
 	BVH(const BaseScene&, int flags = fastBuild | useSah);
 	BVH() { }
 	void Construct(const BaseScene&, int flags = fastBuild | useSah);
-	void serialize(Serializer&);
+	void save(Stream&) const;
+	void load(Stream&);
 	const BBox GetBBox() const { return nodes[0].bbox; }
 	void PrintInfo() const;
 
@@ -72,7 +73,9 @@ public:
 
 	struct MatId {
 		MatId() :id(~0) { }
-		void serialize(Serializer &sr) { sr & name; }
+		//TODO: no need to serialize id?
+		void save(Stream &sr) const { sr << name; }
+		void load(Stream &sr) { sr >> name; }
 
 		string name;
 		int id;
@@ -86,7 +89,8 @@ public:
 
 	ATriVector tris;
 	AShTriVector shTris;
-	vector<Node, AlignedAllocator<Node, 256> > nodes;
+	using ANodesVector = std::vector<Node, AlignedAllocator<Node, 256> >;
+	ANodesVector nodes;
 
 	vector<MatId> materials;
 	int depth;

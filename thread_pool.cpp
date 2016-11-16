@@ -1,6 +1,5 @@
 #include <pthread.h>
 #include <iostream>
-#include <baselib.h>
 #include "thread_pool.h"
 
 enum { maxThreads = 32 };
@@ -116,7 +115,8 @@ namespace {
 			speContext[nThreads].Create(&speGang);
 			speProgram[nThreads] = 0;
 #endif
-			if(nThreads) pthread_create(&threads[nThreads], 0, InnerLoop, (void*)nThreads);
+			if(nThreads)
+				pthread_create(&threads[nThreads], 0, InnerLoop, (void*)(long long)nThreads);
 		}
 		while(nThreads > nThreads_) {
 			nThreads--;

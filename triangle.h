@@ -249,9 +249,8 @@ public:
 
 	vector<ShData> shData;
 
-	void serialize(Serializer &sr) {
-		sr &verts & shData & tris;
-	}
+	void save(Stream &sr) const { sr << verts << shData << tris; }
+	void load(Stream &sr) { sr >> verts >> shData >> tris; }
 
 	typedef Triangle      CElement;
 	typedef ShTriangle    SElement;
@@ -355,7 +354,7 @@ private:
 
 typedef vector<Triangle> TriVector;
 typedef vector<ShTriangle> ShTriVector;
-typedef vector<Triangle, AlignedAllocator<Triangle, 256> > ATriVector;
-typedef vector<ShTriangle, AlignedAllocator<ShTriangle, 256> > AShTriVector;
+typedef std::vector<Triangle, AlignedAllocator<Triangle, 256> > ATriVector;
+typedef std::vector<ShTriangle, AlignedAllocator<ShTriangle, 256> > AShTriVector;
 
 #endif

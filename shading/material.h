@@ -8,7 +8,7 @@
 
 namespace shading {
 
-	class Material: public RefCounter {
+	class Material {
 	public:
 		enum {
 			fTexCoords = 1,
@@ -27,7 +27,7 @@ namespace shading {
 		virtual void Shade(Sample*, const RayGroup<1, 0>&, SCache&) const = 0;
 		virtual void Shade(Sample*, const RayGroup<1, 1>&, SCache&) const = 0;
 
-		virtual const gfxlib::Texture *GetTexture() const { return 0; }
+		virtual const MipmapTexture *GetTexture() const { return 0; }
 
 		int id;
 		int flags;
@@ -71,15 +71,14 @@ namespace shading {
 	const vector<MaterialDesc> LoadMaterialDescs(const string &fileName);
 
 	using sampling::TexDict;
-	using sampling::PTexture;
 
-	typedef Ptr<Material> PMaterial;
+	using PMaterial = shared_ptr<Material>;
 	typedef std::map<string, PMaterial> MatDict;
 
-	Material *NewMaterial(PTexture tex, bool nDotL = 1);
+	PMaterial NewMaterial(PMipmapTexture tex, bool nDotL = 1);
 
-	const TexDict LoadTextures(const vector<MaterialDesc> &matDescs, const string &texPath);
-	const MatDict MakeMaterials(const vector<MaterialDesc> &matDescs, const TexDict &texDict);
+	TexDict LoadTextures(const vector<MaterialDesc> &matDescs, const string &texPath);
+	MatDict MakeMaterials(const vector<MaterialDesc> &matDescs, const TexDict &texDict);
 
 }
 

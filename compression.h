@@ -1,8 +1,7 @@
 #ifndef COMPRESSION_H
 #define COMPRESSION_H
 
-#include <gfxlib_texture.h>
-#include <vector>
+#include "rtbase.h"
 
 struct CompressedPart {
 	struct Info { int x, y, w, h, size; } info;
@@ -12,7 +11,7 @@ struct CompressedPart {
 void TransformData(unsigned char *ptr, uint w, uint h, uint pitch);
 void ITransformData(unsigned char *ptr, uint w, uint h, uint pitch);
 
-void CompressParts(gfxlib::Texture &image, const std::vector<int> &coords,
+void CompressParts(MipmapTexture &image, const std::vector<int> &coords,
 				std::vector<CompressedPart> &parts, uint nThreads);
 
 struct DecompressBuffer {
@@ -22,7 +21,7 @@ struct DecompressBuffer {
 };
 
 // returns number of decompressed pixels
-void DecompressParts(gfxlib::Texture &image, std::vector<DecompressBuffer> &parts,
+void DecompressParts(MipmapTexture &image, std::vector<DecompressBuffer> &parts,
 				uint nParts, uint nThreads);
 
 #endif

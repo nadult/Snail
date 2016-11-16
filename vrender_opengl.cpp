@@ -8,9 +8,9 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
-#include "gfxlib_texture.h"
 
 #include "camera.h"
+#include "fwk_gfx.h"
 
 typedef Matrix<Vec4f> Matrix4;
 
@@ -109,10 +109,10 @@ namespace
 		if(transferHandle)
 			return;
 
-		gfxlib::Texture tex;
-		Loader("hue_bar.png") & tex;
+		fwk::Texture tex;
+		fwk::Loader("hue_bar.png") >> tex;
 
-		const char *data = (const char*)tex.DataPointer();
+		const char *data = (const char*)tex.data();
 
 		GLuint handle;
 		glGenTextures(1, &handle);
@@ -125,7 +125,8 @@ namespace
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP);
 
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, tex.Width(), tex.Height(), 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		auto format = tex.format();
+		glTexImage2D(GL_TEXTURE_2D, 0, format.glInternal(), tex.width(), tex.height(), 0, format.glFormat(), format.glType(), data);
 		transferHandle = handle;
 	}
 
@@ -140,9 +141,9 @@ namespace
 		unsigned f = glCreateShader(GL_FRAGMENT_SHADER);
 
 		vector<char> fs;
-		Loader ldr("shader.fsh");
+		fwk::Loader ldr("shader.fsh");
 		fs.resize(ldr.size() + 1);
-		ldr.data(&fs[0], ldr.size());
+		ldr.loadData(&fs[0], ldr.size());
 		fs.back() = 0;
 		
 		const char *fsp = &fs[0];

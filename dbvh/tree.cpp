@@ -176,7 +176,7 @@ void DBVH::PrintInfo() const {
 	double objBytes = elements.size() * sizeof(ObjectInstance);
 
 	printf("Instances: %d * %d (%.2fMB)\n",
-			(int)elements.size(), sizeof(ObjectInstance), objBytes * 0.000001);
+			(int)elements.size(), (int)sizeof(ObjectInstance), objBytes * 0.000001);
 	printf("Nodes: %d * %d = %6.2fMB\n",
 			(int)nodes.size(), (int)sizeof(Node), nodeBytes * 0.000001);
 	printf("~ %.0f bytes per instance\n", double(nodeBytes + objBytes) / double(elements.size()));

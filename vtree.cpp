@@ -180,16 +180,16 @@ u16 VTree::Trace(const Vec3f &origin, const Vec3f &dir, u16 cmin) const {
 }
 
 #include "camera.h"
-#include <gfxlib_texture.h>
+#include "fwk_gfx.h"
 
-void RenderTree(gfxlib::Texture &image, const VTree &tree, const Camera &camera) {
+void RenderTree(fwk::Texture &image, const VTree &tree, const Camera &camera) {
 //		dicom.Blit(image, slice);
 
 #pragma omp parallel for
-	for(int y = 0; y < image.Height(); y += 1) {
-		for(int x = 0; x < image.Width(); x += 1) {
-			float tx = float(x) / image.Width() - 0.5f;
-			float ty = float(y) / image.Height() - 0.5f;
+	for(int y = 0; y < image.height(); y += 1) {
+		for(int x = 0; x < image.width(); x += 1) {
+			float tx = float(x) / image.width() - 0.5f;
+			float ty = float(y) / image.height() - 0.5f;
 
 			Vec3f eye = camera.pos;
 			Vec3f target = eye + camera.front + camera.right * tx + camera.up * ty
@@ -200,9 +200,7 @@ void RenderTree(gfxlib::Texture &image, const VTree &tree, const Camera &camera)
 			int color = (value >> 7) * 4;
 			color = Min(color, 255);
 
-#define PIXEL(x, y, col) { \
-				u8 *img = ((u8*)image.DataPointer()) + ((x) + (y) * image.Width()) * 3; \
-				img[0] = img[1] = img[2] = (col); }
+#define PIXEL(x, y, col) { image(x, y) = {color, color, color}; }
 
 			PIXEL(x, y, color);
 //				   	PIXEL(x + 1, y, color);

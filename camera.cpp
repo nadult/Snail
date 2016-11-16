@@ -19,39 +19,33 @@ static void Rotate(const Vec3f axis, float radians, Vec3f &v1, Vec3f &v2, Vec3f 
 	v3 = Vec3f(xzm + ySin, yzm - xSin, zz * oneMinusCos + cos);
 }
 
-void CameraConfigs::serialize(Serializer &sr) {
-	std::map<string, FPSCamera>::iterator it=data.begin();
-	int count=data.size();
-	sr&count;
+void CameraConfigs::save(Stream &sr) const {
+	sr << int(data.size());
+	for(auto &pair : data)
+		sr << pair.first << pair.second;
+}
 
-	if(sr.isLoading()) {
-		for(int n=0;n<count;n++) {
-			string str; FPSCamera cam;
-			sr & str & cam;
-			data[str] = cam;
-		}
-	}
-	else {
-		while(it!=data.end()) {
-			string tmp=it->first;
-			sr & tmp & it->second;
-			++it;
-		}
+void CameraConfigs::load(Stream &sr) {
+	int count;
+   	sr >> count;
+	for(int n = 0; n < count; n++) {
+		string first;
+		FPSCamera second;
+		sr >> first >> second;
+		data[first] = second;
 	}
 }
 
-FPSCamera::FPSCamera()
-	:pos(0, 0, 0), ang(0), pitch(0), plane_dist(1.0) { }
-FPSCamera::FPSCamera(const Vec3f p, float ang, float pitch)
-	:pos(pos), ang(ang), pitch(pitch), plane_dist(1.0) { }
-
+FPSCamera::FPSCamera() = default;
+FPSCamera::FPSCamera(const Vec3f pos, float ang, float pitch)
+	:ang(ang), pitch(pitch), pos(pos) { }
 
 void FPSCamera::Print() {
 	printf("FPSCamera(Vec3f(%.4f, %.4f, %.4f), %.4f, %.4f);\n",
 			pos.x, pos.y, pos.z, ang, pitch);
 }
 
-FPSCamera::operator const Camera() const {
+FPSCamera::operator Camera() const {
 	Vec3f x[2], y[2], z[2];
 
 	::Rotate(Vec3f(0, 1, 0), ang, x[0], y[0], z[0]);
@@ -67,8 +61,12 @@ FPSCamera::operator const Camera() const {
 	return Camera(pos, right, up, front, plane_dist);
 }
 
-void FPSCamera::serialize(Serializer &sr) {
-	sr & pos & ang & pitch & plane_dist;
+void FPSCamera::save(Stream &sr) const {
+	sr << pos << ang << pitch << plane_dist;
+}
+
+void FPSCamera::load(Stream &sr) {
+	sr >> pos >> ang >> pitch >> plane_dist;
 }
 
 void FPSCamera::Move(const Vec3f shift) {
@@ -94,7 +92,7 @@ const Vec3f FPSCamera::Pos() const {
 OrbitingCamera::OrbitingCamera()
 	:pos(0, 0, -100), target(0, 0, 0), right(1, 0, 0), plane_dist(1.0) { }
 	
-OrbitingCamera::operator const Camera() const {
+OrbitingCamera::operator Camera() const {
 	Vec3f front = Normalize(target - pos);
 	Vec3f up = front ^ right;
 

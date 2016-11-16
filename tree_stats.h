@@ -12,8 +12,6 @@ namespace stats {
 
 }
 
-namespace gfxlib { class Texture; };
-
 // Gives information about what memory chunks are needed
 // for given view, lights, etc.
 // It slows down computation up to 20% (or even more) so
@@ -28,7 +26,7 @@ struct MemPattern {
 			if(p>=0 && p<res) data[p]+=count;
 		}
 	}
-	void Draw(gfxlib::Texture &img) const;
+	void Draw(MipmapTexture &img) const;
 
 private:
 	int res; float mul;

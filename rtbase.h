@@ -1,13 +1,57 @@
 #ifndef RTBASE_H
 #define RTBASE_H
 
-#include <baselib.h>
+#include <fwk_base.h>
 #include "allocator.h"
 #include <cassert>
 
 #include "rtbase_math.h"
 
-using namespace baselib;
+using fwk::Stream;
+using fwk::string;
+using fwk::vector;
+using fwk::Exception;
+using fwk::shared_ptr;
+using fwk::make_shared;
+
+class MipmapTexture;
+using PMipmapTexture = shared_ptr<MipmapTexture>;
+
+namespace fwk {
+	class Font;
+}
+
+// TODO: these shouldn't be required
+template <class T, class A> void loadFromStream(std::vector<T, A> &v, Stream &sr) {
+	u32 size;
+	sr.loadData(&size, sizeof(size));
+	try {
+		v.resize(size);
+	} catch(Exception &ex) {
+		sr.handleException(ex);
+	}
+
+	if(fwk::SerializeAsPod<T>::value)
+		sr.loadData(&v[0], sizeof(T) * size);
+	else
+		for(u32 n = 0; n < size; n++)
+			loadFromStream(v[n], sr);
+}
+
+template <class T, class A> void saveToStream(const std::vector<T, A> &v, Stream &sr) {
+	u32 size;
+	size = u32(v.size());
+	if(size_t(size) != v.size())
+		sr.handleException(Exception("Vector size too big (> 2^32) for serializer to handle"));
+	sr.saveData(&size, sizeof(size));
+
+	if(fwk::SerializeAsPod<T>::value)
+		sr.saveData(&v[0], sizeof(T) * size);
+	else
+		for(u32 n = 0; n < size; n++)
+			saveToStream(v[n], sr);
+}
+
 
 extern int gVals[16];
 
@@ -157,10 +201,9 @@ std::ostream &operator<<(std::ostream&, const Plane&);
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f>&);
 
-const vector<string> FindFiles(const char *tDirName, const char *ext, bool recursive);
+fwk::Font getFont(const string &name);
 
 #include "tree_stats.h"
-
 
 template <class A,class B> struct TIsSame { enum { value=0 }; };
 template<class A> struct TIsSame<A,A> { enum { value=1 }; };
@@ -238,7 +281,7 @@ public:
 		return element[q];
 	}
 
-	const int LastShadowTri() const { return lastShadowTri; }
+	int LastShadowTri() const { return lastShadowTri; }
 	int &LastShadowTri() { return lastShadowTri; } 
 
 	TreeStats &Stats() { return stats; }
@@ -287,7 +330,6 @@ public:
 		return *this;
 	}
 };
-
 
 #include "bounding_box.h"
 

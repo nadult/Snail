@@ -1,11 +1,12 @@
 #include "sampling/sat_sampler.h"
+#include "mipmap_texture.h"
 
 namespace sampling {
 
-	SATSampler::SATSampler(const gfxlib::Texture &tex) {
+	SATSampler::SATSampler(const MipmapTexture &tex) {
 		if(tex.Width()&(tex.Width()-1)||tex.Height()&(tex.Height()-1))
 			THROW("Texture width & height must be a power of 2");
-		if(tex.GetFormat().GetIdent()!=gfxlib::TI_R8G8B8)
+		if(tex.GetFormat() != fwk::TextureFormatId::rgb)
 			THROW("For now only R8G8B8 textures are supported");
 
 		w=tex.Width(); h=tex.Height();
@@ -16,7 +17,7 @@ namespace sampling {
 		const u8 *data=(u8*)tex.DataPointer();
 		int pitch=tex.Pitch();
 
-		vector<TSample,AlignedAllocator<TSample> > hSum(w*h);
+		std::vector<TSample,AlignedAllocator<TSample> > hSum(w*h);
 		samples.resize(w*(h+1));
 
 		for(int y=0;y<h;y++) {

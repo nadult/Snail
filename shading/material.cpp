@@ -3,6 +3,7 @@
 #include "shading/tex_material.h"
 #include "shading/uber_material.h"
 #include "shading/transparent_material.h"
+#include "mipmap_texture.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -12,14 +13,18 @@ namespace shading {
 
 	Material::~Material() { }
 
-	Material *NewMaterial(PTexture tex, bool NDotL) {
-		PSampler sampler = sampling::NewSampler(tex);
+	PMaterial NewMaterial(PMipmapTexture tex, bool NDotL) {
+		auto sampler = sampling::NewSampler(tex);
 
-		return sampler?
-					NDotL?	(Material*)new MaterialWrapper< TexMaterial<1> >(sampler):
-							(Material*)new MaterialWrapper< TexMaterial<0> >(sampler)
-				:	NDotL?	(Material*)new MaterialWrapper< SimpleMaterial<1> >(Vec3f(1.0f, 1.0f, 1.0f)):
-							(Material*)new MaterialWrapper< SimpleMaterial<0> >(Vec3f(1.0f, 1.0f, 1.0f));
+		if(sampler) {
+			if(NDotL)
+				return std::make_shared<MaterialWrapper< TexMaterial<1> >>(sampler);
+			return std::make_shared<MaterialWrapper< TexMaterial<0> >>(sampler);
+		}
+
+		if(NDotL)
+			return std::make_shared<MaterialWrapper< SimpleMaterial<1> >>(Vec3f(1.0f, 1.0f, 1.0f));
+		return std::make_shared<MaterialWrapper< SimpleMaterial<0> >>(Vec3f(1.0f, 1.0f, 1.0f));
 	}
 
 	static const Vec3f ReadColor(std::stringstream &ss) {
@@ -116,10 +121,14 @@ namespace shading {
 
 	static void LoadTex(const string &name, const string &path, TexDict &dict) {
 		if(name != "" && dict.find(name) == dict.end()) {
+			if(!fwk::access(path + name)) {
+				std::cout << "Cannot open file: " << path + name << std::endl;
+				return;
+			}
 			try {
-				PTexture tex = new gfxlib::Texture;
-				Loader(path + name) & *tex;
-				dict[name] = tex;
+				fwk::Texture tex;
+				fwk::Loader(path + name) >> tex;
+				dict[name] = make_shared<MipmapTexture>(tex, fwk::TextureFormatId::rgb, true);
 			}
 			catch(const Exception &ex) {
 				std::cout << ex.what() << '\n';
@@ -127,11 +136,10 @@ namespace shading {
 		}
 	}
 
-	const TexDict LoadTextures(const vector<MaterialDesc> &matDescs, const string &texPath) {
+	TexDict LoadTextures(const vector<MaterialDesc> &matDescs, const string &texPath) {
 		TexDict texDict;
 
-		for(size_t n = 0; n < matDescs.size(); n++) {
-			const MaterialDesc &mat = matDescs[n];
+		for(const auto &mat : matDescs) {
 			LoadTex(mat.dissolveMap, texPath, texDict);
 			LoadTex(mat.diffuseMap, texPath, texDict);
 			LoadTex(mat.dissolveMap, texPath, texDict);
@@ -144,28 +152,27 @@ namespace shading {
 		return texDict;
 	}
 
-	const MatDict MakeMaterials(const vector<MaterialDesc> &matDescs, const TexDict &texDict) {
+	MatDict MakeMaterials(const vector<MaterialDesc> &matDescs, const TexDict &texDict) {
 		std::map<string, PMaterial> out;
 
-		for(size_t n = 0; n < matDescs.size(); n++) {
-			const MaterialDesc &mat = matDescs[n];
+		for(const auto &mat : matDescs) {
 			PMaterial newMat;
 			try {
 				TexDict::const_iterator it1 = texDict.find(mat.diffuseMap);
 				TexDict::const_iterator it2 = texDict.find(mat.dissolveMap);
-				PTexture diff  = it1 == texDict.end()? (PTexture)0 : it1->second;
-				PTexture trans = it2 == texDict.end()? (PTexture)0 : it2->second;
+				auto diff  = it1 == texDict.end()? PMipmapTexture() : it1->second;
+				auto trans = it2 == texDict.end()? PMipmapTexture() : it2->second;
 
 				if(diff && trans)
-					newMat = new MaterialWrapper<TransparentMaterial<1>>(
+					newMat = std::make_shared<MaterialWrapper<TransparentMaterial<1>>>(
 								sampling::NewSampler(diff), sampling::NewSampler(trans));
 				else {
-					newMat = diff?NewMaterial(diff) : new MaterialWrapper<UberMaterial>(mat);
+					newMat = diff?NewMaterial(diff) : std::make_shared<MaterialWrapper<UberMaterial>>(mat);
 				}
 			}
 			catch(const Exception &ex) {
 				std::cout << ex.what() << '\n';
-				newMat = NewMaterial(0);
+				newMat = NewMaterial({});
 			}
 
 			out[mat.name] = newMat;

@@ -2,13 +2,14 @@
 #define RTRACER_SAMPLING_BILINEAR_SAMPLER_H
 
 #include "rtbase.h"
-#include <gfxlib_texture.h>
+#include "sampling.h"
+#include "mipmap_texture.h"
 
 namespace sampling {
 
 	class BilinearSampler {
 	public:
-		BilinearSampler(const gfxlib::Texture&);
+		BilinearSampler(const MipmapTexture&);
 		BilinearSampler() { }
 
 	//	template<class Vec2>
@@ -20,7 +21,7 @@ namespace sampling {
 		Vec3q operator()(const Vec2q &uv) const;
 
 	protected:
-		gfxlib::Texture tex;
+		MipmapTexture tex;
 		uint wMask,hMask;
 		float hMul,wMul;
 	};

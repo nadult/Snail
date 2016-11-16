@@ -14,7 +14,7 @@ struct ShadingData {
 	Vec2f uv[3];
 };
 
-typedef vector<ShadingData,AlignedAllocator<ShadingData> > ShadingDataVec;
+typedef std::vector<ShadingData,AlignedAllocator<ShadingData> > ShadingDataVec;
 
 void LoadWavefrontObj(const char *fileName,TriVector &out,ShadingDataVec &shadingData,float scale,uint maxTris);
 void LoadRaw(const char *fileName,TriVector &out,float scale,uint maxTris);

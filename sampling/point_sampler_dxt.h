@@ -2,14 +2,13 @@
 #define RTRACER_SAMPLING_POINT_SAMPLER_DXT_H
 
 #include "rtbase.h"
-#include <gfxlib_texture.h>
 #include "sampling.h"
 
 namespace sampling {
 
 	class PointSamplerDXT: public Sampler {
 	public:
-		PointSamplerDXT(const gfxlib::Texture&);
+		PointSamplerDXT(const Texture&);
 		PointSamplerDXT() { }
 
 	//	template<class Vec2>
@@ -24,9 +23,9 @@ namespace sampling {
 		void Sample(shading::Sample*,Cache&,bool) const;
 
 	protected:
-		void Init(const gfxlib::Texture&);
+		void Init(const Texture&);
 
-		gfxlib::Texture tex;
+		Texture tex;
 		uint wMask,hMask,mips,w,h,bShift;
 		float hMul,wMul;
 	};
