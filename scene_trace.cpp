@@ -465,7 +465,8 @@ const TreeStats Scene<AccStruct>::RayTrace(const RayGroup <sharedOrigin, hasMask
 		}
 	}
 
-	if(transSel.Any()) {
+	bool transparency_enabled = true; // TODO: this may cause segfaults sometimes...
+	if(transSel.Any() && transparency_enabled) {
 		Vec3q transColor[size];
 		for(int q = 0; q < size; q++)
 			transSel[q] &= ForWhich(samples[q].opacity < 1.0f);
@@ -625,7 +626,7 @@ const TreeStats Scene<AccStruct>::TraceTransparency(RaySelector selector,
 	const int size = rays.Size();
 	Vec3q origin[size];
 	for(int q = 0; q < size; q++) //TODO: robust epsilons
-		origin[q] = rays.Dir(q) * (distance[q] + 0.0001) + rays.Origin(q);
+		origin[q] = rays.Dir(q) * (distance[q] + 0.001) + rays.Origin(q);
 
 	return selector.All()?
 		RayTrace(RayGroup<0, 0>(origin, rays.DirPtr(), rays.IDirPtr(), size), cache, out) :

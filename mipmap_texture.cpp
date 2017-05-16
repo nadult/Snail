@@ -36,7 +36,7 @@ MipmapTexture::MipmapTexture(const fwk::Texture &tex, fwk::TextureFormat fmt, bo
 				auto color = tex(x, y);
 				dst[x * 3 + 0] = color.r;
 				dst[x * 3 + 1] = color.g;
-				dst[x * 3 + 1] = color.b;
+				dst[x * 3 + 2] = color.b;
 			}
 		}
 	}
