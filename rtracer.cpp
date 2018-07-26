@@ -516,7 +516,8 @@ static int tmain(int argc, char **argv) {
 		
 		double buildTime = getTime();
 		scene.geometry.Construct(baseScene, conf.buildFlags);
-		fwk::mkdirRecursive("dump");
+		auto path = fwk::FilePath("dump") / conf.sceneName;
+		fwk::mkdirRecursive(path.parent());
 		Saver(string("dump/") + conf.sceneName) << scene.geometry;
 		buildTime = getTime() - buildTime;
 		std::cout << "Loading time: " << loadingTime << "  Build time: " << buildTime << '\n';
