@@ -27,11 +27,6 @@ std::ostream &operator<<(std::ostream &str, const Plane &p) {
 	return str << "(" << p.normal << " " << p.distance << ")";
 }
 
-bool isnan(float t) {
-	floatq t4(t);
-	return ForAny(t4 != t4);
-}
-
 bool IsNan(const Vec3f f) {
 	floatq t(f.x, f.y, f.z, f.z);
 	return ForAny(t != t);

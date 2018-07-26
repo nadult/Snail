@@ -445,8 +445,6 @@ static int tmain(int argc, char **argv) {
 
 //	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 	ASSERT(IsNan(Vec3f(nan, nan, nan)));
-	ASSERT(isnan(nan));
-	ASSERT(!isnan(not_nan));
 	Vec3q nan3;
 	Convert(Vec3f(nan, nan, nan), Vec3f(nan, nan, nan), Vec3f(nan, nan, nan), Vec3f(nan, nan, nan), nan3);
 	ASSERT(IsNan(nan3));

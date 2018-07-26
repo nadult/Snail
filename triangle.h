@@ -24,11 +24,11 @@ public:
 	Triangle() { }
 
 	bool Test() const {
-		bool nan = isnan(a.x) || isnan(a.y) || isnan(a.z);
+		bool nan = std::isnan(a.x) || std::isnan(a.y) || std::isnan(a.z);
 
-		nan = nan || isnan(ba.x) || isnan(ba.y) || isnan(ba.z);
-		nan = nan || isnan(ca.x) || isnan(ca.y) || isnan(ca.z);
-		nan = nan || isnan(plane.x) || isnan(plane.y) || isnan(plane.z);
+		nan = nan || std::isnan(ba.x) || std::isnan(ba.y) || std::isnan(ba.z);
+		nan = nan || std::isnan(ca.x) || std::isnan(ca.y) || std::isnan(ca.z);
+		nan = nan || std::isnan(plane.x) || std::isnan(plane.y) || std::isnan(plane.z);
 
 		return !nan;
 	}

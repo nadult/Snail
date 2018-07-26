@@ -135,7 +135,6 @@ inline void ByteSwap(Vec4f *v)
 	{ *v = Vec4f(ByteSwap(v->x), ByteSwap(v->y), ByteSwap(v->z), ByteSwap(v->w)); }
 
 
-bool isnan(float t);
 bool IsNan(const Vec3f f);
 bool IsNan(const Vec4f f);
 bool IsNan(const Vec3q f);
