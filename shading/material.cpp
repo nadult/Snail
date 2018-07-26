@@ -120,18 +120,27 @@ namespace shading {
 	}
 
 	static void LoadTex(const string &name, const string &path, TexDict &dict) {
+		auto fpath = fwk::FilePath(path) / fwk::FilePath(name);
+		auto ext = fpath.fileExtension();
+		for(auto &c : ext)
+			c = tolower(c);
+
 		if(name != "" && dict.find(name) == dict.end()) {
-			if(!fwk::access(path + name)) {
-				std::cout << "Cannot open file: " << path + name << std::endl;
+			if(!fwk::access(fpath)) {
+				std::cout << "Cannot open file: " << fpath.c_str() << std::endl;
+				return;
+			}
+			if(ext != "bmp" && ext != "tga" && ext != "png") {
+				std::cout << "Unsupported image type: " << ext << std::endl;
 				return;
 			}
 			try {
 				fwk::Texture tex;
-				fwk::Loader(path + name) >> tex;
+				fwk::Loader(fpath) >> tex;
 				dict[name] = make_shared<MipmapTexture>(tex, fwk::TextureFormatId::rgb, true);
 			}
 			catch(const Exception &ex) {
-				std::cout << ex.what() << '\n';
+				std::cout << "While loading: " << fpath.c_str() << std::endl << ex.what() << '\n';
 			}
 		}
 	}
