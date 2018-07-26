@@ -2,6 +2,7 @@
 #include <fstream>
 #include <fwk_gfx.h>
 #include <fwk_input.h>
+#include <fwk_opengl.h>
 #include "camera.h"
 
 #include "formats/loader.h"
@@ -189,6 +190,13 @@ public:
 		:m_scene(scene), matDescs(matDescs), m_config(config),
 		m_font(getFont("liberation_24")), m_image(config.resx, config.resy, fwk::TextureFormatId::rgb) {
 	
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+		m_dtexture = fwk::make_shared<fwk::DTexture>(fwk::TextureFormatId::rgba, fwk::int2(config.resx, config.resy));
+		glGenBuffers(1, &m_pbo);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_pbo);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+		fwk::testGlError("glUnmap");
+
 		sceneScale = Length(Vec3f(scene.geometry.GetBBox().Size()));
 		sceneCenter = scene.geometry.GetBBox().Center();
 
@@ -302,11 +310,33 @@ public:
 	}
 
 	void drawImage(fwk::Renderer2D &out, const MipmapTexture &image) const {
-		auto dtexture = fwk::make_shared<fwk::DTexture>(fwk::Texture(image));
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_pbo);
+		int num_pixels = m_dtexture->width() * m_dtexture->height();
+		glBufferData(GL_PIXEL_UNPACK_BUFFER, num_pixels * 4, 0, GL_STREAM_DRAW);
+
+		auto *dst = (u32*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+		const auto *src = image.DataPointer(0);
+
+		DASSERT(image.GetFormat() == fwk::TextureFormatId::rgb);
+		int w = m_dtexture->width(), h = m_dtexture->height();
+		for(int y = 0; y < h; y++) {
+			const unsigned char *src_row = image.DataPointer() + image.Pitch() * y;
+			auto *dst_row = dst + w * y;
+			for(int x = 0; x < w; x++)
+				dst_row[x] = u32(src_row[x * 3 + 0]) | (u32(src_row[x * 3 + 1]) << 8) | (u32(src_row[x * 3 + 2]) << 16) | 0xff000000;
+		}
+
+		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+
+		m_dtexture->bind();
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_dtexture->width(), m_dtexture->height(),
+					GL_RGBA, GL_UNSIGNED_BYTE, 0);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
 		fwk::FColor colors[4] = {fwk::ColorId::white, fwk::ColorId::white, fwk::ColorId::white,
 								 fwk::ColorId::white};
 		fwk::int2 size(image.Width(), image.Height());
-		out.addFilledRect(fwk::FRect(fwk::float2(size)), fwk::FRect(0, 0, 1, -1), colors, dtexture);
+		out.addFilledRect(fwk::FRect(fwk::float2(size)), fwk::FRect(0, 0, 1, -1), colors, m_dtexture);
 	}
 
 	void draw(fwk::GfxDevice &device) {
@@ -376,6 +406,9 @@ public:
 	CameraConfigs m_camConfigs;
 	fwk::Font m_font;
 	MipmapTexture m_image;
+
+	fwk::STexture m_dtexture;
+	uint m_pbo;
 
 	float sceneScale = 1.0f;
 	Vec3f sceneCenter;
