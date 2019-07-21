@@ -1,5 +1,4 @@
-#ifndef RTRACER_VOLUME_DATA_H
-#define RTRACER_VOLUME_DATA_H
+#pragma once
 
 #include "rtbase.h"
 
@@ -13,7 +12,3 @@ struct VolumeData {
 	vector<u16> data;
 	int width = 0, height = 0, depth = 0;
 };
-
-
-#endif
-

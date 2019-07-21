@@ -1,5 +1,4 @@
-#ifndef RTRACER_SHADING_MATERIAL_H
-#define RTRACER_SHADING_MATERIAL_H
+#pragma once
 
 #include "rtbase.h"
 #include "ray_group.h"
@@ -81,6 +80,3 @@ namespace shading {
 	MatDict MakeMaterials(const vector<MaterialDesc> &matDescs, const TexDict &texDict);
 
 }
-
-#endif
-

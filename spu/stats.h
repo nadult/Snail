@@ -1,5 +1,4 @@
-#ifndef RTRACER_SPU_STATS_H
-#define RTRACER_SPU_STATS_H
+#pragma once
 
 #include "spu/base.h"
 
@@ -46,5 +45,3 @@ struct Stats {
 	int iters, intersects;
 	int rays;
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef RTRACER_ALIGNED_ALLOCATOR_H
-#define RTRACER_ALIGNED_ALLOCATOR_H
+#pragma once
 
 #include <limits>
 #include <veclib.h>
@@ -51,7 +50,3 @@
      	   construct(pointer __p, _Args&&... __args)
 			{ ::new((void *)__p) T(std::forward<_Args>(__args)...); }
 	};
-
-
-#endif
-

@@ -1,5 +1,4 @@
-#ifndef RTRACER_PHOTONS_H
-#define RTRACER_PHOTONS_H
+#pragma once
 
 #include "rtbase.h"
 #include "bvh/tree.h"
@@ -53,5 +52,3 @@ void TracePhotons(vector<Photon> &out, const Scene<BVH> &scene, unsigned count);
 
 Vec3f UniformSampleHemisphere(float u1, float u2);
 Vec3f UniformSampleSphere(float u1, float u2);
-
-#endif

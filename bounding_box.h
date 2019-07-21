@@ -1,5 +1,4 @@
-#ifndef RTRACER_BOUNDING_BOX_H
-#define RTRACER_BOUNDING_BOX_H
+#pragma once
 
 #include "rtbase.h"
 
@@ -268,5 +267,3 @@ float BoxPointDistanceSq(const BBox &box,const Vec3f &point);
 
 inline BBox operator+(const BBox &a,const BBox &b) { BBox out(a); out+=b; return out; }
 inline BBox operator*(const BBox &a,const Matrix<Vec4f> &mat) { BBox out(a); out*=mat; return out; }
-
-#endif

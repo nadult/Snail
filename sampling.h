@@ -1,5 +1,4 @@
-#ifndef RTRACER_SAMPLING_H
-#define RTRACER_SAMPLING_H
+#pragma once
 
 #include "shading.h"
 #include <map>
@@ -48,6 +47,3 @@ namespace sampling {
 	PSampler NewSampler(PMipmapTexture);
 
 }
-
-#endif
-

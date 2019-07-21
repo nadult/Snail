@@ -1,5 +1,4 @@
-#ifndef RTRACER_LOADER_H
-#define RTRACER_LOADER_H
+#pragma once
 
 #include "rtbase.h"
 #include "triangle.h"
@@ -21,6 +20,3 @@ void LoadRaw(const char *fileName,TriVector &out,float scale,uint maxTris);
 void LoadV3O(string fileName,TriVector &out,ShadingDataVec &shadingData,float scale,uint maxTris);
 void LoadModel(const string &fileName,TriVector &out,ShadingDataVec &shadingData,float scale,uint maxTris);
 void LoadProc(const string &fileName,TriVector &out,ShadingDataVec &shData,float scale,uint maxTris);
-
-#endif
-

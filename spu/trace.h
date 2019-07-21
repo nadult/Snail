@@ -1,5 +1,4 @@
-#ifndef RTRACER_SPU_TRACE_H
-#define RTRACER_SPU_TRACE_H
+#pragma once
 
 #define ALIGN256 __attribute__((aligned(256)))
 
@@ -74,5 +73,3 @@ struct TextureInfo {
 	unsigned short width, height;
 	unsigned short wMask, hMask;
 };
-
-#endif

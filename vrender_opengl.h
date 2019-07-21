@@ -1,5 +1,4 @@
-#ifndef RTRACER_VRENDER_H
-#define RTRACER_VRENDER_H
+#pragma once
 
 #include "rtbase.h"
 #include "bounding_box.h"
@@ -9,6 +8,3 @@ class Camera;
 
 void Load3dTexture(const VolumeData&);
 void RenderVolume(const Camera &cam, float aspectRatio, int resolution);
-
-#endif
-

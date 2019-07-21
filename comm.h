@@ -1,5 +1,4 @@
-#ifndef RTRACER_COMM_H
-#define RTRACER_COMM_H
+#pragma once
 
 #include <tr1/type_traits>
 #include "rtbase.h"
@@ -160,5 +159,3 @@ namespace comm {
 	PSocket operator>>(PSocket sock, LoadNewModel&);
 
 }
-
-#endif

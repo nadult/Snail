@@ -1,5 +1,4 @@
-#ifndef RTRACER_QUAT_H
-#define RTRACER_QUAT_H
+#pragma once
 
 #include "rtbase.h"
 
@@ -59,5 +58,3 @@ const Quat operator *(const Vec3f&, const Quat&);
 
 const Vec3f RotateVec(const Quat quat, const Vec3f);
 const Vec3q RotateVec(const Quat quat, const Vec3q);
-
-#endif

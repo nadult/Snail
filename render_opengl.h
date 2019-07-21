@@ -1,5 +1,4 @@
-#ifndef RTRACER_RENDER_OPENGL_H
-#define RTRACER_RENDER_OPENGL_H
+#pragma once
 
 #include "rtbase.h"
 #include "scene.h"
@@ -32,5 +31,3 @@ private:
 	bool useNormals, useUvs;
 	BBox bbox;
 };
-
-#endif

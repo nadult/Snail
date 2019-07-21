@@ -1,5 +1,4 @@
-#ifndef RTRACER_CAMERA_H
-#define RTRACER_CAMERA_H
+#pragma once
 
 #include "rtbase.h"
 #include <stdio.h>
@@ -63,7 +62,3 @@ public:
 
 	std::map<string, FPSCamera> data;
 };
-
-
-#endif
-

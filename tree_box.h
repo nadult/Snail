@@ -1,5 +1,4 @@
-#ifndef RTRACER_TREE_BOX_H
-#define RTRACER_TREE_BOX_H
+#pragma once
 
 #include "ray_group.h"
 #include "tree_stats.h"
@@ -147,8 +146,3 @@
 
 		vector<CElement,AlignedAllocator<CElement> > elems;
 	};
-
-
-#endif
-
-

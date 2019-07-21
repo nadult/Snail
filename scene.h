@@ -1,5 +1,4 @@
-#ifndef RTRACER_SCENE_H
-#define RTRACER_SCENE_H
+#pragma once
 
 #include "rtbase.h"
 #include "light.h"
@@ -57,6 +56,3 @@ private:
 	const TreeStats TraceTransparency(RaySelector, const RayGroup<sharedOrigin, hasMask>&, const floatq*,
 			Vec3q *__restrict__, Cache&) const NOINLINE;
 };
-
-#endif
-

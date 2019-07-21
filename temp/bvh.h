@@ -1,5 +1,4 @@
-#ifndef RTRACER_BVH_H
-#define RTRACER_BVH_H
+#pragma once
 
 #include "rtbase.h"
 #include "sphere.h"
@@ -149,6 +148,3 @@ public:
 	TreeBoxVector<StaticTree> objects;
 	vector<Node,AlignedAllocator<Node> > nodes;
 };
-
-
-#endif

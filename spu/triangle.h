@@ -1,5 +1,4 @@
-#ifndef RTRACER_SPU_TRIANGLE_H
-#define RTRACER_SPU_TRIANGLE_H
+#pragma once
 
 #include "spu/base.h"
 
@@ -45,7 +44,3 @@ struct ShTriangle {
 
 static_assert(sizeof(Triangle) == 64, "");
 static_assert(sizeof(ShTriangle) == 64, "");
-
-
-#endif
-

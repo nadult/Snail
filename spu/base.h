@@ -1,5 +1,4 @@
-#ifndef RTRACER_SPU_BASE_H
-#define RTRACER_SPU_BASE_H
+#pragma once
 
 #include <spu_mfcio.h>
 #include "rtbase_math.h"
@@ -136,7 +135,3 @@ struct Cache {
 	unsigned long long dataPtr;
 	int indices[tsize];
 };
-
-
-#endif
-

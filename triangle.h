@@ -1,5 +1,4 @@
-#ifndef RTRACER_TRIANGLE_H
-#define RTRACER_TRIANGLE_H
+#pragma once
 
 #include "rtbase.h"
 #include "ray_group.h"
@@ -356,5 +355,3 @@ typedef vector<Triangle> TriVector;
 typedef vector<ShTriangle> ShTriVector;
 typedef std::vector<Triangle, AlignedAllocator<Triangle, 256> > ATriVector;
 typedef std::vector<ShTriangle, AlignedAllocator<ShTriangle, 256> > AShTriVector;
-
-#endif

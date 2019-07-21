@@ -1,5 +1,4 @@
-#ifndef RTRACER_SCENE_INL_H
-#define RTRACER_SCENE_INL_H
+#pragma once
 
 #include "scene.h"
 
@@ -528,6 +527,3 @@ const TreeStats Scene<AccStruct>::TraceTransparency(RaySelector selector,
 		RayTrace(RayGroup<0, 0>(origin, rays.DirPtr(), rays.IDirPtr(), size), cache, out) :
 		RayTrace(RayGroup<0, 1>(origin, rays.DirPtr(), rays.IDirPtr(), size, &selector[0]), cache, out);
 }
-
-
-#endif

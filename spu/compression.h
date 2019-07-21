@@ -1,5 +1,4 @@
-#ifndef RTRACER_SPU_COMPRESSION_H
-#define RTRACER_SPU_COMPRESSION_H
+#pragma once
 
 
 #ifndef ALIGN256
@@ -11,5 +10,3 @@ struct TaskInfo {
 	int w, h, bpp, outSize;
 	char fill[128];
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef RTRACER_SPU_CONTEXT_H
-#define RTRACER_SPU_CONTEXT_H
+#pragma once
 
 #include <libspe2.h>
 #include "rtbase.h"
@@ -28,5 +27,3 @@ struct SPEContext {
 
 	spe_context_ptr_t ptr;
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef RTRACER_BIH_TRAVERSE_H
-#define RTRACER_BIH_TRAVERSE_H
+#pragma once
 
 #include "bih/tree.h"
 
@@ -120,6 +119,3 @@ INST(StaticTree,rFlags,64,RaySelector)
 //INST(FullTree,rFlags,64,RaySelector)
 
 #undef INST
-
-#endif
-

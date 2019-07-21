@@ -1,5 +1,4 @@
-#ifndef RTRACER_FRAME_COUNTER_H
-#define RTRACER_FRAME_COUNTER_H
+#pragma once
 
 class FrameCounter
 {
@@ -12,6 +11,3 @@ private:
 	unsigned frames;
 	double time, fps;
 };
-
-#endif
-

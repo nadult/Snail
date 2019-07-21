@@ -1,5 +1,4 @@
-#ifndef RTRACER_RAY_GENERATOR_H
-#define RTRACER_RAY_GENERATOR_H
+#pragma once
 
 #include "rtbase_math.h"
 
@@ -69,6 +68,3 @@ private:
 	float w, h, invW, invH, planeDist;
 	int level;
 };
-
-#endif
-

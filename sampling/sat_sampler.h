@@ -1,5 +1,4 @@
-#ifndef RTRACER_SAMPLING_SAT_SAMPLER_H
-#define RTRACER_SAMPLING_SAT_SAMPLER_H
+#pragma once
 
 #include "rtbase.h"
 #include "sampling.h"
@@ -56,6 +55,3 @@ namespace sampling {
 	};
 
 }
-
-#endif
-

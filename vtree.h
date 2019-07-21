@@ -1,5 +1,4 @@
-#ifndef RTRACER_VTREE_H
-#define RTRACER_VTREE_H
+#pragma once
 
 #include "rtbase.h"
 #include "bounding_box.h"
@@ -44,5 +43,3 @@ struct VTree {
 class Camera;
 
 void RenderTree(MipmapTexture &image, const VTree &tree, const Camera &camera);
-
-#endif

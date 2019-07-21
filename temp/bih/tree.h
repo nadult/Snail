@@ -1,5 +1,4 @@
-#ifndef RTRACER_BIH_TREE_H
-#define RTRACER_BIH_TREE_H
+#pragma once
 
 #include "ray_group.h"
 #include "tree_stats.h"
@@ -198,7 +197,3 @@ namespace bih {
 
 
 }
-
-#endif
-
-

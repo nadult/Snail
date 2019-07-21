@@ -1,5 +1,4 @@
-#ifndef RTRACER_LIGHT_H
-#define RTRACER_LIGHT_H
+#pragma once
 
 #include "rtbase.h"
 
@@ -16,6 +15,3 @@ public:
 	Vec3f pos,color;
 	float radius,radSq,iRadius;
 };
-
-#endif
-

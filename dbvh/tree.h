@@ -1,5 +1,4 @@
-#ifndef RTRACER_DBVH_H
-#define RTRACER_DBVH_H
+#pragma once
 
 #include "ray_group.h"
 #include "tree_stats.h"
@@ -253,5 +252,3 @@ public:
 };
 
 SERIALIZE_AS_POD(DBVH::Node)
-
-#endif

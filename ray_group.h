@@ -1,5 +1,4 @@
-#ifndef RTRACER_RAY_GROUP_H
-#define RTRACER_RAY_GROUP_H
+#pragma once
 
 #include "rtbase.h"
 
@@ -442,6 +441,3 @@ struct FContext {
 	TreeStats *stats;
 };
 */
-
-#endif
-

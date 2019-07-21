@@ -1,5 +1,4 @@
-#ifndef RTRACER_SHADING_TRANSPARENT_MATERIAL_H
-#define RTRACER_SHADING_TRANSPARENT_MATERIAL_H
+#pragma once
 
 #include "shading/material.h"
 #include "sampling.h"
@@ -49,6 +48,3 @@ namespace shading {
 
 
 }
-
-#endif
-

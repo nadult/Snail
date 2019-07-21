@@ -1,5 +1,4 @@
-#ifndef RTRACER_SHADING_H
-#define RTRACER_SHADING_H
+#pragma once
 
 #include "rtbase.h"
 
@@ -28,6 +27,3 @@ namespace shading {
 	};
 
 }
-
-#endif
-

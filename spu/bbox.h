@@ -1,5 +1,4 @@
-#ifndef RTRACER_SPU_BBOX_H
-#define RTRACER_SPU_BBOX_H
+#pragma once
 
 #include "spu/base.h"
 
@@ -13,7 +12,3 @@ struct BBox {
 	bool Test(Context &ctx, int &firstActive, int &lastActive) const;
 	bool Test(SecondaryContext &ctx, int &firstActive, int &lastActive) const;
 };
-
-
-
-#endif

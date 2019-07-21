@@ -1,5 +1,4 @@
-#ifndef RTRACER_TREE_STATS_H
-#define RTRACER_TREE_STATS_H
+#pragma once
 
 #include "rtbase.h"
 
@@ -112,6 +111,3 @@ private:
 	// intersectFail	8
 	// skips			9
 };
-
-#endif
-

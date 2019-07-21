@@ -1,5 +1,4 @@
-#ifndef RTRACER_SCENE_BUILDER_H
-#define RTRACER_SCENE_BUILDER_H
+#pragma once
 
 #include "rtbase.h"
 #include "tree_box.h"
@@ -53,7 +52,3 @@ public:
 	vector<Object> objects;
 	vector<Instance> instances;
 };
-
-
-#endif
-

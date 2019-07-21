@@ -1,5 +1,4 @@
-#ifndef RTRACER_BASE_SCENE_H
-#define RTRACER_BASE_SCENE_H
+#pragma once
 
 #include "rtbase.h"
 #include "triangle.h"
@@ -102,5 +101,3 @@ public:
 	vector<Object> objects;
 	BBox bbox;
 };
-
-#endif

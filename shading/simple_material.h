@@ -1,5 +1,4 @@
-#ifndef RTRACER_SHADING_SIMPLE_MATERIAL_H
-#define RTRACER_SHADING_SIMPLE_MATERIAL_H
+#pragma once
 
 #include "shading/material.h"
 
@@ -35,6 +34,3 @@ namespace shading {
 	};
 
 }
-
-#endif
-

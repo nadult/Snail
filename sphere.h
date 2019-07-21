@@ -1,5 +1,4 @@
-#ifndef RTRACER_SPHERE_H
-#define RTRACER_SPHERE_H
+#pragma once
 
 #include "rtbase.h"
 
@@ -37,7 +36,3 @@ INLINE typename Vec::TScalar Sphere::Collide(const VecO &rOrigin,const Vec &rDir
 	typename Vec::TBool mask=d>=Const<base,0>();
 	return ForAny(mask)?Condition(mask,-b-Sqrt(d),Const<base,-1>()):Const<base,-1>();
 }
-
-
-#endif
-
