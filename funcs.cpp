@@ -2,7 +2,9 @@
 #include <libgen.h>
 #include <errno.h>
 #include <cstring>
-#include <fwk_gfx.h>
+#include <fwk/sys/resource_manager.h>
+#include <fwk/gfx/font.h>
+#include <fwk/gfx/dtexture.h>
 
 float BoxPointDistanceSq(const BBox &box,const Vec3f &point) {
 	float xMin=box.min.x,yMin=box.min.y,zMin=box.min.z;

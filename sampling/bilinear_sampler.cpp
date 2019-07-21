@@ -1,13 +1,12 @@
 #include "sampling/bilinear_sampler.h"
-#include <fwk_gfx.h>
 
 namespace sampling {
 
 	BilinearSampler::BilinearSampler(const MipmapTexture &t) :tex(t) {
 		if(tex.Width()&(tex.Width()-1)||tex.Height()&(tex.Height()-1))
-			THROW("Texture width & height must be a power of 2");
+			FATAL("Texture width & height must be a power of 2");
 		if(tex.GetFormat() != fwk::TextureFormatId::rgb)
-			THROW("For now only R8G8B8 textures are supported");
+			FATAL("For now only R8G8B8 textures are supported");
 
 		wMask=tex.Width()-1;
 		hMask=tex.Height()-1;

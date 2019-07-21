@@ -1,7 +1,7 @@
 #if defined(__PPC) || defined(__PPC__)
 
 int server_main(int, char**) {
-	THROW("Server (node with rank 0) can only be run on x86");
+	FATAL("Server (node with rank 0) can only be run on x86");
 }
 
 #else
@@ -282,7 +282,7 @@ int server_main(int argc, char **argv) {
 						baseScene.LoadDoom3Proc(fileName);
 					else if(fileName.find(".obj") != string::npos)
 						baseScene.LoadWavefrontObj(fileName);
-					else THROW("Unrecognized format: ", fileName);
+					else FATAL("Unrecognized format: ", fileName);
 				}
 				catch(const Exception &ex) {
 					printf("Exception: %s\n", ex.what());

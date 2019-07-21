@@ -4,6 +4,7 @@
 
 #include <veclib.h>
 #include <math.h>
+#include <fwk/sys_base.h>
 
 using namespace veclib;
 
@@ -15,6 +16,15 @@ typedef vec3f32x4	Vec3q;
 typedef vec4f32x4	Vec4q;
 typedef f32x4		floatq;
 typedef i32x4		intq;
+
+SERIALIZE_AS_POD(Vec2f)
+SERIALIZE_AS_POD(Vec3f)
+SERIALIZE_AS_POD(Vec4f)
+SERIALIZE_AS_POD(Vec2q)
+SERIALIZE_AS_POD(Vec3q)
+SERIALIZE_AS_POD(Vec4q)
+SERIALIZE_AS_POD(floatq)
+SERIALIZE_AS_POD(intq)
 
 enum {
 	blockWidth = 16,

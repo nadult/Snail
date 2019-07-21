@@ -37,7 +37,7 @@ namespace sampling {
 		//		return make_shared<PointSamplerDXT>(*tex);
 		}
 
-		THROW("Cannot create a sampler from texture ", "TODO: name",
+		FATAL("Cannot create a sampler from texture ", "TODO: name",
 						": format is not supported");
 		return {};
 	}

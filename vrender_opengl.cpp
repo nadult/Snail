@@ -9,7 +9,7 @@
 #include <sys/types.h>
 
 #include "camera.h"
-#include "fwk_gfx.h"
+#include <fwk/gfx/texture.h>
 
 typedef Matrix<Vec4f> Matrix4;
 

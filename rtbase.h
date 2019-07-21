@@ -1,18 +1,24 @@
 #ifndef RTBASE_H
 #define RTBASE_H
 
-#include <fwk_base.h>
+#include <fwk/sys_base.h>
+#include <fwk/format.h>
+#include <fwk/sys/stream.h>
 #include "allocator.h"
 #include <cassert>
+#include <vector>
 
 #include "rtbase_math.h"
+
+#define FATAL FWK_FATAL
 
 using fwk::Stream;
 using fwk::string;
 using fwk::vector;
-using fwk::Exception;
 using fwk::shared_ptr;
 using fwk::make_shared;
+using fwk::ErrorChunk;
+using fwk::Error;
 
 class MipmapTexture;
 using PMipmapTexture = shared_ptr<MipmapTexture>;
@@ -23,13 +29,10 @@ namespace fwk {
 
 // TODO: these shouldn't be required
 template <class T, class A> void loadFromStream(std::vector<T, A> &v, Stream &sr) {
+	// TODO: handle errors properly
 	u32 size;
 	sr.loadData(&size, sizeof(size));
-	try {
-		v.resize(size);
-	} catch(Exception &ex) {
-		sr.handleException(ex);
-	}
+	v.resize(size);
 
 	if(fwk::SerializeAsPod<T>::value)
 		sr.loadData(&v[0], sizeof(T) * size);
@@ -41,8 +44,7 @@ template <class T, class A> void loadFromStream(std::vector<T, A> &v, Stream &sr
 template <class T, class A> void saveToStream(const std::vector<T, A> &v, Stream &sr) {
 	u32 size;
 	size = u32(v.size());
-	if(size_t(size) != v.size())
-		sr.handleException(Exception("Vector size too big (> 2^32) for serializer to handle"));
+	ASSERT(size_t(size) == v.size());
 	sr.saveData(&size, sizeof(size));
 
 	if(fwk::SerializeAsPod<T>::value)
@@ -256,27 +258,27 @@ public:
 	Isct() { }
 
 	Real &Distance(int q=0) {
-		if(!(flags&isct::fDistance)) THROW("Structure doesnt contain 'distance' member.");
+		if(!(flags&isct::fDistance)) FATAL("Structure doesnt contain 'distance' member.");
 		return distance[q];
 	}
 	const Real &Distance(int q=0) const {
-		if(!(flags&isct::fDistance)) THROW("Structure doesnt contain 'distance' member.");
+		if(!(flags&isct::fDistance)) FATAL("Structure doesnt contain 'distance' member.");
 		return distance[q];
 	}
 	Int &Object(int q=0) {
-		if(!(flags&isct::fObject)) THROW("Structure doesnt contain 'object' member.");
+		if(!(flags&isct::fObject)) FATAL("Structure doesnt contain 'object' member.");
 		return object[q];
 	}
 	const Int &Object(int q=0) const {
-		if(!(flags&isct::fObject)) THROW("Structure doesnt contain 'object' member.");
+		if(!(flags&isct::fObject)) FATAL("Structure doesnt contain 'object' member.");
 		return object[q];
 	}
 	Int &Element(int q=0) {
-		if(!(flags&isct::fElement)) THROW("Structure doesnt contain 'element' member.");
+		if(!(flags&isct::fElement)) FATAL("Structure doesnt contain 'element' member.");
 		return element[q];
 	}
 	const Int &Element(int q=0) const {
-		if(!(flags&isct::fElement)) THROW("Structure doesnt contain 'element' member.");
+		if(!(flags&isct::fElement)) FATAL("Structure doesnt contain 'element' member.");
 		return element[q];
 	}
 

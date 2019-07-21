@@ -35,7 +35,7 @@ MINGW_LIBS=$(MINGW_FWK_LIBS) $(shell $(MINGW_PKG_CONFIG) --libs $(LIBS))
 INCLUDES=-I./ -Iveclib/ $(FWK_INCLUDES)
 
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
-FLAGS=-march=native -std=c++14 -O3 -ggdb -rdynamic \
+FLAGS=-march=native -std=c++17 -O3 -ggdb -rdynamic \
 	  -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread -fopenmp
 
 CXX=g++
@@ -59,16 +59,14 @@ node: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/server.o $(BUILD_DIR)/nod
 	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(MPILIBS) $(LINUX_LIBS) -lboost_system -lboost_regex -lGL -lGLU
 
 client: $(SHARED_OBJECTS) $(BUILD_DIR)/client.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o $(LINUX_FWK_LIB)
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lGL -lGLU \
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ \
 		$(LINUX_LIBS) -lboost_system -lboost_regex -g
 
 dicom_viewer: $(SHARED_OBJECTS) $(BUILD_DIR)/dicom_viewer.o	$(BUILD_DIR)/camera.o $(LINUX_FWK_LIB)
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lGL -lGLU \
-		$(LINUX_LIBS) -g
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(LINUX_LIBS) -g
 
 rtracer: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)/render_opengl.o $(LINUX_FWK_LIB)
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ -lglfw -lGL -lGLU \
-		$(LINUX_LIBS) -g
+	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(LINUX_LIBS) -g
 
 rtclean:
 	-rm -f $(OBJECTS) $(DEPS) $(PCH_FILE) $(BUILD_DIR)/pch.h client node rtracer dicom_viewer

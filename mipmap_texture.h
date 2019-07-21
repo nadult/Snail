@@ -2,7 +2,8 @@
 #define MIPMAP_TEXTURE_H
 
 #include "rtbase.h"
-#include <fwk_gfx.h>
+#include <fwk/gfx_base.h>
+#include <fwk/gfx/texture_format.h>
 
 class MipmapTexture
 {

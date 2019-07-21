@@ -10,7 +10,7 @@ namespace {
 	std::map<string,string> LoadMat2TextureMap() {
 		std::filebuf fb;
 		if(!fb.open("scenes/doom3/materials.mtr",std::ios::in))
-			THROW("Error while opening file: scenes/doom3/materials.mtr");
+			FATAL("Error while opening file: scenes/doom3/materials.mtr");
 		std::istream in(&fb);
 
 		std::map<string,string> out;
@@ -137,7 +137,7 @@ void BaseScene::LoadDoom3Proc(const string &fileName) {
 
 	std::filebuf fb;
 	if(!fb.open (fileName.c_str(),std::ios::in))
-		THROW("Error while opening file: %s",fileName.c_str());
+		FATAL("Error while opening file: %s",fileName.c_str());
 
 	std::istream is(&fb);
 

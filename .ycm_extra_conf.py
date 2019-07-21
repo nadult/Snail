@@ -37,7 +37,7 @@ import ycm_core
 flags = [
 '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-Wno-unused-variable', '-fexceptions',
 '-x', 'c++',
-'-DNDEBUG', '-std=c++14',
+'-DNDEBUG', '-std=c++17',
 #'-include-pch', 'build/base.h.pch',
 
 '-I./',

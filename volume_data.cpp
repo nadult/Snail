@@ -1,7 +1,9 @@
 #include "volume_data.h"
 #include <algorithm>
-#include <cstring>
-#include "fwk_gfx.h"
+#include <string>
+#include <fwk/gfx_base.h>
+#include <fwk/filesystem.h>
+#include <fwk/gfx/texture.h>
 
 using fwk::Loader;
 

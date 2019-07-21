@@ -1,5 +1,7 @@
 #include "vtree.h"
+
 #include <cstring>
+#include <fwk/gfx/texture.h>
 
 
 VTree::VTree(const VolumeData &dic) {
@@ -180,7 +182,6 @@ u16 VTree::Trace(const Vec3f &origin, const Vec3f &dir, u16 cmin) const {
 }
 
 #include "camera.h"
-#include "fwk_gfx.h"
 
 void RenderTree(fwk::Texture &image, const VTree &tree, const Camera &camera) {
 //		dicom.Blit(image, slice);

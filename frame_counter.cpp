@@ -1,9 +1,7 @@
 #include "frame_counter.h"
-#include "fwk_base.h"
+#include <fwk/sys_base.h>
 
-FrameCounter::FrameCounter()
-	:time(fwk::getTime()), frames(0), fps(0) {
-}
+FrameCounter::FrameCounter() : frames(0), time(fwk::getTime()), fps(0) {}
 
 void FrameCounter::NextFrame() {
 	double tTime = fwk::getTime();
@@ -16,4 +14,3 @@ void FrameCounter::NextFrame() {
 		frames = 0;
 	}
 }
-

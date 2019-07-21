@@ -1,5 +1,6 @@
 #include "mipmap_texture.h"
 #include <memory.h>
+#include <fwk/gfx/texture.h>
 
 namespace
 {
@@ -41,7 +42,7 @@ MipmapTexture::MipmapTexture(const fwk::Texture &tex, fwk::TextureFormat fmt, bo
 		}
 	}
 	else {
-		THROW("Format %s not supported", toString(fmt.id()));
+		FATAL("Format %s not supported", toString(fmt.id()));
 	}
 
 	if(hasMips)
@@ -92,7 +93,7 @@ MipmapTexture::operator fwk::Texture() const {
 	else if(format == fwk::TextureFormatId::rgba) {
 	}
 	else {
-		THROW("Unsupported conversion: MipmapTexture(%s) -> fwk::Texture", toString(format.id()));
+		FATAL("Unsupported conversion: MipmapTexture(%s) -> fwk::Texture", toString(format.id()));
 	}
 
 	return out;
@@ -283,7 +284,7 @@ void MipmapTexture::GenMip(size_t mip) {
 	}
 
 	default:
-		THROW("Mipmap generation for texture in %s format not supported", toString(format.id()));
+		FATAL("Mipmap generation for texture in %s format not supported", toString(format.id()));
 		break;
 	}
 }

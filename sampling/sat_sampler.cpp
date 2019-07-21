@@ -5,9 +5,9 @@ namespace sampling {
 
 	SATSampler::SATSampler(const MipmapTexture &tex) {
 		if(tex.Width()&(tex.Width()-1)||tex.Height()&(tex.Height()-1))
-			THROW("Texture width & height must be a power of 2");
+			FATAL("Texture width & height must be a power of 2");
 		if(tex.GetFormat() != fwk::TextureFormatId::rgb)
-			THROW("For now only R8G8B8 textures are supported");
+			FATAL("For now only R8G8B8 textures are supported");
 
 		w=tex.Width(); h=tex.Height();
 		wMask=w-1; hMask=h-1;

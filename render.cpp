@@ -6,7 +6,6 @@
 #include "render.h"
 #include "thread_pool.h"
 #include "ray_generator.h"
-#include "fwk_gfx.h"
 #include "mipmap_texture.h"
 
 static i32x4 ConvColor(Vec3q rgb) {

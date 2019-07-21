@@ -4,11 +4,11 @@ namespace sampling {
 
 	PointSamplerDXT::PointSamplerDXT(const Texture &t) :tex(t) {
 		if(tex.Width()&(tex.Width()-1)||tex.Height()&(tex.Height()-1))
-			THROW("Texture width & height must be a power of 2");
+			FATAL("Texture width & height must be a power of 2");
 		if(tex.GetFormat().GetIdent()!=TextureFormatId::dxt1)
-			THROW("DXT sampler requires DXT1 texture");
+			FATAL("DXT sampler requires DXT1 texture");
 //		if(tex.Mips()>1&&tex.Width()!=tex.Height())
-//			THROW("Mipmapped textures must have width same as height");
+//			FATAL("Mipmapped textures must have width same as height");
 
 		wMask=tex.Width()-1;
 		hMask=tex.Height()-1;
@@ -38,7 +38,7 @@ namespace sampling {
 					c[3]=c[0]+c[1]+c[1];
 				}
 			/*	else { // premultiplied alpha
-					THROW("DXT1 with premultiplied alpha not supported");
+					FATAL("DXT1 with premultiplied alpha not supported");
 				} */
 			
 				c[0]=c[0]+c[0]+c[0];

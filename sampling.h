@@ -2,6 +2,7 @@
 #define RTRACER_SAMPLING_H
 
 #include "shading.h"
+#include <map>
 
 namespace sampling {
 

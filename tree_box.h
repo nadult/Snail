@@ -104,7 +104,7 @@
 			return 0;
 		}
 		void serialize(const Serializer &sr) {
-			THROW("TODO: TreeBox serializer not avaliable");
+			FATAL("TODO: TreeBox serializer not avaliable");
 		}
 
 //	private:

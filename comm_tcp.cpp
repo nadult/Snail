@@ -40,7 +40,7 @@ namespace comm {
 			((tcp::socket*)sock)->connect(*endpointIterator++, error);
 		}
 		if(error)
-			THROW("Error while connecting to ", host, ':', port, " : ", error);
+			FATAL("Error while connecting to ", host, ':', port, " : ", error);
 		
 		((tcp::socket*)sock)->set_option(tcp::no_delay(true));
 	}

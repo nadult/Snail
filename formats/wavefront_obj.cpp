@@ -68,7 +68,7 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 	
 	std::filebuf fb;
 	if(!fb.open (fileName.c_str(),std::ios::in))
-		THROW("Error while opening: %s", fileName.c_str());
+		FATAL("Error while opening: %s", fileName.c_str());
 
 	std::istream is(&fb);
 	
@@ -147,13 +147,13 @@ void BaseScene::LoadWavefrontObj(const string &fileName) {
 
 				if(tri.v[k] >= int(verts.size()) || tri.v[k] < 0) {
 					std::cout << line << '\n';
-					THROW("Wrong vertex index: ",tri.v[k],"/",int(verts.size()));
+					FATAL("Wrong vertex index: ",tri.v[k],"/",int(verts.size()));
 				}
 				if(tri.vt[k] >= int(uvs.size()))
-					THROW("Wrong tex-coord index: ",tri.vt[k],"/",int(uvs.size()));
+					FATAL("Wrong tex-coord index: ",tri.vt[k],"/",int(uvs.size()));
 				if(tri.vn[k] >= int(normals.size())) {
 					tri.vn[k] = -1; //TODO
-				//	THROW("Wrong normal index",tri.vn[k],"/",int(normals.size()));
+				//	FATAL("Wrong normal index",tri.vn[k],"/",int(normals.size()));
 				}
 			}
 			

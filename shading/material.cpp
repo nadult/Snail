@@ -1,12 +1,17 @@
+#include "mipmap_texture.h"
 #include "shading/material.h"
 #include "shading/simple_material.h"
 #include "shading/tex_material.h"
-#include "shading/uber_material.h"
 #include "shading/transparent_material.h"
-#include "mipmap_texture.h"
-#include <sstream>
+#include "shading/uber_material.h"
 #include <fstream>
+#include <string>
+#include <fwk/filesystem.h>
+#include <fwk/sys/error.h>
+#include <fwk/gfx/texture.h>
+#include <fwk/sys/on_fail.h>
 #include <iostream>
+#include <sstream>
 
 namespace shading {
 	using namespace sampling;
@@ -31,9 +36,9 @@ namespace shading {
 		string x, y, z;
 		ss >> x;
 		if(x == "spectral")
-			THROW("spectral files not supported");
+			FATAL("spectral files not supported");
 		if(x == "xyz")
-			THROW("xyz values not supported");
+			FATAL("xyz values not supported");
 		Vec3f out;
 		out.x = atof(x.c_str());
 		ss >> y >> z;
@@ -94,7 +99,7 @@ namespace shading {
 				string token;
 				ss >> token;
 				if(token == "-halo")
-					THROW("-halo parameter not supported");
+					FATAL("-halo parameter not supported");
 				newMat.dissolveFactor = atof(token.c_str());
 			}
 			else if(token == "Ns") ss >> newMat.specularExponent;
@@ -109,7 +114,7 @@ namespace shading {
 			}
 			else if(token == "") continue;
 			else {
-			//	THROW("Unknown token: ", token);
+			//	FATAL("Unknown token: ", token);
 			}
 		}
 
@@ -134,14 +139,11 @@ namespace shading {
 				std::cout << "Unsupported image type: " << ext << std::endl;
 				return;
 			}
-			try {
-				fwk::Texture tex;
-				fwk::Loader(fpath) >> tex;
-				dict[name] = make_shared<MipmapTexture>(tex, fwk::TextureFormatId::rgb, true);
-			}
-			catch(const Exception &ex) {
-				std::cout << "While loading: " << fpath.c_str() << std::endl << ex.what() << '\n';
-			}
+			ON_FAIL("While loading: ", fpath);
+
+			fwk::Texture tex;
+			fwk::Loader(fpath) >> tex;
+			dict[name] = make_shared<MipmapTexture>(tex, fwk::TextureFormatId::rgb, true);
 		}
 	}
 
@@ -166,23 +168,22 @@ namespace shading {
 
 		for(const auto &mat : matDescs) {
 			PMaterial newMat;
-			try {
-				TexDict::const_iterator it1 = texDict.find(mat.diffuseMap);
-				TexDict::const_iterator it2 = texDict.find(mat.dissolveMap);
-				auto diff  = it1 == texDict.end()? PMipmapTexture() : it1->second;
-				auto trans = it2 == texDict.end()? PMipmapTexture() : it2->second;
+			// TODO: handle errors
+			
+			TexDict::const_iterator it1 = texDict.find(mat.diffuseMap);
+			TexDict::const_iterator it2 = texDict.find(mat.dissolveMap);
+			auto diff  = it1 == texDict.end()? PMipmapTexture() : it1->second;
+			auto trans = it2 == texDict.end()? PMipmapTexture() : it2->second;
 
-				if(diff && trans)
-					newMat = std::make_shared<MaterialWrapper<TransparentMaterial<1>>>(
-								sampling::NewSampler(diff), sampling::NewSampler(trans));
-				else {
-					newMat = diff?NewMaterial(diff) : std::make_shared<MaterialWrapper<UberMaterial>>(mat);
-				}
+			if(diff && trans)
+				newMat = std::make_shared<MaterialWrapper<TransparentMaterial<1>>>(
+							sampling::NewSampler(diff), sampling::NewSampler(trans));
+			else {
+				newMat = diff?NewMaterial(diff) : std::make_shared<MaterialWrapper<UberMaterial>>(mat);
 			}
-			catch(const Exception &ex) {
-				std::cout << ex.what() << '\n';
-				newMat = NewMaterial({});
-			}
+
+			// TODO: if error:
+			//newMat = NewMaterial({});
 
 			out[mat.name] = newMat;
 		}

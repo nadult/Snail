@@ -1,9 +1,17 @@
-#include <iostream>
-#include <fstream>
-#include <fwk_gfx.h>
-#include <fwk_input.h>
-#include <fwk_opengl.h>
 #include "camera.h"
+#include <fstream>
+#include <fwk/filesystem.h>
+#include <fwk/gfx/color.h>
+#include <fwk/gfx/dtexture.h>
+#include <fwk/gfx/font.h>
+#include <fwk/gfx/gfx_device.h>
+#include <fwk/gfx/opengl.h>
+#include <fwk/gfx/renderer2d.h>
+#include <fwk/gfx/texture.h>
+#include <fwk/sys/expected.h>
+#include <fwk/sys/input.h>
+#include <fwk/sys/backtrace.h>
+#include <iostream>
 
 #include "formats/loader.h"
 #include "base_scene.h"
@@ -200,9 +208,12 @@ public:
 		sceneScale = Length(Vec3f(scene.geometry.GetBBox().Size()));
 		sceneCenter = scene.geometry.GetBBox().Center();
 
-		try {
-			Loader("scenes/cameras.dat") >> m_camConfigs;
-		} catch(...) {
+		fwk::FilePath camPath("scenes/cameras.dat");
+		if(fwk::access(camPath)) {
+			Loader(camPath) >> m_camConfigs;
+			// TODO: handle errors
+		}
+		else {
 			m_camConfigs = {};
 		}
 
@@ -267,13 +278,8 @@ public:
 		if(input.isKeyDown('h')) {
 			oglRendering ^= 1;
 			if(oglRendering && !oglRenderer) {
-				try {
-					oglRenderer = std::make_unique<OGLRenderer>(m_scene);
-				}
-				catch(const Exception &ex) {
-					std::cout << ex.what();
-					oglRendering = false;
-				}
+				// TODO: proper error handling
+				oglRenderer = std::make_unique<OGLRenderer>(m_scene);
 			}
 		}
 
@@ -384,13 +390,13 @@ public:
 		auto style = fwk::FontStyle{fwk::ColorId::white, fwk::ColorId::black};
 
 		if(oglRendering) {
-			font.draw(renderer, {5.0f, 25.0f}, style, fwk::format("FPS: %f (opengl rendering)", fps));
+			font.draw(renderer, {5.0f, 25.0f}, style, fwk::format("FPS: % (opengl rendering)", fps));
 		}
 		else {
 			font.draw(renderer, {5.0f, 5.0f}, style, stats.GenInfo(m_config.resx, m_config.resy, time * 1000.0, buildTime * 1000.0));
-			font.draw(renderer, {5.0f, 25.0f}, style, fwk::format("FPS: %.2f %s%.2f", fps, " MRays/sec:", mrays));
+			font.draw(renderer, {5.0f, 25.0f}, style, fwk::stdFormat("FPS: %.2f %s%.2f", fps, " MRays/sec:", mrays));
 			if(lightsEnabled && lights.size())
-				font.draw(renderer, {5.0f, 65.0f}, style, fwk::format("Lights: %d", lightsEnabled?(int)lights.size() : 0));
+				font.draw(renderer, {5.0f, 65.0f}, style, fwk::format("Lights: %", lightsEnabled?(int)lights.size() : 0));
 	//		snprintf(text, sizeof(text), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
 	//			" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7]);
 	//		font.PrintAt(Vec2f(5, 85), text);
@@ -431,7 +437,7 @@ public:
 
 static RayTracer *s_rtracer = nullptr;
 
-bool mainLoop(fwk::GfxDevice &device) {
+bool mainLoop(fwk::GfxDevice &device, void*) {
 	DASSERT(s_rtracer);
 	if(!s_rtracer->processInput(device))
 		return false;
@@ -439,9 +445,11 @@ bool mainLoop(fwk::GfxDevice &device) {
 	return true;
 }
 
-static int tmain(int argc, char **argv) {
+int main(int argc, char **argv) {
 	float nan = 0.0f / 0.0f;
 	float not_nan = 3.0f;
+
+	fwk::Backtrace::t_default_mode = fwk::BacktraceMode::full;
 
 //	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 	ASSERT(IsNan(Vec3f(nan, nan, nan)));
@@ -490,10 +498,14 @@ static int tmain(int argc, char **argv) {
 
 	Scene<BVH> scene;
 	if(!conf.rebuild) {
-		try {
-			Loader(string("dump/") + conf.sceneName) >> scene.geometry;
+		fwk::FilePath path("dump/" + conf.sceneName);
+		if(path.isRegularFile()) {
+			Loader(path) >> scene.geometry;
+			// TODO: handle errors
 		}
-		catch(...) { conf.rebuild = 1; }
+		else {
+			conf.rebuild = true;
+		}
 	}
 	if(conf.rebuild) {
 		printf("Loading...\n");
@@ -527,7 +539,7 @@ static int tmain(int argc, char **argv) {
 						break;
 				}
 			}
-			else THROW("Unrecognized format: %s", fileName.c_str());
+			else FATAL("Unrecognized format: %s", fileName.c_str());
 
 			int tris = 0;
 			for(int n = 0; n < baseScene.objects.size(); n++)
@@ -569,8 +581,8 @@ static int tmain(int argc, char **argv) {
 
 
 	fwk::GfxDevice device;
-	uint gfx_flags = conf.fullscreen? fwk::GfxDevice::flag_fullscreen_desktop : 0;
-	device.createWindow("Snail realtime raytracer", {conf.resx, conf.resy}, gfx_flags);
+	auto gfx_flags = mask(conf.fullscreen, fwk::GfxDeviceOpt::fullscreen_desktop);
+	device.createWindow("Snail realtime raytracer", {conf.resx, conf.resy}, gfx_flags, 2.1);
 	conf.resx = device.windowSize().x;
 	conf.resy = device.windowSize().y;
 
@@ -579,18 +591,4 @@ static int tmain(int argc, char **argv) {
 	device.runMainLoop(mainLoop);
 
 	return 0;
-}
-
-int main(int argc,char **argv) {
-	try {
-		return tmain(argc,argv);
-	}
-	catch(const std::exception &ex) {
-		std::cout << ex.what() << '\n';
-		return 1;
-	}
-	catch(...) {
-		std::cout << "Unknown exception thrown.\n";
-		throw;
-	}
 }

@@ -4,6 +4,7 @@
 #include "ray_group.h"
 #include "tree_stats.h"
 #include "triangle.h"
+#include <map>
 
 class BaseScene;
 

@@ -1,5 +1,10 @@
-#include <fwk.h>
 #include <veclib.h>
-#include <cassert>
 #include <math.h>
 #include <iostream>
+#include <fwk/math_base.h>
+#include <fwk/math/box.h>
+#include <fwk/gfx_base.h>
+#include <fwk/sys_base.h>
+#include <fwk/sys/error.h>
+#include <fwk/sys/xml.h>
+#include <fwk/format.h>
