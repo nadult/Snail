@@ -46,20 +46,19 @@ MPILIBS=`mpicxx -showme:link`
 LINUX_LIBS=$(LINUX_FWK_LIBS) $(shell $(LINUX_PKG_CONFIG) --libs $(LIBS))
 MINGW_LIBS=$(MINGW_FWK_LIBS) $(shell $(MINGW_PKG_CONFIG) --libs $(LIBS))
 
-INCLUDES=-I./ -Iveclib/ $(FWK_INCLUDES)
+INCLUDES=-Isrc/ -Iveclib/ -Iextern/ $(FWK_INCLUDES)
 
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
 FLAGS=-std=c++17 -O3 -ggdb -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread -fopenmp
 LINUX_FLAGS=$(FLAGS) $(INCLUDES)
 
-SOURCES:=$(FILES:%=%.cpp)
 OBJECTS:=$(FILES:%=$(BUILD_DIR)/%.o)
 SHARED_OBJECTS:=$(SHARED_FILES:%=$(BUILD_DIR)/%.o)
 RENDER_OBJECTS:=$(RFILES:%=$(BUILD_DIR)/%.o)
 
 # --- Precompiled headers -------------------------------------------------------------------------
 
-PCH_FILE_SRC=rtracer_pch.h
+PCH_FILE_SRC=src/rtracer_pch.h
 
 PCH_FILE_H=$(BUILD_DIR)/pch.h
 PCH_FILE_GCH=$(BUILD_DIR)/pch.h.gch
@@ -87,8 +86,8 @@ $(PCH_FILE_MAIN): $(PCH_FILE_H)
 
 DEPS:=$(FILES:%=$(BUILD_DIR)/%.d) $(PCH_FILE_H).d
 
-$(OBJECTS): $(BUILD_DIR)/%.o: $(PCH_FILE_MAIN) %.cpp
-	$(LINUX_CXX) -MMD $(LINUX_FLAGS) $(PCH_INCLUDE) -c $*.cpp -o $@
+$(OBJECTS): $(BUILD_DIR)/%.o: $(PCH_FILE_MAIN) src/%.cpp
+	$(LINUX_CXX) -MMD $(LINUX_FLAGS) $(PCH_INCLUDE) -c src/$*.cpp -o $@
 
 node: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/server.o $(BUILD_DIR)/node.o \
 		$(BUILD_DIR)/comm_mpi.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o $(LINUX_FWK_LIB)
@@ -107,7 +106,7 @@ rtracer: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)
 # Recreates dependency files, in case they got outdated
 depends: $(PCH_FILE_MAIN)
 	@echo $(FILES) | tr '\n' ' ' | xargs -P16 -t -d' ' -I '{}' $(LINUX_CXX) $(LINUX_FLAGS) $(PCH_INCLUDE) \
-		'{}'.cpp -MM -MF $(BUILD_DIR)/'{}'.d -MT $(BUILD_DIR)/'{}'.o -E > /dev/null
+		src/'{}'.cpp -MM -MF $(BUILD_DIR)/'{}'.d -MT $(BUILD_DIR)/'{}'.o -E > /dev/null
 
 libfwk-clean:
 	$(MAKE) -C $(FWK_DIR) clean
