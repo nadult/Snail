@@ -44,8 +44,9 @@ namespace sampling {
 	INLINE Vec2 ClampTexCoord(const Vec2 &coord) {
 		Vec2 uv = coord - Vec2(Int(coord.x), Int(coord.y));
 
-		uv.x = Condition(uv.x < 0.0f, uv.x + 1.0f, uv.x);
-		uv.y = Condition(uv.y < 0.0f, uv.y + 1.0f, uv.y);
+		using Scalar = typename Vec2::TScalar;
+		uv.x = Condition(uv.x < 0.0f, uv.x + Scalar(1.0f), uv.x);
+		uv.y = Condition(uv.y < 0.0f, uv.y + Scalar(1.0f), uv.y);
 		return uv;
 	}
 

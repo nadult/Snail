@@ -25,7 +25,7 @@ namespace {
 
 	template <class Context>
 	void InitializationShader(Context &c, uint i, const typename Context::real &maxDist) {
-		Vec3q ambient = Vec3f(0.4, 0.4, 0.4);
+		Vec3q ambient(Vec3f(0.4, 0.4, 0.4));
 
 		c.distance[i] = maxDist;
 		c.color[i]    = f32x4(0.0f);
@@ -626,7 +626,7 @@ const TreeStats Scene<AccStruct>::TraceTransparency(RaySelector selector,
 	const int size = rays.Size();
 	Vec3q origin[size];
 	for(int q = 0; q < size; q++) //TODO: robust epsilons
-		origin[q] = rays.Dir(q) * (distance[q] + 0.001) + rays.Origin(q);
+		origin[q] = rays.Dir(q) * (distance[q] + f32x4(0.001)) + rays.Origin(q);
 
 	return selector.All()?
 		RayTrace(RayGroup<0, 0>(origin, rays.DirPtr(), rays.IDirPtr(), size), cache, out) :

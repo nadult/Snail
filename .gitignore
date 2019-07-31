@@ -4,3 +4,4 @@ build/
 scenes/cameras.dat
 .ycm_extra_conf.pyc
 rtracer
+Makefile.local

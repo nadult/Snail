@@ -1,5 +1,19 @@
-all: client node rtracer
+MINGW_PREFIX=x86_64-w64-mingw32.static.posix-
+BUILD_DIR=build
+LINUX_CXX=clang++
 
+-include Makefile.local
+
+ifndef LINUX_LINK
+LINUX_LINK=$(LINUX_CXX)
+endif
+
+ifneq (,$(findstring clang,$(LINUX_CXX)))
+	CLANG=yes
+	LINUX_LINK+=-fuse-ld=gold
+endif
+
+all: client node rtracer
 BUILD_DIR=build
 
 _dummy := $(shell [ -d $(BUILD_DIR) ] || mkdir -p $(BUILD_DIR))
@@ -35,47 +49,75 @@ MINGW_LIBS=$(MINGW_FWK_LIBS) $(shell $(MINGW_PKG_CONFIG) --libs $(LIBS))
 INCLUDES=-I./ -Iveclib/ $(FWK_INCLUDES)
 
 NICE_FLAGS=-Woverloaded-virtual -Wnon-virtual-dtor
-FLAGS=-march=native -std=c++17 -O3 -ggdb -rdynamic \
-	  -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread -fopenmp
+FLAGS=-std=c++17 -O3 -ggdb -DNDEBUG -mfpmath=sse -msse2 $(NICE_FLAGS) -pthread -fopenmp
+LINUX_FLAGS=$(FLAGS) $(INCLUDES)
 
-CXX=g++
-
-DEPS:=$(FILES:%=$(BUILD_DIR)/%.d) $(BUILD_DIR)/pch.h.d
 SOURCES:=$(FILES:%=%.cpp)
 OBJECTS:=$(FILES:%=$(BUILD_DIR)/%.o)
 SHARED_OBJECTS:=$(SHARED_FILES:%=$(BUILD_DIR)/%.o)
 RENDER_OBJECTS:=$(RFILES:%=$(BUILD_DIR)/%.o)
 
-PCH_FILE=$(BUILD_DIR)/pch.h.gch
-$(PCH_FILE): pch.h
-	cp pch.h $(BUILD_DIR)/pch.h
-	$(CXX) -MMD $(FLAGS) $(INCLUDES) $(BUILD_DIR)/pch.h -o $@
+# --- Precompiled headers -------------------------------------------------------------------------
 
-$(OBJECTS): $(BUILD_DIR)/%.o: $(PCH_FILE) %.cpp
-	$(CXX) -MMD $(FLAGS) $(INCLUDES) -include $(BUILD_DIR)/pch.h -c $*.cpp -o $@
+PCH_FILE_SRC=rtracer_pch.h
+
+PCH_FILE_H=$(BUILD_DIR)/pch.h
+PCH_FILE_GCH=$(BUILD_DIR)/pch.h.gch
+PCH_FILE_PCH=$(BUILD_DIR)/pch.h.pch
+
+ifdef CLANG
+	PCH_INCLUDE=-include-pch $(PCH_FILE_PCH)
+	PCH_FILE_MAIN=$(PCH_FILE_PCH)
+
+	ifneq ("$(wildcard libfwk/checker.so)","")
+		LINUX_CHECKER_FLAGS+=-Xclang -load -Xclang  $(realpath libfwk/checker.so) -Xclang -add-plugin -Xclang check-error-attribs
+	endif
+else
+	PCH_INCLUDE=-I$(BUILD_DIR) -include $(PCH_FILE_H)
+	PCH_FILE_MAIN=$(PCH_FILE_GCH)
+endif
+
+
+$(PCH_FILE_H): $(PCH_FILE_SRC)
+	cp $^ $@
+$(PCH_FILE_MAIN): $(PCH_FILE_H)
+	$(LINUX_CXX) -x c++-header -MMD $(LINUX_FLAGS) $(PCH_FILE_H) -o $@
+
+# --- Main build commands -------------------------------------------------------------------------
+
+DEPS:=$(FILES:%=$(BUILD_DIR)/%.d) $(PCH_FILE_H).d
+
+$(OBJECTS): $(BUILD_DIR)/%.o: $(PCH_FILE_MAIN) %.cpp
+	$(LINUX_CXX) -MMD $(LINUX_FLAGS) $(PCH_INCLUDE) -c $*.cpp -o $@
 
 node: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/server.o $(BUILD_DIR)/node.o \
 		$(BUILD_DIR)/comm_mpi.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o $(LINUX_FWK_LIB)
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(MPILIBS) $(LINUX_LIBS) -lboost_system -lboost_regex -lGL -lGLU
+	$(LINUX_LINK) $(LINUX_FLAGS) -o $@ $^ $(MPILIBS) $(LINUX_LIBS) -lboost_system -lboost_regex -lGL -lGLU
 
 client: $(SHARED_OBJECTS) $(BUILD_DIR)/client.o $(BUILD_DIR)/comm_tcp.o $(BUILD_DIR)/comm_data.o $(LINUX_FWK_LIB)
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ \
+	$(LINUX_LINK) $(LINUX_FLAGS) -o $@ $^ \
 		$(LINUX_LIBS) -lboost_system -lboost_regex -g
 
 dicom_viewer: $(SHARED_OBJECTS) $(BUILD_DIR)/dicom_viewer.o	$(BUILD_DIR)/camera.o $(LINUX_FWK_LIB)
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(LINUX_LIBS) -g
+	$(LINUX_LINK) $(LINUX_FLAGS) -o $@ $^ $(LINUX_LIBS) -g
 
 rtracer: $(SHARED_OBJECTS) $(RENDER_OBJECTS) $(BUILD_DIR)/rtracer.o $(BUILD_DIR)/render_opengl.o $(LINUX_FWK_LIB)
-	$(CXX) $(FLAGS) $(INCLUDES) -o $@ $^ $(LINUX_LIBS) -g
+	$(LINUX_LINK) $(LINUX_FLAGS) -o $@ $^ $(LINUX_LIBS) -g
 
-rtclean:
-	-rm -f $(OBJECTS) $(DEPS) $(PCH_FILE) $(BUILD_DIR)/pch.h client node rtracer dicom_viewer
-	find $(BUILD_DIR) -type d -empty -delete
-	-rmdir $(BUILD_DIR)
+# Recreates dependency files, in case they got outdated
+depends: $(PCH_FILE_MAIN)
+	@echo $(FILES) | tr '\n' ' ' | xargs -P16 -t -d' ' -I '{}' $(LINUX_CXX) $(LINUX_FLAGS) $(PCH_INCLUDE) \
+		'{}'.cpp -MM -MF $(BUILD_DIR)/'{}'.d -MT $(BUILD_DIR)/'{}'.o -E > /dev/null
 
-clean: rtclean
+libfwk-clean:
 	$(MAKE) -C $(FWK_DIR) clean
 
-.PHONY: clean rtclean 
+clean:
+	-rm -f $(OBJECTS) $(DEPS) client node rtracer dicom_viewer $(PCH_FILE_GCH) $(PCH_FILE_PCH) $(PCH_FILE_H)
+	find $(BUILD_DIR) -type d -empty -delete
+
+full-clean: clean libfwk-clean
+
+.PHONY: clean libfwk-clean full-clean
 
 -include $(DEPS)

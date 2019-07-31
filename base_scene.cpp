@@ -155,7 +155,7 @@ BaseScene::Object::Object(const vector<Vec3f> &tverts,const vector<Vec2f> &tuvs,
 		dst.matId=src.matId;
 	}
 	
-	trans=Identity<>();
+	trans=identity;
 	bbox=BBox(&verts[0],verts.size());
 }
 
@@ -469,7 +469,7 @@ Vec3f BaseScene::Center() const {
 
 void BaseScene::Object::FindOptimalTrans() {
 	{
-		Matrix<Vec4f> min=Identity<>();
+		Matrix<Vec4f> min=identity;
 		float minSum=1.0f/0.0f;
 		
 		enum { dx=4,dy=4,dz=4 };
