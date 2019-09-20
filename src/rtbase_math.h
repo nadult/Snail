@@ -6,6 +6,8 @@
 #include <math.h>
 #include <fwk/sys_base.h>
 
+#define SERIALIZE_AS_POD(Type) template <> constexpr bool fwk::is_flat_data<Type> = true;
+
 using namespace veclib;
 
 typedef Vec2<float> Vec2f;

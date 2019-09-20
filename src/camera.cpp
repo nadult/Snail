@@ -19,23 +19,6 @@ static void Rotate(const Vec3f axis, float radians, Vec3f &v1, Vec3f &v2, Vec3f 
 	v3 = Vec3f(xzm + ySin, yzm - xSin, zz * oneMinusCos + cos);
 }
 
-void CameraConfigs::save(Stream &sr) const {
-	sr << int(data.size());
-	for(auto &pair : data)
-		sr << pair.first << pair.second;
-}
-
-void CameraConfigs::load(Stream &sr) {
-	int count;
-   	sr >> count;
-	for(int n = 0; n < count; n++) {
-		string first;
-		FPSCamera second;
-		sr >> first >> second;
-		data[first] = second;
-	}
-}
-
 FPSCamera::FPSCamera() = default;
 FPSCamera::FPSCamera(const Vec3f pos, float ang, float pitch)
 	:ang(ang), pitch(pitch), pos(pos) { }
@@ -59,14 +42,6 @@ FPSCamera::operator Camera() const {
 //	Vec3f front = y[1] * z[0].x + y[1] * z[0].y + z[1] * z[0].z;
 
 	return Camera(pos, right, up, front, plane_dist);
-}
-
-void FPSCamera::save(Stream &sr) const {
-	sr << pos << ang << pitch << plane_dist;
-}
-
-void FPSCamera::load(Stream &sr) {
-	sr >> pos >> ang >> pitch >> plane_dist;
 }
 
 void FPSCamera::Move(const Vec3f shift) {
@@ -134,19 +109,4 @@ void OrbitingCamera::Zoom(float z) {
 	float dist = Length(target - pos);
 	Vec3f front = Normalize(target - pos);
 	pos += front * float(log(dist) * z);
-}
-
-void CameraConfigs::AddConfig(const string &str,const FPSCamera &cam) {
-	data[str] = cam;
-}
-
-bool CameraConfigs::GetConfig(const string &str, FPSCamera &cam) const {
-	std::map<string, FPSCamera>::const_iterator it = data.find(str);
-
-	if(it != data.end()) {
-		cam = it->second;
-		return 1;
-	}
-
-	return 0;
 }

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "rtbase.h"
-#include <stdio.h>
-#include <map>
+	
+// TODO: loading & saving of cams
 
 struct Camera {
 	Camera() { }
@@ -36,8 +36,6 @@ public:
 	operator Camera() const;
 
 	void Print();
-	void save(Stream&) const;
-	void load(Stream&);
 
 	void Rotate(float a);
 	void RotateY(float p);
@@ -52,13 +50,3 @@ public:
 	Vec3f pos = Vec3f(0.0f, 0.0f, 0.0f);
 };
 
-class CameraConfigs {
-public:
-	void AddConfig(const string &fileName, const FPSCamera&);
-	bool GetConfig(const string &fileName, FPSCamera&) const;
-
-	void save(Stream&) const;
-	void load(Stream&);
-
-	std::map<string, FPSCamera> data;
-};

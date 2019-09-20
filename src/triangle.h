@@ -135,7 +135,6 @@ public:
 	Vec4f plane;
 };
 
-SERIALIZE_AS_POD(::Triangle)
 
 template <int flags, class VecO, class Vec>
 const Isct <typename Vec::TScalar, 1, isct::fDistance | flags> Triangle::Collide(VecO rOrig, Vec rDir) const {
@@ -230,7 +229,6 @@ protected:
 	int matId;
 };
 
-SERIALIZE_AS_POD(ShTriangle)
 
 class BaseScene;
 
@@ -248,8 +246,8 @@ public:
 
 	vector<ShData> shData;
 
-	void save(Stream &sr) const { sr << verts << shData << tris; }
-	void load(Stream &sr) { sr >> verts >> shData >> tris; }
+	void save(FileStream &sr) const;
+	void load(FileStream &sr);
 
 	typedef Triangle      CElement;
 	typedef ShTriangle    SElement;
@@ -301,8 +299,6 @@ public:
 	vector<TriIdx> tris;
 };
 
-SERIALIZE_AS_POD(CompactTris::TriIdx)
-SERIALIZE_AS_POD(CompactTris::ShData)
 
 
 // After changing the element, you have to set the id because it will be trashed
@@ -350,6 +346,11 @@ private:
 	Tri data[size];
 	Id ids[size];
 };
+
+SERIALIZE_AS_POD(::Triangle)
+SERIALIZE_AS_POD(ShTriangle)
+SERIALIZE_AS_POD(CompactTris::TriIdx)
+SERIALIZE_AS_POD(CompactTris::ShData)
 
 typedef vector<Triangle> TriVector;
 typedef vector<ShTriangle> ShTriVector;

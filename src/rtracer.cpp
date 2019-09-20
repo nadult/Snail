@@ -1,9 +1,10 @@
 #include "camera.h"
 #include <fstream>
-#include <fwk/filesystem.h>
+#include <fwk/sys/file_system.h>
 #include <fwk/gfx/color.h>
 #include <fwk/gfx/gl_texture.h>
 #include <fwk/gfx/font.h>
+#include <fwk/any_config.h>
 #include <fwk/gfx/gl_device.h>
 #include <fwk/gfx/opengl.h>
 #include <fwk/gfx/renderer2d.h>
@@ -32,8 +33,6 @@
 using std::cout;
 using std::endl;
 using fwk::getTime;
-using fwk::Loader;
-using fwk::Saver;
 
 namespace InputKey = fwk::InputKey;
 using fwk::InputButton;
@@ -196,7 +195,7 @@ public:
 
 	RayTracer(Scene<BVH> &scene, const vector<shading::MaterialDesc> &matDescs, Config config)
 		:m_scene(scene), matDescs(matDescs), m_config(config),
-		m_font(getFont("liberation_24")), m_image(config.resx, config.resy, fwk::GlFormat::rgb) {
+		m_font(loadFont("liberation_24").get()), m_image(config.resx, config.resy, fwk::GlFormat::rgb) {
 	
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 		m_dtexture = fwk::GlTexture::make(fwk::GlFormat::rgba, fwk::int2(config.resx, config.resy));
@@ -208,17 +207,20 @@ public:
 		sceneScale = Length(Vec3f(scene.geometry.GetBBox().Size()));
 		sceneCenter = scene.geometry.GetBBox().Center();
 
-		fwk::FilePath camPath("scenes/cameras.dat");
+		fwk::FilePath camPath("scenes/cameras.xml");
 		if(fwk::access(camPath)) {
-			Loader(camPath) >> m_camConfigs;
-			// TODO: handle errors
-		}
-		else {
-			m_camConfigs = {};
+			if(auto doc = fwk::XmlDocument::load(camPath); doc && doc->child())
+				if(auto config = fwk::AnyConfig::load(doc->child()))
+					m_camConfigs = move(*config);
+			// TODO: handle errors?
 		}
 
-		if(!m_camConfigs.GetConfig(string(config.sceneName), cam))
+		// TODO: make it work, use cameras from libfwk
+		if(auto *cam_ = m_camConfigs.get<FPSCamera>(config.sceneName))
+			cam = *cam_;
+		else
 			cam.SetPos(sceneCenter);
+
 		{
 			//scene.geometry.Construct(builder.ExtractElements());
 			Vec3f size = scene.geometry.GetBBox().Size();
@@ -235,8 +237,8 @@ public:
 		if(input.isKeyUp(InputKey::esc))
 			return false;
 		if(input.isKeyDown('k')) {
-			fwk::mkdirRecursive("out").checked();
-			Saver("out/output.tga") << fwk::Texture(m_image);
+			fwk::mkdirRecursive("out").check();
+			fwk::Texture(m_image).saveTGA(fwk::fileSaver("out/output.tga").get()).check();
 		}
 
 		if(input.isKeyDown('c')) {
@@ -253,9 +255,11 @@ public:
 			orbiting ^= 1;
 		}
 		if(input.isKeyDown('p')) {
-			m_camConfigs.AddConfig(string(m_config.sceneName),cam);
-			fwk::mkdirRecursive("scenes").checked();
-			Saver("scenes/cameras.dat") << m_camConfigs;
+			m_camConfigs.set(m_config.sceneName, cam);
+			fwk::mkdirRecursive("scenes").check();
+			fwk::XmlDocument doc;
+			m_camConfigs.save(doc.addChild("cameras"));
+			doc.save("scenes/cameras.dat").check();
 			cam.Print();
 		}
 		if(input.isKeyDown('l')) {
@@ -361,7 +365,7 @@ public:
 		m_scene.lights = tLights;
 		dscene.lights = tLights;
 
-		fwk::Renderer2D renderer(fwk::IRect(0, 0, m_config.resx, m_config.resy));
+		fwk::Renderer2D renderer(fwk::IRect(0, 0, m_config.resx, m_config.resy), fwk::Orient2D::y_down);
 
 		double time = getTime(); 
 		TreeStats stats; {
@@ -408,7 +412,7 @@ public:
 	Scene<BVH> &m_scene; // TODO: const?
 	const vector<shading::MaterialDesc> &matDescs;
 	Config m_config;
-	CameraConfigs m_camConfigs;
+	fwk::AnyConfig m_camConfigs;
 	fwk::Font m_font;
 	MipmapTexture m_image;
 
@@ -498,14 +502,12 @@ int main(int argc, char **argv) {
 	Scene<BVH> scene;
 	if(!conf.rebuild) {
 		fwk::FilePath path("dump/" + conf.sceneName);
-		if(path.isRegularFile()) {
-			Loader(path) >> scene.geometry;
-			// TODO: handle errors
-		}
-		else {
+		if(path.isRegularFile())
+			scene.geometry.load(fileLoader(path).get()).check();
+		else
 			conf.rebuild = true;
-		}
 	}
+
 	if(conf.rebuild) {
 		printf("Loading...\n");
 		double loadingTime = getTime();
@@ -558,9 +560,10 @@ int main(int argc, char **argv) {
 		
 		double buildTime = getTime();
 		scene.geometry.Construct(baseScene, conf.buildFlags);
+
 		auto path = fwk::FilePath("dump") / conf.sceneName;
-		fwk::mkdirRecursive(path.parent()).checked();
-		Saver(string("dump/") + conf.sceneName) << scene.geometry;
+		fwk::mkdirRecursive(path.parent()).check();
+		scene.geometry.save(fwk::fileSaver(string("dump/") + conf.sceneName).get()).check();
 		buildTime = getTime() - buildTime;
 		std::cout << "Loading time: " << loadingTime << "  Build time: " << buildTime << '\n';
 	}

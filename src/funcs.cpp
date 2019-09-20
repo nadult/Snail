@@ -117,11 +117,9 @@ Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 	return mOut;   
 }
 
-fwk::Font getFont(const string &name) {
-	fwk::Loader ldr1("data/fonts/" + name + ".fnt");
-	fwk::FontCore core(name, ldr1);
-	fwk::Loader ldr2("data/fonts/" + core.textureName());
-	auto tex = fwk::GlTexture::make(name, ldr2);
-	return {std::move(core), std::move(tex)};
+fwk::Ex<fwk::Font> loadFont(const string &name) {
+	auto core = EXPECT_PASS(fwk::FontCore::load("data/fonts/" + name + ".fnt"));
+	auto tex = EXPECT_PASS(fwk::GlTexture::load("data/fonts/" + core.textureName()));
+	return fwk::Font{std::move(core), std::move(tex)};
 }
 

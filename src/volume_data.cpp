@@ -2,22 +2,22 @@
 #include <algorithm>
 #include <string>
 #include <fwk/gfx_base.h>
-#include <fwk/filesystem.h>
+#include <fwk/sys/file_system.h>
 #include <fwk/gfx/texture.h>
-
-using fwk::Loader;
 
 namespace
 {
 
 	struct Slice {
-		void load(Stream&);
+		void load(FileStream&);
 	
 		int width, height;
 		vector<u16> data;
 	};
 
-	void Slice::load(Stream &sr) {
+	void Slice::load(FileStream &sr) {
+		FATAL("fixme");
+		/*
 		char zeros[128] = {0,};
 		sr.loadData(zeros, sizeof(zeros));
 
@@ -72,8 +72,8 @@ namespace
 	//			dst[n] = ((int)src[n]) * 256;
 			bits = 16;
 		}
-
 		ASSERT(data.size() * sizeof(data[0]) == width * height * (bits / 8));
+		*/
 	}
 
 }
@@ -82,6 +82,8 @@ void VolumeData::LoadDicom(const char *folder) {
 	vector<string> files = fwk::findFiles(folder, ".dcm");
 	ASSERT(files.size());
 
+	FATAL("fixme");
+	/*
 	std::sort(files.begin(), files.end());
 
 	Slice slice; Loader(files[0]) >> slice;
@@ -106,7 +108,7 @@ void VolumeData::LoadDicom(const char *folder) {
 			memcpy(&data[(z * height + n) * width], &slice.data[z * width], width * sizeof(data[0]));
 		printf("."); fflush(stdout);
 	}
-	printf("\n");
+	printf("\n");*/
 }
 
 void VolumeData::LoadRaw(const char *folder, int w, int h, int bits) {
@@ -122,6 +124,8 @@ void VolumeData::LoadRaw(const char *folder, int w, int h, int bits) {
 
 	ASSERT(bits == 8 || bits == 16);
 	
+	FATAL("fixme");
+	/*
 	width = w;
 	height = h;
 	depth = files.size();
@@ -148,7 +152,7 @@ void VolumeData::LoadRaw(const char *folder, int w, int h, int bits) {
 		}
 	}
 
-	printf("Min / Max: %d %d\n", (int)min, (int)max);
+	printf("Min / Max: %d %d\n", (int)min, (int)max);*/
 }
 
 void VolumeData::Blit(fwk::Texture &img, int slice) const {

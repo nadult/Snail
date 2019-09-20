@@ -11,6 +11,7 @@
 #include "camera.h"
 #include <fwk/gfx/gl_format.h>
 #include <fwk/gfx/texture.h>
+#include <fwk/sys/file_system.h>
 
 typedef Matrix<Vec4f> Matrix4;
 
@@ -109,9 +110,7 @@ namespace
 		if(transferHandle)
 			return;
 
-		fwk::Texture tex;
-		fwk::Loader("hue_bar.png") >> tex;
-
+		auto tex = fwk::Texture::load("hue_bar.png").get();
 		const char *data = (const char*)tex.data();
 
 		GLuint handle;
@@ -141,12 +140,7 @@ namespace
 		unsigned v = glCreateShader(GL_VERTEX_SHADER);
 		unsigned f = glCreateShader(GL_FRAGMENT_SHADER);
 
-		vector<char> fs;
-		fwk::Loader ldr("shader.fsh");
-		fs.resize(ldr.size() + 1);
-		ldr.loadData(&fs[0], ldr.size());
-		fs.back() = 0;
-		
+		auto fs = fwk::loadFileString("shader.fsh").get();
 		const char *fsp = &fs[0];
 		const char *vs =
 			"#version 130\n"

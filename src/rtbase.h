@@ -3,7 +3,8 @@
 
 #include <fwk/sys_base.h>
 #include <fwk/format.h>
-#include <fwk/sys/stream.h>
+#include <fwk/sys/file_stream.h>
+#include <fwk/sys/expected.h>
 #include "allocator.h"
 #include <cassert>
 #include <vector>
@@ -12,13 +13,14 @@
 
 #define FATAL FWK_FATAL
 
-using fwk::Stream;
+using fwk::FileStream;
 using fwk::string;
 using fwk::vector;
 using fwk::shared_ptr;
 using fwk::make_shared;
 using fwk::ErrorChunk;
 using fwk::Error;
+using fwk::Ex;
 
 class MipmapTexture;
 using PMipmapTexture = shared_ptr<MipmapTexture>;
@@ -27,11 +29,12 @@ namespace fwk {
 	class Font;
 }
 
+
 // TODO: these shouldn't be required
-template <class T, class A> void loadFromStream(std::vector<T, A> &v, Stream &sr) {
+template <class T, class A> void loadFromStream(std::vector<T, A> &v, FileStream &sr) {
 	// TODO: handle errors properly
 	u32 size;
-	sr.loadData(&size, sizeof(size));
+	sr >> size;
 	v.resize(size);
 
 	if(fwk::SerializeAsPod<T>::value)
@@ -41,11 +44,11 @@ template <class T, class A> void loadFromStream(std::vector<T, A> &v, Stream &sr
 			loadFromStream(v[n], sr);
 }
 
-template <class T, class A> void saveToStream(const std::vector<T, A> &v, Stream &sr) {
+template <class T, class A> void saveToStream(const std::vector<T, A> &v, FileStream &sr) {
 	u32 size;
 	size = u32(v.size());
 	ASSERT(size_t(size) == v.size());
-	sr.saveData(&size, sizeof(size));
+	sr << size;
 
 	if(fwk::SerializeAsPod<T>::value)
 		sr.saveData(&v[0], sizeof(T) * size);
@@ -202,7 +205,7 @@ std::ostream &operator<<(std::ostream&, const Plane&);
 
 Matrix<Vec4f> Inverse(const Matrix<Vec4f>&);
 
-fwk::Font getFont(const string &name);
+Ex<fwk::Font> loadFont(const string &name);
 
 #include "tree_stats.h"
 

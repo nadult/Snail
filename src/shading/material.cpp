@@ -6,7 +6,7 @@
 #include "shading/uber_material.h"
 #include <fstream>
 #include <string>
-#include <fwk/filesystem.h>
+#include <fwk/sys/file_system.h>
 #include <fwk/sys/error.h>
 #include <fwk/gfx/texture.h>
 #include <fwk/sys/on_fail.h>
@@ -141,8 +141,8 @@ namespace shading {
 			}
 			ON_FAIL("While loading: ", fpath);
 
-			fwk::Texture tex;
-			fwk::Loader(fpath) >> tex;
+			// TODO: properly handle errors
+			auto tex = fwk::Texture::load(fpath).get();
 			dict[name] = make_shared<MipmapTexture>(tex, fwk::GlFormat::rgb, true);
 		}
 	}

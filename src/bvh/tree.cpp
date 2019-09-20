@@ -326,12 +326,40 @@ void BVH::Construct(const BaseScene &scene, int flags) {
 }
 
 
-void BVH::save(Stream &sr) const {
-	sr << depth << tris << shTris << nodes << materials;
+Ex<void> BVH::save(FileStream &sr) const {
+	sr.pack(depth, (int)tris.size(), (int)shTris.size(), (int)nodes.size(), (int)materials.size());
+	sr.saveData(tris);
+	sr.saveData(shTris);
+	sr.saveData(nodes);
+		
+	//TODO: no need to serialize id?
+	for(auto & mat : materials)
+		sr.saveString(mat.name);
+	return {};
 }
 
-void BVH::load(Stream &sr) {
-	sr >> depth >> tris >> shTris >> nodes >> materials;
+Ex<void> BVH::load(FileStream &sr) {
+	int num_tris = 0, num_shtris = 0, num_nodes = 0, num_materials = 0;
+	sr.unpack(depth, num_tris, num_shtris, num_nodes, num_materials);
+
+	EXPECT_CATCH();
+	EXPECT(num_tris >= 0);
+	EXPECT(num_shtris >= 0);
+	EXPECT(num_nodes >= 0);
+	EXPECT(num_materials >= 0);
+
+	tris.resize(num_tris);
+	shTris.resize(num_shtris);
+	nodes.resize(num_nodes);
+	materials.resize(num_materials);
+
+	sr.loadData(tris);
+	sr.loadData(shTris);
+	sr.loadData(nodes);
+
+	for(auto &mat : materials)
+		mat.name = sr.loadString();
+	return {};
 }
 
 void BVH::PrintInfo() const {

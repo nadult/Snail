@@ -13,8 +13,8 @@ public:
 	BVH(const BaseScene&, int flags = fastBuild | useSah);
 	BVH() { }
 	void Construct(const BaseScene&, int flags = fastBuild | useSah);
-	void save(Stream&) const;
-	void load(Stream&);
+	Ex<void> save(FileStream&) const;
+	Ex<void> load(FileStream&);
 	const BBox GetBBox() const { return nodes[0].bbox; }
 	void PrintInfo() const;
 
@@ -73,10 +73,6 @@ public:
 
 	struct MatId {
 		MatId() :id(~0) { }
-		//TODO: no need to serialize id?
-		void save(Stream &sr) const { sr << name; }
-		void load(Stream &sr) { sr >> name; }
-
 		string name;
 		int id;
 	};
