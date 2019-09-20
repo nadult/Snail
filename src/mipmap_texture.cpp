@@ -24,12 +24,12 @@ namespace
 	}
 }
 
-MipmapTexture::MipmapTexture(const fwk::Texture &tex, fwk::TextureFormat fmt, bool hasMips) {
-	if(fmt == fwk::TextureFormatId::rgba) {
+MipmapTexture::MipmapTexture(const fwk::Texture &tex, Format fmt, bool hasMips) {
+	if(fmt == Format::rgba) {
 		Set(tex.width(), tex.height(), fmt, hasMips? 32 : 0);
 		memcpy(DataPointer(), tex.data(), tex.width() * tex.height() * 4);	
 	}
-	else if(fmt == fwk::TextureFormatId::rgb) {
+	else if(fmt == Format::rgb) {
 		Set(tex.width(), tex.height(), fmt, hasMips? 32 : 0);
 		for(int y = 0; y < tex.height(); y++) {
 			unsigned char *dst = DataPointer() + Pitch() * y;
@@ -42,14 +42,14 @@ MipmapTexture::MipmapTexture(const fwk::Texture &tex, fwk::TextureFormat fmt, bo
 		}
 	}
 	else {
-		FATAL("Format %s not supported", toString(fmt.id()));
+		FATAL("Format %s not supported", toString(fmt));
 	}
 
 	if(hasMips)
 		GenMips();
 }
 
-MipmapTexture::MipmapTexture(size_t w, size_t h, fwk::TextureFormat fmt, size_t m) {
+MipmapTexture::MipmapTexture(size_t w, size_t h, Format fmt, size_t m) {
 	Set(w, h, fmt, m);
 }
 
@@ -83,23 +83,23 @@ const MipmapTexture &MipmapTexture::operator=(const MipmapTexture &rhs) {
 MipmapTexture::operator fwk::Texture() const {
 	fwk::Texture out({(int)width, (int)height});
 
-	if(format == fwk::TextureFormatId::rgb) {
-		for(int y = 0; y < height; y++) {
+	if(format == Format::rgb) {
+		for(int y = 0; y < (int)height; y++) {
 			const unsigned char *src = DataPointer() + Pitch() * y;
-			for(int x = 0; x < width; x++)
+			for(int x = 0; x < (int)width; x++)
 				out(x, y) = fwk::IColor(src[x * 3 + 0], src[x * 3 + 1], src[x * 3 + 2]);
 		}
 	}
-	else if(format == fwk::TextureFormatId::rgba) {
+	else if(format == Format::rgba) {
 	}
 	else {
-		FATAL("Unsupported conversion: MipmapTexture(%s) -> fwk::Texture", toString(format.id()));
+		FATAL("Unsupported conversion: MipmapTexture(%s) -> fwk::Texture", toString(format));
 	}
 
 	return out;
 }
 
-void MipmapTexture::Set(size_t w, size_t h, fwk::TextureFormat fmt, size_t m) {
+void MipmapTexture::Set(size_t w, size_t h, Format fmt, size_t m) {
 	width  = w;
 	height = h;
 	size_t tMaxMips = std::min(size_t(maxMips), Log2(std::max(width, height)) + 1);
@@ -156,7 +156,7 @@ void MipmapTexture::Free() {
 // TODO: Optimize this to ( w * h + iters * borderPixels )
 //       (if you have nothing better to do)
 void MipmapTexture::RepairAlphaBorders(size_t iters, bool allMips) {
-	if(format.id() == fwk::TextureFormatId::rgba) {
+	if(format == Format::rgba) {
 		size_t startMip = 0, endMip = allMips ? 0 : mips - 1;
 
 		//		printf("Repairing...\n");
@@ -220,8 +220,8 @@ void MipmapTexture::GenMip(size_t mip) {
 	size_t srcW     = Width(mip - 1), srcH = Height(mip - 1), dstW = Width(mip), dstH = Height(mip);
 	size_t srcPitch = Pitch(mip - 1), dstPitch = Pitch(mip);
 
-	switch(format.id()) {
-	case fwk::TextureFormatId::rgba:
+	switch(format) {
+	case Format::rgba:
 	{
 		u8 *src = (u8 *)DataPointer(mip - 1), *dst = (u8 *)DataPointer(mip);
 
@@ -252,7 +252,7 @@ void MipmapTexture::GenMip(size_t mip) {
 		break;
 	}
 
-	case fwk::TextureFormatId::rgb:
+	case Format::rgb:
 	{
 		u8 *src = (u8 *)DataPointer(mip - 1), *dst = (u8 *)DataPointer(mip);
 
@@ -284,7 +284,7 @@ void MipmapTexture::GenMip(size_t mip) {
 	}
 
 	default:
-		FATAL("Mipmap generation for texture in %s format not supported", toString(format.id()));
+		FATAL("Mipmap generation for texture in %s format not supported", toString(format));
 		break;
 	}
 }

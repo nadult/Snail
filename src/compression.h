@@ -22,7 +22,7 @@ struct DecompressBuffer {
 
 // returns number of decompressed pixels
 void DecompressParts(MipmapTexture &image, std::vector<DecompressBuffer> &parts,
-				uint nParts, uint nThreads);
+				int nParts, int nThreads);
 
 #endif
 

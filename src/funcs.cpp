@@ -2,9 +2,8 @@
 #include <libgen.h>
 #include <errno.h>
 #include <cstring>
-#include <fwk/sys/resource_manager.h>
 #include <fwk/gfx/font.h>
-#include <fwk/gfx/dtexture.h>
+#include <fwk/gfx/gl_texture.h>
 
 float BoxPointDistanceSq(const BBox &box,const Vec3f &point) {
 	float xMin=box.min.x,yMin=box.min.y,zMin=box.min.z;
@@ -118,14 +117,11 @@ Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 	return mOut;   
 }
 
-namespace {
-	fwk::ResourceManager<fwk::FontCore> s_font_cores("data/fonts/", ".fnt");
-	fwk::ResourceManager<fwk::DTexture> s_font_textures("data/fonts/", "");
-}
-
 fwk::Font getFont(const string &name) {
-	auto core = s_font_cores[name];
-	auto texture = s_font_textures[core->textureName()];
-	return {std::move(core), std::move(texture)};
+	fwk::Loader ldr1("data/fonts/" + name + ".fnt");
+	fwk::FontCore core(name, ldr1);
+	fwk::Loader ldr2("data/fonts/" + core.textureName());
+	auto tex = fwk::GlTexture::make(name, ldr2);
+	return {std::move(core), std::move(tex)};
 }
 

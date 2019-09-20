@@ -10,9 +10,9 @@ namespace sampling {
 		if(!tex)
 			return {};
 
-		switch(tex->GetFormat().id()) {
-			case fwk::TextureFormatId::rgba: {
-				auto tmp = make_shared<MipmapTexture>(tex->Width(),tex->Height(), fwk::TextureFormatId::rgb, 0);
+		switch(tex->GetFormat()) {
+			case fwk::GlFormat::rgba: {
+				auto tmp = make_shared<MipmapTexture>(tex->Width(),tex->Height(), fwk::GlFormat::rgb, 0);
 				int w=tex->Width(),h=tex->Height();
 				for(int y=0;y<h;y++) {
 					u8 *src=(u8*)tex->DataPointer()+y*tex->Pitch();
@@ -27,7 +27,7 @@ namespace sampling {
 			 	tmp->GenMips();
 				return make_shared<PointSampler>(PointSampler(tmp));
 			}
-			case fwk::TextureFormatId::rgb:
+			case fwk::GlFormat::rgb:
 				if(tex->Mips() == 1) {
 					tex->ReallocMips(0);
 					tex->GenMips();
@@ -35,10 +35,10 @@ namespace sampling {
 				return make_shared<PointSampler>(tex);
 		//	case gfxlib::TI_DXT1:
 		//		return make_shared<PointSamplerDXT>(*tex);
+			default:
+				FATAL("Cannot create a sampler from texture: format is not supported");
 		}
 
-		FATAL("Cannot create a sampler from texture ", "TODO: name",
-						": format is not supported");
 		return {};
 	}
 

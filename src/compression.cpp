@@ -86,7 +86,7 @@ namespace {
 
 			int size = qlz_size_decompressed((char*)&buf->comprData[0]);
 
-			if(buf->data.size() < size)
+			if((int)buf->data.size() < size)
 				buf->data.resize(size);
 			char scratch[QLZ_SCRATCH_DECOMPRESS];
 
@@ -152,13 +152,12 @@ namespace {
 
 }
 
-void DecompressParts(MipmapTexture &image, vector<DecompressBuffer> &parts, uint nParts,
-		uint nThreads) {
+void DecompressParts(MipmapTexture &image, vector<DecompressBuffer> &parts, int nParts, int nThreads) {
 	ASSERT(parts.size() >= nParts);
-	ASSERT(image.GetFormat() == fwk::TextureFormatId::rgb);
+	ASSERT(image.GetFormat() == fwk::GlFormat::rgb);
 
 	vector<DecompressTask> tasks(nParts);
-	for(size_t n = 0; n < nParts; n++)
+	for(int n = 0; n < nParts; n++)
 		tasks[n] = DecompressTask(image, &parts[n]);
 	thread_pool::Run(tasks, nThreads);
 }

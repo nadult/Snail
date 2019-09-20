@@ -9,6 +9,7 @@
 #include <sys/types.h>
 
 #include "camera.h"
+#include <fwk/gfx/gl_format.h>
 #include <fwk/gfx/texture.h>
 
 typedef Matrix<Vec4f> Matrix4;
@@ -125,7 +126,8 @@ namespace
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP);
 
 		auto format = tex.format();
-		glTexImage2D(GL_TEXTURE_2D, 0, format.glInternal(), tex.width(), tex.height(), 0, format.glFormat(), format.glType(), data);
+		glTexImage2D(GL_TEXTURE_2D, 0, glInternalFormat(format), tex.width(), tex.height(), 0, glPixelFormat(format),
+				glDataType(format), data);
 		transferHandle = handle;
 	}
 

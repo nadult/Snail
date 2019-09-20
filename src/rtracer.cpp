@@ -2,9 +2,9 @@
 #include <fstream>
 #include <fwk/filesystem.h>
 #include <fwk/gfx/color.h>
-#include <fwk/gfx/dtexture.h>
+#include <fwk/gfx/gl_texture.h>
 #include <fwk/gfx/font.h>
-#include <fwk/gfx/gfx_device.h>
+#include <fwk/gfx/gl_device.h>
 #include <fwk/gfx/opengl.h>
 #include <fwk/gfx/renderer2d.h>
 #include <fwk/gfx/texture.h>
@@ -73,7 +73,7 @@ static void PrintHelp() {
 		);
 }
 
-static void MoveCamera(OrbitingCamera &cam, fwk::GfxDevice &device, float speed) {
+static void MoveCamera(OrbitingCamera &cam, fwk::GlDevice &device, float speed) {
 	auto input = device.inputState();
 
 	if(input.isKeyPressed(InputKey::lshift)) speed *= 5.f;
@@ -114,7 +114,7 @@ static void MoveCamera(OrbitingCamera &cam, fwk::GfxDevice &device, float speed)
 	cam.pos += move * speed;
 }
 
-static void MoveCamera(FPSCamera &cam, fwk::GfxDevice &device, float speed) {
+static void MoveCamera(FPSCamera &cam, fwk::GlDevice &device, float speed) {
 	auto input = device.inputState();
 
 	if(input.isKeyPressed(InputKey::lshift)) speed *= 5.f;
@@ -196,10 +196,10 @@ public:
 
 	RayTracer(Scene<BVH> &scene, const vector<shading::MaterialDesc> &matDescs, Config config)
 		:m_scene(scene), matDescs(matDescs), m_config(config),
-		m_font(getFont("liberation_24")), m_image(config.resx, config.resy, fwk::TextureFormatId::rgb) {
+		m_font(getFont("liberation_24")), m_image(config.resx, config.resy, fwk::GlFormat::rgb) {
 	
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-		m_dtexture = fwk::make_shared<fwk::DTexture>(fwk::TextureFormatId::rgba, fwk::int2(config.resx, config.resy));
+		m_dtexture = fwk::GlTexture::make(fwk::GlFormat::rgba, fwk::int2(config.resx, config.resy));
 		glGenBuffers(1, &m_pbo);
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_pbo);
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
@@ -227,7 +227,7 @@ public:
 
 	}
 
-	bool processInput(fwk::GfxDevice &device) {
+	bool processInput(fwk::GlDevice &device) {
 		auto input = device.inputState();
 
 		frmCounter.NextFrame();
@@ -235,7 +235,7 @@ public:
 		if(input.isKeyUp(InputKey::esc))
 			return false;
 		if(input.isKeyDown('k')) {
-			fwk::mkdirRecursive("out");
+			fwk::mkdirRecursive("out").checked();
 			Saver("out/output.tga") << fwk::Texture(m_image);
 		}
 
@@ -254,7 +254,7 @@ public:
 		}
 		if(input.isKeyDown('p')) {
 			m_camConfigs.AddConfig(string(m_config.sceneName),cam);
-			fwk::mkdirRecursive("scenes");
+			fwk::mkdirRecursive("scenes").checked();
 			Saver("scenes/cameras.dat") << m_camConfigs;
 			cam.Print();
 		}
@@ -323,7 +323,7 @@ public:
 		auto *dst = (u32*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
 		const auto *src = image.DataPointer(0);
 
-		DASSERT(image.GetFormat() == fwk::TextureFormatId::rgb);
+		DASSERT(image.GetFormat() == fwk::GlFormat::rgb);
 		int w = m_dtexture->width(), h = m_dtexture->height();
 		for(int y = 0; y < h; y++) {
 			const unsigned char *src_row = image.DataPointer() + image.Pitch() * y;
@@ -345,7 +345,7 @@ public:
 		out.addFilledRect(fwk::FRect(fwk::float2(size)), fwk::FRect(0, 0, 1, -1), colors, m_dtexture);
 	}
 
-	void draw(fwk::GfxDevice &device) {
+	void draw(fwk::GlDevice &device) {
 		double buildTime = getTime();
 		Scene<DBVH> dscene;
 		if(m_config.nInstances > 1) {
@@ -385,24 +385,23 @@ public:
 		double fps = double(unsigned(frmCounter.FPS() * 100)) * 0.01;
 		double mrays = double(unsigned(frmCounter.FPS() * stats.GetRays() * 0.0001)) * 0.01;
 
-		auto font = getFont("liberation_24");
 		char text[256];
 		auto style = fwk::FontStyle{fwk::ColorId::white, fwk::ColorId::black};
 
 		if(oglRendering) {
-			font.draw(renderer, {5.0f, 25.0f}, style, fwk::format("FPS: % (opengl rendering)", fps));
+			m_font.draw(renderer, {5.0f, 25.0f}, style, fwk::format("FPS: % (opengl rendering)", fps));
 		}
 		else {
-			font.draw(renderer, {5.0f, 5.0f}, style, stats.GenInfo(m_config.resx, m_config.resy, time * 1000.0, buildTime * 1000.0));
-			font.draw(renderer, {5.0f, 25.0f}, style, fwk::stdFormat("FPS: %.2f %s%.2f", fps, " MRays/sec:", mrays));
+			m_font.draw(renderer, {5.0f, 5.0f}, style, stats.GenInfo(m_config.resx, m_config.resy, time * 1000.0, buildTime * 1000.0));
+			m_font.draw(renderer, {5.0f, 25.0f}, style, fwk::stdFormat("FPS: %.2f %s%.2f", fps, " MRays/sec:", mrays));
 			if(lightsEnabled && lights.size())
-				font.draw(renderer, {5.0f, 65.0f}, style, fwk::format("Lights: %", lightsEnabled?(int)lights.size() : 0));
+				m_font.draw(renderer, {5.0f, 65.0f}, style, fwk::format("Lights: %", lightsEnabled?(int)lights.size() : 0));
 	//		snprintf(text, sizeof(text), "prim:", gVals[1], ' ', gVals[2], ' ', gVals[3],
 	//			" sh:", gVals[4], " refl:", gVals[5], ' ', gVals[6], " smart:", gVals[7]);
 	//		font.PrintAt(Vec2f(5, 85), text);
 		}
 
-		device.clearColor(fwk::ColorId::black);
+		fwk::clearColor((fwk::IColor)fwk::ColorId::black);
 		renderer.render();
 	}
 
@@ -413,7 +412,7 @@ public:
 	fwk::Font m_font;
 	MipmapTexture m_image;
 
-	fwk::STexture m_dtexture;
+	fwk::PTexture m_dtexture;
 	uint m_pbo;
 
 	float sceneScale = 1.0f;
@@ -437,7 +436,7 @@ public:
 
 static RayTracer *s_rtracer = nullptr;
 
-bool mainLoop(fwk::GfxDevice &device, void*) {
+bool mainLoop(fwk::GlDevice &device, void*) {
 	DASSERT(s_rtracer);
 	if(!s_rtracer->processInput(device))
 		return false;
@@ -560,7 +559,7 @@ int main(int argc, char **argv) {
 		double buildTime = getTime();
 		scene.geometry.Construct(baseScene, conf.buildFlags);
 		auto path = fwk::FilePath("dump") / conf.sceneName;
-		fwk::mkdirRecursive(path.parent());
+		fwk::mkdirRecursive(path.parent()).checked();
 		Saver(string("dump/") + conf.sceneName) << scene.geometry;
 		buildTime = getTime() - buildTime;
 		std::cout << "Loading time: " << loadingTime << "  Build time: " << buildTime << '\n';
@@ -580,9 +579,9 @@ int main(int argc, char **argv) {
 	scene.geometry.UpdateMaterialIds(scene.GetMatIdMap());
 
 
-	fwk::GfxDevice device;
-	auto gfx_flags = mask(conf.fullscreen, fwk::GfxDeviceOpt::fullscreen_desktop);
-	device.createWindow("Snail realtime raytracer", {conf.resx, conf.resy}, gfx_flags, 2.1);
+	fwk::GlDevice device;
+	auto gfx_flags = mask(conf.fullscreen, fwk::GlDeviceOpt::fullscreen_desktop);
+	device.createWindow("Snail realtime raytracer", {conf.resx, conf.resy}, gfx_flags, fwk::GlProfile::compatibility, 2.1);
 	conf.resx = device.windowSize().x;
 	conf.resy = device.windowSize().y;
 

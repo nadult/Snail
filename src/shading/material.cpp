@@ -143,7 +143,7 @@ namespace shading {
 
 			fwk::Texture tex;
 			fwk::Loader(fpath) >> tex;
-			dict[name] = make_shared<MipmapTexture>(tex, fwk::TextureFormatId::rgb, true);
+			dict[name] = make_shared<MipmapTexture>(tex, fwk::GlFormat::rgb, true);
 		}
 	}
 
