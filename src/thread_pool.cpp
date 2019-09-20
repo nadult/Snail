@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <iostream>
+#include <fwk/sys/assert.h>
 #include "thread_pool.h"
 
 enum { maxThreads = 32 };
@@ -89,7 +90,7 @@ namespace {
 	void FreeThreads();
 
 	void ChangeThreads(int nThreads_) {
-		DASSERT(nThreads_ > 0 && nThreads_ <= maxThreads);
+		DASSERT(nThreads_ >= 0 && nThreads_ <= maxThreads);
 
 		static bool sinit = 0;
 		if(!sinit) {

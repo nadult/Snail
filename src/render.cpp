@@ -132,7 +132,7 @@ struct RenderTask: public thread_pool::Task {
 				}
 
 				if(NQuads == 1)
-					throw 0; //TODO
+					FATAL("todo");
 				else {
 			//		rayGen.Decompose(colors, colors);
 					const Vec3q *src = colors;

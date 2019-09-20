@@ -79,16 +79,7 @@ OGLRenderer::OGLRenderer(const Scene<BVH> &scene) {
 	triCount = tris.size();
 	bbox = scene.geometry.GetBBox();
 
-	//TODO: zrobic porzadna obsluge wyjatkow
-	try {
-		InitShaders();
-	}
-	catch(...) {
-		glDeleteBuffers(1, &posBuffer);
-		glDeleteBuffers(1, &uvBuffer);
-		glDeleteBuffers(1, &nrmBuffer);
-		throw;
-	}
+	InitShaders();
 }
 
 void OGLRenderer::InitShaders() {

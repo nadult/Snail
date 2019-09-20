@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <veclib.h>
+#include <fwk/sys/memory.h>
 
 	template <class T,int alignment = 64>
 	class AlignedAllocator
@@ -27,8 +28,7 @@
 		pointer allocate(size_type n, const void* = 0) {
 			size_t size = n * sizeof(T);
 
-			char *ptr = (char *)malloc(size + alignment + sizeof(int));
-			if(!ptr) throw std::bad_alloc();
+			char *ptr = (char*)fwk::allocate(size + alignment + sizeof(int));
 
 			char *ptr2 = ptr + sizeof(int);
 			char *aligned_ptr = ptr2 + (alignment - ((size_t)ptr2 & (alignment - 1)));
@@ -40,13 +40,11 @@
 		}
 
 		void deallocate(pointer ptr, size_type n) {
-			free((char*)ptr - ((int*)ptr)[-1]);
+			fwk::deallocate((char*)ptr - ((int*)ptr)[-1]);
 		}
 		void construct(pointer p,const_reference c)	{ new( reinterpret_cast<void*>(p) ) T(c); }
 		void destroy(pointer p)						{ (p)->~T(); }
       
-		template<typename... _Args>
-        void
-     	   construct(pointer __p, _Args&&... __args)
-			{ ::new((void *)__p) T(std::forward<_Args>(__args)...); }
+		template<typename... Args>
+        void construct(pointer __p, Args&&... __args) { ::new((void *)__p) T(std::forward<Args>(__args)...); }
 	};

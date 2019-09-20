@@ -346,7 +346,11 @@ public:
 		fwk::FColor colors[4] = {fwk::ColorId::white, fwk::ColorId::white, fwk::ColorId::white,
 								 fwk::ColorId::white};
 		fwk::int2 size(image.Width(), image.Height());
-		out.addFilledRect(fwk::FRect(fwk::float2(size)), fwk::FRect(0, 0, 1, -1), colors, m_dtexture);
+		fwk::FRect rect{fwk::float2(size)},tex_rect(0,0,1,1);
+		auto tex_corners = tex_rect.corners();
+		for(auto &corner : tex_corners)
+			corner.y *= -1.0f;
+		out.addQuads(rect.corners(), tex_corners, colors, m_dtexture);
 	}
 
 	void draw(fwk::GlDevice &device) {
