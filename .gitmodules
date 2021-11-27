@@ -1,6 +1,3 @@
 [submodule "libfwk"]
 	path = libfwk
 	url = ../libfwk.git
-[submodule "veclib"]
-	path = veclib
-	url = ../veclib.git
