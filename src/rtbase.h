@@ -3,7 +3,6 @@
 
 #include <fwk/sys_base.h>
 #include <fwk/format.h>
-#include <fwk/sys/file_stream.h>
 #include <fwk/sys/expected.h>
 #include "allocator.h"
 #include <cassert>
@@ -28,35 +27,6 @@ using PMipmapTexture = shared_ptr<MipmapTexture>;
 namespace fwk {
 	class Font;
 }
-
-
-// TODO: these shouldn't be required
-template <class T, class A> void loadFromStream(std::vector<T, A> &v, FileStream &sr) {
-	// TODO: handle errors properly
-	u32 size;
-	sr >> size;
-	v.resize(size);
-
-	if(fwk::SerializeAsPod<T>::value)
-		sr.loadData(&v[0], sizeof(T) * size);
-	else
-		for(u32 n = 0; n < size; n++)
-			loadFromStream(v[n], sr);
-}
-
-template <class T, class A> void saveToStream(const std::vector<T, A> &v, FileStream &sr) {
-	u32 size;
-	size = u32(v.size());
-	ASSERT(size_t(size) == v.size());
-	sr << size;
-
-	if(fwk::SerializeAsPod<T>::value)
-		sr.saveData(&v[0], sizeof(T) * size);
-	else
-		for(u32 n = 0; n < size; n++)
-			saveToStream(v[n], sr);
-}
-
 
 extern int gVals[16];
 

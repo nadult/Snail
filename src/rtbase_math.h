@@ -6,7 +6,7 @@
 #include <math.h>
 #include <fwk/sys_base.h>
 
-#define SERIALIZE_AS_POD(Type) template <> constexpr bool fwk::is_flat_data<Type> = true;
+#define SERIALIZE_AS_POD(Type) template <> static constexpr bool fwk::is_flat_data<Type> = true;
 
 using namespace veclib;
 

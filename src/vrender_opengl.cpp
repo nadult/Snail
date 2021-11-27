@@ -10,8 +10,8 @@
 
 #include "camera.h"
 #include <fwk/gfx/gl_format.h>
-#include <fwk/gfx/texture.h>
-#include <fwk/sys/file_system.h>
+#include <fwk/gfx/image.h>
+#include <fwk/io/file_system.h>
 
 typedef Matrix<Vec4f> Matrix4;
 
@@ -110,8 +110,7 @@ namespace
 		if(transferHandle)
 			return;
 
-		auto tex = fwk::Texture::load("hue_bar.png").get();
-		const char *data = (const char*)tex.data();
+		auto tex = fwk::Image::load("hue_bar.png").get();
 
 		GLuint handle;
 		glGenTextures(1, &handle);
@@ -125,8 +124,9 @@ namespace
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP);
 
 		auto format = tex.format();
-		glTexImage2D(GL_TEXTURE_2D, 0, glInternalFormat(format), tex.width(), tex.height(), 0, glPixelFormat(format),
-				glDataType(format), data);
+		auto packed_format = glPackedFormat(format);
+		glTexImage2D(GL_TEXTURE_2D, 0, glInternalFormat(format), tex.width(), tex.height(), 0, packed_format.pixel_format,
+				packed_format.pixel_type, tex.data().data());
 		transferHandle = handle;
 	}
 

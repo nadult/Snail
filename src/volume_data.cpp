@@ -2,8 +2,8 @@
 #include <algorithm>
 #include <string>
 #include <fwk/gfx_base.h>
-#include <fwk/sys/file_system.h>
-#include <fwk/gfx/texture.h>
+#include <fwk/io/file_system.h>
+#include <fwk/gfx/image.h>
 
 namespace
 {
@@ -155,7 +155,7 @@ void VolumeData::LoadRaw(const char *folder, int w, int h, int bits) {
 	printf("Min / Max: %d %d\n", (int)min, (int)max);*/
 }
 
-void VolumeData::Blit(fwk::Texture &img, int slice) const {
+void VolumeData::Blit(fwk::Image &img, int slice) const {
 	int w = Min(width, img.width()), h = Min(height, img.height());
 	//TODO: testme
 

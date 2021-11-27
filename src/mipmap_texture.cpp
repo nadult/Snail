@@ -1,6 +1,6 @@
 #include "mipmap_texture.h"
 #include <memory.h>
-#include <fwk/gfx/texture.h>
+#include <fwk/gfx/image.h>
 
 namespace
 {
@@ -24,12 +24,13 @@ namespace
 	}
 }
 
-MipmapTexture::MipmapTexture(const fwk::Texture &tex, Format fmt, bool hasMips) {
-	if(fmt == Format::rgba) {
+MipmapTexture::MipmapTexture(const fwk::Image &tex, Format fmt, bool hasMips) {
+	if(fmt == Format::rgba8) {
 		Set(tex.width(), tex.height(), fmt, hasMips? 32 : 0);
-		memcpy(DataPointer(), tex.data(), tex.width() * tex.height() * 4);	
+		auto src_data = tex.data().reinterpret<u8>();
+		copy(data, src_data);
 	}
-	else if(fmt == Format::rgb) {
+	else if(fmt == Format::rgb8) {
 		Set(tex.width(), tex.height(), fmt, hasMips? 32 : 0);
 		for(int y = 0; y < tex.height(); y++) {
 			unsigned char *dst = DataPointer() + Pitch() * y;
@@ -80,20 +81,20 @@ const MipmapTexture &MipmapTexture::operator=(const MipmapTexture &rhs) {
 	return *this;
 }
 	
-MipmapTexture::operator fwk::Texture() const {
-	fwk::Texture out({(int)width, (int)height});
+MipmapTexture::operator fwk::Image() const {
+	fwk::Image out({(int)width, (int)height});
 
-	if(format == Format::rgb) {
+	if(format == Format::rgb8) {
 		for(int y = 0; y < (int)height; y++) {
 			const unsigned char *src = DataPointer() + Pitch() * y;
 			for(int x = 0; x < (int)width; x++)
 				out(x, y) = fwk::IColor(src[x * 3 + 0], src[x * 3 + 1], src[x * 3 + 2]);
 		}
 	}
-	else if(format == Format::rgba) {
+	else if(format == Format::rgba8) {
 	}
 	else {
-		FATAL("Unsupported conversion: MipmapTexture(%s) -> fwk::Texture", toString(format));
+		FATAL("Unsupported conversion: MipmapTexture(%s) -> fwk::Image", toString(format));
 	}
 
 	return out;
@@ -156,7 +157,7 @@ void MipmapTexture::Free() {
 // TODO: Optimize this to ( w * h + iters * borderPixels )
 //       (if you have nothing better to do)
 void MipmapTexture::RepairAlphaBorders(size_t iters, bool allMips) {
-	if(format == Format::rgba) {
+	if(format == Format::rgba8) {
 		size_t startMip = 0, endMip = allMips ? 0 : mips - 1;
 
 		//		printf("Repairing...\n");
@@ -221,7 +222,7 @@ void MipmapTexture::GenMip(size_t mip) {
 	size_t srcPitch = Pitch(mip - 1), dstPitch = Pitch(mip);
 
 	switch(format) {
-	case Format::rgba:
+	case Format::rgba8:
 	{
 		u8 *src = (u8 *)DataPointer(mip - 1), *dst = (u8 *)DataPointer(mip);
 
@@ -252,7 +253,7 @@ void MipmapTexture::GenMip(size_t mip) {
 		break;
 	}
 
-	case Format::rgb:
+	case Format::rgb8:
 	{
 		u8 *src = (u8 *)DataPointer(mip - 1), *dst = (u8 *)DataPointer(mip);
 

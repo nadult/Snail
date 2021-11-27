@@ -118,8 +118,8 @@ Matrix<Vec4f> Inverse(const Matrix<Vec4f> &mat) {
 }
 
 fwk::Ex<fwk::Font> loadFont(const string &name) {
-	auto core = EXPECT_PASS(fwk::FontCore::load("data/fonts/" + name + ".fnt"));
-	auto tex = EXPECT_PASS(fwk::GlTexture::load("data/fonts/" + core.textureName()));
+	auto core = EX_PASS(fwk::FontCore::load("data/fonts/" + name + ".fnt"));
+	auto tex = EX_PASS(fwk::GlTexture::load("data/fonts/" + core.textureName(), false));
 	return fwk::Font{std::move(core), std::move(tex)};
 }
 

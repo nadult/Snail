@@ -408,8 +408,8 @@ CompactTris BaseScene::Object::ToCompactTris() const {
 
 	{
 		std::sort(inds.begin(), inds.end());
-		vector<Idx>::iterator end=std::unique(inds.begin(),inds.end());
-		inds.resize(end-inds.begin());
+		auto end = std::unique(inds.begin(), inds.end());
+		inds.resize(end - inds.begin());
 	}
 
 	out.verts.resize(inds.size());

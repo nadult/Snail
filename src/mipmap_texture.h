@@ -5,24 +5,25 @@
 #include <fwk/gfx_base.h>
 #include <fwk/gfx/gl_format.h>
 
+// TODO: rename to MipmapImage
 class MipmapTexture
 {
 public:
 	enum { maxMips = 32 };
 	using Format = fwk::GlFormat;
 
-	MipmapTexture(const fwk::Texture&, Format = Format::rgba, bool hasMips = true);
+	MipmapTexture(const fwk::Image&, Format = Format::rgba8, bool hasMips = true);
 	MipmapTexture(size_t width, size_t height, Format fmt, size_t mips = 0);
 	MipmapTexture(const MipmapTexture &rhs);
 	const MipmapTexture &operator=(const MipmapTexture &);
 	MipmapTexture();
 
-	operator fwk::Texture() const;
+	operator fwk::Image() const;
 
 	// poprzednie dane zostaja utracone
 	void Set(size_t width, size_t height, Format fmt, size_t mips = 0);
 
-	void Set(fwk::Texture, Format);
+	void Set(fwk::Image, Format);
 	
 	// Zmienia ilosc mipmap, parametr 0 oznacza max
 	// procedura jedynie alokuje odpowiednia ilosc pamieci i kopiuje
@@ -37,12 +38,12 @@ public:
 		return std::max(height >> mip, size_t(1));
 	}
 	size_t Pitch(size_t mip = 0) const {
-		return evalLineSize(format, std::max(width >> mip, size_t(1)));
+		return imageRowSize(format, std::max(width >> mip, size_t(1)));
 	}
 
 	// size (in bytes) of given mipmap
 	size_t Size(size_t mip = 0) const {
-		return evalImageSize(format, std::max(width >> mip, size_t(1)), std::max(height >> mip, size_t(1)));
+		return imageSize(format, std::max(width >> mip, size_t(1)), std::max(height >> mip, size_t(1)));
 	}
 
 	unsigned char *DataPointer(size_t mip = 0) const {

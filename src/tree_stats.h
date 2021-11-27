@@ -66,7 +66,7 @@ public:
 		if(enabled) {
 			for(int n = 0; n < dataSize; n++)
 				data[n] += rhs.data[n];
-			for(int n = 0; n < sizeof(timers) / sizeof(int); n++)
+			for(int n = 0; n < (int)sizeof(timers) / sizeof(int); n++)
 				timers[n] += rhs.timers[n];
 		}
 		return *this;

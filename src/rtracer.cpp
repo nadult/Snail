@@ -1,6 +1,7 @@
 #include "camera.h"
 #include <fstream>
-#include <fwk/sys/file_system.h>
+#include <fwk/io/file_system.h>
+#include <fwk/io/file_stream.h>
 #include <fwk/gfx/color.h>
 #include <fwk/gfx/gl_texture.h>
 #include <fwk/gfx/font.h>
@@ -8,7 +9,7 @@
 #include <fwk/gfx/gl_device.h>
 #include <fwk/gfx/opengl.h>
 #include <fwk/gfx/renderer2d.h>
-#include <fwk/gfx/texture.h>
+#include <fwk/gfx/image.h>
 #include <fwk/sys/expected.h>
 #include <fwk/sys/input.h>
 #include <fwk/sys/backtrace.h>
@@ -195,10 +196,10 @@ public:
 
 	RayTracer(Scene<BVH> &scene, const vector<shading::MaterialDesc> &matDescs, Config config)
 		:m_scene(scene), matDescs(matDescs), m_config(config),
-		m_font(loadFont("liberation_24").get()), m_image(config.resx, config.resy, fwk::GlFormat::rgb) {
+		m_font(loadFont("liberation_24").get()), m_image(config.resx, config.resy, fwk::GlFormat::rgb8) {
 	
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-		m_dtexture = fwk::GlTexture::make(fwk::GlFormat::rgba, fwk::int2(config.resx, config.resy));
+		m_dtexture = fwk::GlTexture::make(fwk::GlFormat::rgba8, fwk::int2(config.resx, config.resy), 1);
 		glGenBuffers(1, &m_pbo);
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_pbo);
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
@@ -238,7 +239,7 @@ public:
 			return false;
 		if(input.isKeyDown('k')) {
 			fwk::mkdirRecursive("out").check();
-			fwk::Texture(m_image).saveTGA(fwk::fileSaver("out/output.tga").get()).check();
+			fwk::Image(m_image).saveTGA("out/output.tga").check();
 		}
 
 		if(input.isKeyDown('c')) {
@@ -296,9 +297,9 @@ public:
 		else
 			MoveCamera(cam, device, tspeed);
 
-		for(int n = 1; n <= 8; n++)
+		for(int n = 0; n <= 9; n++)
 			if(input.isKeyDown('0' + n)) {
-				m_config.threads = n;
+				m_config.threads = n == 0? 32 : n == 9? 16 : n;
 				printf("Threads: %d\n", m_config.threads);
 			}
 
@@ -327,7 +328,7 @@ public:
 		auto *dst = (u32*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
 		const auto *src = image.DataPointer(0);
 
-		DASSERT(image.GetFormat() == fwk::GlFormat::rgb);
+		DASSERT(image.GetFormat() == fwk::GlFormat::rgb8);
 		int w = m_dtexture->width(), h = m_dtexture->height();
 		for(int y = 0; y < h; y++) {
 			const unsigned char *src_row = image.DataPointer() + image.Pitch() * y;
@@ -456,8 +457,6 @@ int main(int argc, char **argv) {
 	float nan = 0.0f / 0.0f;
 	float not_nan = 3.0f;
 
-	fwk::Backtrace::t_default_mode = fwk::BacktraceMode::full;
-
 //	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 	ASSERT(IsNan(Vec3f(nan, nan, nan)));
 	Vec3q nan3;
@@ -506,7 +505,8 @@ int main(int argc, char **argv) {
 	Scene<BVH> scene;
 	if(!conf.rebuild) {
 		fwk::FilePath path("dump/" + conf.sceneName);
-		if(path.isRegularFile())
+		// TODO: scene serialization is broken
+		if(path.isRegularFile() && false)
 			scene.geometry.load(fileLoader(path).get()).check();
 		else
 			conf.rebuild = true;
@@ -587,8 +587,10 @@ int main(int argc, char **argv) {
 
 
 	fwk::GlDevice device;
-	auto gfx_flags = mask(conf.fullscreen, fwk::GlDeviceOpt::fullscreen_desktop);
-	device.createWindow("Snail realtime raytracer", {conf.resx, conf.resy}, gfx_flags, fwk::GlProfile::compatibility, 2.1);
+	fwk::GlDeviceConfig config;
+	config.profile = fwk::GlProfile::compatibility;
+	config.flags = mask(conf.fullscreen, fwk::GlDeviceOpt::fullscreen_desktop);
+	device.createWindow("Snail realtime raytracer", {conf.resx, conf.resy}, config);
 	conf.resx = device.windowSize().x;
 	conf.resy = device.windowSize().y;
 

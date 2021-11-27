@@ -215,7 +215,7 @@ template <int QuadLevels, class AccStruct>
 static TreeStats Render(const Scene<AccStruct> &scene, const Camera &camera,
 		MipmapTexture &image, const Options options, uint nThreads) {
 	enum { taskSize = 64 };
-	ASSERT(image.GetFormat() == fwk::GlFormat::rgb);
+	ASSERT_EQ(image.GetFormat(), fwk::GlFormat::rgb8);
 
 	uint nTasks = ((image.Width() + taskSize - 1) / taskSize)
 					* ((image.Height() + taskSize - 1) / taskSize);

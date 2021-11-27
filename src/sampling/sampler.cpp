@@ -11,8 +11,8 @@ namespace sampling {
 			return {};
 
 		switch(tex->GetFormat()) {
-			case fwk::GlFormat::rgba: {
-				auto tmp = make_shared<MipmapTexture>(tex->Width(),tex->Height(), fwk::GlFormat::rgb, 0);
+			case fwk::GlFormat::rgba8: {
+				auto tmp = make_shared<MipmapTexture>(tex->Width(),tex->Height(), fwk::GlFormat::rgb8, 0);
 				int w=tex->Width(),h=tex->Height();
 				for(int y=0;y<h;y++) {
 					u8 *src=(u8*)tex->DataPointer()+y*tex->Pitch();
@@ -27,7 +27,7 @@ namespace sampling {
 			 	tmp->GenMips();
 				return make_shared<PointSampler>(PointSampler(tmp));
 			}
-			case fwk::GlFormat::rgb:
+			case fwk::GlFormat::rgb8:
 				if(tex->Mips() == 1) {
 					tex->ReallocMips(0);
 					tex->GenMips();

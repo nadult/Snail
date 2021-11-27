@@ -6,9 +6,9 @@
 #include "shading/uber_material.h"
 #include <fstream>
 #include <string>
-#include <fwk/sys/file_system.h>
+#include <fwk/io/file_system.h>
 #include <fwk/sys/error.h>
-#include <fwk/gfx/texture.h>
+#include <fwk/gfx/image.h>
 #include <fwk/sys/on_fail.h>
 #include <iostream>
 #include <sstream>
@@ -73,10 +73,9 @@ namespace shading {
 			if(!is.good())
 				break;
 
-			for(int n = 0; n < line.size(); n++) if(line[n] == '#') {
-				line.resize(n);
-				break;
-			}
+			auto it = line.find('#');
+			if(it != string::npos)
+				line.resize(it);
 			std::stringstream ss(line);
 
 			string token; ss >> token;
@@ -125,26 +124,27 @@ namespace shading {
 	}
 
 	static void LoadTex(const string &name, const string &path, TexDict &dict) {
+		if(name == "" || dict.find(name) != dict.end())
+			return;
+
 		auto fpath = fwk::FilePath(path) / fwk::FilePath(name);
-		auto ext = fpath.fileExtension();
+		string ext = fpath.fileExtension().orElse("");
 		for(auto &c : ext)
 			c = tolower(c);
 
-		if(name != "" && dict.find(name) == dict.end()) {
-			if(!fwk::access(fpath)) {
-				std::cout << "Cannot open file: " << fpath.c_str() << std::endl;
-				return;
-			}
-			if(ext != "bmp" && ext != "tga" && ext != "png") {
-				std::cout << "Unsupported image type: " << ext << std::endl;
-				return;
-			}
-			ON_FAIL("While loading: ", fpath);
-
-			// TODO: properly handle errors
-			auto tex = fwk::Texture::load(fpath).get();
-			dict[name] = make_shared<MipmapTexture>(tex, fwk::GlFormat::rgb, true);
+		if(!fwk::access(fpath)) {
+			std::cout << "Cannot open file: " << fpath.c_str() << std::endl;
+			return;
 		}
+		if(ext != "bmp" && ext != "tga" && ext != "png") {
+			std::cout << "Unsupported image type: " << ext << std::endl;
+			return;
+		}
+		ON_FAIL("While loading: ", fpath);
+
+		// TODO: properly handle errors
+		auto tex = fwk::Image::load(fpath).get();
+		dict[name] = make_shared<MipmapTexture>(tex, fwk::GlFormat::rgb8, true);
 	}
 
 	TexDict LoadTextures(const vector<MaterialDesc> &matDescs, const string &texPath) {

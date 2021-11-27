@@ -2,6 +2,8 @@
 #include "base_scene.h"
 #include <algorithm>
 
+#include <fwk/io/file_stream.h>
+
 namespace {
 	struct OrderTris {
 		OrderTris(const ATriVector &tris, int axis)
@@ -72,7 +74,7 @@ void BVH::FindSplitSweep(int nNode, int first, int count, int sdepth, bool useSa
 				for(int axis = 0; axis <= 2; axis++) {
 					for(int n = 0; n < count; n++)
 						indices[n] = first + n;
-					std::sort(&indices[0], &indices[count], OrderTris(tris, axis));
+					std::sort(indices.begin(), indices.begin() + count, OrderTris(tris, axis));
 
 					vector<float> leftSA(count), rightSA(count); {
 						rightSA[count - 1] = BoxSA(tris[indices[count - 1]].GetBBox());
@@ -327,7 +329,7 @@ void BVH::Construct(const BaseScene &scene, int flags) {
 
 
 Ex<void> BVH::save(FileStream &sr) const {
-	sr.pack(depth, (int)tris.size(), (int)shTris.size(), (int)nodes.size(), (int)materials.size());
+	sr.pack(depth, tris.size(), shTris.size(), nodes.size(), materials.size());
 	sr.saveData(tris);
 	sr.saveData(shTris);
 	sr.saveData(nodes);
@@ -342,7 +344,6 @@ Ex<void> BVH::load(FileStream &sr) {
 	int num_tris = 0, num_shtris = 0, num_nodes = 0, num_materials = 0;
 	sr.unpack(depth, num_tris, num_shtris, num_nodes, num_materials);
 
-	EXPECT_CATCH();
 	EXPECT(num_tris >= 0);
 	EXPECT(num_shtris >= 0);
 	EXPECT(num_nodes >= 0);
@@ -378,8 +379,8 @@ void BVH::UpdateMaterialIds(const std::map<string, int> &dict) {
 		return;
 	}
 
-	for(size_t n = 0; n < materials.size(); n++) {
-		std::map<string, int>::const_iterator it = dict.find(materials[n].name);
+	for(int n = 0; n < materials.size(); n++) {
+		auto it = dict.find(materials[n].name);
 		materials[n].id = it == dict.end() ? ~0 : it->second;
 	}
 }

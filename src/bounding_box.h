@@ -3,8 +3,8 @@
 #include "rtbase.h"
 
 template <bool,bool> class RayGroup;
-template <bool, bool> class Context;
-class ShadowContext;
+template <bool, bool> struct Context;
+struct ShadowContext;
 
 class CornerRays;
 class RayInterval;

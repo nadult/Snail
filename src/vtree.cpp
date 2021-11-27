@@ -1,7 +1,7 @@
 #include "vtree.h"
 
 #include <cstring>
-#include <fwk/gfx/texture.h>
+#include <fwk/gfx/image.h>
 
 
 VTree::VTree(const VolumeData &dic) {
@@ -183,7 +183,7 @@ u16 VTree::Trace(const Vec3f &origin, const Vec3f &dir, u16 cmin) const {
 
 #include "camera.h"
 
-void RenderTree(fwk::Texture &image, const VTree &tree, const Camera &camera) {
+void RenderTree(fwk::Image &image, const VTree &tree, const Camera &camera) {
 //		dicom.Blit(image, slice);
 
 #pragma omp parallel for

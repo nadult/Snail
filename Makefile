@@ -1,7 +1,9 @@
 all: programs
 
 FWK_DIR       = libfwk/
-FWK_MODE     ?= release-paranoid
+FWK_MODE     ?= devel
+FWK_GEOM      = disabled
+
 CFLAGS        = -Iveclib/ -Isrc/ -fopenmp
 LDFLAGS_gcc   = -lgomp
 LDFLAGS_clang = -fopenmp
@@ -15,8 +17,10 @@ include $(FWK_DIR)Makefile-shared
 SUBDIRS        = build
 BUILD_SUBDIRS  = bvh cell dbvh formats sampling shading
 
+ifndef JUNK_GATHERING
 _dummy := $(shell mkdir -p $(SUBDIRS))
 _dummy := $(shell mkdir -p $(addprefix $(BUILD_DIR)/,$(BUILD_SUBDIRS)))
+endif
 
 # --- List of source files ------------------------------------------------------------------------
 
@@ -55,28 +59,8 @@ rtracer: $(RENDER_OBJECTS)
 
 DEPS:=$(ALL_SRC:%=$(BUILD_DIR)/%.d) $(PCH_TEMP).d
 
-# --- Clean targets -------------------------------------------------------------------------------
-
-JUNK          := $(OBJECTS) $(PROGRAMS) $(DEPS) $(PCH_JUNK)
-EXISTING_JUNK := $(call filter-existing,$(SUBDIRS),$(JUNK))
-print-junk:
-	@echo $(EXISTING_JUNK)
-ALL_JUNK = $(sort $(shell \
-	for platform in $(VALID_PLATFORMS) ; do for mode in $(VALID_MODES) ; do \
-		$(MAKE) PLATFORM=$$platform MODE=$$mode print-junk -s ; \
-	done ; done))
-
-clean:
-	-rm -f $(EXISTING_JUNK)
-	find $(SUBDIRS) -type d -empty -delete
-
-clean-all:
-	-rm -f $(ALL_JUNK)
-	find $(SUBDIRS) -type d -empty -delete
-	$(MAKE) $(FWK_MAKE_ARGS) clean-all
-
-clean-libfwk:
-	$(MAKE) $(FWK_MAKE_ARGS) clean
+JUNK_FILES    := $(OBJECTS) $(DEPS)
+JUNK_DIRS     := $(SUBDIRS)
 
 # --- Other stuff ---------------------------------------------------------------------------------
 
